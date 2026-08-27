@@ -73,6 +73,12 @@ export CC_DATABASE_URL=postgres://cc_app:cc_app_dev_password@localhost:5432/cont
 ./bin/ccd bootstrap --email you@example.com --name "Your Name"
 ```
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow and review discipline, and
+[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for community expectations. Please report security issues
+privately — see [SECURITY.md](SECURITY.md), not a public issue.
+
 ## License
 
 [GNU AGPL-3.0](LICENSE). This does **not** restrict commercial use or running a competing service —
