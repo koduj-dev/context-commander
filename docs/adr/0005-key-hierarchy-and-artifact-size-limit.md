@@ -28,11 +28,32 @@ project_keys (verzovaná per-project, wrapped_key + root_key_ref)
 DEK per artifact_version (in artifact_version_envelopes, not artifact_versions)
 ```
 
-- `RotateRootKey()` rewraps every `project_keys` row; no DEK, no ciphertext, no
-  `artifact_versions`/`artifact_version_envelopes` row changes.
-- `RotateProjectKey(projectID)` creates a new `project_keys` version and rewraps that project's
-  DEKs — i.e. it `UPDATE`s `artifact_version_envelopes` rows, never `artifact_versions` rows. See
-  [0010](0010-immutable-artifact-version.md) for why that split exists.
+- `RotateRootKey(tx, previous RootKeyProvider)` rewraps every `project_keys` row in place (same
+  `key_version`, new `wrapped_key`/`root_key_ref`); no DEK, no ciphertext, no
+  `artifact_versions`/`artifact_version_envelopes` row changes. It takes the outgoing root key
+  explicitly as `previous`, separate from the `Provider`'s own (incoming) `RootKeyProvider` — found
+  necessary by testing, not designed up front: once a root key stops being "current," nothing else
+  retains access to it (the whole point of never storing it in the DB), so a rotation is the one
+  operation that legitimately needs both the old and new key material at once, and the interface
+  has to say so explicitly rather than pretend `CurrentKey()` alone can serve both roles. If a row's
+  `root_key_ref` matches neither `previous` nor the current key, rotation fails loudly for that row
+  instead of silently mismatching. This is a cross-project maintenance operation — it runs against
+  every `project_keys` row regardless of project, so it executes with an RLS-exempt
+  (`cc_owner`-connected) transaction, not through the normal per-principal `WithPrincipal` path
+  (docs/adr/0002 — RLS is scoped per-principal-per-project by design, which a "rotate for the whole
+  installation" operation doesn't fit, and shouldn't be forced into).
+- `RotateProjectKey(projectID)` **creates a new, additional `project_keys` version** — it does not
+  touch any existing `artifact_version_envelopes` row. Revised from the original design (which had
+  this eagerly rewrap every existing DEK) once implementation surfaced two problems with that: it
+  made rotation an O(artifacts-in-project) operation instead of O(1), and it made
+  `internal/crypto` (Phase 2) depend on `artifact_version_envelopes` (Phase 3), which doesn't need
+  to exist yet. Instead, rotation matches how AWS/GCP KMS key rotation actually works: a new key
+  version is created, **new** encryptions use it, and every existing `ArtifactVersionEnvelope` keeps
+  referencing whatever `project_key_version` encrypted it — `Decrypt` looks that exact version up
+  (`project_keys` rows are never deleted), so old envelopes stay decryptable indefinitely without
+  any rewrap. Eagerly migrating existing envelopes to the latest key version (e.g. for
+  crypto-shredding an old version) is a distinct, separately-invoked maintenance operation, not an
+  implicit consequence of "rotate."
 
 **AAD**: every `Encrypt`/`Decrypt` call takes an `EncryptionContext{FormatVersion, ProjectID,
 ResourceType, ResourceID, ResourceVersion}`, canonically encoded (fixed field order, fixed-width
