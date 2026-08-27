@@ -14,12 +14,22 @@ import (
 	"context"
 	"errors"
 	"io"
+	"time"
 )
 
 var (
 	ErrNotFound   = errors.New("storage: object not found")
 	ErrInvalidKey = errors.New("storage: invalid object key")
 )
+
+// ObjectInfo is what List reports about a stored object — just enough to
+// drive orphan cleanup (docs/adr/0013): the key, to diff against known DB
+// storage_keys, and LastModified, to give an in-flight Write (uploaded but
+// not yet committed) a grace period before it's swept as an orphan.
+type ObjectInfo struct {
+	Key          string
+	LastModified time.Time
+}
 
 type ObjectStore interface {
 	// Put stores the content of r (exactly size bytes) under key, which
@@ -40,4 +50,9 @@ type ObjectStore interface {
 	// calls this only after the owning DB row is already gone, so
 	// "already gone" here is a normal, expected outcome, not a bug.
 	Delete(ctx context.Context, key string) error
+
+	// List enumerates objects whose key starts with prefix — used only for
+	// orphan cleanup (internal/artifacts.SweepOrphanObjects), never on a
+	// request-serving path.
+	List(ctx context.Context, prefix string) ([]ObjectInfo, error)
 }

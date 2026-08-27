@@ -136,3 +136,27 @@ func (s *Store) Delete(ctx context.Context, key string) error {
 	}
 	return nil
 }
+
+func (s *Store) List(ctx context.Context, prefix string) ([]storage.ObjectInfo, error) {
+	var out []storage.ObjectInfo
+	paginator := s3.NewListObjectsV2Paginator(s.client, &s3.ListObjectsV2Input{
+		Bucket: aws.String(s.bucket),
+		Prefix: aws.String(prefix),
+	})
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("storage/s3: list %q: %w", prefix, err)
+		}
+		for _, obj := range page.Contents {
+			info := storage.ObjectInfo{Key: aws.ToString(obj.Key)}
+			if obj.LastModified != nil {
+				info.LastModified = *obj.LastModified
+			}
+			out = append(out, info)
+		}
+	}
+	return out, nil
+}
+
+var _ storage.ObjectStore = (*Store)(nil)

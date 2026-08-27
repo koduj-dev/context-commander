@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -124,3 +125,47 @@ func (s *Store) Delete(_ context.Context, key string) error {
 	}
 	return nil
 }
+
+func (s *Store) List(_ context.Context, prefix string) ([]storage.ObjectInfo, error) {
+	root, err := s.resolve(prefix)
+	if err != nil {
+		// A prefix that isn't a valid key in its own right (e.g. it just
+		// doesn't exist yet) is not an error for List — it just means "no
+		// objects," matching S3's ListObjectsV2 behavior for an absent prefix.
+		if errors.Is(err, storage.ErrInvalidKey) {
+			return nil, err
+		}
+	}
+
+	var out []storage.ObjectInfo
+	walkErr := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil // prefix directory doesn't exist yet: no objects, not an error
+		}
+		if err != nil {
+			return err
+		}
+		if d.IsDir() || strings.HasPrefix(d.Name(), ".tmp-") {
+			return nil
+		}
+		rel, err := filepath.Rel(s.root, path)
+		if err != nil {
+			return err
+		}
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+		out = append(out, storage.ObjectInfo{
+			Key:          filepath.ToSlash(rel),
+			LastModified: info.ModTime(),
+		})
+		return nil
+	})
+	if walkErr != nil {
+		return nil, fmt.Errorf("storage/filesystem: list %q: %w", prefix, walkErr)
+	}
+	return out, nil
+}
+
+var _ storage.ObjectStore = (*Store)(nil)
