@@ -1,0 +1,46 @@
+{
+  "brand": {
+    "contextPink": "#FF2D8D",
+    "relayViolet": "#7A35F5",
+    "void": "#0B0B12",
+    "paper": "#FFFFFF"
+  },
+  "light": {
+    "background": "#FFFFFF",
+    "surface1": "#F7F6FA",
+    "surface2": "#F0EEF4",
+    "surface3": "#E9E6EF",
+    "border": "#DDD9E5",
+    "borderStrong": "#C3BECD",
+    "text": "#111118",
+    "textSecondary": "#4A4652",
+    "textMuted": "#77727F",
+    "accentPrimary": "#D91473",
+    "accentPrimaryVisual": "#FF2D8D",
+    "accentSecondary": "#5F27D6",
+    "accentSecondaryVisual": "#7A35F5",
+    "focusRing": "#7A35F5",
+    "success": "#18794E",
+    "warning": "#9A6700",
+    "danger": "#C93C49",
+    "info": "#126EAA"
+  },
+  "dark": {
+    "background": "#0B0B12",
+    "surface1": "#14141D",
+    "surface2": "#1B1B26",
+    "surface3": "#242431",
+    "border": "#2F2E3A",
+    "borderStrong": "#444150",
+    "text": "#F8F7FB",
+    "textSecondary": "#C3C0CB",
+    "textMuted": "#8D8997",
+    "accentPrimary": "#FF2D8D",
+    "accentSecondary": "#7A35F5",
+    "focusRing": "#B79AFF",
+    "success": "#45D483",
+    "warning": "#FFC857",
+    "danger": "#FF5D6C",
+    "info": "#52B7FF"
+  }
+}

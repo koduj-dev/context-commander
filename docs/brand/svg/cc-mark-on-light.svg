@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Context Commander logo">
+
+
+    <path d="M 400 210 H 235
+             C 155 210 115 258 115 330
+             V 625
+             C 115 702 158 742 225 742
+             L 177 842
+             L 325 742
+             H 400"
+          fill="none" stroke="#FF2D8D" stroke-width="52"
+          stroke-linecap="round" stroke-linejoin="round"/>
+    
+    <path d="M 624 210 H 789
+             C 869 210 909 258 909 330
+             V 625
+             C 909 702 866 742 799 742
+             L 847 842
+             L 699 742
+             H 624"
+          fill="none" stroke="#7A35F5" stroke-width="52"
+          stroke-linecap="round" stroke-linejoin="round"/>
+    
+    <circle cx="512" cy="492" r="62" fill="none" stroke="#0B0B12" stroke-width="34"/>
+    <path d="M 425 420 V 390 Q 425 365 450 365 H 480"
+          fill="none" stroke="#0B0B12" stroke-width="30" stroke-linecap="round"/>
+    <path d="M 599 420 V 390 Q 599 365 574 365 H 544"
+          fill="none" stroke="#0B0B12" stroke-width="30" stroke-linecap="round"/>
+    <path d="M 425 565 V 595 Q 425 620 450 620 H 480"
+          fill="none" stroke="#0B0B12" stroke-width="30" stroke-linecap="round"/>
+    <path d="M 599 565 V 595 Q 599 620 574 620 H 544"
+          fill="none" stroke="#0B0B12" stroke-width="30" stroke-linecap="round"/>
+    
+        <line x1="344" y1="430" x2="414" y2="452" stroke="#FF2D8D" stroke-width="22" stroke-linecap="round"/>
+        <circle cx="325" cy="424" r="25" fill="none" stroke="#FF2D8D" stroke-width="18"/>
+        <line x1="344" y1="554" x2="414" y2="532" stroke="#FF2D8D" stroke-width="22" stroke-linecap="round"/>
+        <circle cx="325" cy="560" r="25" fill="none" stroke="#FF2D8D" stroke-width="18"/>
+        <line x1="680" y1="452" x2="750" y2="430" stroke="#7A35F5" stroke-width="22" stroke-linecap="round"/>
+        <circle cx="769" cy="424" r="25" fill="none" stroke="#7A35F5" stroke-width="18"/>
+        <line x1="680" y1="532" x2="750" y2="554" stroke="#7A35F5" stroke-width="22" stroke-linecap="round"/>
+        <circle cx="769" cy="560" r="25" fill="none" stroke="#7A35F5" stroke-width="18"/>
+        
+</svg>
