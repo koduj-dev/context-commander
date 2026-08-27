@@ -1,0 +1,20 @@
+# Build artifacts
+/bin/
+/ccd
+*.test
+*.out
+
+# Local env / secrets
+.env
+.env.*
+!.env.example
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+
+# Local dev data
+/deploy/data/

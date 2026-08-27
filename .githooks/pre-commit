@@ -1,0 +1,12 @@
+#!/bin/sh
+# Enable with: git config core.hooksPath .githooks
+# Mirrors the gitleaks CI job locally so a secret never reaches a commit,
+# not just never reaches the PR (see CONTRIBUTING.md).
+set -e
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+  echo "gitleaks not installed locally — skipping pre-commit secret scan (CI still runs it)." >&2
+  exit 0
+fi
+
+gitleaks protect --staged --redact -v

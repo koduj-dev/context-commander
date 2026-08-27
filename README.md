@@ -1,0 +1,76 @@
+# Context Commander
+
+Self-hosted, vendor-neutral shared context and collaboration layer for humans and AI agents.
+
+> **Agents are clients. Context is the product.**
+
+## The problem
+
+It is easy to use several AI tools — ChatGPT, Claude Code, Codex, custom agents — but hard to make
+them cooperate. They don't share a neutral project state: research done in one chat has to be
+manually copied into another tool, context gets re-explained, artifacts get shuffled by hand.
+
+Context Commander gives independent AI clients a common, project-scoped workspace: artifacts,
+context, handoffs, skills, events, history, and access control — owned by the project, not by any
+single AI vendor.
+
+## Non-goals
+
+Context Commander deliberately does **not** try to be:
+
+- **an agent orchestrator** — it does not decide which model runs, which agent wakes up next, or
+  how a multi-agent reasoning loop works. It exposes events and handoffs that an orchestrator can
+  consume, but does not require one.
+- **an S3/MCP filesystem wrapper** — `list/read/write/delete` alone would just be another
+  object-store MCP server. The product is *project context*: membership, artifacts, handoffs,
+  skills, events, history, and integrations.
+- **a Git replacement** — Git remains the correct system for source code and source history.
+  Context Commander stores AI-generated artifacts, research, handoffs, and cross-agent
+  collaboration state, and may bind a project to one or more repositories as metadata.
+
+See [`docs/architecture-cookbook.md`](docs/architecture-cookbook.md) for the full design rationale
+and [`docs/adr/`](docs/adr/) for individual architecture decisions.
+
+## Status
+
+Design draft → implementation. See the ADRs in `docs/adr/` for what is decided and why.
+
+## Architecture
+
+Modular monolith written in Go. Domain logic lives under `internal/`; `adapters/` maps that domain
+onto MCP, HTTP, and CLI without duplicating business logic.
+
+```text
+context-commander/
+├── cmd/ccd/            single binary: server + migrations + CLI
+├── internal/           domain packages (identity, projects, crypto, artifacts, ...)
+├── adapters/           mcp / http / cli — transport only, no business logic
+├── migrations/         golang-migrate SQL migrations
+├── deploy/             docker-compose for local development
+└── docs/               architecture cookbook + ADRs
+```
+
+## Development
+
+Requires Go 1.27+, Docker, and Docker Compose.
+
+```bash
+make dev-up      # start Postgres + MinIO
+make migrate     # apply migrations
+make build       # build ./cmd/ccd
+make test        # run the test suite
+make lint        # golangci-lint
+```
+
+Bootstrapping the first user/PAT on a fresh install does not require the UI:
+
+```bash
+./ccd bootstrap
+```
+
+## License
+
+[GNU AGPL-3.0](LICENSE). This does **not** restrict commercial use or running a competing service —
+it is a network copyleft license: anyone who runs a modified version of Context Commander over a
+network must make the corresponding source of their modifications available to its users. See
+[`docs/adr/0005-agpl-3.0-license.md`](docs/adr/0005-agpl-3.0-license.md) for the full rationale.

@@ -1,0 +1,21 @@
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - unused
+    - gosec
+    - bodyclose
+    - sqlclosecheck
+    - noctx
+  settings:
+    gosec:
+      excludes:
+        - G404 # math/rand is fine outside crypto paths; crypto paths use crypto/rand explicitly
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
