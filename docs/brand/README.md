@@ -42,3 +42,26 @@ The horizontal SVG lockups ship with the wordmark converted to vector outlines. 
 - Brand violet is decorative on dark backgrounds; use white for small body text.
 
 See `context-commander-brand-manual.pdf` for the full manual.
+
+## Horizontal lockup note
+
+The horizontal lockups are built so the icon remains fully contained inside the canvas and the wordmark sits to the right, vertically centered against the mark.
+
+## Stacked lockup
+
+Added stacked SVG lockups with the wordmark centered below the icon:
+
+- `svg/cc-logo-stacked-on-light.svg`
+- `svg/cc-logo-stacked-on-dark.svg`
+- `svg/cc-logo-stacked-duotone-on-light.svg`
+- `svg/cc-logo-stacked-duotone-on-dark.svg`
+
+These are suitable for README headers, social cards, app splash screens and narrow layouts.
+
+## Connector geometry note
+
+The relay lines on both sides are intentionally connected toward the central context core with a more balanced, meaningfully symmetric construction. The mark should read as two participants talking through one shared context, not as a disconnected right-hand relay.
+
+## Brand Manual v1.1
+
+Layout cleanup: tighter horizontal SVG canvases, larger horizontal previews, corrected clear-space diagram, and compact typography / usage / implementation-note layouts.

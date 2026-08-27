@@ -31,13 +31,16 @@
     <path d="M 599 565 V 595 Q 599 620 574 620 H 544"
           fill="none" stroke="#0B0B12" stroke-width="30" stroke-linecap="round"/>
     
-        <line x1="344" y1="430" x2="414" y2="452" stroke="#0B0B12" stroke-width="22" stroke-linecap="round"/>
-        <circle cx="325" cy="424" r="25" fill="none" stroke="#0B0B12" stroke-width="18"/>
-        <line x1="344" y1="554" x2="414" y2="532" stroke="#0B0B12" stroke-width="22" stroke-linecap="round"/>
-        <circle cx="325" cy="560" r="25" fill="none" stroke="#0B0B12" stroke-width="18"/>
-        <line x1="680" y1="452" x2="750" y2="430" stroke="#0B0B12" stroke-width="22" stroke-linecap="round"/>
-        <circle cx="769" cy="424" r="25" fill="none" stroke="#0B0B12" stroke-width="18"/>
-        <line x1="680" y1="532" x2="750" y2="554" stroke="#0B0B12" stroke-width="22" stroke-linecap="round"/>
-        <circle cx="769" cy="560" r="25" fill="none" stroke="#0B0B12" stroke-width="18"/>
+        <!-- left relay -->
+        <line x1="350" y1="425" x2="432" y2="452" stroke="#0B0B12" stroke-width="22" stroke-linecap="round"/>
+        <circle cx="327" cy="418" r="25" fill="none" stroke="#0B0B12" stroke-width="18"/>
+        <line x1="350" y1="559" x2="432" y2="532" stroke="#0B0B12" stroke-width="22" stroke-linecap="round"/>
+        <circle cx="327" cy="566" r="25" fill="none" stroke="#0B0B12" stroke-width="18"/>
+
+        <!-- right relay -->
+        <line x1="592" y1="452" x2="674" y2="425" stroke="#0B0B12" stroke-width="22" stroke-linecap="round"/>
+        <circle cx="697" cy="418" r="25" fill="none" stroke="#0B0B12" stroke-width="18"/>
+        <line x1="592" y1="532" x2="674" y2="559" stroke="#0B0B12" stroke-width="22" stroke-linecap="round"/>
+        <circle cx="697" cy="566" r="25" fill="none" stroke="#0B0B12" stroke-width="18"/>
         
 </svg>
