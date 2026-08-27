@@ -33,8 +33,8 @@ application-layer authorization bug is "you attacked your own local data."
    `internal/projects.MembershipStore` is an interface; `internal/db/postgres` provides the
    implementation used in Phase 1–2.
 2. `internal/db.WithPrincipal(ctx, fn)` is a **transaction-scoping** abstraction, not
-   Postgres-specific. The Postgres implementation opens a `pgx.Tx` and issues
-   `SET LOCAL app.current_principal_id = $1` inside it (see ADR 0002). A future SQLite
+   Postgres-specific. The Postgres implementation opens a `pgx.Tx` and sets the principal via
+   `set_config('app.current_principal_id', ..., true)` inside it (see ADR 0003). A future SQLite
    implementation opens a `database/sql` transaction and does *not* set any session variable —
    there is nothing for RLS policies to read, because SQLite has no RLS.
 3. `AuthzService.Can()` remains mandatory and backend-independent. It is what actually decides

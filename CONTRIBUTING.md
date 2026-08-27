@@ -31,7 +31,8 @@ the link) and should be mirrored into ADRs as the corresponding subsystem is imp
 ```bash
 git config core.hooksPath .githooks   # enable local gitleaks pre-commit (one-time)
 make lint    # golangci-lint — must pass before a PR
-make test    # go test ./... — must pass before a PR
+make test    # go test ./... -race — must pass before a PR (needs Docker: internal/dbtest
+             # spins up a real, disposable Postgres per test via testcontainers-go)
 ```
 
 - New tables that carry `project_id` must enable Row-Level Security using the

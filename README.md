@@ -52,20 +52,25 @@ context-commander/
 
 ## Development
 
-Requires Go 1.27+, Docker, and Docker Compose.
+Requires Go 1.27+, Docker, and Docker Compose (`make test` also needs Docker — the integration
+suite runs against a real, disposable Postgres via testcontainers-go, not mocks).
 
 ```bash
 make dev-up      # start Postgres + MinIO
-make migrate     # apply migrations
-make build       # build ./cmd/ccd
-make test        # run the test suite
+make build       # build ./cmd/ccd -> bin/ccd
+make test        # run the test suite (unit + real-Postgres integration tests)
 make lint        # golangci-lint
 ```
 
-Bootstrapping the first user/PAT on a fresh install does not require the UI:
+Migrations and the first user/PAT are handled by the binary itself, no external tool or UI
+required:
 
 ```bash
-./ccd bootstrap
+export CC_DATABASE_URL=postgres://cc_owner:cc_owner_dev_password@localhost:5432/context_commander?sslmode=disable
+./bin/ccd migrate
+
+export CC_DATABASE_URL=postgres://cc_app:cc_app_dev_password@localhost:5432/context_commander?sslmode=disable
+./bin/ccd bootstrap --email you@example.com --name "Your Name"
 ```
 
 ## License

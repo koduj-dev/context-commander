@@ -20,7 +20,13 @@ identity from RLS's point of view. This is close to a blocker, not a style prefe
   transaction and is automatically cleared on `COMMIT`/`ROLLBACK` — the connection returns to the
   pool with no residual state.
 - Every project-scoped database operation runs inside a transaction opened by
-  `internal/db.WithPrincipal`, and `SET LOCAL` is issued **only** inside that function:
+  `internal/db.WithPrincipal`, and the principal is set **only** inside that function — via
+  `set_config()`, not a literal `SET LOCAL ... = $1` statement. Postgres's `SET` is a utility
+  statement processed outside the normal extended-query/parameter-binding path, so it does not
+  accept a `$1` placeholder for the value (drivers either reject it or you'd be forced into unsafe
+  string formatting). `set_config(setting_name, new_value, is_local)` is an ordinary SQL function —
+  it takes normal, safely-bound parameters — and `is_local = true` makes it behave exactly like
+  `SET LOCAL`, scoped to the current transaction:
 
 ```go
 // internal/db
@@ -31,7 +37,8 @@ func WithPrincipal(ctx context.Context, pool *pgxpool.Pool, principal Principal,
     }
     defer tx.Rollback(ctx) // no-op once Commit has succeeded
 
-    if _, err := tx.Exec(ctx, `SET LOCAL app.current_principal_id = $1`, principal.ID); err != nil {
+    const setPrincipal = `SELECT set_config('app.current_principal_id', $1::text, true)`
+    if _, err := tx.Exec(ctx, setPrincipal, principal.ID.String()); err != nil {
         return err
     }
     if err := fn(tx); err != nil {
@@ -41,9 +48,10 @@ func WithPrincipal(ctx context.Context, pool *pgxpool.Pool, principal Principal,
 }
 ```
 
-- No repository method, handler, or adapter is allowed to call `tx.Exec(ctx, "SET ...")` or begin
-  a transaction on its own for project-scoped work. `golangci-lint` custom rule / code review
-  checklist item: any `pool.Begin(` or `pool.Exec(ctx, "SET` outside `internal/db` is a bug.
+- No repository method, handler, or adapter is allowed to call `tx.Exec(ctx, "SET ...")` /
+  `set_config(...)` directly, or begin a transaction on its own for project-scoped work.
+  `golangci-lint` custom rule / code review checklist item: any `pool.Begin(`, `pool.Exec(ctx, "SET`,
+  or `set_config(` outside `internal/db` is a bug.
 
 ## Consequences
 

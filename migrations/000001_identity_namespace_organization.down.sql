@@ -1,0 +1,13 @@
+DROP TABLE IF EXISTS encrypted_audit_payload;
+DROP TABLE IF EXISTS audit_log;
+DROP POLICY IF EXISTS project_scoped ON project_members;
+DROP TABLE IF EXISTS project_members;
+DROP FUNCTION IF EXISTS cc_has_project_access(text, uuid);
+DROP TABLE IF EXISTS projects;
+DROP TABLE IF EXISTS namespaces;
+DROP TABLE IF EXISTS organization_members;
+DROP TABLE IF EXISTS organizations;
+DROP TABLE IF EXISTS client_credentials;
+DROP TABLE IF EXISTS principals;
+DROP TABLE IF EXISTS service_principals;
+DROP TABLE IF EXISTS users;

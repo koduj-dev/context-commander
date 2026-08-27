@@ -30,15 +30,35 @@ whatever provisioning the production deployment uses:
 - `cc_migrator` is `cc_owner` itself for now; split out later only if a real operational reason
   appears.
 
-**Non-recursive helper**, owned by `cc_owner`, `SECURITY DEFINER`:
+**Non-recursive helper**, owned by `cc_owner`, `SECURITY DEFINER`. Takes the principal id as
+**`text`, not `uuid`**, and casts internally with a guard — confirmed necessary by testing against a
+real Postgres instance (not just reasoned about): `current_setting('app.current_principal_id', true)`
+returns `NULL` only the *first* time that custom GUC is ever touched on a backend/connection. After
+any `set_config()` call on it — i.e. after the first `WithPrincipal` transaction on a pooled
+connection — it returns `''` (empty string, not `NULL`) for every later transaction that doesn't set
+it again. Casting `''::uuid` at the `USING` clause directly would hard-error
+("invalid input syntax for type uuid") instead of safely denying, on any query that reaches a
+project-scoped table outside `WithPrincipal` on an already-used connection:
 
 ```sql
-CREATE FUNCTION cc_has_project_access(p_principal_id uuid, p_project_id uuid)
-RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
-  SELECT EXISTS (
+CREATE FUNCTION cc_has_project_access(p_principal_id_text text, p_project_id uuid)
+RETURNS boolean LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+  p_principal_id uuid;
+BEGIN
+  IF p_principal_id_text IS NULL OR p_principal_id_text = '' THEN
+    RETURN false;
+  END IF;
+  BEGIN
+    p_principal_id := p_principal_id_text::uuid;
+  EXCEPTION WHEN invalid_text_representation THEN
+    RETURN false;
+  END;
+  RETURN EXISTS (
     SELECT 1 FROM project_members
     WHERE principal_id = p_principal_id AND project_id = p_project_id
   );
+END;
 $$;
 ```
 
@@ -49,7 +69,7 @@ uses the identical policy shape:
 
 ```sql
 CREATE POLICY project_scoped ON <table>
-  USING (cc_has_project_access(current_setting('app.current_principal_id')::uuid, project_id));
+  USING (cc_has_project_access(current_setting('app.current_principal_id', true), project_id));
 ```
 
 **Session context is `SET LOCAL`, never `SET`**, and only ever set from one place — see

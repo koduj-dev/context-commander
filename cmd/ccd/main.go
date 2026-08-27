@@ -7,6 +7,8 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+
+	"github.com/koduj-dev/context-commander/adapters/cli"
 )
 
 // version is overridden at build time via -ldflags "-X main.version=...".
@@ -27,8 +29,9 @@ func newRootCmd() *cobra.Command {
 	}
 
 	cmd.AddCommand(newVersionCmd())
-	// Domain-backed subcommands (serve, bootstrap, user, token, migrate, sync-skills)
-	// land in adapters/cli once internal/identity and internal/db exist (Phase 1).
+	cmd.AddCommand(cli.NewCommand()...)
+	// `serve` (the actual server) and `sync-skills` land with adapters/http
+	// and internal/skills respectively (later phases).
 
 	return cmd
 }
