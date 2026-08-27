@@ -3,7 +3,6 @@ package cli
 import (
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/spf13/cobra"
@@ -19,12 +18,9 @@ func newProjectCmd() *cobra.Command {
 	return projectCmd
 }
 
-// newProjectCreateCmd creates a project at "namespace/slug", creating a
-// personal namespace for the caller first if it doesn't exist yet, and
-// adds the caller as OWNER — all in one transaction, per
-// docs/adr/0015-project-creation-rls-bootstrap.md: a project committed
-// without an immediate self-membership insert would be permanently
-// inaccessible to everyone, itself included.
+// newProjectCreateCmd wraps projects.Store.CreateForOwner — see that
+// method's doc for why creating a project and self-adding as OWNER always
+// happens together (docs/adr/0015-project-creation-rls-bootstrap.md).
 func newProjectCreateCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "create",
@@ -42,10 +38,6 @@ func newProjectCreateCmd() *cobra.Command {
 			name, _ := cmd.Flags().GetString("name")
 			if projectPath == "" || name == "" {
 				return fmt.Errorf("--project and --name are required")
-			}
-			namespaceSlug, projectSlug, ok := strings.Cut(projectPath, "/")
-			if !ok || namespaceSlug == "" || projectSlug == "" {
-				return fmt.Errorf(`--project must look like "namespace/slug", got %q`, projectPath)
 			}
 
 			pool, err := db.NewPool(cmd.Context(), dsn)
@@ -71,34 +63,14 @@ func newProjectCreateCmd() *cobra.Command {
 				if principal.UserID == nil {
 					return errors.New("cli: only a User principal can create a personal namespace this way (ServicePrincipal support is a later feature)")
 				}
-
-				ns, err := projStore.GetNamespaceBySlug(cmd.Context(), tx, namespaceSlug)
-				if errors.Is(err, projects.ErrNotFound) {
-					ns, err = projStore.CreatePersonalNamespace(cmd.Context(), tx, *principal.UserID, namespaceSlug)
-				}
-				if err != nil {
-					return fmt.Errorf("resolve/create namespace %q: %w", namespaceSlug, err)
-				}
-				if ns.OwnerUserID == nil || *ns.OwnerUserID != *principal.UserID {
-					return fmt.Errorf("namespace %q is not yours to create a project in", namespaceSlug)
-				}
-
-				project, err = projStore.Create(cmd.Context(), tx, ns.ID, projectSlug, name)
-				if err != nil {
-					return fmt.Errorf("create project: %w", err)
-				}
-
-				_, err = projStore.AddMember(cmd.Context(), tx, project.ID, principalID, projects.RoleOwner)
-				if err != nil {
-					return fmt.Errorf("add self as OWNER: %w", err)
-				}
-				return nil
+				project, err = projStore.CreateForOwner(cmd.Context(), tx, *principal.UserID, principalID, projectPath, name)
+				return err
 			})
 			if err != nil {
 				return err
 			}
 
-			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "created %s/%s (id=%s), you are OWNER\n", namespaceSlug, projectSlug, project.ID)
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "created %s (id=%s), you are OWNER\n", projectPath, project.ID)
 			return nil
 		},
 	}

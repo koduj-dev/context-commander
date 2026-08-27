@@ -12,6 +12,71 @@ import (
 	"github.com/koduj-dev/context-commander/internal/projects"
 )
 
+// TestCreateForOwnerThroughAppRole exercises Store.CreateForOwner — the
+// consolidated version of the manual namespace+project+membership sequence
+// TestCreateProjectAndSelfOwnerThroughAppRole exercises by hand — used by
+// every adapter that lets a caller create a project (CLI, HTTP, MCP).
+func TestCreateForOwnerThroughAppRole(t *testing.T) {
+	dsns := dbtest.New(t)
+	ctx := context.Background()
+
+	ownerPool, err := db.NewPool(ctx, dsns.Owner)
+	if err != nil {
+		t.Fatalf("connect as cc_owner: %v", err)
+	}
+	appPool, err := db.NewPool(ctx, dsns.App)
+	if err != nil {
+		t.Fatalf("connect as cc_app: %v", err)
+	}
+
+	principalID := uuid.New()
+	var userID uuid.UUID
+	err = db.WithoutPrincipal(ctx, ownerPool, func(tx pgx.Tx) error {
+		userID = uuid.New()
+		if _, err := tx.Exec(ctx, `INSERT INTO users (id, email, display_name) VALUES ($1, $2, $3)`,
+			userID, userID.String()+"@example.test", "Fixture User"); err != nil {
+			return err
+		}
+		_, err := tx.Exec(ctx, `INSERT INTO principals (id, kind, user_id) VALUES ($1, 'user', $2)`, principalID, userID)
+		return err
+	})
+	if err != nil {
+		t.Fatalf("seed principal: %v", err)
+	}
+
+	store := projects.NewStore()
+	var project projects.Project
+	err = db.WithPrincipal(ctx, appPool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+		var err error
+		project, err = store.CreateForOwner(ctx, tx, userID, principalID, "createforowner/proj", "Proj")
+		return err
+	})
+	if err != nil {
+		t.Fatalf("CreateForOwner: %v", err)
+	}
+
+	err = db.WithPrincipal(ctx, appPool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+		membership, err := store.GetMembership(ctx, tx, project.ID, principalID)
+		if err != nil {
+			return err
+		}
+		if membership.Role != projects.RoleOwner {
+			t.Errorf("role = %s, want OWNER", membership.Role)
+		}
+		resolved, err := store.Resolve(ctx, tx, "createforowner/proj")
+		if err != nil {
+			return err
+		}
+		if resolved.ID != project.ID {
+			t.Error("Resolve returned a different project than CreateForOwner created")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("verify via cc_app: %v", err)
+	}
+}
+
 // TestCreateProjectAndSelfOwnerThroughAppRole is the regression test
 // docs/adr/0015-project-creation-rls-bootstrap.md calls for: creating a
 // project and adding oneself as its first OWNER, run entirely as cc_app —

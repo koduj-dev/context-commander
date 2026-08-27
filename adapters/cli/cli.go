@@ -32,6 +32,7 @@ func NewCommand() []*cobra.Command {
 		newTokenCmd(),
 		newProjectCmd(),
 		newArtifactCmd(),
+		newServeCmd(),
 	}
 }
 
