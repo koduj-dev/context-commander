@@ -120,13 +120,26 @@ func (s *Store) GetNamespaceBySlug(ctx context.Context, tx pgx.Tx, slug string) 
 // Create inserts a project directly into its target namespace. Namespace
 // transfer (filip/foo -> acme/foo) is explicitly out of scope for MVP — see
 // docs/adr/0001 — a project's namespace is fixed at creation.
+//
+// Deliberately no RETURNING: a newly created project has no members yet, so
+// its row does not satisfy projects_select's membership check — and
+// INSERT...RETURNING requires the SELECT policy to pass too, not just
+// INSERT's WITH CHECK (confirmed against a real Postgres instance, not
+// assumed; see docs/adr/0015-project-creation-rls-bootstrap.md). Every
+// field is already known client-side, so RETURNING buys nothing here.
 func (s *Store) Create(ctx context.Context, tx pgx.Tx, namespaceID uuid.UUID, slug, name string) (Project, error) {
-	var p Project
-	err := tx.QueryRow(ctx,
-		`INSERT INTO projects (namespace_id, slug, name) VALUES ($1, $2, $3)
-		 RETURNING id, namespace_id, slug, name, visibility, created_at`,
-		namespaceID, slug, name,
-	).Scan(&p.ID, &p.NamespaceID, &p.Slug, &p.Name, &p.Visibility, &p.CreatedAt)
+	p := Project{
+		ID:          uuid.New(),
+		NamespaceID: namespaceID,
+		Slug:        slug,
+		Name:        name,
+		Visibility:  VisibilityPrivate,
+		CreatedAt:   time.Now().UTC(),
+	}
+	_, err := tx.Exec(ctx,
+		`INSERT INTO projects (id, namespace_id, slug, name, visibility, created_at) VALUES ($1, $2, $3, $4, $5, $6)`,
+		p.ID, p.NamespaceID, p.Slug, p.Name, p.Visibility, p.CreatedAt,
+	)
 	if err != nil {
 		return Project{}, fmt.Errorf("projects: create: %w", err)
 	}
@@ -172,13 +185,19 @@ func (s *Store) Resolve(ctx context.Context, tx pgx.Tx, path string) (Project, e
 	return p, nil
 }
 
+// AddMember has the same deliberate no-RETURNING shape as Create, for the
+// same reason: adding a project's very first member can't satisfy a
+// membership-based SELECT check on its own newly-inserted row within the
+// same statement (docs/adr/0015) — confirmed empirically, including that
+// the row being self-referentially checked is NOT visible to the RLS
+// policy's STABLE helper function within the inserting statement even
+// though it's the same transaction.
 func (s *Store) AddMember(ctx context.Context, tx pgx.Tx, projectID, principalID uuid.UUID, role Role) (Membership, error) {
-	var m Membership
-	err := tx.QueryRow(ctx,
-		`INSERT INTO project_members (project_id, principal_id, role) VALUES ($1, $2, $3)
-		 RETURNING project_id, principal_id, role, created_at`,
-		projectID, principalID, role,
-	).Scan(&m.ProjectID, &m.PrincipalID, &m.Role, &m.CreatedAt)
+	m := Membership{ProjectID: projectID, PrincipalID: principalID, Role: role, CreatedAt: time.Now().UTC()}
+	_, err := tx.Exec(ctx,
+		`INSERT INTO project_members (project_id, principal_id, role, created_at) VALUES ($1, $2, $3, $4)`,
+		m.ProjectID, m.PrincipalID, m.Role, m.CreatedAt,
+	)
 	if err != nil {
 		return Membership{}, fmt.Errorf("projects: add member: %w", err)
 	}

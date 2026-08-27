@@ -78,7 +78,13 @@ CREATE POLICY project_scoped ON <table>
 ## Consequences
 
 - Adding a new project-scoped table means: `ENABLE ROW LEVEL SECURITY` + the one `CREATE POLICY`
-  shape above + a `GRANT` to `cc_app`. No table gets a bespoke policy.
+  shape above + a `GRANT` to `cc_app`. No table gets a bespoke policy — **except** the table that
+  records membership itself (`project_members`) and any table whose row can be created before
+  membership exists (`projects`): those need an explicit `WITH CHECK` split by command, not the
+  single blanket `USING` shape above, or the very first `INSERT` for a new project is
+  unsatisfiable. See [0015](0015-project-creation-rls-bootstrap.md) — found only once a real
+  `cc_app`-authenticated "create a project" path was actually exercised, not by any test that
+  seeds fixtures through `cc_owner`.
 - The negative test suite (cross-project read → DENY) must run **as `cc_app`**, not as `cc_owner`
   or the initdb superuser, or it proves nothing (review round 2, acceptance criteria).
 - `FORCE ROW LEVEL SECURITY` is reserved for tables where even `cc_owner`-run code must not read
