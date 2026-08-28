@@ -1,0 +1,33 @@
+[Unit]
+Description=Context Commander — shared context and collaboration layer for AI agents
+Documentation=https://github.com/koduj-dev/context-commander
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ccd
+Group=ccd
+
+# ccd has no config-file loader yet (see adapters/cli) — everything is flags
+# or CC_* environment variables (CC_DATABASE_URL, CC_STORAGE_DIR, CC_ROOT_KEY,
+# ...). This file is generated empty by the package and MUST be filled in by
+# the operator before the service can start — see postinstall's message.
+EnvironmentFile=/etc/context-commander/ccd.env
+
+ExecStart=/usr/bin/ccd serve
+Restart=on-failure
+RestartSec=5s
+
+SyslogIdentifier=ccd
+
+# --- hardening ---------------------------------------------------------------
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/ccd
+StateDirectory=ccd
+
+[Install]
+WantedBy=multi-user.target

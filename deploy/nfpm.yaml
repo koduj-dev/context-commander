@@ -1,0 +1,34 @@
+# nfpm config for the ccd .deb / .rpm packages. Rendered per-arch with VERSION
+# and ARCH set in the environment (mirrors docker-commander's release job):
+#   VERSION=0.1.0 ARCH=amd64 nfpm pkg -p deb -f deploy/nfpm.yaml
+#
+# Not wired into a release workflow yet — see NEXT.md. This is scaffolding,
+# adapted from docker-commander's deploy/nfpm.yaml rather than copied
+# verbatim: ccd needs a reachable Postgres + object storage, has no
+# config-file loader (env file, not a conf file), and no self-update.
+name: ccd
+arch: ${ARCH}
+platform: linux
+version: ${VERSION}
+version_schema: semver
+section: admin
+priority: optional
+maintainer: "koduj-dev <noreply@koduj.dev>"
+vendor: "koduj-dev"
+homepage: "https://github.com/koduj-dev/context-commander"
+license: AGPL-3.0-only
+description: |
+  Self-hosted, vendor-neutral shared context and collaboration layer for
+  humans and AI agents. ccd is a single Go binary serving the REST API and
+  MCP server, backed by Postgres and S3-compatible object storage.
+contents:
+  - src: ./dist-bin/ccd-linux-${ARCH}
+    dst: /usr/bin/ccd
+    file_info:
+      mode: 0755
+  - src: ./deploy/packaging/ccd.service
+    dst: /lib/systemd/system/ccd.service
+scripts:
+  postinstall: ./deploy/packaging/postinstall.sh
+  preremove: ./deploy/packaging/preremove.sh
+  postremove: ./deploy/packaging/postremove.sh
