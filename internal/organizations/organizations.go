@@ -45,12 +45,22 @@ type Store struct{}
 
 func NewStore() *Store { return &Store{} }
 
+// Create deliberately does not use INSERT ... RETURNING — see
+// projects.Store.Create for the same choice and why: with
+// organizations_select requiring cc_has_org_access
+// (migrations/000005_organizations_rls.up.sql) and a brand-new
+// organization having zero members yet, RETURNING would need to
+// read the just-inserted row back through that same SELECT policy and
+// fail with "new row violates row-level security policy," even though
+// the INSERT itself (governed only by organizations_insert's
+// unconditional WITH CHECK (true)) succeeds. Building the struct
+// client-side and using a plain Exec sidesteps the read-back entirely.
 func (s *Store) Create(ctx context.Context, tx pgx.Tx, name string) (Organization, error) {
-	var o Organization
-	err := tx.QueryRow(ctx,
-		`INSERT INTO organizations (name) VALUES ($1) RETURNING id, name, created_at`,
-		name,
-	).Scan(&o.ID, &o.Name, &o.CreatedAt)
+	o := Organization{ID: uuid.New(), Name: name, CreatedAt: time.Now().UTC()}
+	_, err := tx.Exec(ctx,
+		`INSERT INTO organizations (id, name, created_at) VALUES ($1, $2, $3)`,
+		o.ID, o.Name, o.CreatedAt,
+	)
 	if err != nil {
 		return Organization{}, fmt.Errorf("organizations: create: %w", err)
 	}
@@ -71,13 +81,16 @@ func (s *Store) Get(ctx context.Context, tx pgx.Tx, id uuid.UUID) (Organization,
 	return o, nil
 }
 
+// AddMember avoids RETURNING for the same reason Create does: the very
+// first member of a brand-new organization would otherwise need to pass
+// organization_members_select's cc_has_org_access check before that
+// membership row exists to grant it.
 func (s *Store) AddMember(ctx context.Context, tx pgx.Tx, organizationID, userID uuid.UUID, role Role) (Membership, error) {
-	var m Membership
-	err := tx.QueryRow(ctx,
-		`INSERT INTO organization_members (organization_id, user_id, role) VALUES ($1, $2, $3)
-		 RETURNING organization_id, user_id, role, created_at`,
-		organizationID, userID, role,
-	).Scan(&m.OrganizationID, &m.UserID, &m.Role, &m.CreatedAt)
+	m := Membership{OrganizationID: organizationID, UserID: userID, Role: role, CreatedAt: time.Now().UTC()}
+	_, err := tx.Exec(ctx,
+		`INSERT INTO organization_members (organization_id, user_id, role, created_at) VALUES ($1, $2, $3, $4)`,
+		m.OrganizationID, m.UserID, m.Role, m.CreatedAt,
+	)
 	if err != nil {
 		return Membership{}, fmt.Errorf("organizations: add member: %w", err)
 	}

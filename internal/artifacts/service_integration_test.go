@@ -15,6 +15,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/crypto"
 	"github.com/koduj-dev/context-commander/internal/db"
 	"github.com/koduj-dev/context-commander/internal/dbtest"
+	"github.com/koduj-dev/context-commander/internal/gates"
 	"github.com/koduj-dev/context-commander/internal/projects"
 	"github.com/koduj-dev/context-commander/internal/storage"
 	"github.com/koduj-dev/context-commander/internal/storage/filesystem"
@@ -99,7 +100,7 @@ func newFixture(t *testing.T) *fixture {
 	}
 
 	return &fixture{
-		svc:         artifacts.NewService(appPool, cryptoProvider, store, auth.NewAuthzService(appPool, projects.NewStore())),
+		svc:         artifacts.NewService(appPool, cryptoProvider, store, auth.NewAuthzService(appPool, projects.NewStore()), gates.NewEngine(appPool)),
 		ownerPool:   ownerPool,
 		store:       store,
 		projectID:   projectID,
@@ -455,6 +456,31 @@ func TestSweepOrphanObjectsNeverDeletesKnownVersions(t *testing.T) {
 
 	if _, _, err := f.svc.Read(ctx, f.principalID, f.projectID, "keep.md", nil); err != nil {
 		t.Fatalf("Read after sweep: %v", err)
+	}
+}
+
+func TestWriteBlockedBySecretScannerGate(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+
+	err := db.WithoutPrincipal(ctx, f.ownerPool, func(tx pgx.Tx) error {
+		_, err := tx.Exec(ctx,
+			`INSERT INTO gate_bindings (id, scope, scope_ref, gate_name, hook) VALUES ($1, 'installation', NULL, 'secret-scanner', 'artifact.before_write')`,
+			uuid.New())
+		return err
+	})
+	if err != nil {
+		t.Fatalf("seed gate binding: %v", err)
+	}
+
+	_, err = f.svc.Write(ctx, f.principalID, f.clientID, f.projectID, "config/.env", "text/plain", []byte("AWS_SECRET_ACCESS_KEY=AKIAABCDEFGHIJKLMNOP"), 0)
+	if !errors.Is(err, artifacts.ErrBlockedByGate) {
+		t.Fatalf("Write with secret-like content: got err=%v, want ErrBlockedByGate", err)
+	}
+
+	// Writing ordinary content on the same hook must still succeed.
+	if _, err := f.svc.Write(ctx, f.principalID, f.clientID, f.projectID, "notes/readme.md", "text/markdown", []byte("# hello"), 0); err != nil {
+		t.Fatalf("Write with clean content: %v", err)
 	}
 }
 

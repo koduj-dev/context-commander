@@ -18,6 +18,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/crypto"
 	"github.com/koduj-dev/context-commander/internal/db"
 	"github.com/koduj-dev/context-commander/internal/events"
+	"github.com/koduj-dev/context-commander/internal/gates"
 	"github.com/koduj-dev/context-commander/internal/storage"
 )
 
@@ -28,11 +29,17 @@ import (
 // adapter's call, not this package's.
 var ErrForbidden = errors.New("artifacts: forbidden")
 
+// ErrBlockedByGate is returned when the "artifact.before_write" gate hook
+// (internal/gates) evaluates to DENY — e.g. the secret-scanner gate
+// finding secret-like content — before any crypto/storage work happens.
+var ErrBlockedByGate = errors.New("artifacts: write blocked by gate policy")
+
 type Service struct {
 	pool   *db.Pool
 	crypto *crypto.Provider
 	store  storage.ObjectStore
 	authz  *auth.AuthzService
+	gates  *gates.Engine
 }
 
 // NewService wires Service to AuthzService deliberately: every method here
@@ -47,8 +54,8 @@ type Service struct {
 // "someone adds a handler and forgets" failure mode the pitfall warns
 // about. RLS (docs/adr/0002) remains the defense-in-depth layer beneath
 // this, not a replacement for it.
-func NewService(pool *db.Pool, cryptoProvider *crypto.Provider, store storage.ObjectStore, authz *auth.AuthzService) *Service {
-	return &Service{pool: pool, crypto: cryptoProvider, store: store, authz: authz}
+func NewService(pool *db.Pool, cryptoProvider *crypto.Provider, store storage.ObjectStore, authz *auth.AuthzService, gatesEngine *gates.Engine) *Service {
+	return &Service{pool: pool, crypto: cryptoProvider, store: store, authz: authz, gates: gatesEngine}
 }
 
 func (s *Service) checkCapability(ctx context.Context, principalID, projectID uuid.UUID, cap auth.Capability) error {
@@ -87,6 +94,18 @@ func (s *Service) Write(
 		return Version{}, ErrTooLarge
 	}
 
+	gateResult, err := s.gates.Evaluate(ctx, principalID, projectID, nil, "artifact.before_write", plaintext)
+	if err != nil {
+		return Version{}, fmt.Errorf("artifacts: gate evaluation: %w", err)
+	}
+	if gateResult.Verdict == gates.Deny {
+		return Version{}, fmt.Errorf("%w: %s", ErrBlockedByGate, gateResult.Guidance)
+	}
+	// ALLOW_WITH_GUIDANCE / ALLOW_WITH_REDACTION: v1 does not thread
+	// guidance back to the caller or apply a redaction to plaintext before
+	// encryption — both proceed as ALLOW. Surfacing guidance and applying
+	// redaction is adapter-phase work (Fáze 3).
+
 	principal := db.Principal{ID: principalID}
 	sum := sha256.Sum256(plaintext)
 	contentHash := hex.EncodeToString(sum[:])
@@ -97,7 +116,7 @@ func (s *Service) Write(
 	var ciphertext, nonce, wrappedDEK []byte
 	var projectKeyVersion int
 
-	err := db.WithPrincipal(ctx, s.pool, principal, func(tx pgx.Tx) error {
+	err = db.WithPrincipal(ctx, s.pool, principal, func(tx pgx.Tx) error {
 		id, currentVersion, deleted, err := upsertArtifactStub(ctx, tx, projectID, logicalPath, contentType, principalID, clientID)
 		if err != nil {
 			return err

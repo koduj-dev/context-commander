@@ -8,9 +8,12 @@ package audit
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+
+	"github.com/koduj-dev/context-commander/internal/crypto"
 )
 
 type Result string
@@ -48,4 +51,154 @@ func Write(ctx context.Context, tx pgx.Tx, e Entry) error {
 		return fmt.Errorf("audit: write: %w", err)
 	}
 	return nil
+}
+
+// Record is one row read back from the audit log — Entry plus the two
+// columns Write's caller never needs to supply (they're assigned by the
+// database).
+type Record struct {
+	ID        int64
+	Timestamp time.Time
+	Entry
+}
+
+// QueryOptions filters a Query call. Action/ResourceType are exact-match,
+// empty means "no filter"; Since/Until are inclusive bounds on ts. Limit
+// defaults to 100 and is capped at 500 to keep a single call bounded.
+type QueryOptions struct {
+	Action       string
+	ResourceType string
+	Since        *time.Time
+	Until        *time.Time
+	Limit        int
+}
+
+// Query returns audit_log rows for projectID, most recent first. Every
+// caller-facing entry point (adapters, future internal/audit.Service) must
+// scope this by project — there is no unscoped "query everything" here,
+// matching the same project-first shape as every other domain's List.
+func Query(ctx context.Context, tx pgx.Tx, projectID uuid.UUID, opts QueryOptions) ([]Record, error) {
+	limit := opts.Limit
+	if limit <= 0 || limit > 500 {
+		limit = 100
+	}
+
+	query := `SELECT id, ts, project_id, principal_id, client_id, action, resource_type, resource_id, result, request_id, event_id
+		FROM audit_log WHERE project_id = $1`
+	args := []any{projectID}
+
+	if opts.Action != "" {
+		args = append(args, opts.Action)
+		query += fmt.Sprintf(" AND action = $%d", len(args))
+	}
+	if opts.ResourceType != "" {
+		args = append(args, opts.ResourceType)
+		query += fmt.Sprintf(" AND resource_type = $%d", len(args))
+	}
+	if opts.Since != nil {
+		args = append(args, *opts.Since)
+		query += fmt.Sprintf(" AND ts >= $%d", len(args))
+	}
+	if opts.Until != nil {
+		args = append(args, *opts.Until)
+		query += fmt.Sprintf(" AND ts <= $%d", len(args))
+	}
+	args = append(args, limit)
+	query += fmt.Sprintf(" ORDER BY ts DESC, id DESC LIMIT $%d", len(args))
+
+	rows, err := tx.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("audit: query: %w", err)
+	}
+	defer rows.Close()
+
+	var out []Record
+	for rows.Next() {
+		var r Record
+		if err := rows.Scan(&r.ID, &r.Timestamp, &r.ProjectID, &r.PrincipalID, &r.ClientID,
+			&r.Action, &r.ResourceType, &r.ResourceID, &r.Result, &r.RequestID, &r.EventID); err != nil {
+			return nil, fmt.Errorf("audit: scan: %w", err)
+		}
+		out = append(out, r)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("audit: iterate: %w", err)
+	}
+	return out, nil
+}
+
+// WriteWithPayload is Write plus a CONTENT PAYLOAD side table for callers
+// that need to attach a sensitive payload to an audit row (e.g. what
+// changed, not just that something changed) — see
+// docs/adr/0011-encryption-classification.md: this table exists precisely
+// so that payload never has to go into audit_log's fixed allowlisted
+// columns. e.ProjectID is required (crypto.EncryptionContext's key
+// hierarchy is per-project — see docs/adr/0005) even though it's optional
+// on a plain Write.
+func WriteWithPayload(ctx context.Context, tx pgx.Tx, e Entry, payload []byte, cryptoProvider *crypto.Provider) error {
+	if e.ProjectID == nil {
+		return fmt.Errorf("audit: write with payload: ProjectID is required")
+	}
+
+	var auditLogID int64
+	err := tx.QueryRow(ctx,
+		`INSERT INTO audit_log (project_id, principal_id, client_id, action, resource_type, resource_id, result, request_id, event_id)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+		e.ProjectID, e.PrincipalID, e.ClientID, e.Action, e.ResourceType, e.ResourceID, e.Result, e.RequestID, e.EventID,
+	).Scan(&auditLogID)
+	if err != nil {
+		return fmt.Errorf("audit: write with payload: insert audit_log: %w", err)
+	}
+
+	var resourceID uuid.UUID
+	if e.ResourceID != nil {
+		resourceID = *e.ResourceID
+	}
+	ec := crypto.EncryptionContext{
+		ProjectID:       *e.ProjectID,
+		ResourceType:    "audit_payload",
+		ResourceID:      resourceID,
+		ResourceVersion: uint64(auditLogID), //nolint:gosec // auditLogID is a small positive bigserial counter
+	}
+	ciphertext, nonce, wrappedDEK, projectKeyVersion, err := cryptoProvider.Encrypt(ctx, tx, ec, payload)
+	if err != nil {
+		return fmt.Errorf("audit: write with payload: encrypt: %w", err)
+	}
+
+	_, err = tx.Exec(ctx,
+		`INSERT INTO encrypted_audit_payload (audit_log_id, ciphertext, nonce, wrapped_dek, project_key_version)
+		 VALUES ($1, $2, $3, $4, $5)`,
+		auditLogID, ciphertext, nonce, wrappedDEK, projectKeyVersion,
+	)
+	if err != nil {
+		return fmt.Errorf("audit: write with payload: insert encrypted_audit_payload: %w", err)
+	}
+	return nil
+}
+
+// ReadPayload decrypts the payload WriteWithPayload attached to auditLogID.
+// projectID and resourceID must match what WriteWithPayload was called
+// with for that row — crypto.EncryptionContext binds ciphertext to its
+// exact (project, resource type/id/version) tuple, so any mismatch fails
+// authentication rather than returning wrong/stale plaintext.
+func ReadPayload(ctx context.Context, tx pgx.Tx, cryptoProvider *crypto.Provider, projectID uuid.UUID, auditLogID int64, resourceID uuid.UUID) ([]byte, error) {
+	var ciphertext, nonce, wrappedDEK []byte
+	var projectKeyVersion int
+	err := tx.QueryRow(ctx,
+		`SELECT ciphertext, nonce, wrapped_dek, project_key_version FROM encrypted_audit_payload WHERE audit_log_id = $1`,
+		auditLogID,
+	).Scan(&ciphertext, &nonce, &wrappedDEK, &projectKeyVersion)
+	if err != nil {
+		return nil, fmt.Errorf("audit: read payload: %w", err)
+	}
+
+	ec := crypto.EncryptionContext{
+		ProjectID: projectID, ResourceType: "audit_payload",
+		ResourceID: resourceID, ResourceVersion: uint64(auditLogID), //nolint:gosec // auditLogID is a small positive bigserial counter
+	}
+	plaintext, err := cryptoProvider.Decrypt(ctx, tx, ec, ciphertext, nonce, wrappedDEK, projectKeyVersion)
+	if err != nil {
+		return nil, fmt.Errorf("audit: decrypt payload: %w", err)
+	}
+	return plaintext, nil
 }

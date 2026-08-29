@@ -12,12 +12,20 @@ import (
 
 	ccmcp "github.com/koduj-dev/context-commander/adapters/mcp"
 	"github.com/koduj-dev/context-commander/internal/artifacts"
+	"github.com/koduj-dev/context-commander/internal/audit"
 	"github.com/koduj-dev/context-commander/internal/auth"
 	"github.com/koduj-dev/context-commander/internal/crypto"
 	"github.com/koduj-dev/context-commander/internal/db"
 	"github.com/koduj-dev/context-commander/internal/dbtest"
+	"github.com/koduj-dev/context-commander/internal/events"
+	"github.com/koduj-dev/context-commander/internal/gates"
+	"github.com/koduj-dev/context-commander/internal/handoffs"
+	"github.com/koduj-dev/context-commander/internal/history"
 	"github.com/koduj-dev/context-commander/internal/identity"
+	"github.com/koduj-dev/context-commander/internal/organizations"
 	"github.com/koduj-dev/context-commander/internal/projects"
+	"github.com/koduj-dev/context-commander/internal/secrets"
+	"github.com/koduj-dev/context-commander/internal/skills"
 	"github.com/koduj-dev/context-commander/internal/storage/filesystem"
 )
 
@@ -59,9 +67,24 @@ func newFixture(t *testing.T) *fixture {
 
 	projStore := projects.NewStore()
 	authz := auth.NewAuthzService(appPool, projStore)
-	artifactsSvc := artifacts.NewService(appPool, cryptoProvider, store, authz)
+	artifactsSvc := artifacts.NewService(appPool, cryptoProvider, store, authz, gates.NewEngine(appPool))
 
-	handler := ccmcp.NewHandler(ccmcp.Deps{Pool: appPool, Projects: projStore, Artifacts: artifactsSvc})
+	orgStore := organizations.NewStore()
+	eventsSvc := events.NewService(appPool, authz)
+	orgSvc := organizations.NewService(appPool, orgStore)
+	auditSvc := audit.NewService(appPool, authz)
+	handoffsSvc := handoffs.NewService(appPool, cryptoProvider, authz)
+	historySvc := history.NewService(appPool, cryptoProvider, authz)
+	skillsSvc := skills.NewService(appPool, authz, orgStore, store)
+	gatesAdmin := gates.NewAdminService(appPool, authz, orgStore)
+	secretsSvc := secrets.NewService(appPool, authz, secrets.NewLocalEncryptedBackend(appPool, cryptoProvider))
+
+	handler := ccmcp.NewHandler(ccmcp.Deps{
+		Pool: appPool, Projects: projStore, Artifacts: artifactsSvc,
+		Events: eventsSvc, Organizations: orgSvc, Audit: auditSvc,
+		Handoffs: handoffsSvc, History: historySvc,
+		Skills: skillsSvc, Gates: gatesAdmin, Secrets: secretsSvc,
+	})
 	server := httptest.NewServer(handler)
 	t.Cleanup(server.Close)
 
@@ -225,6 +248,321 @@ func TestArtifactWriteConflictIsToolError(t *testing.T) {
 	}
 	if !result.IsError {
 		t.Fatal("expected a stale expected_version to produce a tool error (isError=true), got success")
+	}
+}
+
+// userIDByEmail mirrors adapters/http/http_test.go's helper of the same
+// name — organization.add_member needs the target user's id, and the MCP
+// tool itself only resolves the *caller's* user id from their bearer token,
+// not an arbitrary other user's.
+func (f *fixture) userIDByEmail(email string) string {
+	f.t.Helper()
+	ctx := context.Background()
+	var id string
+	err := db.WithoutPrincipal(ctx, f.ownerPool, func(tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `SELECT id FROM users WHERE email = $1`, email).Scan(&id)
+	})
+	if err != nil {
+		f.t.Fatalf("userIDByEmail(%q): %v", email, err)
+	}
+	return id
+}
+
+func TestEventListAfterArtifactWrite(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	token := f.newUserWithToken("mcp-events@example.test")
+	session, err := f.connect(ctx, token)
+	if err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	defer func() { _ = session.Close() }()
+
+	callTool[projectResult](t, ctx, session, "project.create", map[string]any{"project": "mcp-events/proj", "name": "Proj"})
+	callTool[versionResult](t, ctx, session, "artifact.write", map[string]any{
+		"project": "mcp-events/proj", "path": "f.txt", "content": "v1", "expected_version": 0,
+	})
+
+	eventList := callTool[[]map[string]any](t, ctx, session, "event.list", map[string]any{"project": "mcp-events/proj"})
+	if len(eventList) == 0 {
+		t.Fatal("event.list returned no events after artifact.write")
+	}
+}
+
+func TestOrganizationCreateAndAddMemberMCP(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	ownerToken := f.newUserWithToken("mcp-org-owner@example.test")
+	f.newUserWithToken("mcp-org-member@example.test")
+	memberUserID := f.userIDByEmail("mcp-org-member@example.test")
+
+	session, err := f.connect(ctx, ownerToken)
+	if err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	defer func() { _ = session.Close() }()
+
+	type organizationResult struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+	}
+	org := callTool[organizationResult](t, ctx, session, "organization.create", map[string]any{"name": "Acme MCP"})
+	if org.ID == "" {
+		t.Fatalf("organization.create: no id in result %+v", org)
+	}
+
+	type membershipResult struct {
+		Role string `json:"role"`
+	}
+	m := callTool[membershipResult](t, ctx, session, "organization.add_member", map[string]any{
+		"organization_id": org.ID, "user_id": memberUserID, "role": "MEMBER",
+	})
+	if m.Role != "MEMBER" {
+		t.Fatalf("organization.add_member: role = %q, want MEMBER", m.Role)
+	}
+}
+
+func TestAuditListAfterArtifactWrite(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	token := f.newUserWithToken("mcp-audit@example.test")
+	session, err := f.connect(ctx, token)
+	if err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	defer func() { _ = session.Close() }()
+
+	callTool[projectResult](t, ctx, session, "project.create", map[string]any{"project": "mcp-audit/proj", "name": "Proj"})
+	callTool[versionResult](t, ctx, session, "artifact.write", map[string]any{
+		"project": "mcp-audit/proj", "path": "f.txt", "content": "v1", "expected_version": 0,
+	})
+
+	records := callTool[[]map[string]any](t, ctx, session, "audit.list", map[string]any{"project": "mcp-audit/proj"})
+	if len(records) == 0 {
+		t.Fatal("audit.list returned no records after artifact.write")
+	}
+}
+
+func TestHandoffCreateGetListMCP(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	token := f.newUserWithToken("mcp-handoff@example.test")
+	session, err := f.connect(ctx, token)
+	if err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	defer func() { _ = session.Close() }()
+
+	callTool[projectResult](t, ctx, session, "project.create", map[string]any{"project": "mcp-handoff/proj", "name": "Proj"})
+
+	type handoffResult struct {
+		ID string `json:"id"`
+	}
+	created := callTool[handoffResult](t, ctx, session, "handoff.create", map[string]any{
+		"project": "mcp-handoff/proj", "summary": "did the thing", "completed_work": "x", "next_actions": "y",
+	})
+	if created.ID == "" {
+		t.Fatal("handoff.create returned no id")
+	}
+
+	type handoffDetailResult struct {
+		Summary string `json:"summary"`
+	}
+	got := callTool[handoffDetailResult](t, ctx, session, "handoff.get", map[string]any{
+		"project": "mcp-handoff/proj", "id": created.ID,
+	})
+	if got.Summary != "did the thing" {
+		t.Fatalf("handoff.get summary = %q", got.Summary)
+	}
+
+	list := callTool[[]handoffResult](t, ctx, session, "handoff.list", map[string]any{"project": "mcp-handoff/proj"})
+	if len(list) != 1 {
+		t.Fatalf("handoff.list: got %d, want 1", len(list))
+	}
+}
+
+func TestHistoryLineageMCP(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	token := f.newUserWithToken("mcp-history@example.test")
+	session, err := f.connect(ctx, token)
+	if err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	defer func() { _ = session.Close() }()
+
+	callTool[projectResult](t, ctx, session, "project.create", map[string]any{"project": "mcp-history/proj", "name": "Proj"})
+
+	type conversationResult struct {
+		ID string `json:"id"`
+	}
+	conv := callTool[conversationResult](t, ctx, session, "history.create_conversation", map[string]any{"project": "mcp-history/proj"})
+
+	type externalSessionResult struct {
+		ID string `json:"id"`
+	}
+	sess := callTool[externalSessionResult](t, ctx, session, "history.create_external_session", map[string]any{
+		"project": "mcp-history/proj", "conversation_id": conv.ID,
+		"provider": "anthropic", "client": "claude-code", "provider_session_id": "sess-1", "relation": "started",
+	})
+
+	type historyObjectResult struct {
+		ID string `json:"id"`
+	}
+	raw := callTool[historyObjectResult](t, ctx, session, "history.append_object", map[string]any{
+		"project": "mcp-history/proj", "conversation_id": conv.ID, "external_session_id": sess.ID,
+		"type": "raw", "content": "hello world",
+	})
+	callTool[historyObjectResult](t, ctx, session, "history.append_object", map[string]any{
+		"project": "mcp-history/proj", "conversation_id": conv.ID, "external_session_id": sess.ID,
+		"type": "compacted", "derived_from": raw.ID, "content": "hello",
+	})
+
+	objects := callTool[[]historyObjectResult](t, ctx, session, "history.list_objects", map[string]any{
+		"project": "mcp-history/proj", "conversation_id": conv.ID,
+	})
+	if len(objects) != 2 {
+		t.Fatalf("history.list_objects: got %d, want 2", len(objects))
+	}
+
+	type lineageEdgeResult struct {
+		FromID string `json:"from_id"`
+		ToID   string `json:"to_id"`
+	}
+	edges := callTool[[]lineageEdgeResult](t, ctx, session, "history.get_lineage", map[string]any{
+		"project": "mcp-history/proj", "conversation_id": conv.ID,
+	})
+	if len(edges) == 0 {
+		t.Fatal("history.get_lineage returned no edges")
+	}
+}
+
+func TestSkillPublishInstallListEffectiveMCP(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	token := f.newUserWithToken("mcp-skills@example.test")
+	session, err := f.connect(ctx, token)
+	if err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	defer func() { _ = session.Close() }()
+
+	proj := callTool[projectResult](t, ctx, session, "project.create", map[string]any{"project": "mcp-skills/proj", "name": "Proj"})
+
+	type skillVersionResult struct {
+		ID      string `json:"id"`
+		SkillID string `json:"skill_id"`
+	}
+	v := callTool[skillVersionResult](t, ctx, session, "skill.publish", map[string]any{
+		"project": "mcp-skills/proj", "name": "code-review", "content": "checklist",
+	})
+	if v.ID == "" || v.SkillID == "" {
+		t.Fatalf("skill.publish: missing ids in %+v", v)
+	}
+
+	type skillBindingResult struct {
+		ID string `json:"id"`
+	}
+	binding := callTool[skillBindingResult](t, ctx, session, "skill.install", map[string]any{
+		"project": "mcp-skills/proj", "scope": "project", "scope_ref": proj.ID,
+		"skill_id": v.SkillID, "skill_version_id": v.ID,
+	})
+	if binding.ID == "" {
+		t.Fatal("skill.install returned no binding id")
+	}
+
+	effective := callTool[[]skillBindingResult](t, ctx, session, "skill.list_effective", map[string]any{"project": "mcp-skills/proj"})
+	if len(effective) != 1 {
+		t.Fatalf("skill.list_effective: got %d, want 1", len(effective))
+	}
+}
+
+func TestGateBindListUnbindMCP(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	token := f.newUserWithToken("mcp-gates@example.test")
+	session, err := f.connect(ctx, token)
+	if err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	defer func() { _ = session.Close() }()
+
+	proj := callTool[projectResult](t, ctx, session, "project.create", map[string]any{"project": "mcp-gates/proj", "name": "Proj"})
+
+	type gateBindingResult struct {
+		ID string `json:"id"`
+	}
+	binding := callTool[gateBindingResult](t, ctx, session, "gate.bind", map[string]any{
+		"project": "mcp-gates/proj", "scope": "project", "scope_ref": proj.ID,
+		"gate_name": "secret-scanner", "hook": "artifact.before_write",
+	})
+	if binding.ID == "" {
+		t.Fatal("gate.bind returned no binding id")
+	}
+
+	list := callTool[[]gateBindingResult](t, ctx, session, "gate.list_bindings", map[string]any{"project": "mcp-gates/proj"})
+	if len(list) != 1 {
+		t.Fatalf("gate.list_bindings: got %d, want 1", len(list))
+	}
+
+	type unbindResult struct {
+		Unbound bool `json:"unbound"`
+	}
+	unbound := callTool[unbindResult](t, ctx, session, "gate.unbind", map[string]any{
+		"project": "mcp-gates/proj", "binding_id": binding.ID,
+	})
+	if !unbound.Unbound {
+		t.Fatal("gate.unbind: unbound = false")
+	}
+}
+
+func TestSecretCreateListDeleteNeverReturnsValueMCP(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	token := f.newUserWithToken("mcp-secrets@example.test")
+	session, err := f.connect(ctx, token)
+	if err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	defer func() { _ = session.Close() }()
+
+	callTool[projectResult](t, ctx, session, "project.create", map[string]any{"project": "mcp-secrets/proj", "name": "Proj"})
+
+	type secretReferenceResult struct {
+		Reference string `json:"reference"`
+		Name      string `json:"name"`
+	}
+	created := callTool[secretReferenceResult](t, ctx, session, "secret.create", map[string]any{
+		"project": "mcp-secrets/proj", "name": "github-token", "value": "ghp_supersecret",
+	})
+	if created.Name != "github-token" {
+		t.Fatalf("secret.create: name = %q", created.Name)
+	}
+
+	list := callTool[[]secretReferenceResult](t, ctx, session, "secret.list", map[string]any{"project": "mcp-secrets/proj"})
+	if len(list) != 1 {
+		t.Fatalf("secret.list: got %d, want 1", len(list))
+	}
+	for _, ref := range list {
+		if ref.Reference == "ghp_supersecret" || ref.Name == "ghp_supersecret" {
+			t.Fatal("secret.list leaked the plaintext value")
+		}
+	}
+
+	// There is deliberately no secret.resolve tool at all — verify a client
+	// can't even name it, rather than merely not calling it.
+	if _, err := session.CallTool(ctx, &sdkmcp.CallToolParams{Name: "secret.resolve", Arguments: map[string]any{}}); err == nil {
+		t.Fatal("expected calling a non-existent secret.resolve tool to fail")
+	}
+
+	type deleteResult struct {
+		Deleted bool `json:"deleted"`
+	}
+	del := callTool[deleteResult](t, ctx, session, "secret.delete", map[string]any{
+		"project": "mcp-secrets/proj", "name": "github-token",
+	})
+	if !del.Deleted {
+		t.Fatal("secret.delete: deleted = false")
 	}
 }
 

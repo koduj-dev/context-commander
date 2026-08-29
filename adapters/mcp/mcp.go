@@ -14,17 +14,33 @@ import (
 	sdkmcp "github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/koduj-dev/context-commander/internal/artifacts"
+	"github.com/koduj-dev/context-commander/internal/audit"
 	"github.com/koduj-dev/context-commander/internal/db"
+	"github.com/koduj-dev/context-commander/internal/events"
+	"github.com/koduj-dev/context-commander/internal/gates"
+	"github.com/koduj-dev/context-commander/internal/handoffs"
+	"github.com/koduj-dev/context-commander/internal/history"
 	"github.com/koduj-dev/context-commander/internal/identity"
+	"github.com/koduj-dev/context-commander/internal/organizations"
 	"github.com/koduj-dev/context-commander/internal/projects"
+	"github.com/koduj-dev/context-commander/internal/secrets"
+	"github.com/koduj-dev/context-commander/internal/skills"
 )
 
 // Deps bundles what every tool handler needs — constructed once in
 // cmd/ccd and passed to NewHandler.
 type Deps struct {
-	Pool      *db.Pool
-	Projects  *projects.Store
-	Artifacts *artifacts.Service
+	Pool          *db.Pool
+	Projects      *projects.Store
+	Artifacts     *artifacts.Service
+	Events        *events.Service
+	Organizations *organizations.Service
+	Audit         *audit.Service
+	Handoffs      *handoffs.Service
+	History       *history.Service
+	Skills        *skills.Service
+	Gates         *gates.AdminService
+	Secrets       *secrets.Service
 }
 
 type credKey struct{}
@@ -78,6 +94,14 @@ func newServer(deps Deps, principalID, clientID uuid.UUID) *sdkmcp.Server {
 
 	registerProjectTools(server, deps, principalID, clientID)
 	registerArtifactTools(server, deps, principalID, clientID)
+	registerEventTools(server, deps, principalID, clientID)
+	registerOrganizationTools(server, deps, principalID, clientID)
+	registerAuditTools(server, deps, principalID, clientID)
+	registerHandoffTools(server, deps, principalID, clientID)
+	registerHistoryTools(server, deps, principalID, clientID)
+	registerSkillTools(server, deps, principalID, clientID)
+	registerGateTools(server, deps, principalID, clientID)
+	registerSecretTools(server, deps, principalID, clientID)
 
 	return server
 }

@@ -1,0 +1,284 @@
+package gates_test
+
+import (
+	"context"
+	"errors"
+	"testing"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+
+	"github.com/koduj-dev/context-commander/internal/auth"
+	"github.com/koduj-dev/context-commander/internal/db"
+	"github.com/koduj-dev/context-commander/internal/dbtest"
+	"github.com/koduj-dev/context-commander/internal/gates"
+	"github.com/koduj-dev/context-commander/internal/organizations"
+	"github.com/koduj-dev/context-commander/internal/projects"
+)
+
+type engineFixture struct {
+	t           *testing.T
+	ctx         context.Context
+	ownerPool   *db.Pool
+	appPool     *db.Pool
+	engine      *gates.Engine
+	projectID   uuid.UUID
+	principalID uuid.UUID
+}
+
+func newEngineFixture(t *testing.T) *engineFixture {
+	t.Helper()
+	dsns := dbtest.New(t)
+	ctx := context.Background()
+
+	ownerPool, err := db.NewPool(ctx, dsns.Owner)
+	if err != nil {
+		t.Fatalf("connect as cc_owner: %v", err)
+	}
+	appPool, err := db.NewPool(ctx, dsns.App)
+	if err != nil {
+		t.Fatalf("connect as cc_app: %v", err)
+	}
+
+	principalID := uuid.New()
+	projectID := uuid.New()
+	err = db.WithoutPrincipal(ctx, ownerPool, func(tx pgx.Tx) error {
+		userID := uuid.New()
+		if _, err := tx.Exec(ctx, `INSERT INTO users (id, email, display_name) VALUES ($1, $2, $3)`,
+			userID, userID.String()+"@example.test", "Fixture User"); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `INSERT INTO principals (id, kind, user_id) VALUES ($1, 'user', $2)`,
+			principalID, userID); err != nil {
+			return err
+		}
+		namespaceID := uuid.New()
+		if _, err := tx.Exec(ctx,
+			`INSERT INTO namespaces (id, kind, slug, owner_user_id) VALUES ($1, 'personal', $2, $3)`,
+			namespaceID, "fixture-"+namespaceID.String()[:8], userID); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `INSERT INTO projects (id, namespace_id, slug, name) VALUES ($1, $2, 'fixture', 'Fixture')`,
+			projectID, namespaceID); err != nil {
+			return err
+		}
+		_, err := tx.Exec(ctx, `INSERT INTO project_members (project_id, principal_id, role) VALUES ($1, $2, 'OWNER')`,
+			projectID, principalID)
+		return err
+	})
+	if err != nil {
+		t.Fatalf("seed fixture: %v", err)
+	}
+
+	return &engineFixture{
+		t: t, ctx: ctx, ownerPool: ownerPool, appPool: appPool,
+		engine: gates.NewEngine(appPool), projectID: projectID, principalID: principalID,
+	}
+}
+
+func (f *engineFixture) bindGate(hook, scope, gateName string, scopeRef *uuid.UUID) {
+	f.t.Helper()
+	err := db.WithoutPrincipal(f.ctx, f.ownerPool, func(tx pgx.Tx) error {
+		_, err := tx.Exec(f.ctx,
+			`INSERT INTO gate_bindings (id, scope, scope_ref, gate_name, hook) VALUES ($1, $2, $3, $4, $5)`,
+			uuid.New(), scope, scopeRef, gateName, hook)
+		return err
+	})
+	if err != nil {
+		f.t.Fatalf("bindGate: %v", err)
+	}
+}
+
+func TestEngineEvaluateNoBindingsAllows(t *testing.T) {
+	f := newEngineFixture(t)
+	r, err := f.engine.Evaluate(f.ctx, f.principalID, f.projectID, nil, "artifact.before_write", []byte("hello"))
+	if err != nil {
+		t.Fatalf("Evaluate: %v", err)
+	}
+	if r.Verdict != gates.Allow {
+		t.Fatalf("got verdict %s, want ALLOW with no bindings", r.Verdict)
+	}
+}
+
+func TestEngineDenyTakesPriorityAcrossScopes(t *testing.T) {
+	f := newEngineFixture(t)
+	f.bindGate("artifact.before_write", "installation", "secret-scanner", nil)
+
+	r, err := f.engine.Evaluate(f.ctx, f.principalID, f.projectID, nil, "artifact.before_write", []byte("AWS_KEY=AKIAABCDEFGHIJKLMNOP"))
+	if err != nil {
+		t.Fatalf("Evaluate: %v", err)
+	}
+	if r.Verdict != gates.Deny {
+		t.Fatalf("got verdict %s, want DENY", r.Verdict)
+	}
+}
+
+func TestEngineIgnoresUnregisteredGateName(t *testing.T) {
+	f := newEngineFixture(t)
+	f.bindGate("artifact.before_write", "project", "no-such-gate", &f.projectID)
+
+	r, err := f.engine.Evaluate(f.ctx, f.principalID, f.projectID, nil, "artifact.before_write", []byte("hello"))
+	if err != nil {
+		t.Fatalf("Evaluate: %v", err)
+	}
+	if r.Verdict != gates.Allow {
+		t.Fatalf("got verdict %s, want ALLOW when the bound gate name is unregistered", r.Verdict)
+	}
+}
+
+func TestEngineOnlyMatchesBoundHook(t *testing.T) {
+	f := newEngineFixture(t)
+	f.bindGate("artifact.before_delete", "installation", "secret-scanner", nil)
+
+	r, err := f.engine.Evaluate(f.ctx, f.principalID, f.projectID, nil, "artifact.before_write", []byte("AWS_KEY=AKIAABCDEFGHIJKLMNOP"))
+	if err != nil {
+		t.Fatalf("Evaluate: %v", err)
+	}
+	if r.Verdict != gates.Allow {
+		t.Fatalf("got verdict %s, want ALLOW — bound gate is on a different hook", r.Verdict)
+	}
+}
+
+// --- AdminService (Bind/Unbind/ListBindings) ---
+
+type adminFixture struct {
+	*engineFixture
+	admin               *gates.AdminService
+	userID              uuid.UUID
+	contributorID       uuid.UUID
+	contributorUserID   uuid.UUID
+	organizationID      uuid.UUID
+	organizationOwnerID uuid.UUID
+}
+
+func newAdminFixture(t *testing.T) *adminFixture {
+	t.Helper()
+	f := newEngineFixture(t)
+
+	var userID, contributorID, contributorUserID, organizationID, organizationOwnerUserID uuid.UUID
+	err := db.WithoutPrincipal(f.ctx, f.ownerPool, func(tx pgx.Tx) error {
+		// f.principalID's user_id, needed as the "userID" AdminService.Bind
+		// checks organization membership against.
+		if err := tx.QueryRow(f.ctx, `SELECT user_id FROM principals WHERE id = $1`, f.principalID).Scan(&userID); err != nil {
+			return err
+		}
+
+		contributorUserID = uuid.New()
+		contributorID = uuid.New()
+		if _, err := tx.Exec(f.ctx, `INSERT INTO users (id, email, display_name) VALUES ($1, $2, $3)`,
+			contributorUserID, contributorUserID.String()+"@example.test", "Contributor"); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(f.ctx, `INSERT INTO principals (id, kind, user_id) VALUES ($1, 'user', $2)`,
+			contributorID, contributorUserID); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(f.ctx, `INSERT INTO project_members (project_id, principal_id, role) VALUES ($1, $2, 'CONTRIBUTOR')`,
+			f.projectID, contributorID); err != nil {
+			return err
+		}
+
+		orgs := organizations.NewStore()
+		org, err := orgs.Create(f.ctx, tx, "fixture-org")
+		if err != nil {
+			return err
+		}
+		organizationID = org.ID
+		organizationOwnerUserID = userID
+		_, err = orgs.AddMember(f.ctx, tx, organizationID, organizationOwnerUserID, organizations.RoleOwner)
+		return err
+	})
+	if err != nil {
+		t.Fatalf("seed admin fixture: %v", err)
+	}
+
+	authz := auth.NewAuthzService(f.appPool, projects.NewStore())
+
+	return &adminFixture{
+		engineFixture:       f,
+		admin:               gates.NewAdminService(f.appPool, authz, organizations.NewStore()),
+		userID:              userID,
+		contributorID:       contributorID,
+		contributorUserID:   contributorUserID,
+		organizationID:      organizationID,
+		organizationOwnerID: organizationOwnerUserID,
+	}
+}
+
+func TestAdminBindAndListBindingsProjectScope(t *testing.T) {
+	f := newAdminFixture(t)
+
+	b, err := f.admin.Bind(f.ctx, f.principalID, f.userID, f.projectID, gates.ScopeProject, &f.projectID, "secret-scanner", "artifact.before_write", nil)
+	if err != nil {
+		t.Fatalf("Bind: %v", err)
+	}
+	if b.Scope != gates.ScopeProject || !b.Enabled {
+		t.Fatalf("unexpected binding: %+v", b)
+	}
+
+	list, err := f.admin.ListBindings(f.ctx, f.principalID, f.projectID, nil)
+	if err != nil {
+		t.Fatalf("ListBindings: %v", err)
+	}
+	if len(list) != 1 || list[0].ID != b.ID {
+		t.Fatalf("got %d bindings, want the one just created: %+v", len(list), list)
+	}
+}
+
+func TestAdminBindRejectsInstallationScope(t *testing.T) {
+	f := newAdminFixture(t)
+
+	_, err := f.admin.Bind(f.ctx, f.principalID, f.userID, f.projectID, gates.ScopeInstallation, nil, "secret-scanner", "artifact.before_write", nil)
+	if !errors.Is(err, gates.ErrUnsupportedScope) {
+		t.Fatalf("got %v, want ErrUnsupportedScope", err)
+	}
+}
+
+func TestAdminBindOrganizationScopeRequiresOrgMembership(t *testing.T) {
+	f := newAdminFixture(t)
+
+	// f.userID is OWNER of f.organizationID — should succeed.
+	if _, err := f.admin.Bind(f.ctx, f.principalID, f.userID, f.projectID, gates.ScopeOrganization, &f.organizationID, "secret-scanner", "artifact.before_write", nil); err != nil {
+		t.Fatalf("Bind as org owner: %v", err)
+	}
+
+	// contributorUserID has no organization membership at all.
+	_, err := f.admin.Bind(f.ctx, f.contributorID, f.contributorUserID, f.projectID, gates.ScopeOrganization, &f.organizationID, "secret-scanner", "artifact.before_write", nil)
+	if !errors.Is(err, gates.ErrForbidden) {
+		t.Fatalf("got %v, want ErrForbidden for a caller with no organization membership", err)
+	}
+}
+
+func TestAdminBindDeniedWithoutCapGateManage(t *testing.T) {
+	f := newAdminFixture(t)
+
+	_, err := f.admin.Bind(f.ctx, f.contributorID, f.contributorUserID, f.projectID, gates.ScopeProject, &f.projectID, "secret-scanner", "artifact.before_write", nil)
+	if !errors.Is(err, gates.ErrForbidden) {
+		t.Fatalf("got %v, want ErrForbidden — CONTRIBUTOR lacks CapGateManage", err)
+	}
+}
+
+func TestAdminUnbind(t *testing.T) {
+	f := newAdminFixture(t)
+
+	b, err := f.admin.Bind(f.ctx, f.principalID, f.userID, f.projectID, gates.ScopeProject, &f.projectID, "secret-scanner", "artifact.before_write", nil)
+	if err != nil {
+		t.Fatalf("Bind: %v", err)
+	}
+
+	if err := f.admin.Unbind(f.ctx, f.principalID, f.userID, f.projectID, b.ID); err != nil {
+		t.Fatalf("Unbind: %v", err)
+	}
+
+	list, err := f.admin.ListBindings(f.ctx, f.principalID, f.projectID, nil)
+	if err != nil {
+		t.Fatalf("ListBindings: %v", err)
+	}
+	if len(list) != 0 {
+		t.Fatalf("got %d bindings after Unbind, want 0: %+v", len(list), list)
+	}
+
+	if err := f.admin.Unbind(f.ctx, f.principalID, f.userID, f.projectID, b.ID); !errors.Is(err, gates.ErrNotFound) {
+		t.Fatalf("second Unbind: got %v, want ErrNotFound", err)
+	}
+}

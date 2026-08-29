@@ -16,16 +16,32 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/koduj-dev/context-commander/internal/artifacts"
+	"github.com/koduj-dev/context-commander/internal/audit"
 	"github.com/koduj-dev/context-commander/internal/db"
+	"github.com/koduj-dev/context-commander/internal/events"
+	"github.com/koduj-dev/context-commander/internal/gates"
+	"github.com/koduj-dev/context-commander/internal/handoffs"
+	"github.com/koduj-dev/context-commander/internal/history"
+	"github.com/koduj-dev/context-commander/internal/organizations"
 	"github.com/koduj-dev/context-commander/internal/projects"
+	"github.com/koduj-dev/context-commander/internal/secrets"
+	"github.com/koduj-dev/context-commander/internal/skills"
 )
 
 // Deps bundles what every handler needs — constructed once in cmd/ccd and
 // passed to NewHandler.
 type Deps struct {
-	Pool      *db.Pool
-	Projects  *projects.Store
-	Artifacts *artifacts.Service
+	Pool          *db.Pool
+	Projects      *projects.Store
+	Artifacts     *artifacts.Service
+	Events        *events.Service
+	Organizations *organizations.Service
+	Audit         *audit.Service
+	Handoffs      *handoffs.Service
+	History       *history.Service
+	Skills        *skills.Service
+	Gates         *gates.AdminService
+	Secrets       *secrets.Service
 }
 
 func NewHandler(deps Deps) http.Handler {
@@ -45,6 +61,10 @@ func NewHandler(deps Deps) http.Handler {
 		r.Use(deps.authenticateMiddleware)
 
 		r.Post("/projects", deps.createProject)
+
+		r.Post("/organizations", deps.createOrganization)
+		r.Post("/organizations/{id}/members", deps.addOrganizationMember)
+
 		r.Route("/projects/{namespace}/{slug}", func(r chi.Router) {
 			r.Use(deps.resolveProjectMiddleware)
 
@@ -57,6 +77,40 @@ func NewHandler(deps Deps) http.Handler {
 			r.Get("/artifacts/content", deps.readArtifact)
 			r.Put("/artifacts/content", deps.writeArtifact)
 			r.Delete("/artifacts/content", deps.deleteArtifact)
+
+			r.Get("/events", deps.listEvents)
+			r.Get("/audit", deps.queryAudit)
+
+			r.Route("/handoffs", func(r chi.Router) {
+				r.Post("/", deps.createHandoff)
+				r.Get("/", deps.listHandoffs)
+				r.Get("/{handoffID}", deps.getHandoff)
+			})
+
+			r.Route("/conversations", func(r chi.Router) {
+				r.Post("/", deps.createConversation)
+				r.Route("/{conversationID}", func(r chi.Router) {
+					r.Post("/sessions", deps.createExternalSession)
+					r.Post("/objects", deps.appendHistoryObject)
+					r.Get("/objects", deps.listHistoryObjects)
+					r.Get("/lineage", deps.getLineage)
+				})
+			})
+
+			r.Post("/skills", deps.publishSkill)
+			r.Post("/skills/install", deps.installSkill)
+			r.Post("/skills/override", deps.overrideSkill)
+			r.Post("/skills/pin", deps.pinSkillBinding)
+			r.Post("/skills/unpin", deps.unpinSkillBinding)
+			r.Get("/skills/effective", deps.listEffectiveSkills)
+
+			r.Get("/gates/bindings", deps.listGateBindings)
+			r.Post("/gates/bindings", deps.bindGate)
+			r.Delete("/gates/bindings", deps.unbindGate)
+
+			r.Post("/secrets", deps.createSecret)
+			r.Get("/secrets", deps.listSecrets)
+			r.Delete("/secrets/{name}", deps.deleteSecret)
 		})
 	})
 

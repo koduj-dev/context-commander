@@ -13,12 +13,20 @@ import (
 
 	cchttp "github.com/koduj-dev/context-commander/adapters/http"
 	"github.com/koduj-dev/context-commander/internal/artifacts"
+	"github.com/koduj-dev/context-commander/internal/audit"
 	"github.com/koduj-dev/context-commander/internal/auth"
 	"github.com/koduj-dev/context-commander/internal/crypto"
 	"github.com/koduj-dev/context-commander/internal/db"
 	"github.com/koduj-dev/context-commander/internal/dbtest"
+	"github.com/koduj-dev/context-commander/internal/events"
+	"github.com/koduj-dev/context-commander/internal/gates"
+	"github.com/koduj-dev/context-commander/internal/handoffs"
+	"github.com/koduj-dev/context-commander/internal/history"
 	"github.com/koduj-dev/context-commander/internal/identity"
+	"github.com/koduj-dev/context-commander/internal/organizations"
 	"github.com/koduj-dev/context-commander/internal/projects"
+	"github.com/koduj-dev/context-commander/internal/secrets"
+	"github.com/koduj-dev/context-commander/internal/skills"
 	"github.com/koduj-dev/context-commander/internal/storage/filesystem"
 )
 
@@ -60,9 +68,24 @@ func newFixture(t *testing.T) *fixture {
 
 	projStore := projects.NewStore()
 	authz := auth.NewAuthzService(appPool, projStore)
-	artifactsSvc := artifacts.NewService(appPool, cryptoProvider, store, authz)
+	artifactsSvc := artifacts.NewService(appPool, cryptoProvider, store, authz, gates.NewEngine(appPool))
 
-	handler := cchttp.NewHandler(cchttp.Deps{Pool: appPool, Projects: projStore, Artifacts: artifactsSvc})
+	orgStore := organizations.NewStore()
+	eventsSvc := events.NewService(appPool, authz)
+	orgSvc := organizations.NewService(appPool, orgStore)
+	auditSvc := audit.NewService(appPool, authz)
+	handoffsSvc := handoffs.NewService(appPool, cryptoProvider, authz)
+	historySvc := history.NewService(appPool, cryptoProvider, authz)
+	skillsSvc := skills.NewService(appPool, authz, orgStore, store)
+	gatesAdmin := gates.NewAdminService(appPool, authz, orgStore)
+	secretsSvc := secrets.NewService(appPool, authz, secrets.NewLocalEncryptedBackend(appPool, cryptoProvider))
+
+	handler := cchttp.NewHandler(cchttp.Deps{
+		Pool: appPool, Projects: projStore, Artifacts: artifactsSvc,
+		Events: eventsSvc, Organizations: orgSvc, Audit: auditSvc,
+		Handoffs: handoffsSvc, History: historySvc,
+		Skills: skillsSvc, Gates: gatesAdmin, Secrets: secretsSvc,
+	})
 	server := httptest.NewServer(handler)
 	t.Cleanup(server.Close)
 
@@ -189,6 +212,372 @@ func TestNoTokenIsUnauthorized(t *testing.T) {
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("no token: status=%d, want 401", resp.StatusCode)
+	}
+}
+
+// createProject is a shared helper for the new-domain tests below — they
+// all need a project to anchor project-scoped capability checks against,
+// and repeating the raw POST /v1/projects call in every test would just be
+// noise.
+func (f *fixture) createProject(token, path, name string) {
+	f.t.Helper()
+	body, _ := json.Marshal(map[string]string{"project": path, "name": name})
+	resp := f.do(http.MethodPost, "/v1/projects", token, body)
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusCreated {
+		b, _ := io.ReadAll(resp.Body)
+		f.t.Fatalf("create project %q: status=%d body=%s", path, resp.StatusCode, b)
+	}
+}
+
+func TestEventsListAfterArtifactWrite(t *testing.T) {
+	f := newFixture(t)
+	token := f.newUserWithToken("events@example.test")
+	f.createProject(token, "events/proj", "Events Proj")
+
+	resp := f.do(http.MethodPut, "/v1/projects/events/proj/artifacts/content?path=f.txt&expected_version=0", token, []byte("v1"))
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("write artifact: status=%d", resp.StatusCode)
+	}
+
+	resp = f.do(http.MethodGet, "/v1/projects/events/proj/events", token, nil)
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("list events: status=%d", resp.StatusCode)
+	}
+	var list []map[string]any
+	_ = json.NewDecoder(resp.Body).Decode(&list)
+	if len(list) == 0 {
+		t.Fatal("expected at least one event after artifact.write, got none")
+	}
+}
+
+// userIDByEmail looks up a User row's id directly — the HTTP organizations
+// surface takes a raw user_id in its request body (unlike every
+// project-scoped endpoint, which resolves identity from the bearer token),
+// so a test that adds a *different* person as a member needs their id from
+// somewhere other than the token it issued them.
+func (f *fixture) userIDByEmail(email string) string {
+	f.t.Helper()
+	ctx := context.Background()
+	var id string
+	err := db.WithoutPrincipal(ctx, f.ownerPool, func(tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `SELECT id FROM users WHERE email = $1`, email).Scan(&id)
+	})
+	if err != nil {
+		f.t.Fatalf("userIDByEmail(%q): %v", email, err)
+	}
+	return id
+}
+
+func TestOrganizationCreateAndAddMember(t *testing.T) {
+	f := newFixture(t)
+	ownerToken := f.newUserWithToken("org-owner@example.test")
+	f.newUserWithToken("org-member@example.test")
+	memberUserID := f.userIDByEmail("org-member@example.test")
+
+	createBody, _ := json.Marshal(map[string]string{"name": "Acme"})
+	resp := f.do(http.MethodPost, "/v1/organizations", ownerToken, createBody)
+	if resp.StatusCode != http.StatusCreated {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("create organization: status=%d body=%s", resp.StatusCode, b)
+	}
+	var org map[string]any
+	_ = json.NewDecoder(resp.Body).Decode(&org)
+	_ = resp.Body.Close()
+	orgID, _ := org["id"].(string)
+	if orgID == "" {
+		t.Fatalf("create organization: response had no id: %+v", org)
+	}
+
+	addBody, _ := json.Marshal(map[string]string{"user_id": memberUserID, "role": "MEMBER"})
+	resp = f.do(http.MethodPost, "/v1/organizations/"+orgID+"/members", ownerToken, addBody)
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("add_member: status=%d body=%s", resp.StatusCode, b)
+	}
+	var membership map[string]any
+	_ = json.NewDecoder(resp.Body).Decode(&membership)
+	if membership["role"] != "MEMBER" {
+		t.Fatalf("add_member: role = %+v, want MEMBER", membership["role"])
+	}
+}
+
+func TestAuditListAfterArtifactWrite(t *testing.T) {
+	f := newFixture(t)
+	token := f.newUserWithToken("audit@example.test")
+	f.createProject(token, "audit/proj", "Audit Proj")
+
+	resp := f.do(http.MethodPut, "/v1/projects/audit/proj/artifacts/content?path=f.txt&expected_version=0", token, []byte("v1"))
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("write artifact: status=%d", resp.StatusCode)
+	}
+
+	resp = f.do(http.MethodGet, "/v1/projects/audit/proj/audit", token, nil)
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("list audit: status=%d body=%s", resp.StatusCode, b)
+	}
+	var list []map[string]any
+	_ = json.NewDecoder(resp.Body).Decode(&list)
+	if len(list) == 0 {
+		t.Fatal("expected at least one audit record after artifact.write, got none")
+	}
+}
+
+func TestHandoffCreateGetListRoundTrip(t *testing.T) {
+	f := newFixture(t)
+	token := f.newUserWithToken("handoff@example.test")
+	f.createProject(token, "handoff/proj", "Handoff Proj")
+
+	createBody, _ := json.Marshal(map[string]any{
+		"summary": "migrated ES cluster", "completed_work": "reindexed", "next_actions": "verify latency",
+	})
+	resp := f.do(http.MethodPost, "/v1/projects/handoff/proj/handoffs", token, createBody)
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("create handoff: status=%d body=%s", resp.StatusCode, b)
+	}
+	var created map[string]any
+	_ = json.NewDecoder(resp.Body).Decode(&created)
+	_ = resp.Body.Close()
+	handoffID, _ := created["id"].(string)
+	if handoffID == "" {
+		t.Fatalf("create handoff: response had no id: %+v", created)
+	}
+
+	resp = f.do(http.MethodGet, "/v1/projects/handoff/proj/handoffs/"+handoffID, token, nil)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("get handoff: status=%d", resp.StatusCode)
+	}
+	var got map[string]any
+	_ = json.NewDecoder(resp.Body).Decode(&got)
+	_ = resp.Body.Close()
+	if got["summary"] != "migrated ES cluster" {
+		t.Fatalf("get handoff: summary = %+v, want %q", got["summary"], "migrated ES cluster")
+	}
+
+	resp = f.do(http.MethodGet, "/v1/projects/handoff/proj/handoffs", token, nil)
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("list handoffs: status=%d", resp.StatusCode)
+	}
+	var list []map[string]any
+	_ = json.NewDecoder(resp.Body).Decode(&list)
+	if len(list) != 1 {
+		t.Fatalf("list handoffs: got %d entries, want 1", len(list))
+	}
+}
+
+func TestHistoryConversationSessionObjectLineage(t *testing.T) {
+	f := newFixture(t)
+	token := f.newUserWithToken("history@example.test")
+	f.createProject(token, "history/proj", "History Proj")
+
+	resp := f.do(http.MethodPost, "/v1/projects/history/proj/conversations", token, nil)
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("create conversation: status=%d body=%s", resp.StatusCode, b)
+	}
+	var conv map[string]any
+	_ = json.NewDecoder(resp.Body).Decode(&conv)
+	_ = resp.Body.Close()
+	conversationID, _ := conv["id"].(string)
+	if conversationID == "" {
+		t.Fatalf("create conversation: response had no id: %+v", conv)
+	}
+
+	sessionBody, _ := json.Marshal(map[string]string{
+		"provider": "anthropic", "client": "claude-code", "provider_session_id": "sess-1", "relation": "started",
+	})
+	resp = f.do(http.MethodPost, "/v1/projects/history/proj/conversations/"+conversationID+"/sessions", token, sessionBody)
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("create external session: status=%d body=%s", resp.StatusCode, b)
+	}
+	var session map[string]any
+	_ = json.NewDecoder(resp.Body).Decode(&session)
+	_ = resp.Body.Close()
+	externalSessionID, _ := session["id"].(string)
+
+	rawObjBody, _ := json.Marshal(map[string]string{
+		"external_session_id": externalSessionID, "type": "raw", "content": "hello world",
+	})
+	resp = f.do(http.MethodPost, "/v1/projects/history/proj/conversations/"+conversationID+"/objects", token, rawObjBody)
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("append raw history object: status=%d body=%s", resp.StatusCode, b)
+	}
+	var rawObj map[string]any
+	_ = json.NewDecoder(resp.Body).Decode(&rawObj)
+	_ = resp.Body.Close()
+	rawID, _ := rawObj["id"].(string)
+
+	compactedBody, _ := json.Marshal(map[string]string{
+		"external_session_id": externalSessionID, "type": "compacted", "derived_from": rawID, "content": "hello",
+	})
+	resp = f.do(http.MethodPost, "/v1/projects/history/proj/conversations/"+conversationID+"/objects", token, compactedBody)
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("append compacted history object: status=%d", resp.StatusCode)
+	}
+
+	resp = f.do(http.MethodGet, "/v1/projects/history/proj/conversations/"+conversationID+"/objects", token, nil)
+	var objects []map[string]any
+	_ = json.NewDecoder(resp.Body).Decode(&objects)
+	_ = resp.Body.Close()
+	if len(objects) != 2 {
+		t.Fatalf("list history objects: got %d, want 2", len(objects))
+	}
+
+	resp = f.do(http.MethodGet, "/v1/projects/history/proj/conversations/"+conversationID+"/lineage", token, nil)
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("get lineage: status=%d", resp.StatusCode)
+	}
+	var edges []map[string]any
+	_ = json.NewDecoder(resp.Body).Decode(&edges)
+	if len(edges) == 0 {
+		t.Fatal("expected at least one lineage edge (raw -> compacted), got none")
+	}
+}
+
+func TestSkillPublishInstallListEffective(t *testing.T) {
+	f := newFixture(t)
+	token := f.newUserWithToken("skills@example.test")
+	f.createProject(token, "skills/proj", "Skills Proj")
+
+	resp := f.do(http.MethodGet, "/v1/projects/skills/proj", token, nil)
+	var proj map[string]any
+	_ = json.NewDecoder(resp.Body).Decode(&proj)
+	_ = resp.Body.Close()
+	projectID, _ := proj["id"].(string)
+	if projectID == "" {
+		t.Fatalf("get project: response had no id: %+v", proj)
+	}
+
+	publishBody, _ := json.Marshal(map[string]any{
+		"name": "code-review", "author": "filip", "content": "review checklist",
+	})
+	resp = f.do(http.MethodPost, "/v1/projects/skills/proj/skills", token, publishBody)
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("publish skill: status=%d body=%s", resp.StatusCode, b)
+	}
+	var version map[string]any
+	_ = json.NewDecoder(resp.Body).Decode(&version)
+	_ = resp.Body.Close()
+	skillID, _ := version["skill_id"].(string)
+	skillVersionID, _ := version["id"].(string)
+	if skillID == "" || skillVersionID == "" {
+		t.Fatalf("publish skill: response missing ids: %+v", version)
+	}
+
+	installBody, _ := json.Marshal(map[string]any{
+		"scope": "project", "scope_ref": projectID, "skill_id": skillID, "skill_version_id": skillVersionID,
+	})
+	resp = f.do(http.MethodPost, "/v1/projects/skills/proj/skills/install", token, installBody)
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("install skill: status=%d body=%s", resp.StatusCode, b)
+	}
+	_ = resp.Body.Close()
+
+	resp = f.do(http.MethodGet, "/v1/projects/skills/proj/skills/effective", token, nil)
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("list effective skills: status=%d", resp.StatusCode)
+	}
+	var effective []map[string]any
+	_ = json.NewDecoder(resp.Body).Decode(&effective)
+	if len(effective) != 1 {
+		t.Fatalf("list effective skills: got %d, want 1", len(effective))
+	}
+}
+
+func TestGateBindListUnbind(t *testing.T) {
+	f := newFixture(t)
+	token := f.newUserWithToken("gates@example.test")
+	f.createProject(token, "gates/proj", "Gates Proj")
+
+	resp := f.do(http.MethodGet, "/v1/projects/gates/proj", token, nil)
+	var proj map[string]any
+	_ = json.NewDecoder(resp.Body).Decode(&proj)
+	_ = resp.Body.Close()
+	projectID, _ := proj["id"].(string)
+
+	bindBody, _ := json.Marshal(map[string]any{
+		"scope": "project", "scope_ref": projectID, "gate_name": "secret-scanner", "hook": "artifact.before_write",
+	})
+	resp = f.do(http.MethodPost, "/v1/projects/gates/proj/gates/bindings", token, bindBody)
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("bind gate: status=%d body=%s", resp.StatusCode, b)
+	}
+	var binding map[string]any
+	_ = json.NewDecoder(resp.Body).Decode(&binding)
+	_ = resp.Body.Close()
+	bindingID, _ := binding["id"].(string)
+	if bindingID == "" {
+		t.Fatalf("bind gate: response had no id: %+v", binding)
+	}
+
+	resp = f.do(http.MethodGet, "/v1/projects/gates/proj/gates/bindings", token, nil)
+	var list []map[string]any
+	_ = json.NewDecoder(resp.Body).Decode(&list)
+	_ = resp.Body.Close()
+	if len(list) != 1 {
+		t.Fatalf("list gate bindings: got %d, want 1", len(list))
+	}
+
+	resp = f.do(http.MethodDelete, "/v1/projects/gates/proj/gates/bindings?id="+bindingID, token, nil)
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusNoContent {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("unbind gate: status=%d body=%s", resp.StatusCode, b)
+	}
+}
+
+func TestSecretCreateListDeleteNeverReturnsValue(t *testing.T) {
+	f := newFixture(t)
+	token := f.newUserWithToken("secrets@example.test")
+	f.createProject(token, "secrets/proj", "Secrets Proj")
+
+	createBody, _ := json.Marshal(map[string]string{"name": "github-token", "value": "ghp_supersecret"})
+	resp := f.do(http.MethodPost, "/v1/projects/secrets/proj/secrets", token, createBody)
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("create secret: status=%d body=%s", resp.StatusCode, b)
+	}
+	raw, _ := io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
+	if bytes.Contains(raw, []byte("ghp_supersecret")) {
+		t.Fatalf("create secret response leaked the plaintext value: %s", raw)
+	}
+
+	resp = f.do(http.MethodGet, "/v1/projects/secrets/proj/secrets", token, nil)
+	raw, _ = io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("list secrets: status=%d body=%s", resp.StatusCode, raw)
+	}
+	if bytes.Contains(raw, []byte("ghp_supersecret")) {
+		t.Fatalf("list secrets response leaked the plaintext value: %s", raw)
+	}
+	var refs []map[string]any
+	_ = json.Unmarshal(raw, &refs)
+	if len(refs) != 1 {
+		t.Fatalf("list secrets: got %d entries, want 1", len(refs))
+	}
+
+	resp = f.do(http.MethodDelete, "/v1/projects/secrets/proj/secrets/github-token", token, nil)
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("delete secret: status=%d", resp.StatusCode)
 	}
 }
 

@@ -15,10 +15,18 @@ import (
 	cchttp "github.com/koduj-dev/context-commander/adapters/http"
 	ccmcp "github.com/koduj-dev/context-commander/adapters/mcp"
 	"github.com/koduj-dev/context-commander/internal/artifacts"
+	"github.com/koduj-dev/context-commander/internal/audit"
 	"github.com/koduj-dev/context-commander/internal/auth"
 	"github.com/koduj-dev/context-commander/internal/crypto"
 	"github.com/koduj-dev/context-commander/internal/db"
+	"github.com/koduj-dev/context-commander/internal/events"
+	"github.com/koduj-dev/context-commander/internal/gates"
+	"github.com/koduj-dev/context-commander/internal/handoffs"
+	"github.com/koduj-dev/context-commander/internal/history"
+	"github.com/koduj-dev/context-commander/internal/organizations"
 	"github.com/koduj-dev/context-commander/internal/projects"
+	"github.com/koduj-dev/context-commander/internal/secrets"
+	"github.com/koduj-dev/context-commander/internal/skills"
 	"github.com/koduj-dev/context-commander/internal/storage/filesystem"
 )
 
@@ -66,11 +74,33 @@ func newServeCmd() *cobra.Command {
 			cryptoProvider := crypto.NewProvider(root)
 			projStore := projects.NewStore()
 			authz := auth.NewAuthzService(pool, projStore)
-			artifactsSvc := artifacts.NewService(pool, cryptoProvider, store, authz)
+			gatesEngine := gates.NewEngine(pool)
+			artifactsSvc := artifacts.NewService(pool, cryptoProvider, store, authz, gatesEngine)
+
+			orgStore := organizations.NewStore()
+			eventsSvc := events.NewService(pool, authz)
+			orgSvc := organizations.NewService(pool, orgStore)
+			auditSvc := audit.NewService(pool, authz)
+			handoffsSvc := handoffs.NewService(pool, cryptoProvider, authz)
+			historySvc := history.NewService(pool, cryptoProvider, authz)
+			skillsSvc := skills.NewService(pool, authz, orgStore, store)
+			gatesAdmin := gates.NewAdminService(pool, authz, orgStore)
+			secretsBackend := secrets.NewLocalEncryptedBackend(pool, cryptoProvider)
+			secretsSvc := secrets.NewService(pool, authz, secretsBackend)
 
 			mux := http.NewServeMux()
-			mux.Handle("/mcp", ccmcp.NewHandler(ccmcp.Deps{Pool: pool, Projects: projStore, Artifacts: artifactsSvc}))
-			mux.Handle("/", cchttp.NewHandler(cchttp.Deps{Pool: pool, Projects: projStore, Artifacts: artifactsSvc}))
+			mux.Handle("/mcp", ccmcp.NewHandler(ccmcp.Deps{
+				Pool: pool, Projects: projStore, Artifacts: artifactsSvc,
+				Events: eventsSvc, Organizations: orgSvc, Audit: auditSvc,
+				Handoffs: handoffsSvc, History: historySvc,
+				Skills: skillsSvc, Gates: gatesAdmin, Secrets: secretsSvc,
+			}))
+			mux.Handle("/", cchttp.NewHandler(cchttp.Deps{
+				Pool: pool, Projects: projStore, Artifacts: artifactsSvc,
+				Events: eventsSvc, Organizations: orgSvc, Audit: auditSvc,
+				Handoffs: handoffsSvc, History: historySvc,
+				Skills: skillsSvc, Gates: gatesAdmin, Secrets: secretsSvc,
+			}))
 
 			server := &http.Server{
 				Addr:              addr,
