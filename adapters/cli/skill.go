@@ -99,7 +99,7 @@ func setupSkillContext(cmd *cobra.Command) (*skillContext, error) {
 	}
 
 	authz := auth.NewAuthzService(pool, projStore)
-	svc := skills.NewService(pool, authz, organizations.NewStore(), store)
+	svc := skills.NewService(pool, authz, organizations.NewStore(), projStore, store)
 
 	return &skillContext{svc: svc, principalID: principalID, userID: userID, project: project, pool: pool}, nil
 }

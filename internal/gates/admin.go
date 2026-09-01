@@ -13,6 +13,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/auth"
 	"github.com/koduj-dev/context-commander/internal/db"
 	"github.com/koduj-dev/context-commander/internal/organizations"
+	"github.com/koduj-dev/context-commander/internal/projects"
 )
 
 // Scope is where a gate_bindings row applies — mirrors internal/skills.Scope
@@ -67,13 +68,14 @@ type Binding struct {
 // action. Splitting them also means adding this service required no change
 // to Engine's constructor or any of its existing call sites.
 type AdminService struct {
-	pool  *db.Pool
-	authz *auth.AuthzService
-	orgs  *organizations.Store
+	pool     *db.Pool
+	authz    *auth.AuthzService
+	orgs     *organizations.Store
+	projects *projects.Store
 }
 
-func NewAdminService(pool *db.Pool, authz *auth.AuthzService, orgs *organizations.Store) *AdminService {
-	return &AdminService{pool: pool, authz: authz, orgs: orgs}
+func NewAdminService(pool *db.Pool, authz *auth.AuthzService, orgs *organizations.Store, projectsStore *projects.Store) *AdminService {
+	return &AdminService{pool: pool, authz: authz, orgs: orgs, projects: projectsStore}
 }
 
 func (s *AdminService) checkCapability(ctx context.Context, principalID, projectID uuid.UUID) error {
@@ -87,13 +89,16 @@ func (s *AdminService) checkCapability(ctx context.Context, principalID, project
 	return nil
 }
 
-// checkScopeTarget mirrors internal/skills.Service.checkScopeTarget
-// exactly: ScopeOrganization requires the caller (identified by userID —
+// checkScopeTarget mirrors internal/skills.Service.checkScopeTarget exactly:
+// ScopeOrganization requires the caller (identified by userID —
 // organization_members is keyed by user, docs/adr/0006) to hold
-// CapOrgManageMembers on that organization; ScopeProject is authorized by
-// the anchor-project capability check the caller already passed;
-// ScopeInstallation is rejected outright.
-func (s *AdminService) checkScopeTarget(ctx context.Context, tx pgx.Tx, userID uuid.UUID, scope Scope, scopeRef *uuid.UUID) error {
+// CapOrgManageMembers on that organization; ScopeProject must be
+// independently checked against scopeRef itself — projectID (the anchor
+// used for the earlier capability check) and scopeRef are caller-supplied
+// and not required to be equal, so the anchor check alone does not prove
+// the caller may manage gates on scopeRef; ScopeInstallation is rejected
+// outright.
+func (s *AdminService) checkScopeTarget(ctx context.Context, tx pgx.Tx, principalID, userID uuid.UUID, scope Scope, scopeRef *uuid.UUID) error {
 	switch scope {
 	case ScopeInstallation:
 		return ErrUnsupportedScope
@@ -113,14 +118,28 @@ func (s *AdminService) checkScopeTarget(ctx context.Context, tx pgx.Tx, userID u
 		if scopeRef == nil {
 			return ErrScopeRefRequired
 		}
+		// Uses projects.Store directly against the already-open tx, not
+		// s.checkCapability (which opens its own transaction via
+		// AuthzService.Can) — nesting a second pool.Begin inside this
+		// transaction's callback risks pool exhaustion/deadlock under a
+		// small connection pool.
+		m, err := s.projects.GetMembership(ctx, tx, *scopeRef, principalID)
+		if err != nil {
+			return ErrForbidden
+		}
+		if !auth.RoleCan(m.Role, auth.CapGateManage) {
+			return ErrForbidden
+		}
 		return nil
 	default:
 		return fmt.Errorf("gates: unknown scope %q", scope)
 	}
 }
 
-// Bind creates a gate_bindings row. projectID anchors the capability check
-// regardless of scope, same reasoning as internal/skills.Service.Install.
+// Bind creates a gate_bindings row. projectID anchors the initial capability
+// check; checkScopeTarget independently authorizes the caller against
+// scopeRef itself before the binding is written, same reasoning as
+// internal/skills.Service.Install.
 func (s *AdminService) Bind(
 	ctx context.Context, principalID, userID, projectID uuid.UUID,
 	scope Scope, scopeRef *uuid.UUID,
@@ -138,7 +157,7 @@ func (s *AdminService) Bind(
 		GateName: gateName, Hook: hook, Enabled: true, Config: config,
 	}
 	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
-		if err := s.checkScopeTarget(ctx, tx, userID, scope, scopeRef); err != nil {
+		if err := s.checkScopeTarget(ctx, tx, principalID, userID, scope, scopeRef); err != nil {
 			return err
 		}
 		return tx.QueryRow(ctx,
@@ -171,7 +190,7 @@ func (s *AdminService) Unbind(ctx context.Context, principalID, userID, projectI
 		if err != nil {
 			return fmt.Errorf("gates: look up binding: %w", err)
 		}
-		if err := s.checkScopeTarget(ctx, tx, userID, scope, scopeRef); err != nil {
+		if err := s.checkScopeTarget(ctx, tx, principalID, userID, scope, scopeRef); err != nil {
 			return err
 		}
 		tag, err := tx.Exec(ctx, `DELETE FROM gate_bindings WHERE id = $1`, bindingID)

@@ -83,8 +83,8 @@ func newServeCmd() *cobra.Command {
 			auditSvc := audit.NewService(pool, authz)
 			handoffsSvc := handoffs.NewService(pool, cryptoProvider, authz)
 			historySvc := history.NewService(pool, cryptoProvider, authz)
-			skillsSvc := skills.NewService(pool, authz, orgStore, store)
-			gatesAdmin := gates.NewAdminService(pool, authz, orgStore)
+			skillsSvc := skills.NewService(pool, authz, orgStore, projStore, store)
+			gatesAdmin := gates.NewAdminService(pool, authz, orgStore, projStore)
 			secretsBackend := secrets.NewLocalEncryptedBackend(pool, cryptoProvider)
 			secretsSvc := secrets.NewService(pool, authz, secretsBackend)
 

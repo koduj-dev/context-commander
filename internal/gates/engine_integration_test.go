@@ -192,11 +192,12 @@ func newAdminFixture(t *testing.T) *adminFixture {
 		t.Fatalf("seed admin fixture: %v", err)
 	}
 
-	authz := auth.NewAuthzService(f.appPool, projects.NewStore())
+	projStore := projects.NewStore()
+	authz := auth.NewAuthzService(f.appPool, projStore)
 
 	return &adminFixture{
 		engineFixture:       f,
-		admin:               gates.NewAdminService(f.appPool, authz, organizations.NewStore()),
+		admin:               gates.NewAdminService(f.appPool, authz, organizations.NewStore(), projStore),
 		userID:              userID,
 		contributorID:       contributorID,
 		contributorUserID:   contributorUserID,
@@ -255,6 +256,64 @@ func TestAdminBindDeniedWithoutCapGateManage(t *testing.T) {
 	_, err := f.admin.Bind(f.ctx, f.contributorID, f.contributorUserID, f.projectID, gates.ScopeProject, &f.projectID, "secret-scanner", "artifact.before_write", nil)
 	if !errors.Is(err, gates.ErrForbidden) {
 		t.Fatalf("got %v, want ErrForbidden — CONTRIBUTOR lacks CapGateManage", err)
+	}
+}
+
+// TestAdminBindAndUnbindDeniedForNonManagerOfScopeRefProject
+// regression-guards against binding into (or unbinding from) a project
+// other than the anchor projectID used for the initial capability check:
+// f.principalID is OWNER on f.projectID (the anchor, giving CapGateManage)
+// but only CONTRIBUTOR on a second project — Bind must deny writing a
+// binding scoped to that second project, and Unbind must likewise deny
+// removing an existing binding scoped there, rather than authorizing
+// either off the unrelated anchor.
+func TestAdminBindAndUnbindDeniedForNonManagerOfScopeRefProject(t *testing.T) {
+	f := newAdminFixture(t)
+	otherProjectID := uuid.New()
+	err := db.WithoutPrincipal(f.ctx, f.ownerPool, func(tx pgx.Tx) error {
+		otherOwnerUserID := uuid.New()
+		if _, err := tx.Exec(f.ctx, `INSERT INTO users (id, email, display_name) VALUES ($1, $2, $3)`,
+			otherOwnerUserID, otherOwnerUserID.String()+"@example.test", "Other Project Owner"); err != nil {
+			return err
+		}
+		namespaceID := uuid.New()
+		if _, err := tx.Exec(f.ctx,
+			`INSERT INTO namespaces (id, kind, slug, owner_user_id) VALUES ($1, 'personal', $2, $3)`,
+			namespaceID, "other-"+namespaceID.String()[:8], otherOwnerUserID); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(f.ctx, `INSERT INTO projects (id, namespace_id, slug, name) VALUES ($1, $2, 'other', 'Other')`,
+			otherProjectID, namespaceID); err != nil {
+			return err
+		}
+		_, err := tx.Exec(f.ctx, `INSERT INTO project_members (project_id, principal_id, role) VALUES ($1, $2, 'CONTRIBUTOR')`,
+			otherProjectID, f.principalID)
+		return err
+	})
+	if err != nil {
+		t.Fatalf("seed other project: %v", err)
+	}
+
+	if _, err := f.admin.Bind(f.ctx, f.principalID, f.userID, f.projectID, gates.ScopeProject, &otherProjectID, "secret-scanner", "artifact.before_write", nil); !errors.Is(err, gates.ErrForbidden) {
+		t.Fatalf("Bind into a project the caller is only CONTRIBUTOR on: got err=%v, want ErrForbidden", err)
+	}
+
+	// Seed an existing project-scope binding directly (bypassing
+	// AdminService) on otherProjectID, then confirm Unbind — anchored at
+	// f.projectID, where the caller has CapGateManage — cannot remove it
+	// either.
+	bindingID := uuid.New()
+	err = db.WithoutPrincipal(f.ctx, f.ownerPool, func(tx pgx.Tx) error {
+		_, err := tx.Exec(f.ctx,
+			`INSERT INTO gate_bindings (id, scope, scope_ref, gate_name, hook) VALUES ($1, 'project', $2, 'secret-scanner', 'artifact.before_write')`,
+			bindingID, otherProjectID)
+		return err
+	})
+	if err != nil {
+		t.Fatalf("seed other project binding: %v", err)
+	}
+	if err := f.admin.Unbind(f.ctx, f.principalID, f.userID, f.projectID, bindingID); !errors.Is(err, gates.ErrForbidden) {
+		t.Fatalf("Unbind a binding scoped to a project the caller is only CONTRIBUTOR on: got err=%v, want ErrForbidden", err)
 	}
 }
 

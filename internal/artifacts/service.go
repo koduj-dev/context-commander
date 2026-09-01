@@ -94,7 +94,17 @@ func (s *Service) Write(
 		return Version{}, ErrTooLarge
 	}
 
-	gateResult, err := s.gates.Evaluate(ctx, principalID, projectID, nil, "artifact.before_write", plaintext)
+	var orgID *uuid.UUID
+	if err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+		return tx.QueryRow(ctx,
+			`SELECT n.organization_id FROM projects p JOIN namespaces n ON n.id = p.namespace_id WHERE p.id = $1`,
+			projectID,
+		).Scan(&orgID)
+	}); err != nil {
+		return Version{}, fmt.Errorf("artifacts: resolve organization: %w", err)
+	}
+
+	gateResult, err := s.gates.Evaluate(ctx, principalID, projectID, orgID, "artifact.before_write", plaintext)
 	if err != nil {
 		return Version{}, fmt.Errorf("artifacts: gate evaluation: %w", err)
 	}

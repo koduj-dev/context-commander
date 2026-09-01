@@ -75,8 +75,8 @@ func newFixture(t *testing.T) *fixture {
 	auditSvc := audit.NewService(appPool, authz)
 	handoffsSvc := handoffs.NewService(appPool, cryptoProvider, authz)
 	historySvc := history.NewService(appPool, cryptoProvider, authz)
-	skillsSvc := skills.NewService(appPool, authz, orgStore, store)
-	gatesAdmin := gates.NewAdminService(appPool, authz, orgStore)
+	skillsSvc := skills.NewService(appPool, authz, orgStore, projStore, store)
+	gatesAdmin := gates.NewAdminService(appPool, authz, orgStore, projStore)
 	secretsSvc := secrets.NewService(appPool, authz, secrets.NewLocalEncryptedBackend(appPool, cryptoProvider))
 
 	handler := ccmcp.NewHandler(ccmcp.Deps{

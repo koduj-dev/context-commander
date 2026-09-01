@@ -484,4 +484,63 @@ func TestWriteBlockedBySecretScannerGate(t *testing.T) {
 	}
 }
 
+// TestWriteBlockedByOrganizationScopeGate regression-guards Write's
+// resolution of the project's owning organization before calling
+// gates.Engine.Evaluate — Evaluate only matches an organization-scope
+// binding when passed that project's real orgID, so a project under an
+// organization namespace must still be blocked by a gate bound at
+// organization scope, not just installation/project scope (already covered
+// by TestWriteBlockedBySecretScannerGate).
+func TestWriteBlockedByOrganizationScopeGate(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+
+	orgProjectID := uuid.New()
+	orgID := uuid.New()
+	err := db.WithoutPrincipal(ctx, f.ownerPool, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, `INSERT INTO organizations (id, name) VALUES ($1, 'Fixture Org')`, orgID); err != nil {
+			return err
+		}
+		namespaceID := uuid.New()
+		if _, err := tx.Exec(ctx,
+			`INSERT INTO namespaces (id, kind, slug, organization_id) VALUES ($1, 'organization', $2, $3)`,
+			namespaceID, "fixture-org-"+namespaceID.String()[:8], orgID); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `INSERT INTO projects (id, namespace_id, slug, name) VALUES ($1, $2, 'org-project', 'Org Project')`,
+			orgProjectID, namespaceID); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `INSERT INTO project_members (project_id, principal_id, role) VALUES ($1, $2, 'OWNER')`,
+			orgProjectID, f.principalID); err != nil {
+			return err
+		}
+		// gate_bindings RLS (migrations/000008_gates.up.sql) hides an
+		// organization-scope row from a principal with no organization_members
+		// row for that org (cc_has_org_access) — independent of project
+		// membership. f.principalID's user needs to actually join the
+		// organization for the binding to be visible at all.
+		var writerUserID uuid.UUID
+		if err := tx.QueryRow(ctx, `SELECT user_id FROM principals WHERE id = $1`, f.principalID).Scan(&writerUserID); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `INSERT INTO organization_members (organization_id, user_id, role) VALUES ($1, $2, 'MEMBER')`,
+			orgID, writerUserID); err != nil {
+			return err
+		}
+		_, err := tx.Exec(ctx,
+			`INSERT INTO gate_bindings (id, scope, scope_ref, gate_name, hook) VALUES ($1, 'organization', $2, 'secret-scanner', 'artifact.before_write')`,
+			uuid.New(), orgID)
+		return err
+	})
+	if err != nil {
+		t.Fatalf("seed org-scoped project and gate binding: %v", err)
+	}
+
+	_, err = f.svc.Write(ctx, f.principalID, f.clientID, orgProjectID, "config/.env", "text/plain", []byte("AWS_SECRET_ACCESS_KEY=AKIAABCDEFGHIJKLMNOP"), 0)
+	if !errors.Is(err, artifacts.ErrBlockedByGate) {
+		t.Fatalf("Write with secret-like content under an organization-scope gate binding: got err=%v, want ErrBlockedByGate", err)
+	}
+}
+
 func intPtr(v int) *int { return &v }

@@ -80,11 +80,12 @@ func newFixture(t *testing.T) *fixture {
 	}
 
 	orgStore := organizations.NewStore()
-	authz := auth.NewAuthzService(appPool, projects.NewStore())
+	projStore := projects.NewStore()
+	authz := auth.NewAuthzService(appPool, projStore)
 
 	return &fixture{
 		t: t, ctx: ctx, ownerPool: ownerPool, appPool: appPool,
-		svc:         skills.NewService(appPool, authz, orgStore, store),
+		svc:         skills.NewService(appPool, authz, orgStore, projStore, store),
 		orgs:        orgStore,
 		orgSvc:      organizations.NewService(appPool, orgStore),
 		projectID:   projectID,
@@ -224,6 +225,50 @@ func TestPublishDeniedWithoutCapability(t *testing.T) {
 	_, err := f.svc.Publish(f.ctx, outsider, f.projectID, nil, "x", "a", "o", []byte("c"), nil)
 	if !errors.Is(err, skills.ErrForbidden) {
 		t.Fatalf("Publish by non-member: got err=%v, want ErrForbidden", err)
+	}
+}
+
+// TestInstallDeniedForNonMemberOfScopeRefProject regression-guards against
+// installing a binding into a project other than the anchor projectID used
+// for the initial capability check: f.principalID is ADMIN on f.projectID
+// (the anchor, giving CapSkillInstall) but only READER on a second project
+// — Install must deny writing a binding scoped to that second project
+// rather than authorizing it off the unrelated anchor.
+func TestInstallDeniedForNonMemberOfScopeRefProject(t *testing.T) {
+	f := newFixture(t)
+	otherProjectID := uuid.New()
+	err := db.WithoutPrincipal(f.ctx, f.ownerPool, func(tx pgx.Tx) error {
+		otherOwnerUserID := uuid.New()
+		if _, err := tx.Exec(f.ctx, `INSERT INTO users (id, email, display_name) VALUES ($1, $2, $3)`,
+			otherOwnerUserID, otherOwnerUserID.String()+"@example.test", "Other Project Owner"); err != nil {
+			return err
+		}
+		namespaceID := uuid.New()
+		if _, err := tx.Exec(f.ctx,
+			`INSERT INTO namespaces (id, kind, slug, owner_user_id) VALUES ($1, 'personal', $2, $3)`,
+			namespaceID, "other-"+namespaceID.String()[:8], otherOwnerUserID); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(f.ctx, `INSERT INTO projects (id, namespace_id, slug, name) VALUES ($1, $2, 'other', 'Other')`,
+			otherProjectID, namespaceID); err != nil {
+			return err
+		}
+		_, err := tx.Exec(f.ctx, `INSERT INTO project_members (project_id, principal_id, role) VALUES ($1, $2, 'READER')`,
+			otherProjectID, f.principalID)
+		return err
+	})
+	if err != nil {
+		t.Fatalf("seed other project: %v", err)
+	}
+
+	v, err := f.svc.Publish(f.ctx, f.principalID, f.projectID, nil, "cross-project-skill", "acme", "local", []byte("content"), nil)
+	if err != nil {
+		t.Fatalf("Publish: %v", err)
+	}
+
+	_, err = f.svc.Install(f.ctx, f.principalID, f.userID, f.projectID, skills.ScopeProject, &otherProjectID, v.SkillID, v.ID, false, true)
+	if !errors.Is(err, skills.ErrForbidden) {
+		t.Fatalf("Install into a project the caller is only READER on: got err=%v, want ErrForbidden", err)
 	}
 }
 

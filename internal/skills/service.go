@@ -13,6 +13,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/auth"
 	"github.com/koduj-dev/context-commander/internal/db"
 	"github.com/koduj-dev/context-commander/internal/organizations"
+	"github.com/koduj-dev/context-commander/internal/projects"
 	"github.com/koduj-dev/context-commander/internal/storage"
 )
 
@@ -27,14 +28,15 @@ import (
 // a shortcut. See ErrUnsupportedScope for the one case (installation-scope
 // bindings) this does not cover at all.
 type Service struct {
-	pool  *db.Pool
-	authz *auth.AuthzService
-	orgs  *organizations.Store
-	store storage.ObjectStore
+	pool     *db.Pool
+	authz    *auth.AuthzService
+	orgs     *organizations.Store
+	projects *projects.Store
+	store    storage.ObjectStore
 }
 
-func NewService(pool *db.Pool, authz *auth.AuthzService, orgs *organizations.Store, store storage.ObjectStore) *Service {
-	return &Service{pool: pool, authz: authz, orgs: orgs, store: store}
+func NewService(pool *db.Pool, authz *auth.AuthzService, orgs *organizations.Store, projectsStore *projects.Store, store storage.ObjectStore) *Service {
+	return &Service{pool: pool, authz: authz, orgs: orgs, projects: projectsStore, store: store}
 }
 
 func (s *Service) checkCapability(ctx context.Context, principalID, projectID uuid.UUID, cap auth.Capability) error {
@@ -51,10 +53,13 @@ func (s *Service) checkCapability(ctx context.Context, principalID, projectID uu
 // checkOverrideTarget verifies scope/scopeRef names something the caller
 // can actually bind into: for ScopeOrganization, the caller (identified by
 // userID — organization_members is keyed by user, docs/adr/0006) must hold
-// CapOrgManageMembers on that organization. ScopeProject is authorized by
-// the anchor-project capability check the caller already did. ScopeStore
-// installation is rejected outright — see ErrUnsupportedScope.
-func (s *Service) checkScopeTarget(ctx context.Context, tx pgx.Tx, userID uuid.UUID, scope Scope, scopeRef *uuid.UUID) error {
+// CapOrgManageMembers on that organization. ScopeProject must be
+// independently checked against scopeRef itself — projectID (the anchor
+// used for the earlier capability check) and scopeRef are caller-supplied
+// and not required to be equal, so the anchor check alone does not prove
+// the caller may install into scopeRef. ScopeStore installation is
+// rejected outright — see ErrUnsupportedScope.
+func (s *Service) checkScopeTarget(ctx context.Context, tx pgx.Tx, principalID, userID uuid.UUID, scope Scope, scopeRef *uuid.UUID) error {
 	switch scope {
 	case ScopeInstallation:
 		return ErrUnsupportedScope
@@ -73,6 +78,18 @@ func (s *Service) checkScopeTarget(ctx context.Context, tx pgx.Tx, userID uuid.U
 	case ScopeProject:
 		if scopeRef == nil {
 			return ErrScopeRefRequired
+		}
+		// Uses projects.Store directly against the already-open tx, not
+		// s.checkCapability (which opens its own transaction via
+		// AuthzService.Can) — nesting a second pool.Begin inside this
+		// transaction's callback risks pool exhaustion/deadlock under a
+		// small connection pool.
+		m, err := s.projects.GetMembership(ctx, tx, *scopeRef, principalID)
+		if err != nil {
+			return ErrForbidden
+		}
+		if !auth.RoleCan(m.Role, auth.CapSkillInstall) {
+			return ErrForbidden
 		}
 		return nil
 	default:
@@ -157,8 +174,10 @@ func (s *Service) Publish(
 // Install creates a SkillBinding — "project X uses skill Y". scope names
 // where the binding applies, scopeRef its organization/project id (nil for
 // ScopeInstallation, which Install always rejects — see
-// ErrUnsupportedScope). projectID is the anchor used for the capability
-// check regardless of scope.
+// ErrUnsupportedScope). projectID anchors the initial capability check;
+// checkScopeTarget independently authorizes the caller against scopeRef
+// itself before the binding is written, since scopeRef need not equal
+// projectID.
 func (s *Service) Install(
 	ctx context.Context, principalID, userID, projectID uuid.UUID,
 	scope Scope, scopeRef *uuid.UUID,
@@ -176,7 +195,7 @@ func (s *Service) Install(
 		InstalledBy: &principalID,
 	}
 	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
-		if err := s.checkScopeTarget(ctx, tx, userID, scope, scopeRef); err != nil {
+		if err := s.checkScopeTarget(ctx, tx, principalID, userID, scope, scopeRef); err != nil {
 			return err
 		}
 		_, err := tx.Exec(ctx,

@@ -81,7 +81,7 @@ func setupGateContext(cmd *cobra.Command) (*gateContext, error) {
 	}
 
 	authz := auth.NewAuthzService(pool, projStore)
-	admin := gates.NewAdminService(pool, authz, organizations.NewStore())
+	admin := gates.NewAdminService(pool, authz, organizations.NewStore(), projStore)
 
 	return &gateContext{admin: admin, principalID: principalID, userID: userID, project: project, pool: pool}, nil
 }
