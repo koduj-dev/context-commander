@@ -15,6 +15,7 @@ import (
 
 	"github.com/koduj-dev/context-commander/internal/artifacts"
 	"github.com/koduj-dev/context-commander/internal/audit"
+	"github.com/koduj-dev/context-commander/internal/auth"
 	"github.com/koduj-dev/context-commander/internal/db"
 	"github.com/koduj-dev/context-commander/internal/events"
 	"github.com/koduj-dev/context-commander/internal/gates"
@@ -32,6 +33,7 @@ import (
 type Deps struct {
 	Pool          *db.Pool
 	Projects      *projects.Store
+	Authz         *auth.AuthzService
 	Artifacts     *artifacts.Service
 	Events        *events.Service
 	Organizations *organizations.Service

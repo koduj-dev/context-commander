@@ -39,6 +39,25 @@ func writeError(w http.ResponseWriter, status int, code, message string) {
 	_ = json.NewEncoder(w).Encode(body)
 }
 
+// maxJSONBodyBytes bounds every JSON request body this API decodes.
+// Metadata bodies (names, roles, references, small text fields) never need
+// more than this; the one payload-carrying exception (artifact content) has
+// its own domain-level cap (artifacts.MaxSize) applied separately, before
+// this would ever be hit.
+const maxJSONBodyBytes = 1 << 20 // 1 MiB
+
+// decodeJSONBody wraps r.Body in http.MaxBytesReader before decoding, so a
+// body over maxJSONBodyBytes fails the read (and json.Decode) instead of a
+// caller being able to make a handler buffer an unbounded body in memory —
+// see docs/gotchas.md and the P2 finding this fixes: several handlers used
+// to call json.NewDecoder(r.Body) with no cap at all, others used a bare
+// io.LimitReader inconsistently. Every handler in this package should call
+// this instead of decoding r.Body directly.
+func decodeJSONBody(w http.ResponseWriter, r *http.Request, dst any) error {
+	r.Body = http.MaxBytesReader(w, r.Body, maxJSONBodyBytes)
+	return json.NewDecoder(r.Body).Decode(dst)
+}
+
 // writeDomainError maps a domain error to the uniform HTTP error envelope —
 // the same status/code mapping regardless of which domain service the
 // error came from, and the same shape adapters/mcp uses for its own error
@@ -62,7 +81,7 @@ func writeDomainError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusConflict, "conflict", "version conflict: the artifact was modified since your expected_version")
 	case errors.Is(err, artifacts.ErrBlockedByGate):
 		writeError(w, http.StatusUnprocessableEntity, "blocked_by_gate", err.Error())
-	case errors.Is(err, artifacts.ErrTooLarge):
+	case errors.Is(err, artifacts.ErrTooLarge), errors.Is(err, history.ErrTooLarge):
 		writeError(w, http.StatusRequestEntityTooLarge, "too_large", err.Error())
 	case errors.Is(err, skills.ErrNotOverridable):
 		writeError(w, http.StatusConflict, "conflict", "shadowed binding is not overridable")
@@ -70,7 +89,13 @@ func writeDomainError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusBadRequest, "invalid_request", "installation-scope bindings are operator-seeded only")
 	case errors.Is(err, skills.ErrScopeRefRequired), errors.Is(err, gates.ErrScopeRefRequired):
 		writeError(w, http.StatusBadRequest, "invalid_request", "organization/project scope requires scope_ref")
-	case errors.Is(err, projects.ErrInvalidResolvePath):
+	case errors.Is(err, skills.ErrSkillVersionMismatch):
+		writeError(w, http.StatusBadRequest, "invalid_request", "skill_version_id does not belong to skill_id")
+	case errors.Is(err, gates.ErrUnknownGate):
+		writeError(w, http.StatusBadRequest, "invalid_request", "gate_name is not a registered provider")
+	case errors.Is(err, history.ErrInvalidReference):
+		writeError(w, http.StatusBadRequest, "invalid_request", "referenced conversation/session/derived_from object does not belong to this project/conversation")
+	case errors.Is(err, projects.ErrInvalidResolvePath), errors.Is(err, secrets.ErrInvalidName):
 		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
 	default:
 		writeError(w, http.StatusInternalServerError, "internal", "internal error")

@@ -13,7 +13,27 @@ import (
 var (
 	ErrNotFound  = errors.New("history: not found")
 	ErrForbidden = errors.New("history: forbidden")
+
+	// ErrInvalidReference is returned when a supplied conversation_id,
+	// external_session_id, parent_external_session_id, or derived_from
+	// does not belong to this project (and, where applicable, this
+	// conversation) — the database enforces this via composite foreign
+	// keys (migrations/000015); this error gives that violation a stable,
+	// domain-level shape instead of an opaque constraint-violation error.
+	ErrInvalidReference = errors.New("history: referenced object does not belong to this project/conversation")
+
+	// ErrTooLarge is returned by Service.AppendHistoryObject when plaintext
+	// exceeds MaxContentSize — history had no domain-level content limit at
+	// all before this, unlike internal/artifacts.MaxSize.
+	ErrTooLarge = errors.New("history: content exceeds the 10 MB MVP limit")
 )
+
+// MaxContentSize is the MVP per-HistoryObject size limit — smaller than
+// internal/artifacts.MaxSize (50 MB) since a single conversation turn/session
+// transcript is expected to be much smaller than an arbitrary artifact, and
+// ListHistoryObjects decrypts every object of a conversation into memory at
+// once (see its own MaxListLimit cap for the row-count half of this).
+const MaxContentSize = 10 * 1024 * 1024 // 10 MB
 
 // Conversation is Context Commander's own stable identity for a logical
 // thread of work — never a provider session ID (§10.1).

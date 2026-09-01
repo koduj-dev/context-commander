@@ -30,10 +30,12 @@ type binding struct {
 
 // Evaluate runs every enabled gate bound to hook for projectID (and orgID,
 // if the project belongs to one) and returns the aggregate Result. A
-// binding naming a gate that isn't registered (Register) is skipped rather
-// than failing the whole evaluation — a missing/renamed provider is a
-// deployment mismatch to fix, not a reason to block every write in the
-// meantime.
+// binding naming a gate that isn't registered (Register) fails the whole
+// evaluation with an error — a mandatory security gate silently disabled by
+// a typo, a removed provider, or an incomplete deployment must not
+// fail open to ALLOW (AdminService.Bind also rejects unknown gate names at
+// bind time; ValidateRegisteredBindings checks the same at startup, in case
+// a binding was written before a provider was un-registered).
 func (e *Engine) Evaluate(ctx context.Context, principalID, projectID uuid.UUID, orgID *uuid.UUID, hook string, payload []byte) (Result, error) {
 	var bindings []binding
 	err := db.WithPrincipal(ctx, e.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
@@ -66,7 +68,7 @@ func (e *Engine) Evaluate(ctx context.Context, principalID, projectID uuid.UUID,
 	for _, b := range bindings {
 		gate, ok := Get(b.gateName)
 		if !ok {
-			continue
+			return Result{}, fmt.Errorf("gates: %q is bound to hook %q but has no registered provider (fail closed, not ALLOW)", b.gateName, hook)
 		}
 		r, err := gate.Evaluate(ctx, HookContext{Hook: hook, ProjectID: projectID, Payload: payload, Config: b.config})
 		if err != nil {

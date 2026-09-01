@@ -50,7 +50,14 @@ Same "sibling project" doc style, adopted as the repo actually grows into it:
 
 ## 📦 Backlog
 
-Nothing parked here yet.
+- **Real cursor pagination for list endpoints.** `history.Service.ListHistoryObjects`
+  is now capped at `MaxListLimit` (1000 rows/call) instead of being fully
+  unbounded, and `events.Service.List` caps `limit` the same way
+  `internal/audit` already did — but none of these, nor `artifacts`/
+  `handoffs`/`secrets` listing, have real cursor-based pagination yet. A
+  conversation/project with more than one page's worth of rows currently has
+  no way to see the rest. Worth doing properly (keyset cursor, not offset)
+  before any of these lists can grow past a single page in practice.
 
 ---
 

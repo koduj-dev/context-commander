@@ -1,8 +1,6 @@
 package http
 
 import (
-	"encoding/json"
-	"io"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -54,7 +52,7 @@ func (d Deps) publishSkill(w http.ResponseWriter, r *http.Request) {
 		Content              string     `json:"content"`
 		DeclaredCapabilities []string   `json:"declared_capabilities"`
 	}
-	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&body); err != nil {
+	if err := decodeJSONBody(w, r, &body); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_request", "could not decode request body")
 		return
 	}
@@ -79,7 +77,7 @@ func (d Deps) installSkill(w http.ResponseWriter, r *http.Request) {
 		Managed        bool       `json:"managed"`
 		Overridable    bool       `json:"overridable"`
 	}
-	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&body); err != nil {
+	if err := decodeJSONBody(w, r, &body); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_request", "could not decode request body")
 		return
 	}
@@ -107,7 +105,7 @@ func (d Deps) overrideSkill(w http.ResponseWriter, r *http.Request) {
 		Managed        bool      `json:"managed"`
 		Overridable    bool      `json:"overridable"`
 	}
-	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&body); err != nil {
+	if err := decodeJSONBody(w, r, &body); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_request", "could not decode request body")
 		return
 	}
@@ -135,7 +133,7 @@ func (d Deps) setSkillPinned(w http.ResponseWriter, r *http.Request, pinned bool
 	var body struct {
 		BindingID uuid.UUID `json:"binding_id"`
 	}
-	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&body); err != nil {
+	if err := decodeJSONBody(w, r, &body); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_request", "could not decode request body")
 		return
 	}
@@ -160,17 +158,7 @@ func (d Deps) listEffectiveSkills(w http.ResponseWriter, r *http.Request) {
 	project := projectFrom(r.Context())
 	principalID := principalIDFrom(r.Context())
 
-	var orgID *uuid.UUID
-	if raw := r.URL.Query().Get("organization_id"); raw != "" {
-		id, err := uuid.Parse(raw)
-		if err != nil {
-			writeError(w, http.StatusBadRequest, "invalid_request", "?organization_id= must be a UUID")
-			return
-		}
-		orgID = &id
-	}
-
-	list, err := d.Skills.ListEffective(r.Context(), principalID, project.ID, orgID)
+	list, err := d.Skills.ListEffective(r.Context(), principalID, project.ID)
 	if err != nil {
 		writeDomainError(w, err)
 		return

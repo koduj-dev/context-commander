@@ -1,0 +1,18 @@
+ALTER TABLE history_objects DROP CONSTRAINT history_objects_derived_from_project_conversation_fkey;
+ALTER TABLE history_objects ADD CONSTRAINT history_objects_derived_from_fkey FOREIGN KEY (derived_from) REFERENCES history_objects (id);
+
+ALTER TABLE history_objects DROP CONSTRAINT history_objects_external_session_project_conversation_fkey;
+ALTER TABLE history_objects ADD CONSTRAINT history_objects_external_session_id_fkey FOREIGN KEY (external_session_id) REFERENCES external_sessions (id);
+
+ALTER TABLE history_objects DROP CONSTRAINT history_objects_project_conversation_fkey;
+ALTER TABLE history_objects ADD CONSTRAINT history_objects_conversation_id_fkey FOREIGN KEY (conversation_id) REFERENCES conversations (id);
+
+ALTER TABLE external_sessions DROP CONSTRAINT external_sessions_parent_project_conversation_fkey;
+ALTER TABLE external_sessions ADD CONSTRAINT external_sessions_parent_external_session_id_fkey FOREIGN KEY (parent_external_session_id) REFERENCES external_sessions (id);
+
+ALTER TABLE external_sessions DROP CONSTRAINT external_sessions_project_conversation_fkey;
+ALTER TABLE external_sessions ADD CONSTRAINT external_sessions_conversation_id_fkey FOREIGN KEY (conversation_id) REFERENCES conversations (id);
+
+ALTER TABLE history_objects DROP CONSTRAINT history_objects_project_conversation_id_key;
+ALTER TABLE external_sessions DROP CONSTRAINT external_sessions_project_conversation_id_key;
+ALTER TABLE conversations DROP CONSTRAINT conversations_project_id_id_key;

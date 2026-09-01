@@ -1,7 +1,6 @@
 package http
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
@@ -10,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/koduj-dev/context-commander/internal/auth"
 	"github.com/koduj-dev/context-commander/internal/db"
 	"github.com/koduj-dev/context-commander/internal/identity"
 	"github.com/koduj-dev/context-commander/internal/projects"
@@ -34,7 +34,7 @@ type projectResponse struct {
 // permanently inaccessible to everyone, itself included.
 func (d Deps) createProject(w http.ResponseWriter, r *http.Request) {
 	var req createProjectRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeJSONBody(w, r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_request", "malformed JSON body")
 		return
 	}
@@ -79,7 +79,7 @@ type addMemberRequest struct {
 
 func (d Deps) addMember(w http.ResponseWriter, r *http.Request) {
 	var req addMemberRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeJSONBody(w, r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_request", "malformed JSON body")
 		return
 	}
@@ -99,15 +99,21 @@ func (d Deps) addMember(w http.ResponseWriter, r *http.Request) {
 	project := projectFrom(r.Context())
 	principalID := principalIDFrom(r.Context())
 
+	allowed, err := d.Authz.Can(r.Context(), principalID, project.ID, auth.CapMemberManage)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "authorization check failed")
+		return
+	}
+	if !allowed {
+		writeError(w, http.StatusForbidden, "forbidden", "you do not have permission to manage members on this project")
+		return
+	}
+
 	err = db.WithPrincipal(r.Context(), d.Pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
 		_, err := d.Projects.AddMember(r.Context(), tx, project.ID, targetPrincipalID, role)
 		return err
 	})
 	if err != nil {
-		// RLS (docs/adr/0015) is the actual gate here for MVP — see that
-		// ADR's note on a future project-membership domain service owning
-		// a proper AuthzService.Can(CapMemberManage) check, the same
-		// pattern internal/artifacts.Service uses (docs/adr/0014).
 		writeError(w, http.StatusForbidden, "forbidden", "could not add member: "+err.Error())
 		return
 	}

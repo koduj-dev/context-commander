@@ -2,7 +2,6 @@ package http
 
 import (
 	"encoding/json"
-	"io"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -61,7 +60,7 @@ func (d Deps) bindGate(w http.ResponseWriter, r *http.Request) {
 		Hook     string          `json:"hook"`
 		Config   json.RawMessage `json:"config"`
 	}
-	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&body); err != nil {
+	if err := decodeJSONBody(w, r, &body); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_request", "could not decode request body")
 		return
 	}

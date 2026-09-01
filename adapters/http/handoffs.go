@@ -1,7 +1,6 @@
 package http
 
 import (
-	"encoding/json"
 	"net/http"
 	"time"
 
@@ -45,7 +44,7 @@ type createHandoffRequest struct {
 
 func (d Deps) createHandoff(w http.ResponseWriter, r *http.Request) {
 	var req createHandoffRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeJSONBody(w, r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_request", "could not decode request body")
 		return
 	}

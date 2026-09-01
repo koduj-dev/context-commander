@@ -81,7 +81,7 @@ func newFixture(t *testing.T) *fixture {
 	secretsSvc := secrets.NewService(appPool, authz, secrets.NewLocalEncryptedBackend(appPool, cryptoProvider))
 
 	handler := cchttp.NewHandler(cchttp.Deps{
-		Pool: appPool, Projects: projStore, Artifacts: artifactsSvc,
+		Pool: appPool, Projects: projStore, Authz: authz, Artifacts: artifactsSvc,
 		Events: eventsSvc, Organizations: orgSvc, Audit: auditSvc,
 		Handoffs: handoffsSvc, History: historySvc,
 		Skills: skillsSvc, Gates: gatesAdmin, Secrets: secretsSvc,

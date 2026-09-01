@@ -237,8 +237,7 @@ func registerSkillTools(server *sdkmcp.Server, deps Deps, principalID, clientID 
 	registerPinTool("skill.unpin", false)
 
 	type listEffectiveArgs struct {
-		Project        string `json:"project" jsonschema:"project path \"namespace/slug\""`
-		OrganizationID string `json:"organization_id,omitempty" jsonschema:"organization UUID, if the project belongs to one"`
+		Project string `json:"project" jsonschema:"project path \"namespace/slug\""`
 	}
 	sdkmcp.AddTool(server, &sdkmcp.Tool{
 		Name: "skill.list_effective",
@@ -249,15 +248,7 @@ func registerSkillTools(server *sdkmcp.Server, deps Deps, principalID, clientID 
 		if err != nil {
 			return nil, nil, err
 		}
-		var orgID *uuid.UUID
-		if args.OrganizationID != "" {
-			id, err := uuid.Parse(args.OrganizationID)
-			if err != nil {
-				return nil, nil, err
-			}
-			orgID = &id
-		}
-		list, err := deps.Skills.ListEffective(ctx, principalID, projectID, orgID)
+		list, err := deps.Skills.ListEffective(ctx, principalID, projectID)
 		if err != nil {
 			return nil, nil, err
 		}

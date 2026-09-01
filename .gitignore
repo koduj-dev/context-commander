@@ -19,3 +19,6 @@
 # Local dev data
 /deploy/data/
 /data/
+
+# Local review notes
+/code-review.md

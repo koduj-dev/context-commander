@@ -12,9 +12,14 @@ package gates
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+
+	"github.com/koduj-dev/context-commander/internal/db"
 )
 
 // Verdict is a gate's decision for one hook invocation.
@@ -90,6 +95,46 @@ func Get(name string) (Gate, bool) {
 	defer registryMu.RUnlock()
 	g, ok := registry[name]
 	return g, ok
+}
+
+// ValidateRegisteredBindings checks that every enabled installation-scope
+// gate_bindings row names a currently registered Gate (Register) — call once
+// at startup so a typo, a removed provider, or a binding written before its
+// provider was un-registered fails loudly instead of Engine silently
+// disabling a mandatory gate (the same failure this fixes at evaluation
+// time by having Engine.Evaluate fail closed on an unregistered name).
+//
+// Only installation-scope bindings are checked here: this runs before any
+// caller is authenticated, so RLS (migrations/000008, 000013) makes
+// organization/project-scope bindings invisible without a principal
+// context. Engine.Evaluate's fail-closed behavior is what protects those at
+// evaluation time.
+func ValidateRegisteredBindings(ctx context.Context, pool *db.Pool) error {
+	var unknown []string
+	err := db.WithoutPrincipal(ctx, pool, func(tx pgx.Tx) error {
+		rows, err := tx.Query(ctx, `SELECT DISTINCT gate_name FROM gate_bindings WHERE enabled = true AND scope = 'installation'`)
+		if err != nil {
+			return fmt.Errorf("query gate_bindings: %w", err)
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var name string
+			if err := rows.Scan(&name); err != nil {
+				return err
+			}
+			if _, ok := Get(name); !ok {
+				unknown = append(unknown, name)
+			}
+		}
+		return rows.Err()
+	})
+	if err != nil {
+		return fmt.Errorf("gates: validate installation bindings: %w", err)
+	}
+	if len(unknown) > 0 {
+		return fmt.Errorf("gates: enabled installation-scope bindings reference unregistered gate providers: %s", strings.Join(unknown, ", "))
+	}
+	return nil
 }
 
 // combine aggregates two Results by verdict priority — DENY beats

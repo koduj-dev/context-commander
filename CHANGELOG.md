@@ -54,3 +54,77 @@ link definition at the bottom of the file.
   binding (e.g. a mandatory secret scanner) never matched and silently never
   ran on any artifact write. `Write` now resolves the project's real
   organization id before evaluating gates.
+- **Security:** `POST /projects/{ns}/{slug}/members` and `project.add_member`
+  called `projects.Store.AddMember` directly after only proving the caller
+  could resolve the project, so any project member — including a READER —
+  could add an arbitrary principal as `OWNER`. Both adapters now check
+  `AuthzService.Can(CapMemberManage)` before the mutation
+  (`adapters/http/projects.go`, `adapters/mcp/tools_project.go`).
+- **Security:** `skills.Service.Override`'s non-overridable check queried
+  `skill_bindings` under the caller's own RLS context, which hid an
+  organization-scope binding from a project-only admin who was never a
+  separate `organization_members` row — so the check silently saw zero rows
+  and let the override through, bypassing ADR 0012's `overridable=false`
+  guarantee. `Override`/`ListEffective` now derive the project's organization
+  server-side (never as adapter-supplied input) and migration `000013` makes
+  organization bindings readable through project membership, mirroring
+  `000012`'s split for `gate_bindings` (`internal/skills/service.go`,
+  `migrations/000013_*`).
+- **Security:** a `gate_bindings` row naming an unregistered gate provider
+  (a typo, a removed provider, an incomplete deployment) was silently skipped
+  during evaluation and returned `ALLOW` — a mandatory security gate could be
+  disabled by accident with no error anywhere. `AdminService.Bind` now
+  rejects unknown gate names at bind time, `Engine.Evaluate` fails closed
+  (errors, never `ALLOW`) on one, and `ValidateRegisteredBindings` checks
+  enabled installation-scope bindings at `serve` startup
+  (`internal/gates/engine.go`, `internal/gates/admin.go`,
+  `internal/gates/gates.go`).
+- **Security:** `ccd serve` defaulted to `:8080` with plain `ListenAndServe`,
+  so bearer tokens and decrypted project content traveled in cleartext on
+  any host that could reach the port. The default is now a loopback bind
+  (`127.0.0.1:8080`); a non-loopback `--addr` is refused unless
+  `--tls-cert`/`--tls-key` (enabling `ListenAndServeTLS`) or an explicit
+  `--insecure-allow-cleartext` override is given (`adapters/cli/serve.go`).
+- **Security:** `skill_bindings` had independent `skill_id`/`skill_version_id`
+  foreign keys with no relationship between them, so `Install`/`Override`
+  could pair one skill's identity with another skill's `SkillVersion` — and
+  `ListEffective` groups/shadows by the claimed `skill_id`, handing a
+  consumer content that never went through the identity/policy it evaluated.
+  `skill_versions` now has a composite `(id, skill_id)` key and
+  `skill_bindings` a matching composite FK (migration `000014`); the service
+  also validates the pairing itself, returning `ErrSkillVersionMismatch`
+  (`internal/skills/service.go`, `migrations/000014_*`).
+- **Security:** `skills.Service.Publish` committed the `skill_versions` row
+  before uploading its content to `ObjectStore`; a failed upload left a
+  permanent, installable version pointing at content that was never written,
+  with no retry or repair path. `Publish` now uploads under an immutable
+  UUID-based key first and only commits the version row once that succeeds —
+  a failed second-phase commit leaves an unreferenced storage object instead
+  of a broken installable version (`internal/skills/service.go`).
+- **Security:** `history.Service`'s session/history-object mutations accepted
+  a caller-supplied `conversation_id`, `parent_external_session_id`,
+  `external_session_id`, or `derived_from` with no check that the referenced
+  row belonged to the same project (or conversation) — a contributor to one
+  project could reference, and probe the existence of, another project's
+  lineage. Composite foreign keys now require project (and, where
+  conversation-scoped, conversation) to match; a violation maps to
+  `ErrInvalidReference` instead of an opaque constraint error
+  (`internal/history/service.go`, `migrations/000015_*`).
+- Several JSON request bodies (`projects`, `secrets`, `history`,
+  `organizations`, `handoffs`) were decoded with no size limit at all, and
+  the ones that had one used a bare `io.LimitReader` inconsistently; the
+  history endpoints buffered a full conversation's ciphertext and every
+  decrypted body in one transaction with no cap, and `events.Service.List`
+  passed a caller-supplied `limit` straight to SQL. All JSON bodies now go
+  through a shared `http.MaxBytesReader`-backed decoder, `history` gained a
+  domain content limit and a bounded `ListHistoryObjects` query, event
+  listing is capped the same way `internal/audit` already was, and the HTTP
+  server now sets `ReadTimeout`/`WriteTimeout`/`IdleTimeout`
+  (`adapters/http/errors.go`, `internal/history/*.go`,
+  `internal/events/service.go`, `adapters/cli/serve.go`).
+- `secrets.Service.Create` accepted names its own `secrets.Parse` would
+  later reject (e.g. a name containing `/`), producing a `Reference` string
+  that couldn't round-trip and that HTTP `DELETE` couldn't address either.
+  Name validation is now centralized in `secrets.ValidateName` and enforced
+  by `Create`/`Delete` (`internal/secrets/reference.go`,
+  `internal/secrets/service.go`).

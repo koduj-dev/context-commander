@@ -152,6 +152,19 @@ func TestCreateResolveRoundTrip(t *testing.T) {
 	}
 }
 
+func TestCreateRejectsInvalidName(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	principalID, projectID := f.seedProject(t, projects.RoleContributor)
+
+	if _, err := f.svc.Create(ctx, principalID, projectID, "team/github", []byte("x")); !errors.Is(err, secrets.ErrInvalidName) {
+		t.Fatalf("Create with a slash in name: got err=%v, want ErrInvalidName", err)
+	}
+	if err := f.svc.Delete(ctx, principalID, projectID, "team/github"); !errors.Is(err, secrets.ErrInvalidName) {
+		t.Fatalf("Delete with a slash in name: got err=%v, want ErrInvalidName", err)
+	}
+}
+
 func TestListReturnsNamesOnly(t *testing.T) {
 	f := newFixture(t)
 	ctx := context.Background()

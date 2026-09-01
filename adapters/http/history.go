@@ -8,6 +8,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+
+	"github.com/koduj-dev/context-commander/internal/history"
 )
 
 type conversationResponse struct {
@@ -53,7 +55,7 @@ func (d Deps) createExternalSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req createExternalSessionRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeJSONBody(w, r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_request", "could not decode request body")
 		return
 	}
@@ -97,6 +99,12 @@ func (d Deps) appendHistoryObject(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid_request", "conversationID must be a UUID")
 		return
 	}
+	// history.MaxContentSize's worth of content plus generous headroom for
+	// JSON/base64 escaping overhead and the request's other fields — the
+	// shared maxJSONBodyBytes cap (decodeJSONBody) is sized for metadata-only
+	// bodies and would reject legitimate history content well under
+	// history.Service's own domain limit.
+	r.Body = http.MaxBytesReader(w, r.Body, 2*history.MaxContentSize)
 	var req appendHistoryObjectRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_request", "could not decode request body")

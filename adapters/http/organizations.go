@@ -1,7 +1,6 @@
 package http
 
 import (
-	"encoding/json"
 	"net/http"
 	"time"
 
@@ -51,7 +50,7 @@ func (d Deps) createOrganization(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Name string `json:"name"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Name == "" {
+	if err := decodeJSONBody(w, r, &body); err != nil || body.Name == "" {
 		writeError(w, http.StatusBadRequest, "invalid_request", "name is required")
 		return
 	}
@@ -83,7 +82,7 @@ func (d Deps) addOrganizationMember(w http.ResponseWriter, r *http.Request) {
 		UserID string `json:"user_id"`
 		Role   string `json:"role"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+	if err := decodeJSONBody(w, r, &body); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_request", "invalid body")
 		return
 	}

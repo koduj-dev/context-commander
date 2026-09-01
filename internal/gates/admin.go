@@ -45,6 +45,13 @@ var (
 	// input mistake, not a server fault, so it must map to 400 rather than
 	// the default 500 an unwrapped fmt.Errorf would fall through to.
 	ErrScopeRefRequired = errors.New("gates: organization/project scope requires scope_ref")
+
+	// ErrUnknownGate is returned by AdminService.Bind when gateName has no
+	// registered provider (Register) — a typo or a removed provider must
+	// not be bindable at all, since Engine.Evaluate now fails closed
+	// (errors, does not ALLOW) on an unregistered name rather than silently
+	// skipping it.
+	ErrUnknownGate = errors.New("gates: gate_name is not a registered provider")
 )
 
 // Binding is one gate_bindings row — data pointing at which registered Gate
@@ -147,6 +154,9 @@ func (s *AdminService) Bind(
 ) (Binding, error) {
 	if err := s.checkCapability(ctx, principalID, projectID); err != nil {
 		return Binding{}, err
+	}
+	if _, ok := Get(gateName); !ok {
+		return Binding{}, ErrUnknownGate
 	}
 	if config == nil {
 		config = json.RawMessage("{}")

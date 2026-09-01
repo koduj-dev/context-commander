@@ -42,11 +42,23 @@ func (s *Service) checkCapability(ctx context.Context, principalID, projectID uu
 	return nil
 }
 
+// maxListLimit bounds a single List call the same way
+// internal/audit.QueryOptions.Limit does — a caller-supplied limit above
+// this (or <= 0) falls back to defaultListLimit instead of running an
+// effectively unbounded query.
+const (
+	defaultListLimit = 100
+	maxListLimit     = 500
+)
+
 // List returns up to limit events for projectID with seq > afterSeq, after
 // checking principalID may read events on that project.
 func (s *Service) List(ctx context.Context, principalID, projectID uuid.UUID, afterSeq int64, limit int) ([]Event, error) {
 	if err := s.checkCapability(ctx, principalID, projectID, auth.CapEventRead); err != nil {
 		return nil, err
+	}
+	if limit <= 0 || limit > maxListLimit {
+		limit = defaultListLimit
 	}
 
 	var out []Event

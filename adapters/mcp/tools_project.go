@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	sdkmcp "github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/koduj-dev/context-commander/internal/auth"
 	"github.com/koduj-dev/context-commander/internal/db"
 	"github.com/koduj-dev/context-commander/internal/identity"
 	"github.com/koduj-dev/context-commander/internal/projects"
@@ -100,12 +101,26 @@ func registerProjectTools(server *sdkmcp.Server, deps Deps, principalID, clientI
 			return nil, addMemberResult{}, errors.New("role must be one of OWNER, ADMIN, CONTRIBUTOR, READER")
 		}
 
+		var project projects.Project
 		err = db.WithPrincipal(ctx, deps.Pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
-			project, err := deps.Projects.Resolve(ctx, tx, args.Project)
-			if err != nil {
-				return err
-			}
-			_, err = deps.Projects.AddMember(ctx, tx, project.ID, targetPrincipalID, role)
+			var err error
+			project, err = deps.Projects.Resolve(ctx, tx, args.Project)
+			return err
+		})
+		if err != nil {
+			return nil, addMemberResult{}, err
+		}
+
+		allowed, err := deps.Authz.Can(ctx, principalID, project.ID, auth.CapMemberManage)
+		if err != nil {
+			return nil, addMemberResult{}, err
+		}
+		if !allowed {
+			return nil, addMemberResult{}, errors.New("you do not have permission to manage members on this project")
+		}
+
+		err = db.WithPrincipal(ctx, deps.Pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+			_, err := deps.Projects.AddMember(ctx, tx, project.ID, targetPrincipalID, role)
 			return err
 		})
 		if err != nil {

@@ -3,6 +3,7 @@ package skills_test
 import (
 	"context"
 	"errors"
+	"io"
 	"testing"
 
 	"github.com/google/uuid"
@@ -14,8 +15,24 @@ import (
 	"github.com/koduj-dev/context-commander/internal/organizations"
 	"github.com/koduj-dev/context-commander/internal/projects"
 	"github.com/koduj-dev/context-commander/internal/skills"
+	"github.com/koduj-dev/context-commander/internal/storage"
 	"github.com/koduj-dev/context-commander/internal/storage/filesystem"
 )
+
+// failingStore is an ObjectStore whose Put always fails — used to prove
+// Publish never commits a skill_versions row before its content has
+// actually reached storage (regression test for the orphan-DB-row bug
+// fixed in Service.Publish).
+type failingStore struct{}
+
+func (failingStore) Put(context.Context, string, io.Reader, int64) (string, error) {
+	return "", errors.New("failingStore: simulated upload failure")
+}
+func (failingStore) Get(context.Context, string) (io.ReadCloser, error) {
+	return nil, storage.ErrNotFound
+}
+func (failingStore) Delete(context.Context, string) error                       { return nil }
+func (failingStore) List(context.Context, string) ([]storage.ObjectInfo, error) { return nil, nil }
 
 type fixture struct {
 	t           *testing.T
@@ -160,6 +177,73 @@ func TestOverrideRejectedWhenNotOverridable(t *testing.T) {
 	}
 }
 
+// TestOverrideDeniedForNonOverridableOrgBindingWithoutOrgMembership
+// regression-guards the fix for the RLS gap where a project-only admin
+// (never an organization_members row) could not see their project's owning
+// organization's skill_bindings row under the old all-commands RLS policy,
+// so Override's non-overridable check silently saw zero rows and let the
+// override through — bypassing docs/adr/0012's overridable=false guarantee.
+// migrations/000013 plus Service.Override deriving the organization from
+// projectID itself (never client input) fixes this.
+func TestOverrideDeniedForNonOverridableOrgBindingWithoutOrgMembership(t *testing.T) {
+	f := newFixture(t)
+
+	var orgProjectID uuid.UUID
+	err := db.WithoutPrincipal(f.ctx, f.ownerPool, func(tx pgx.Tx) error {
+		org, err := f.orgs.Create(f.ctx, tx, "Acme Corp")
+		if err != nil {
+			return err
+		}
+		ns, err := projects.NewStore().CreateOrganizationNamespace(f.ctx, tx, org.ID, "acme-"+org.ID.String()[:8])
+		if err != nil {
+			return err
+		}
+		project, err := projects.NewStore().Create(f.ctx, tx, ns.ID, "proj", "Proj")
+		if err != nil {
+			return err
+		}
+		orgProjectID = project.ID
+		// f.principalID is a project ADMIN, but deliberately never added to
+		// organizations_members for org.ID — this is the exact caller
+		// shape the bug affected.
+		_, err = tx.Exec(f.ctx, `INSERT INTO project_members (project_id, principal_id, role) VALUES ($1, $2, 'ADMIN')`,
+			orgProjectID, f.principalID)
+		return err
+	})
+	if err != nil {
+		t.Fatalf("seed org project: %v", err)
+	}
+
+	v1, err := f.svc.Publish(f.ctx, f.principalID, orgProjectID, nil, "security-review", "acme", "local", []byte("content"), nil)
+	if err != nil {
+		t.Fatalf("Publish: %v", err)
+	}
+
+	// Seed a non-overridable organization-scope binding directly, owned by
+	// the org the project belongs to.
+	err = db.WithoutPrincipal(f.ctx, f.ownerPool, func(tx pgx.Tx) error {
+		var orgID uuid.UUID
+		if scanErr := tx.QueryRow(f.ctx,
+			`SELECT n.organization_id FROM projects p JOIN namespaces n ON n.id = p.namespace_id WHERE p.id = $1`,
+			orgProjectID,
+		).Scan(&orgID); scanErr != nil {
+			return scanErr
+		}
+		_, err := tx.Exec(f.ctx,
+			`INSERT INTO skill_bindings (id, scope, scope_ref, skill_id, skill_version_id, overridable) VALUES ($1, 'organization', $2, $3, $4, false)`,
+			uuid.New(), orgID, v1.SkillID, v1.ID)
+		return err
+	})
+	if err != nil {
+		t.Fatalf("seed organization binding: %v", err)
+	}
+
+	_, err = f.svc.Override(f.ctx, f.principalID, orgProjectID, v1.SkillID, v1.ID, false, true)
+	if !errors.Is(err, skills.ErrNotOverridable) {
+		t.Fatalf("Override of non-overridable organization binding by project-only admin: got err=%v, want ErrNotOverridable", err)
+	}
+}
+
 func TestListEffectiveComposesScopesAndProjectWins(t *testing.T) {
 	f := newFixture(t)
 
@@ -195,7 +279,7 @@ func TestListEffectiveComposesScopesAndProjectWins(t *testing.T) {
 		t.Fatalf("Override: %v", err)
 	}
 
-	effective, err := f.svc.ListEffective(f.ctx, f.principalID, f.projectID, nil)
+	effective, err := f.svc.ListEffective(f.ctx, f.principalID, f.projectID)
 	if err != nil {
 		t.Fatalf("ListEffective: %v", err)
 	}
@@ -283,5 +367,81 @@ func TestInstallInstallationScopeRejected(t *testing.T) {
 	_, err = f.svc.Install(f.ctx, f.principalID, f.userID, f.projectID, skills.ScopeInstallation, nil, v.SkillID, v.ID, false, true)
 	if !errors.Is(err, skills.ErrUnsupportedScope) {
 		t.Fatalf("Install at installation scope: got err=%v, want ErrUnsupportedScope", err)
+	}
+}
+
+// TestInstallRejectsMismatchedSkillVersion and
+// TestOverrideRejectsMismatchedSkillVersion regression-guard against a
+// binding pairing one skill's identity with another skill's SkillVersion —
+// Install/Override used to accept skill_id and skill_version_id
+// independently with no relationship check, so ListEffective (which groups
+// and shadows by the claimed skill_id) could hand out content that never
+// belonged to the identity/policy actually evaluated
+// (migrations/000014 + Service.checkSkillVersionBelongsTo).
+func TestInstallRejectsMismatchedSkillVersion(t *testing.T) {
+	f := newFixture(t)
+
+	a, err := f.svc.Publish(f.ctx, f.principalID, f.projectID, nil, "skill-a", "acme", "local", []byte("a content"), nil)
+	if err != nil {
+		t.Fatalf("Publish skill-a: %v", err)
+	}
+	b, err := f.svc.Publish(f.ctx, f.principalID, f.projectID, nil, "skill-b", "acme", "local", []byte("b content"), nil)
+	if err != nil {
+		t.Fatalf("Publish skill-b: %v", err)
+	}
+
+	_, err = f.svc.Install(f.ctx, f.principalID, f.userID, f.projectID, skills.ScopeProject, &f.projectID, a.SkillID, b.ID, false, true)
+	if !errors.Is(err, skills.ErrSkillVersionMismatch) {
+		t.Fatalf("Install pairing skill-a's ID with skill-b's version: got err=%v, want ErrSkillVersionMismatch", err)
+	}
+}
+
+func TestOverrideRejectsMismatchedSkillVersion(t *testing.T) {
+	f := newFixture(t)
+
+	a, err := f.svc.Publish(f.ctx, f.principalID, f.projectID, nil, "skill-a", "acme", "local", []byte("a content"), nil)
+	if err != nil {
+		t.Fatalf("Publish skill-a: %v", err)
+	}
+	b, err := f.svc.Publish(f.ctx, f.principalID, f.projectID, nil, "skill-b", "acme", "local", []byte("b content"), nil)
+	if err != nil {
+		t.Fatalf("Publish skill-b: %v", err)
+	}
+
+	_, err = f.svc.Override(f.ctx, f.principalID, f.projectID, a.SkillID, b.ID, false, true)
+	if !errors.Is(err, skills.ErrSkillVersionMismatch) {
+		t.Fatalf("Override pairing skill-a's ID with skill-b's version: got err=%v, want ErrSkillVersionMismatch", err)
+	}
+}
+
+// TestPublishUploadFailureLeavesNoInstallableVersion regression-guards
+// against a failed ObjectStore upload leaving a permanent, installable
+// broken skill_versions row (the version used to be committed to the
+// database before content was ever uploaded; Publish now uploads first).
+func TestPublishUploadFailureLeavesNoInstallableVersion(t *testing.T) {
+	f := newFixture(t)
+
+	svc := skills.NewService(f.appPool, auth.NewAuthzService(f.appPool, projects.NewStore()), organizations.NewStore(), projects.NewStore(), failingStore{})
+
+	const name = "broken-upload"
+	_, err := svc.Publish(f.ctx, f.principalID, f.projectID, nil, name, "acme", "local", []byte("content"), nil)
+	if err == nil {
+		t.Fatal("Publish: want an error when ObjectStore.Put fails")
+	}
+
+	err = db.WithoutPrincipal(f.ctx, f.ownerPool, func(tx pgx.Tx) error {
+		var count int
+		if scanErr := tx.QueryRow(f.ctx,
+			`SELECT count(*) FROM skill_versions sv JOIN skills sk ON sk.id = sv.skill_id WHERE sk.name = $1`, name,
+		).Scan(&count); scanErr != nil {
+			return scanErr
+		}
+		if count != 0 {
+			t.Fatalf("skill_versions rows for %q after a failed upload: got %d, want 0 — no installable version must survive", name, count)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("verify no skill_versions row: %v", err)
 	}
 }

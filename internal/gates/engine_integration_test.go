@@ -113,16 +113,13 @@ func TestEngineDenyTakesPriorityAcrossScopes(t *testing.T) {
 	}
 }
 
-func TestEngineIgnoresUnregisteredGateName(t *testing.T) {
+func TestEngineFailsClosedOnUnregisteredGateName(t *testing.T) {
 	f := newEngineFixture(t)
 	f.bindGate("artifact.before_write", "project", "no-such-gate", &f.projectID)
 
-	r, err := f.engine.Evaluate(f.ctx, f.principalID, f.projectID, nil, "artifact.before_write", []byte("hello"))
-	if err != nil {
-		t.Fatalf("Evaluate: %v", err)
-	}
-	if r.Verdict != gates.Allow {
-		t.Fatalf("got verdict %s, want ALLOW when the bound gate name is unregistered", r.Verdict)
+	_, err := f.engine.Evaluate(f.ctx, f.principalID, f.projectID, nil, "artifact.before_write", []byte("hello"))
+	if err == nil {
+		t.Fatal("Evaluate: want an error when the bound gate name is unregistered (fail closed, not ALLOW)")
 	}
 }
 

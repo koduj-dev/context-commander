@@ -220,3 +220,121 @@ func TestRLSIsolationBetweenProjects(t *testing.T) {
 		t.Fatalf("projectB should see 0 history objects for a foreign conversation ID, got %d", len(listB))
 	}
 }
+
+// The following four tests regression-guard migrations/000015's composite
+// lineage FKs: a contributor to project B must not be able to create a
+// session/history object in B that references a conversation, parent
+// session, external session, or derived-from object belonging to project A,
+// even though project A's caller authorized only projectA (docs/adr/0014) —
+// each of these used to insert successfully before the composite FKs
+// existed.
+
+func TestCreateExternalSessionRejectsForeignConversation(t *testing.T) {
+	f, ownerPool := newFixture(t)
+	ctx := context.Background()
+	principalA, projectA := f.seedProject(t, ownerPool, projects.RoleContributor)
+	principalB, projectB := f.seedProject(t, ownerPool, projects.RoleContributor)
+
+	convA, err := f.svc.CreateConversation(ctx, principalA, projectA)
+	if err != nil {
+		t.Fatalf("CreateConversation A: %v", err)
+	}
+	if _, err := f.svc.CreateConversation(ctx, principalB, projectB); err != nil {
+		t.Fatalf("CreateConversation B: %v", err)
+	}
+
+	_, err = f.svc.CreateExternalSession(ctx, principalB, projectB, convA.ID,
+		"anthropic", "claude-code", "sess-cross", nil, "started", time.Now().UTC())
+	if !errors.Is(err, history.ErrInvalidReference) {
+		t.Fatalf("CreateExternalSession in projectB with projectA's conversation_id: got err=%v, want ErrInvalidReference", err)
+	}
+}
+
+func TestCreateExternalSessionRejectsForeignParentSession(t *testing.T) {
+	f, ownerPool := newFixture(t)
+	ctx := context.Background()
+	principalA, projectA := f.seedProject(t, ownerPool, projects.RoleContributor)
+	principalB, projectB := f.seedProject(t, ownerPool, projects.RoleContributor)
+
+	convA, err := f.svc.CreateConversation(ctx, principalA, projectA)
+	if err != nil {
+		t.Fatalf("CreateConversation A: %v", err)
+	}
+	sessionA, err := f.svc.CreateExternalSession(ctx, principalA, projectA, convA.ID,
+		"anthropic", "claude-code", "sess-A", nil, "started", time.Now().UTC())
+	if err != nil {
+		t.Fatalf("CreateExternalSession A: %v", err)
+	}
+	convB, err := f.svc.CreateConversation(ctx, principalB, projectB)
+	if err != nil {
+		t.Fatalf("CreateConversation B: %v", err)
+	}
+
+	_, err = f.svc.CreateExternalSession(ctx, principalB, projectB, convB.ID,
+		"anthropic", "claude-code", "sess-B", &sessionA.ID, "continued", time.Now().UTC())
+	if !errors.Is(err, history.ErrInvalidReference) {
+		t.Fatalf("CreateExternalSession in projectB with projectA's session as parent: got err=%v, want ErrInvalidReference", err)
+	}
+}
+
+func TestAppendHistoryObjectRejectsForeignExternalSession(t *testing.T) {
+	f, ownerPool := newFixture(t)
+	ctx := context.Background()
+	principalA, projectA := f.seedProject(t, ownerPool, projects.RoleContributor)
+	principalB, projectB := f.seedProject(t, ownerPool, projects.RoleContributor)
+
+	convA, err := f.svc.CreateConversation(ctx, principalA, projectA)
+	if err != nil {
+		t.Fatalf("CreateConversation A: %v", err)
+	}
+	sessionA, err := f.svc.CreateExternalSession(ctx, principalA, projectA, convA.ID,
+		"anthropic", "claude-code", "sess-A", nil, "started", time.Now().UTC())
+	if err != nil {
+		t.Fatalf("CreateExternalSession A: %v", err)
+	}
+	convB, err := f.svc.CreateConversation(ctx, principalB, projectB)
+	if err != nil {
+		t.Fatalf("CreateConversation B: %v", err)
+	}
+
+	_, err = f.svc.AppendHistoryObject(ctx, principalB, projectB, convB.ID, sessionA.ID, "raw", nil, []byte("x"))
+	if !errors.Is(err, history.ErrInvalidReference) {
+		t.Fatalf("AppendHistoryObject in projectB with projectA's external_session_id: got err=%v, want ErrInvalidReference", err)
+	}
+}
+
+func TestAppendHistoryObjectRejectsForeignDerivedFrom(t *testing.T) {
+	f, ownerPool := newFixture(t)
+	ctx := context.Background()
+	principalA, projectA := f.seedProject(t, ownerPool, projects.RoleContributor)
+	principalB, projectB := f.seedProject(t, ownerPool, projects.RoleContributor)
+
+	convA, err := f.svc.CreateConversation(ctx, principalA, projectA)
+	if err != nil {
+		t.Fatalf("CreateConversation A: %v", err)
+	}
+	sessionA, err := f.svc.CreateExternalSession(ctx, principalA, projectA, convA.ID,
+		"anthropic", "claude-code", "sess-A", nil, "started", time.Now().UTC())
+	if err != nil {
+		t.Fatalf("CreateExternalSession A: %v", err)
+	}
+	rawA, err := f.svc.AppendHistoryObject(ctx, principalA, projectA, convA.ID, sessionA.ID, "raw", nil, []byte("raw A"))
+	if err != nil {
+		t.Fatalf("AppendHistoryObject A: %v", err)
+	}
+
+	convB, err := f.svc.CreateConversation(ctx, principalB, projectB)
+	if err != nil {
+		t.Fatalf("CreateConversation B: %v", err)
+	}
+	sessionB, err := f.svc.CreateExternalSession(ctx, principalB, projectB, convB.ID,
+		"anthropic", "claude-code", "sess-B", nil, "started", time.Now().UTC())
+	if err != nil {
+		t.Fatalf("CreateExternalSession B: %v", err)
+	}
+
+	_, err = f.svc.AppendHistoryObject(ctx, principalB, projectB, convB.ID, sessionB.ID, "compacted", &rawA.ID, []byte("x"))
+	if !errors.Is(err, history.ErrInvalidReference) {
+		t.Fatalf("AppendHistoryObject in projectB with projectA's object as derived_from: got err=%v, want ErrInvalidReference", err)
+	}
+}

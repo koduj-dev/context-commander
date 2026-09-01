@@ -61,6 +61,9 @@ func (s *Service) Create(ctx context.Context, principalID, projectID uuid.UUID, 
 	if err := s.checkCapability(ctx, principalID, projectID, auth.CapSecretWrite); err != nil {
 		return Reference{}, err
 	}
+	if err := ValidateName(name); err != nil {
+		return Reference{}, err
+	}
 
 	ref := NewProjectReference(projectID, name)
 	if err := s.backend.Store(ctx, principalID, ref, plaintext); err != nil {
@@ -116,6 +119,9 @@ func (s *Service) List(ctx context.Context, principalID, projectID uuid.UUID) ([
 // secret's value is equally trusted to remove it.
 func (s *Service) Delete(ctx context.Context, principalID, projectID uuid.UUID, name string) error {
 	if err := s.checkCapability(ctx, principalID, projectID, auth.CapSecretWrite); err != nil {
+		return err
+	}
+	if err := ValidateName(name); err != nil {
 		return err
 	}
 

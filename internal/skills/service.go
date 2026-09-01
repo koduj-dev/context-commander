@@ -39,6 +39,45 @@ func NewService(pool *db.Pool, authz *auth.AuthzService, orgs *organizations.Sto
 	return &Service{pool: pool, authz: authz, orgs: orgs, projects: projectsStore, store: store}
 }
 
+// resolveProjectOrgID returns projectID's owning organization, or nil if it
+// lives in a personal namespace. Callers must derive the organization this
+// way rather than accept it as adapter-supplied input — an org ID coming
+// from the client is not authority-bearing, and trusting it let a caller
+// drop the real owning organization from an override/effective-resolution
+// check (docs/adr/0012 gap fixed alongside migrations/000013).
+func (s *Service) resolveProjectOrgID(ctx context.Context, tx pgx.Tx, projectID uuid.UUID) (*uuid.UUID, error) {
+	var orgID *uuid.UUID
+	err := tx.QueryRow(ctx,
+		`SELECT n.organization_id FROM projects p JOIN namespaces n ON n.id = p.namespace_id WHERE p.id = $1`,
+		projectID,
+	).Scan(&orgID)
+	if err != nil {
+		return nil, fmt.Errorf("resolve project organization: %w", err)
+	}
+	return orgID, nil
+}
+
+// checkSkillVersionBelongsTo verifies skillVersionID is actually a version
+// of skillID before a binding is allowed to pair them — Install/Override
+// otherwise accept the two UUIDs independently, letting a binding claim
+// skill A's identity while pinning skill B's content. The database also
+// enforces this (migrations/000014); this check exists to return
+// ErrSkillVersionMismatch instead of an opaque constraint-violation error.
+func (s *Service) checkSkillVersionBelongsTo(ctx context.Context, tx pgx.Tx, skillID, skillVersionID uuid.UUID) error {
+	var exists bool
+	err := tx.QueryRow(ctx,
+		`SELECT EXISTS (SELECT 1 FROM skill_versions WHERE id = $1 AND skill_id = $2)`,
+		skillVersionID, skillID,
+	).Scan(&exists)
+	if err != nil {
+		return fmt.Errorf("verify skill_version_id belongs to skill_id: %w", err)
+	}
+	if !exists {
+		return ErrSkillVersionMismatch
+	}
+	return nil
+}
+
 func (s *Service) checkCapability(ctx context.Context, principalID, projectID uuid.UUID, cap auth.Capability) error {
 	allowed, err := s.authz.Can(ctx, principalID, projectID, cap)
 	if err != nil {
@@ -114,9 +153,17 @@ func (s *Service) Publish(
 	checksum := hex.EncodeToString(sum[:])
 	versionID := uuid.New()
 
-	var result SkillVersion
+	declared := declaredCapabilities
+	if declared == nil {
+		declared = []string{}
+	}
+
+	// Phase 1: resolve/create the Skill and reserve the next version number,
+	// committed on its own — before any upload, so a brand-new Skill with no
+	// SkillVersion yet is never mistaken for an installable one.
+	var skill Skill
+	var nextVersion int
 	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
-		var skill Skill
 		if skillID == nil {
 			skill = Skill{ID: uuid.New(), Name: name, Author: author, Origin: origin}
 			if _, err := tx.Exec(ctx,
@@ -129,44 +176,45 @@ func (s *Service) Publish(
 			skill.ID = *skillID
 		}
 
-		var nextVersion int
-		err := tx.QueryRow(ctx,
+		return tx.QueryRow(ctx,
 			`SELECT COALESCE(MAX(version), 0) + 1 FROM skill_versions WHERE skill_id = $1`, skill.ID,
 		).Scan(&nextVersion)
-		if err != nil {
-			return fmt.Errorf("resolve next version: %w", err)
-		}
+	})
+	if err != nil {
+		return SkillVersion{}, fmt.Errorf("skills: publish: resolve next version: %w", err)
+	}
 
-		storageKey := fmt.Sprintf("skills/%s/versions/%d", skill.ID, nextVersion)
+	storageKey := fmt.Sprintf("skills/%s/versions/%s", skill.ID, versionID)
 
-		declared := declaredCapabilities
-		if declared == nil {
-			declared = []string{}
-		}
+	// Phase 2: upload content under an immutable, UUID-based key — outside
+	// any transaction, since object stores don't participate in Postgres
+	// transactions (mirrors internal/artifacts.Service.Write,
+	// docs/adr/0013). If this fails, no skill_versions row was ever
+	// written, so there is nothing installable pointing at missing content.
+	if _, err := s.store.Put(ctx, storageKey, bytes.NewReader(content), int64(len(content))); err != nil {
+		return SkillVersion{}, fmt.Errorf("skills: upload content: %w", err)
+	}
 
-		_, err = tx.Exec(ctx,
+	// Phase 3: commit the immutable SkillVersion row now that its content
+	// definitely exists in storage. If this fails, the object uploaded
+	// above becomes an orphan candidate (unreferenced, unused storage) —
+	// the safe failure direction, unlike a DB row referencing nothing.
+	result := SkillVersion{
+		ID: versionID, SkillID: skill.ID, Version: nextVersion,
+		Checksum: checksum, StorageKey: storageKey,
+		Files: []FileManifestEntry{}, DeclaredCapabilities: declared,
+		TrustStatus: "unverified",
+	}
+	err = db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+		_, err := tx.Exec(ctx,
 			`INSERT INTO skill_versions (id, skill_id, version, checksum, storage_key, files, declared_capabilities, trust_status)
 			 VALUES ($1, $2, $3, $4, $5, $6, $7, 'unverified')`,
 			versionID, skill.ID, nextVersion, checksum, storageKey, []byte("[]"), declared,
 		)
-		if err != nil {
-			return fmt.Errorf("insert skill_versions: %w", err)
-		}
-
-		result = SkillVersion{
-			ID: versionID, SkillID: skill.ID, Version: nextVersion,
-			Checksum: checksum, StorageKey: storageKey,
-			Files: []FileManifestEntry{}, DeclaredCapabilities: declared,
-			TrustStatus: "unverified",
-		}
-		return nil
+		return err
 	})
 	if err != nil {
-		return SkillVersion{}, fmt.Errorf("skills: publish: %w", err)
-	}
-
-	if _, err := s.store.Put(ctx, result.StorageKey, bytes.NewReader(content), int64(len(content))); err != nil {
-		return SkillVersion{}, fmt.Errorf("skills: upload content: %w", err)
+		return SkillVersion{}, fmt.Errorf("skills: publish: insert skill_versions: %w", err)
 	}
 	return result, nil
 }
@@ -196,6 +244,9 @@ func (s *Service) Install(
 	}
 	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
 		if err := s.checkScopeTarget(ctx, tx, principalID, userID, scope, scopeRef); err != nil {
+			return err
+		}
+		if err := s.checkSkillVersionBelongsTo(ctx, tx, skillID, skillVersionID); err != nil {
 			return err
 		}
 		_, err := tx.Exec(ctx,
@@ -231,9 +282,25 @@ func (s *Service) Override(
 		InstalledBy: &principalID,
 	}
 	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+		if err := s.checkSkillVersionBelongsTo(ctx, tx, skillID, skillVersionID); err != nil {
+			return err
+		}
+
+		orgID, err := s.resolveProjectOrgID(ctx, tx, projectID)
+		if err != nil {
+			return err
+		}
+
+		// Scoped to installation-wide bindings plus this project's actual
+		// owning organization only — not every organization's binding of
+		// skillID system-wide, and not silently missing the owning
+		// organization's binding because it wasn't independently visible
+		// under RLS (migrations/000013 makes it visible to any project
+		// member of an org project, regardless of org membership).
 		rows, err := tx.Query(ctx,
-			`SELECT overridable FROM skill_bindings WHERE skill_id = $1 AND scope IN ('installation', 'organization')`,
-			skillID,
+			`SELECT overridable FROM skill_bindings
+			 WHERE skill_id = $1 AND (scope = 'installation' OR (scope = 'organization' AND scope_ref = $2))`,
+			skillID, orgID,
 		)
 		if err != nil {
 			return fmt.Errorf("query existing bindings: %w", err)
@@ -303,13 +370,17 @@ func (s *Service) Unpin(ctx context.Context, principalID, projectID, bindingID u
 // binding of that same SkillID (docs/architecture-cookbook.md §12.1:
 // scopes compose, they do not replace one another, but within a single
 // SkillID the narrowest explicit binding wins).
-func (s *Service) ListEffective(ctx context.Context, principalID, projectID uuid.UUID, orgID *uuid.UUID) ([]SkillBinding, error) {
+func (s *Service) ListEffective(ctx context.Context, principalID, projectID uuid.UUID) ([]SkillBinding, error) {
 	if err := s.checkCapability(ctx, principalID, projectID, auth.CapSkillRead); err != nil {
 		return nil, err
 	}
 
 	var bindings []SkillBinding
 	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+		orgID, err := s.resolveProjectOrgID(ctx, tx, projectID)
+		if err != nil {
+			return err
+		}
 		rows, err := tx.Query(ctx,
 			`SELECT id, scope, scope_ref, skill_id, skill_version_id, pinned, managed, overridable, installed_by, installed_at
 			 FROM skill_bindings

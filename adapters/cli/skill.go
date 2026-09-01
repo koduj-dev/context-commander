@@ -296,16 +296,7 @@ func newSkillListEffectiveCmd() *cobra.Command {
 			}
 			defer sc.pool.Close()
 
-			var orgID *uuid.UUID
-			if raw, _ := cmd.Flags().GetString("organization-id"); raw != "" {
-				id, err := uuid.Parse(raw)
-				if err != nil {
-					return fmt.Errorf("--organization-id: %w", err)
-				}
-				orgID = &id
-			}
-
-			list, err := sc.svc.ListEffective(cmd.Context(), sc.principalID, sc.project.ID, orgID)
+			list, err := sc.svc.ListEffective(cmd.Context(), sc.principalID, sc.project.ID)
 			if err != nil {
 				return err
 			}
@@ -319,7 +310,6 @@ func newSkillListEffectiveCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().String("organization-id", "", "organization UUID, if the project belongs to one")
 	skillFlags(cmd)
 	return cmd
 }

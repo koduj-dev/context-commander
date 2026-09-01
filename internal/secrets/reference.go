@@ -1,8 +1,10 @@
 package secrets
 
 import (
+	"errors"
 	"fmt"
 	"strings"
+	"unicode"
 
 	"github.com/google/uuid"
 )
@@ -10,6 +12,41 @@ import (
 // scheme is the fixed secret:// prefix — see docs/architecture-cookbook.md
 // §15's `secret://project/xyz/github` example.
 const scheme = "secret://"
+
+// maxNameLength keeps a secret name comfortably bounded — it has no other
+// natural limit (unlike, say, a database column) since it only ever
+// appears inside a Reference string and Backend keys.
+const maxNameLength = 200
+
+// ErrInvalidName is returned by ValidateName. Service.Create/Delete and
+// NewProjectReference's callers must all go through ValidateName rather
+// than each re-implementing the rule — see the P3 finding this fixes: a
+// name like "team/github" used to be accepted by Create and rendered into
+// a Reference string that Parse itself then rejected.
+var ErrInvalidName = errors.New("secrets: invalid secret name")
+
+// ValidateName enforces the one constraint Parse's fixed three-segment
+// secret://scope/scope_ref/name format actually requires — no "/" in name,
+// since Parse splits on it and a Reference is a tuple, not a path — plus an
+// explicit length/character policy so names round-trip through String/Parse
+// and through every Backend's own key-naming rules unchanged.
+func ValidateName(name string) error {
+	if name == "" {
+		return fmt.Errorf("%w: name must not be empty", ErrInvalidName)
+	}
+	if len(name) > maxNameLength {
+		return fmt.Errorf("%w: name exceeds %d characters", ErrInvalidName, maxNameLength)
+	}
+	if strings.Contains(name, "/") {
+		return fmt.Errorf(`%w: name must not contain "/" — a Reference is a fixed three-segment tuple, not a path`, ErrInvalidName)
+	}
+	for _, r := range name {
+		if unicode.IsControl(r) {
+			return fmt.Errorf("%w: name must not contain control characters", ErrInvalidName)
+		}
+	}
+	return nil
+}
 
 // Reference is the stable, backend-independent identity of a secret —
 // what every other domain stores/passes around instead of a plaintext

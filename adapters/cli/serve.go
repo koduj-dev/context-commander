@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -30,6 +31,33 @@ import (
 	"github.com/koduj-dev/context-commander/internal/storage/filesystem"
 )
 
+const (
+	tlsCertEnv                = "CC_TLS_CERT"
+	tlsKeyEnv                 = "CC_TLS_KEY"
+	insecureAllowCleartextEnv = "CC_INSECURE_ALLOW_CLEARTEXT"
+)
+
+// isLoopbackAddr reports whether an http.Server.Addr binds only to the local
+// host — the one case where serving REST/MCP (bearer-token authenticated,
+// docs/architecture-cookbook.md §25) in cleartext doesn't put credentials
+// and decrypted project content on a network any other host can observe.
+// Anything else (a wildcard bind, an empty host, a non-loopback hostname or
+// IP) is untrusted here; TLS or an explicit override is required for it.
+func isLoopbackAddr(addr string) bool {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		host = addr
+	}
+	switch host {
+	case "localhost":
+		return true
+	case "":
+		return false
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
+}
+
 // newServeCmd runs the REST API (at "/") and the MCP server (at "/mcp") on
 // one listener, both backed by the exact same domain services — see
 // adapters/http and adapters/mcp's package docs: neither adapter carries
@@ -45,6 +73,33 @@ func newServeCmd() *cobra.Command {
 				return err
 			}
 			addr, _ := cmd.Flags().GetString("addr")
+
+			tlsCert, _ := cmd.Flags().GetString("tls-cert")
+			if tlsCert == "" {
+				tlsCert = os.Getenv(tlsCertEnv)
+			}
+			tlsKey, _ := cmd.Flags().GetString("tls-key")
+			if tlsKey == "" {
+				tlsKey = os.Getenv(tlsKeyEnv)
+			}
+			if (tlsCert == "") != (tlsKey == "") {
+				return fmt.Errorf("serve: --tls-cert and --tls-key (or $%s/$%s) must both be set or both be empty", tlsCertEnv, tlsKeyEnv)
+			}
+			hasTLS := tlsCert != ""
+
+			insecure, _ := cmd.Flags().GetBool("insecure-allow-cleartext")
+			if !insecure && os.Getenv(insecureAllowCleartextEnv) == "true" {
+				insecure = true
+			}
+			if !hasTLS && !isLoopbackAddr(addr) && !insecure {
+				return fmt.Errorf(
+					"serve: refusing to bind %q without TLS — bearer tokens and decrypted project content would travel in "+
+						"plaintext to any host that can reach it (docs/architecture-cookbook.md §25 expects TLS in transit). "+
+						"Configure --tls-cert/--tls-key (or $%s/$%s), bind a loopback address behind a TLS-terminating "+
+						"reverse proxy instead, or pass --insecure-allow-cleartext (or $%s=true) to override",
+					addr, tlsCertEnv, tlsKeyEnv, insecureAllowCleartextEnv,
+				)
+			}
 
 			storageDir, _ := cmd.Flags().GetString("storage-dir")
 			if storageDir == "" {
@@ -75,6 +130,9 @@ func newServeCmd() *cobra.Command {
 			projStore := projects.NewStore()
 			authz := auth.NewAuthzService(pool, projStore)
 			gatesEngine := gates.NewEngine(pool)
+			if err := gates.ValidateRegisteredBindings(cmd.Context(), pool); err != nil {
+				return err
+			}
 			artifactsSvc := artifacts.NewService(pool, cryptoProvider, store, authz, gatesEngine)
 
 			orgStore := organizations.NewStore()
@@ -90,13 +148,13 @@ func newServeCmd() *cobra.Command {
 
 			mux := http.NewServeMux()
 			mux.Handle("/mcp", ccmcp.NewHandler(ccmcp.Deps{
-				Pool: pool, Projects: projStore, Artifacts: artifactsSvc,
+				Pool: pool, Projects: projStore, Authz: authz, Artifacts: artifactsSvc,
 				Events: eventsSvc, Organizations: orgSvc, Audit: auditSvc,
 				Handoffs: handoffsSvc, History: historySvc,
 				Skills: skillsSvc, Gates: gatesAdmin, Secrets: secretsSvc,
 			}))
 			mux.Handle("/", cchttp.NewHandler(cchttp.Deps{
-				Pool: pool, Projects: projStore, Artifacts: artifactsSvc,
+				Pool: pool, Projects: projStore, Authz: authz, Artifacts: artifactsSvc,
 				Events: eventsSvc, Organizations: orgSvc, Audit: auditSvc,
 				Handoffs: handoffsSvc, History: historySvc,
 				Skills: skillsSvc, Gates: gatesAdmin, Secrets: secretsSvc,
@@ -106,11 +164,20 @@ func newServeCmd() *cobra.Command {
 				Addr:              addr,
 				Handler:           mux,
 				ReadHeaderTimeout: 10 * time.Second,
+				ReadTimeout:       30 * time.Second,
+				WriteTimeout:      60 * time.Second,
+				IdleTimeout:       120 * time.Second,
 			}
 
 			serverErr := make(chan error, 1)
-			go func() { serverErr <- server.ListenAndServe() }()
-			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "listening on %s — REST at /v1, MCP at /mcp\n", addr)
+			scheme := "http"
+			if hasTLS {
+				scheme = "https"
+				go func() { serverErr <- server.ListenAndServeTLS(tlsCert, tlsKey) }()
+			} else {
+				go func() { serverErr <- server.ListenAndServe() }()
+			}
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "listening on %s://%s — REST at /v1, MCP at /mcp\n", scheme, addr)
 
 			ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 			defer stop()
@@ -129,8 +196,12 @@ func newServeCmd() *cobra.Command {
 			}
 		},
 	}
-	cmd.Flags().String("addr", ":8080", "listen address")
+	cmd.Flags().String("addr", "127.0.0.1:8080", "listen address — a non-loopback address requires --tls-cert/--tls-key or --insecure-allow-cleartext")
 	cmd.Flags().String("storage-dir", "", fmt.Sprintf("filesystem ObjectStore root (defaults to $%s, or %q)", storageDirEnv, defaultStorageDir))
+	cmd.Flags().String("tls-cert", "", fmt.Sprintf("TLS certificate file, enables HTTPS (defaults to $%s)", tlsCertEnv))
+	cmd.Flags().String("tls-key", "", fmt.Sprintf("TLS private key file, enables HTTPS (defaults to $%s)", tlsKeyEnv))
+	cmd.Flags().Bool("insecure-allow-cleartext", false,
+		fmt.Sprintf("allow binding a non-loopback --addr without TLS — bearer tokens and content travel in plaintext (defaults to $%s=true)", insecureAllowCleartextEnv))
 	databaseURLFlag(cmd)
 	return cmd
 }

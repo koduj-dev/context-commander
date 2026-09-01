@@ -44,6 +44,15 @@ var (
 	// input mistake, not a server fault, so it must map to 400 rather than
 	// the default 500 an unwrapped fmt.Errorf would fall through to.
 	ErrScopeRefRequired = errors.New("skills: organization/project scope requires scope_ref")
+
+	// ErrSkillVersionMismatch is returned by Service.Install/Override when
+	// skillVersionID does not belong to skillID — a client input mistake
+	// (or a supply-chain-relevant one), not a server fault, so it must map
+	// to 400 rather than the default 500 an unwrapped fmt.Errorf/database
+	// constraint violation would fall through to. The database also
+	// enforces this via skill_versions' composite (id, skill_id) key
+	// (migrations/000014) as defense in depth.
+	ErrSkillVersionMismatch = errors.New("skills: skill_version_id does not belong to skill_id")
 )
 
 // Skill is the stable identity a name/author/origin refers to across every

@@ -4,16 +4,34 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/koduj-dev/context-commander/internal/auth"
 	"github.com/koduj-dev/context-commander/internal/crypto"
 	"github.com/koduj-dev/context-commander/internal/db"
 )
+
+// foreignKeyViolation is Postgres's SQLSTATE for a foreign key constraint
+// violation — see migrations/000015's composite lineage FKs.
+const foreignKeyViolation = "23503"
+
+// asInvalidReference maps a composite-FK violation (a caller-supplied
+// conversation/session/derived-from ID that doesn't belong to this
+// project/conversation) to ErrInvalidReference instead of leaking the raw
+// constraint-violation error.
+func asInvalidReference(err error) error {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == foreignKeyViolation {
+		return ErrInvalidReference
+	}
+	return err
+}
 
 // Service is the authorization chokepoint for history (docs/adr/0014).
 type Service struct {
@@ -81,7 +99,7 @@ func (s *Service) CreateExternalSession(
 		return err
 	})
 	if err != nil {
-		return ExternalSession{}, fmt.Errorf("history: create external session: %w", err)
+		return ExternalSession{}, fmt.Errorf("history: create external session: %w", asInvalidReference(err))
 	}
 	return es, nil
 }
@@ -97,6 +115,9 @@ func (s *Service) AppendHistoryObject(
 ) (HistoryObject, error) {
 	if err := s.checkCapability(ctx, principalID, projectID, auth.CapHistoryWrite); err != nil {
 		return HistoryObject{}, err
+	}
+	if int64(len(plaintext)) > MaxContentSize {
+		return HistoryObject{}, ErrTooLarge
 	}
 
 	sum := sha256.Sum256(plaintext)
@@ -123,7 +144,7 @@ func (s *Service) AppendHistoryObject(
 		return err
 	})
 	if err != nil {
-		return HistoryObject{}, fmt.Errorf("history: append history object: %w", err)
+		return HistoryObject{}, fmt.Errorf("history: append history object: %w", asInvalidReference(err))
 	}
 
 	return HistoryObject{
@@ -132,8 +153,15 @@ func (s *Service) AppendHistoryObject(
 	}, nil
 }
 
-// ListHistoryObjects returns a conversation's history objects, decrypted,
-// oldest first.
+// MaxListLimit bounds a single ListHistoryObjects call — before this, the
+// query had no LIMIT at all, so a large conversation made a single call
+// buffer every matching encrypted row and then every decrypted plaintext
+// body in memory inside one transaction. Same convention as
+// internal/audit.QueryOptions.Limit and internal/events.Service.List's cap.
+const MaxListLimit = 1000
+
+// ListHistoryObjects returns up to MaxListLimit of a conversation's history
+// objects, decrypted, oldest first.
 func (s *Service) ListHistoryObjects(ctx context.Context, principalID, projectID, conversationID uuid.UUID) ([]HistoryObject, error) {
 	if err := s.checkCapability(ctx, principalID, projectID, auth.CapHistoryRead); err != nil {
 		return nil, err
@@ -154,8 +182,8 @@ func (s *Service) ListHistoryObjects(ctx context.Context, principalID, projectID
 
 		rows, err := tx.Query(ctx,
 			`SELECT id, project_id, conversation_id, external_session_id, type, derived_from, content_hash, ciphertext, nonce, wrapped_dek, project_key_version, created_at
-			 FROM history_objects WHERE project_id = $1 AND conversation_id = $2 ORDER BY created_at ASC`,
-			projectID, conversationID,
+			 FROM history_objects WHERE project_id = $1 AND conversation_id = $2 ORDER BY created_at ASC LIMIT $3`,
+			projectID, conversationID, MaxListLimit,
 		)
 		if err != nil {
 			return fmt.Errorf("history: list: %w", err)
