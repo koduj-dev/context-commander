@@ -1,0 +1,2 @@
+DROP INDEX organization_members_user_id_idx;
+DROP INDEX project_members_principal_id_idx;

@@ -1,0 +1,7 @@
+node_modules/
+tsconfig.tsbuildinfo
+
+# web/dist (the built SPA) is committed on purpose, same as
+# docker-commander's web/.gitignore — so `go build ./cmd/ccd` always
+# produces a binary with a working UI without requiring Node to be
+# installed. `make ui` overwrites it with a fresh build.

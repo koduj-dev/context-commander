@@ -41,6 +41,56 @@ func (s *Store) CreateUser(ctx context.Context, tx pgx.Tx, email, displayName st
 	return u, nil
 }
 
+// GetUser looks up a User by id — needed anywhere a Principal must be shown
+// as a human (email/display name), since Principal itself only carries the
+// UserID pointer.
+func (s *Store) GetUser(ctx context.Context, tx pgx.Tx, id uuid.UUID) (User, error) {
+	var u User
+	err := tx.QueryRow(ctx,
+		`SELECT id, email, display_name, created_at FROM users WHERE id = $1`, id,
+	).Scan(&u.ID, &u.Email, &u.DisplayName, &u.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return User{}, ErrNotFound
+	}
+	if err != nil {
+		return User{}, fmt.Errorf("identity: get user: %w", err)
+	}
+	return u, nil
+}
+
+// GetUsersForPrincipals batch-resolves Principal ids to their Users, keyed
+// by *principal* id (not user id) — the shape the audit log view needs to
+// label a page of audit_log rows (which carry principal_id) with actor
+// emails in one query instead of one per row. A ServicePrincipal id, or one
+// with no matching row, is simply absent from the result map.
+func (s *Store) GetUsersForPrincipals(ctx context.Context, tx pgx.Tx, principalIDs []uuid.UUID) (map[uuid.UUID]User, error) {
+	out := make(map[uuid.UUID]User, len(principalIDs))
+	if len(principalIDs) == 0 {
+		return out, nil
+	}
+	rows, err := tx.Query(ctx,
+		`SELECT p.id, u.id, u.email, u.display_name, u.created_at
+		 FROM principals p JOIN users u ON u.id = p.user_id
+		 WHERE p.id = ANY($1)`, principalIDs,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("identity: get users for principals: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var principalID uuid.UUID
+		var u User
+		if err := rows.Scan(&principalID, &u.ID, &u.Email, &u.DisplayName, &u.CreatedAt); err != nil {
+			return nil, fmt.Errorf("identity: get users for principals: scan: %w", err)
+		}
+		out[principalID] = u
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("identity: get users for principals: %w", err)
+	}
+	return out, nil
+}
+
 func (s *Store) CreateServicePrincipal(ctx context.Context, tx pgx.Tx, name, description string) (ServicePrincipal, error) {
 	var sp ServicePrincipal
 	err := tx.QueryRow(ctx,
@@ -50,6 +100,23 @@ func (s *Store) CreateServicePrincipal(ctx context.Context, tx pgx.Tx, name, des
 	).Scan(&sp.ID, &sp.Name, &sp.Description, &sp.CreatedAt)
 	if err != nil {
 		return ServicePrincipal{}, fmt.Errorf("identity: create service principal: %w", err)
+	}
+	return sp, nil
+}
+
+// GetServicePrincipal looks up a ServicePrincipal by id — the service-kind
+// counterpart to GetUser, used wherever a Principal must be shown as
+// whatever it actually is (getMe in adapters/http).
+func (s *Store) GetServicePrincipal(ctx context.Context, tx pgx.Tx, id uuid.UUID) (ServicePrincipal, error) {
+	var sp ServicePrincipal
+	err := tx.QueryRow(ctx,
+		`SELECT id, name, description, created_at FROM service_principals WHERE id = $1`, id,
+	).Scan(&sp.ID, &sp.Name, &sp.Description, &sp.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ServicePrincipal{}, ErrNotFound
+	}
+	if err != nil {
+		return ServicePrincipal{}, fmt.Errorf("identity: get service principal: %w", err)
 	}
 	return sp, nil
 }

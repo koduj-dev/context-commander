@@ -99,6 +99,23 @@ func (s *Service) Get(ctx context.Context, principalID, userID, organizationID u
 	return org, nil
 }
 
+// ListMine lists every organization userID belongs to. Unlike Get/AddMember
+// there is no per-organization capability to check here — it's the caller's
+// own membership rows, not access to a specific organization — so this is a
+// thin transaction wrapper around Store.ListForUser.
+func (s *Service) ListMine(ctx context.Context, principalID, userID uuid.UUID) ([]OrganizationMembership, error) {
+	var list []OrganizationMembership
+	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+		var err error
+		list, err = s.store.ListForUser(ctx, tx, userID)
+		return err
+	})
+	if err != nil {
+		return nil, fmt.Errorf("organizations: list mine: %w", err)
+	}
+	return list, nil
+}
+
 // AddMember adds newUserID to organizationID with role, after checking the
 // caller (principalID, callerUserID) holds CapOrgManageMembers on it —
 // OWNER or ADMIN, per roleCapabilities in capability.go.

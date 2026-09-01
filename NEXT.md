@@ -20,13 +20,32 @@ project-level RBAC and no dependency on any single AI vendor. See the cookbook
 §1 for the full definition.
 
 The design (cookbook + 16 ADRs) is settled and every domain it describes is
-now built, with HTTP/MCP/CLI adapters. What's left is engineering-docs parity,
-release/packaging wiring, and whatever the maintainer decides to harden or
-extend next.
+now built, with HTTP/MCP/CLI adapters, plus a basic web UI (below). What's
+left is engineering-docs parity, release/packaging wiring, and whatever the
+maintainer decides to harden or extend next.
 
 ---
 
 ## 🔭 Open work
+
+### Web UI follow-ups (v1 shipped)
+
+A basic React/Vite management UI now exists (`web/`, embedded into `ccd` via
+go:embed, PAT-paste login — see cookbook §5.1/§23 Rule 5: it's a management
+frontend over the same APIs, not a prerequisite). Deliberately left out of
+v1, not silently dropped:
+
+- [ ] **Write actions for gates/skills from the UI** — v1's Gates/Skills tabs
+  are read-only (bind/unbind/install/publish stay CLI-only for now).
+- [ ] **Self-service PAT issuance from the UI** — there's still no HTTP
+  endpoint to issue a token; `ccd token create` is the only way to get one,
+  including the very first login token.
+- [ ] **A real "list project members" endpoint** — the Members tab can only
+  add a member by principal id today; there's no way to see who's already a
+  member without the CLI/DB.
+- [ ] **Audit UI pagination** — same 500-row cap as the backlog item below;
+  the Audit tab shows a "narrow your filters" hint once it hits the cap
+  rather than paging.
 
 ### Engineering docs parity with docker-commander
 
@@ -91,9 +110,12 @@ Same "sibling project" doc style, adopted as the repo actually grows into it:
 **Proposed 2026-09-01 — not yet confirmed with the maintainer.** Everything
 the previous priority order tracked (Handoffs, Events, History,
 Organizations hardening, Audit expansion, Skill Registry, Gates, Secrets,
-adapter catch-up) shipped in a single pass — see `CHANGELOG.md`. What's left
-is smaller and mostly independent:
+adapter catch-up) shipped in a single pass — see `CHANGELOG.md`. The web UI
+v1 (above) shipped the same day. What's left is smaller and mostly
+independent:
 
+- [ ] Web UI follow-ups (above) — member listing, gate/skill write actions,
+  self-service PAT issuance, audit pagination.
 - [ ] `docs/README.md` manual index.
 - [ ] Packaging release wiring (`release.yml`, man page) — once CC is near a
   shippable state; the scaffolding itself already exists (see above).

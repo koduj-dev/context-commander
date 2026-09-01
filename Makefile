@@ -1,4 +1,4 @@
-.PHONY: dev-up dev-down build test lint migrate migrate-down tidy
+.PHONY: dev-up dev-down build ui test lint migrate migrate-down tidy
 
 GOBIN := $(shell go env GOPATH)/bin
 DB_OWNER_URL ?= postgres://cc_owner:cc_owner_dev_password@localhost:5432/context_commander?sslmode=disable
@@ -10,7 +10,16 @@ dev-up:
 dev-down:
 	docker compose -f deploy/docker-compose.yml down
 
-build:
+## ui: build the web frontend into web/dist (embedded into ccd via go:embed)
+#
+# `npm ci`, not `npm install`: web/dist is committed (see web/.gitignore) so
+# `go build` never depends on Node — but that only holds if this target
+# reproduces the exact dependency tree the committed dist was built from.
+ui:
+	cd web && npm ci && npm run build
+
+## build: build the web UI, then the ccd binary with it embedded
+build: ui
 	go build -o bin/ccd ./cmd/ccd
 
 # Integration tests spin up a real Postgres via testcontainers-go

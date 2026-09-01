@@ -12,6 +12,25 @@ link definition at the bottom of the file.
 
 ### Added
 
+- **Web management UI (v1):** a React/Vite frontend (`web/`), embedded into
+  the `ccd` binary via `go:embed` and served as the SPA fallback of `ccd
+  serve` (skip with `--dev` to run `cd web && npm run dev` separately
+  instead). Authenticates with a pasted PAT, same as the CLI — there's no
+  password/session backend (ADR 0009 keeps PAT issuance CLI-only). Covers a
+  project/organization dashboard and, per project, Members (add, role-gated),
+  Artifacts (browse/read/version history), Secrets (list/create/delete),
+  Skills and Gates (read-only), and an Audit log (ADMIN/OWNER-only, matching
+  `CapAuditRead`) with filters.
+- Three small HTTP endpoints and domain methods the UI needed and nothing
+  had before: `GET /v1/me` (resolve the caller's own identity —
+  `identity.Store.GetUser`/`GetServicePrincipal`), `GET /v1/me/projects` and
+  `GET /v1/me/organizations` (`projects.Store.ListForPrincipal`,
+  `organizations.Store.ListForUser`/`Service.ListMine`), backed by new
+  indexes on `project_members(principal_id)` and
+  `organization_members(user_id)` (`migrations/000016`). The audit log HTTP
+  response also now carries `principal_id`/`actor_email` (batch-resolved via
+  `identity.Store.GetUsersForPrincipals`) — it used to drop `Record`'s
+  `PrincipalID` entirely, so there was no way to see who did what.
 - Domain packages: Handoffs (§9), History/session lineage (§10), Skill
   Registry (§12, ADR 0012), Gates (§13), Secrets (§5.4) — each with a domain
   service, migrations, and HTTP/MCP/CLI adapters.

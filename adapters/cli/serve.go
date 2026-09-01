@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"net"
 	"net/http"
 	"os"
@@ -29,6 +30,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/secrets"
 	"github.com/koduj-dev/context-commander/internal/skills"
 	"github.com/koduj-dev/context-commander/internal/storage/filesystem"
+	"github.com/koduj-dev/context-commander/web"
 )
 
 const (
@@ -146,6 +148,19 @@ func newServeCmd() *cobra.Command {
 			secretsBackend := secrets.NewLocalEncryptedBackend(pool, cryptoProvider)
 			secretsSvc := secrets.NewService(pool, authz, secretsBackend)
 
+			dev, _ := cmd.Flags().GetBool("dev")
+			var webFS fs.FS
+			if !dev {
+				// In dev mode the UI is served separately by `cd web && npm
+				// run dev` (Vite, proxying /v1 back here) — mounting the
+				// (placeholder, unbuilt) embedded FS here too would just
+				// shadow it. See web/vite.config.ts.
+				webFS, err = web.DistFS()
+				if err != nil {
+					return err
+				}
+			}
+
 			mux := http.NewServeMux()
 			mux.Handle("/mcp", ccmcp.NewHandler(ccmcp.Deps{
 				Pool: pool, Projects: projStore, Authz: authz, Artifacts: artifactsSvc,
@@ -158,6 +173,7 @@ func newServeCmd() *cobra.Command {
 				Events: eventsSvc, Organizations: orgSvc, Audit: auditSvc,
 				Handoffs: handoffsSvc, History: historySvc,
 				Skills: skillsSvc, Gates: gatesAdmin, Secrets: secretsSvc,
+				WebFS: webFS,
 			}))
 
 			server := &http.Server{
@@ -202,6 +218,7 @@ func newServeCmd() *cobra.Command {
 	cmd.Flags().String("tls-key", "", fmt.Sprintf("TLS private key file, enables HTTPS (defaults to $%s)", tlsKeyEnv))
 	cmd.Flags().Bool("insecure-allow-cleartext", false,
 		fmt.Sprintf("allow binding a non-loopback --addr without TLS — bearer tokens and content travel in plaintext (defaults to $%s=true)", insecureAllowCleartextEnv))
+	cmd.Flags().Bool("dev", false, "skip mounting the embedded web UI — run 'cd web && npm run dev' separately, proxying /v1 back here")
 	databaseURLFlag(cmd)
 	return cmd
 }

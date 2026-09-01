@@ -10,6 +10,7 @@
 package http
 
 import (
+	"io/fs"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -44,6 +45,12 @@ type Deps struct {
 	Skills        *skills.Service
 	Gates         *gates.AdminService
 	Secrets       *secrets.Service
+	// WebFS is the embedded web UI build (web.DistFS()), served as the
+	// SPA fallback for any request under "/" that isn't "/v1/*" or
+	// "/healthz". Left nil in dev mode (`serve --dev`), where the UI is
+	// served separately by the Vite dev server instead — see
+	// adapters/cli/serve.go.
+	WebFS fs.FS
 }
 
 func NewHandler(deps Deps) http.Handler {
@@ -61,6 +68,17 @@ func NewHandler(deps Deps) http.Handler {
 
 	r.Route("/v1", func(r chi.Router) {
 		r.Use(deps.authenticateMiddleware)
+
+		// An unmatched path under /v1 must still get the API's uniform JSON
+		// error envelope, not the SPA fallback below — chi sub-routers
+		// otherwise inherit the parent's NotFoundHandler.
+		r.NotFound(func(w http.ResponseWriter, _ *http.Request) {
+			writeError(w, http.StatusNotFound, "not_found", "not found")
+		})
+
+		r.Get("/me", deps.getMe)
+		r.Get("/me/projects", deps.listMyProjects)
+		r.Get("/me/organizations", deps.listMyOrganizations)
 
 		r.Post("/projects", deps.createProject)
 
@@ -115,6 +133,10 @@ func NewHandler(deps Deps) http.Handler {
 			r.Delete("/secrets/{name}", deps.deleteSecret)
 		})
 	})
+
+	if deps.WebFS != nil {
+		r.NotFound(spaHandler(deps.WebFS).ServeHTTP)
+	}
 
 	return r
 }

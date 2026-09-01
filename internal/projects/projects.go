@@ -219,3 +219,50 @@ func (s *Store) GetMembership(ctx context.Context, tx pgx.Tx, projectID, princip
 	}
 	return m, nil
 }
+
+// MembershipWithProject is one row of ListForPrincipal — a project the
+// principal belongs to, its namespace slug (needed to render the
+// "namespace/slug" path), and the principal's role on it.
+type MembershipWithProject struct {
+	Project       Project
+	NamespaceSlug string
+	Role          Role
+}
+
+// ListForPrincipal lists every project principalID is a member of, driven by
+// project_members_principal_id_idx (migrations/000016) — the web UI's
+// dashboard project picker is the only caller today. RLS on projects/
+// project_members already scopes this to rows the principal can see; the
+// query itself just joins the membership row back to its project and
+// namespace.
+func (s *Store) ListForPrincipal(ctx context.Context, tx pgx.Tx, principalID uuid.UUID) ([]MembershipWithProject, error) {
+	rows, err := tx.Query(ctx,
+		`SELECT p.id, p.namespace_id, p.slug, p.name, p.visibility, p.created_at, n.slug, pm.role
+		 FROM project_members pm
+		 JOIN projects p ON p.id = pm.project_id
+		 JOIN namespaces n ON n.id = p.namespace_id
+		 WHERE pm.principal_id = $1
+		 ORDER BY p.created_at DESC`,
+		principalID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("projects: list for principal: %w", err)
+	}
+	defer rows.Close()
+
+	var out []MembershipWithProject
+	for rows.Next() {
+		var m MembershipWithProject
+		if err := rows.Scan(
+			&m.Project.ID, &m.Project.NamespaceID, &m.Project.Slug, &m.Project.Name, &m.Project.Visibility, &m.Project.CreatedAt,
+			&m.NamespaceSlug, &m.Role,
+		); err != nil {
+			return nil, fmt.Errorf("projects: list for principal: scan: %w", err)
+		}
+		out = append(out, m)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("projects: list for principal: %w", err)
+	}
+	return out, nil
+}

@@ -173,3 +173,37 @@ func TestOrganizationMembersBootstrapCannotBeReusedAfterFirstMember(t *testing.T
 		t.Fatal("attacker self-inserting membership into an already-owned organization should be denied by RLS, got no error")
 	}
 }
+
+// TestListMineOnlyReturnsCallerMemberships is the negative test the web
+// UI's dashboard org picker depends on: a user must see exactly the
+// organizations they belong to, never one they were never added to.
+func TestListMineOnlyReturnsCallerMemberships(t *testing.T) {
+	f := newFixture(t)
+
+	owner := f.newUser("owner-listmine@example.test")
+	outsider := f.newUser("outsider-listmine@example.test")
+
+	org, err := f.svc.Create(f.ctx, owner.principalID, owner.userID, "Acme ListMine")
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	ownerList, err := f.svc.ListMine(f.ctx, owner.principalID, owner.userID)
+	if err != nil {
+		t.Fatalf("ListMine(owner): %v", err)
+	}
+	if len(ownerList) != 1 || ownerList[0].Organization.ID != org.ID {
+		t.Fatalf("ListMine(owner) = %+v, want exactly [%s]", ownerList, org.ID)
+	}
+	if ownerList[0].Role != organizations.RoleOwner {
+		t.Errorf("owner's role = %s, want OWNER", ownerList[0].Role)
+	}
+
+	outsiderList, err := f.svc.ListMine(f.ctx, outsider.principalID, outsider.userID)
+	if err != nil {
+		t.Fatalf("ListMine(outsider): %v", err)
+	}
+	if len(outsiderList) != 0 {
+		t.Fatalf("ListMine(outsider) = %+v, want empty", outsiderList)
+	}
+}

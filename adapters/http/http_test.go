@@ -327,6 +327,12 @@ func TestAuditListAfterArtifactWrite(t *testing.T) {
 	if len(list) == 0 {
 		t.Fatal("expected at least one audit record after artifact.write, got none")
 	}
+	if got := list[0]["actor_email"]; got != "audit@example.test" {
+		t.Errorf("audit record actor_email = %+v, want audit@example.test", got)
+	}
+	if principalID, _ := list[0]["principal_id"].(string); principalID == "" {
+		t.Error("audit record principal_id is empty, want the writing principal's id")
+	}
 }
 
 func TestHandoffCreateGetListRoundTrip(t *testing.T) {

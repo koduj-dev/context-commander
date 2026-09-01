@@ -112,3 +112,41 @@ func (s *Store) GetMembership(ctx context.Context, tx pgx.Tx, organizationID, us
 	}
 	return m, nil
 }
+
+// OrganizationMembership is one row of ListForUser — an organization userID
+// belongs to, plus their role on it.
+type OrganizationMembership struct {
+	Organization Organization
+	Role         Role
+}
+
+// ListForUser lists every organization userID is a member of, driven by
+// organization_members_user_id_idx (migrations/000016) — the web UI's
+// dashboard org picker is the only caller today.
+func (s *Store) ListForUser(ctx context.Context, tx pgx.Tx, userID uuid.UUID) ([]OrganizationMembership, error) {
+	rows, err := tx.Query(ctx,
+		`SELECT o.id, o.name, o.created_at, om.role
+		 FROM organization_members om
+		 JOIN organizations o ON o.id = om.organization_id
+		 WHERE om.user_id = $1
+		 ORDER BY o.created_at DESC`,
+		userID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("organizations: list for user: %w", err)
+	}
+	defer rows.Close()
+
+	var out []OrganizationMembership
+	for rows.Next() {
+		var m OrganizationMembership
+		if err := rows.Scan(&m.Organization.ID, &m.Organization.Name, &m.Organization.CreatedAt, &m.Role); err != nil {
+			return nil, fmt.Errorf("organizations: list for user: scan: %w", err)
+		}
+		out = append(out, m)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("organizations: list for user: %w", err)
+	}
+	return out, nil
+}
