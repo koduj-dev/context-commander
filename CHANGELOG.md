@@ -28,3 +28,19 @@ link definition at the bottom of the file.
 - `docs/testing.md` — the two real test tiers, why integration tests run
   against the RLS-subject `cc_app` role, and where adversarial/negative
   tests live.
+
+### Fixed
+
+- **Security:** `skills.Service.Install` and `gates.AdminService.Bind`/`Unbind`
+  authorized a project-scope mutation using only the caller-supplied anchor
+  project's capability, never checking the capability against `scopeRef` —
+  the project the binding was actually written into or deleted from. A
+  principal with the right capability on any one project they belong to
+  could install a skill into, or unbind a gate from, any other project they
+  hold even a READER membership in. `checkScopeTarget` now authorizes
+  `scopeRef` directly (`internal/skills/service.go`, `internal/gates/admin.go`).
+- **Security:** `artifacts.Service.Write` passed `orgID = nil` to
+  `gates.Engine.Evaluate` unconditionally, so an organization-scope gate
+  binding (e.g. a mandatory secret scanner) never matched and silently never
+  ran on any artifact write. `Write` now resolves the project's real
+  organization id before evaluating gates.

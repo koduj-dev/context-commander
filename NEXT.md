@@ -28,6 +28,25 @@ extend next.
 
 ## 🔭 Open work
 
+### Known security gap
+
+- **Organization-scope gate bindings are invisible to a project member who
+  isn't also an organization member.** `gate_bindings` RLS
+  (`migrations/000008_gates.up.sql`) requires `cc_has_org_access` for
+  `scope = 'organization'` rows — i.e. the *writing* principal must have an
+  `organization_members` row for that org, independent of their
+  `project_members` role on the project actually being written to. Found
+  2026-09-01 while regression-testing the `orgID = nil` fix in
+  `artifacts.Service.Write` (see CHANGELOG "Fixed"): an org-wide policy
+  (e.g. a mandatory secret scanner) silently does not apply to a project
+  contributor who was never added to the organization itself, even though
+  their project lives under it. Fixing this means changing
+  `gate_bindings_scoped`'s USING clause for `scope = 'organization'` to key
+  off the *artifact's project's* organization rather than the acting
+  principal's own org membership — a migration change, not just Go code, so
+  it needs its own review pass rather than folding into the authz-bypass fix
+  it was found alongside.
+
 ### Engineering docs parity with docker-commander
 
 Same "sibling project" doc style, adopted as the repo actually grows into it:
