@@ -32,10 +32,9 @@ extend next.
 
 Same "sibling project" doc style, adopted as the repo actually grows into it:
 
-- [ ] `docs/testing.md` — test tiers (unit + testcontainers-go Postgres
-  integration per `docs/architecture-cookbook.md` "Testování" / the `test`
-  Makefile target) — worth writing now that every domain has an integration
-  test suite worth describing.
+- [x] `docs/testing.md` — the two real tiers (unit, testcontainers-go Postgres
+  integration), why integration tests run against the RLS-subject `cc_app`
+  role rather than `cc_owner`, and where the adversarial/negative tests live.
 - [ ] `docs/README.md` as a manual index — now that the cookbook, ADRs,
   gotchas, dev-environment and brand docs all exist, a manual index is no
   longer premature.
@@ -88,7 +87,7 @@ Organizations hardening, Audit expansion, Skill Registry, Gates, Secrets,
 adapter catch-up) shipped in a single pass — see `CHANGELOG.md`. What's left
 is smaller and mostly independent:
 
-- [ ] `docs/testing.md`, `docs/README.md` manual index.
+- [ ] `docs/README.md` manual index.
 - [ ] Packaging release wiring (`release.yml`, man page) — once CC is near a
   shippable state; the scaffolding itself already exists (see above).
 - [ ] Anything the maintainer wants hardened or extended next — no

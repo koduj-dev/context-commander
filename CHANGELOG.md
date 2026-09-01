@@ -25,3 +25,6 @@ link definition at the bottom of the file.
   requires.
 - Audit expansion (`internal/audit`) with a real service and integration
   tests.
+- `docs/testing.md` — the two real test tiers, why integration tests run
+  against the RLS-subject `cc_app` role, and where adversarial/negative
+  tests live.
