@@ -139,6 +139,69 @@ func TestEngineOnlyMatchesBoundHook(t *testing.T) {
 	}
 }
 
+// TestEngineOrganizationBindingVisibleThroughProjectMembershipButNotMutable
+// exercises both halves of migration 000012's split RLS policy: a principal
+// with project membership but no organization membership must see and execute
+// the organization's gate, but that read visibility must not allow them to
+// mutate the organization-scoped binding directly through cc_app.
+func TestEngineOrganizationBindingVisibleThroughProjectMembershipButNotMutable(t *testing.T) {
+	f := newEngineFixture(t)
+	organizationID := uuid.New()
+	organizationProjectID := uuid.New()
+	bindingID := uuid.New()
+
+	err := db.WithoutPrincipal(f.ctx, f.ownerPool, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(f.ctx, `INSERT INTO organizations (id, name) VALUES ($1, 'Fixture Org')`, organizationID); err != nil {
+			return err
+		}
+		namespaceID := uuid.New()
+		if _, err := tx.Exec(f.ctx,
+			`INSERT INTO namespaces (id, kind, slug, organization_id) VALUES ($1, 'organization', $2, $3)`,
+			namespaceID, "fixture-org-"+namespaceID.String()[:8], organizationID); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(f.ctx,
+			`INSERT INTO projects (id, namespace_id, slug, name) VALUES ($1, $2, 'org-project', 'Org Project')`,
+			organizationProjectID, namespaceID); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(f.ctx,
+			`INSERT INTO project_members (project_id, principal_id, role) VALUES ($1, $2, 'CONTRIBUTOR')`,
+			organizationProjectID, f.principalID); err != nil {
+			return err
+		}
+		_, err := tx.Exec(f.ctx,
+			`INSERT INTO gate_bindings (id, scope, scope_ref, gate_name, hook) VALUES ($1, 'organization', $2, 'secret-scanner', 'artifact.before_write')`,
+			bindingID, organizationID)
+		return err
+	})
+	if err != nil {
+		f.t.Fatalf("seed organization project and binding: %v", err)
+	}
+
+	r, err := f.engine.Evaluate(f.ctx, f.principalID, organizationProjectID, &organizationID, "artifact.before_write", []byte("AWS_KEY=AKIAABCDEFGHIJKLMNOP"))
+	if err != nil {
+		f.t.Fatalf("Evaluate: %v", err)
+	}
+	if r.Verdict != gates.Deny {
+		f.t.Fatalf("got verdict %s, want DENY from organization binding visible through project membership", r.Verdict)
+	}
+
+	err = db.WithPrincipal(f.ctx, f.appPool, db.Principal{ID: f.principalID}, func(tx pgx.Tx) error {
+		tag, err := tx.Exec(f.ctx, `DELETE FROM gate_bindings WHERE id = $1`, bindingID)
+		if err != nil {
+			return err
+		}
+		if tag.RowsAffected() != 0 {
+			f.t.Fatalf("deleted %d organization bindings without organization membership, want 0", tag.RowsAffected())
+		}
+		return nil
+	})
+	if err != nil {
+		f.t.Fatalf("attempt direct binding delete: %v", err)
+	}
+}
+
 // --- AdminService (Bind/Unbind/ListBindings) ---
 
 type adminFixture struct {

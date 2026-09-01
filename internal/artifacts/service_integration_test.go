@@ -490,7 +490,9 @@ func TestWriteBlockedBySecretScannerGate(t *testing.T) {
 // binding when passed that project's real orgID, so a project under an
 // organization namespace must still be blocked by a gate bound at
 // organization scope, not just installation/project scope (already covered
-// by TestWriteBlockedBySecretScannerGate).
+// by TestWriteBlockedBySecretScannerGate). The writer deliberately has no
+// organization_members row: project membership alone must make the owning
+// organization's mandatory gate visible during evaluation.
 func TestWriteBlockedByOrganizationScopeGate(t *testing.T) {
 	f := newFixture(t)
 	ctx := context.Background()
@@ -513,19 +515,6 @@ func TestWriteBlockedByOrganizationScopeGate(t *testing.T) {
 		}
 		if _, err := tx.Exec(ctx, `INSERT INTO project_members (project_id, principal_id, role) VALUES ($1, $2, 'OWNER')`,
 			orgProjectID, f.principalID); err != nil {
-			return err
-		}
-		// gate_bindings RLS (migrations/000008_gates.up.sql) hides an
-		// organization-scope row from a principal with no organization_members
-		// row for that org (cc_has_org_access) — independent of project
-		// membership. f.principalID's user needs to actually join the
-		// organization for the binding to be visible at all.
-		var writerUserID uuid.UUID
-		if err := tx.QueryRow(ctx, `SELECT user_id FROM principals WHERE id = $1`, f.principalID).Scan(&writerUserID); err != nil {
-			return err
-		}
-		if _, err := tx.Exec(ctx, `INSERT INTO organization_members (organization_id, user_id, role) VALUES ($1, $2, 'MEMBER')`,
-			orgID, writerUserID); err != nil {
 			return err
 		}
 		_, err := tx.Exec(ctx,

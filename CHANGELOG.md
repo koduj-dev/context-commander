@@ -31,6 +31,16 @@ link definition at the bottom of the file.
 
 ### Fixed
 
+- **Security:** organization-scope gate bindings were hidden by RLS from a
+  principal who belonged to a project under the organization but had no
+  separate `organization_members` row, so a mandatory organization-wide gate
+  could silently fail to run for project-only members and service principals.
+  Migration `000012` makes organization bindings readable through project
+  membership while retaining the original, narrower mutation rules; regression
+  tests verify both that the gate executes and that this added read visibility
+  cannot be used to delete the binding (`migrations/000012_*`,
+  `internal/gates/engine_integration_test.go`,
+  `internal/artifacts/service_integration_test.go`).
 - **Security:** `skills.Service.Install` and `gates.AdminService.Bind`/`Unbind`
   authorized a project-scope mutation using only the caller-supplied anchor
   project's capability, never checking the capability against `scopeRef` —
