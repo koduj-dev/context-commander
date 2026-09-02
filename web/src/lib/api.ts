@@ -112,11 +112,24 @@ export interface GateBinding {
   config?: string;
 }
 
-export interface EffectiveSkillBinding {
-  skill_name: string;
-  skill_version_id: string;
+export interface SkillVersion {
+  id: string;
+  skill_id: string;
+  version: number;
+  checksum: string;
+  declared_capabilities: string[];
+  trust_status: string;
+}
+
+export interface SkillBinding {
+  id: string;
   scope: string;
+  scope_ref?: string;
+  skill_id: string;
+  skill_version_id: string;
   pinned: boolean;
+  managed: boolean;
+  overridable: boolean;
 }
 
 export interface AuditRecord {
@@ -163,10 +176,36 @@ export const api = {
     req<void>("DELETE", `/v1/projects/${namespace}/${slug}/secrets/${encodeURIComponent(name)}`),
 
   listEffectiveSkills: (namespace: string, slug: string) =>
-    req<EffectiveSkillBinding[]>("GET", `/v1/projects/${namespace}/${slug}/skills/effective`),
+    req<SkillBinding[]>("GET", `/v1/projects/${namespace}/${slug}/skills/effective`),
+  publishSkill: (
+    namespace: string,
+    slug: string,
+    body: { skill_id?: string; name: string; author: string; origin: string; content: string; declared_capabilities: string[] },
+  ) => req<SkillVersion>("POST", `/v1/projects/${namespace}/${slug}/skills`, body),
+  installSkill: (
+    namespace: string,
+    slug: string,
+    body: { scope: string; scope_ref?: string; skill_id: string; skill_version_id: string; managed: boolean; overridable: boolean },
+  ) => req<SkillBinding>("POST", `/v1/projects/${namespace}/${slug}/skills/install`, body),
+  overrideSkill: (
+    namespace: string,
+    slug: string,
+    body: { skill_id: string; skill_version_id: string; managed: boolean; overridable: boolean },
+  ) => req<SkillBinding>("POST", `/v1/projects/${namespace}/${slug}/skills/override`, body),
+  pinSkillBinding: (namespace: string, slug: string, bindingId: string) =>
+    req<void>("POST", `/v1/projects/${namespace}/${slug}/skills/pin`, { binding_id: bindingId }),
+  unpinSkillBinding: (namespace: string, slug: string, bindingId: string) =>
+    req<void>("POST", `/v1/projects/${namespace}/${slug}/skills/unpin`, { binding_id: bindingId }),
 
   listGateBindings: (namespace: string, slug: string) =>
     req<GateBinding[]>("GET", `/v1/projects/${namespace}/${slug}/gates/bindings`),
+  bindGate: (
+    namespace: string,
+    slug: string,
+    body: { scope: string; scope_ref?: string; gate_name: string; hook: string; config: unknown },
+  ) => req<GateBinding>("POST", `/v1/projects/${namespace}/${slug}/gates/bindings`, body),
+  unbindGate: (namespace: string, slug: string, id: string) =>
+    req<void>("DELETE", `/v1/projects/${namespace}/${slug}/gates/bindings?id=${encodeURIComponent(id)}`),
 
   queryAudit: (
     namespace: string,

@@ -99,6 +99,15 @@ Same "sibling project" doc style, adopted as the repo actually grows into it:
 
 ## ❓ Open questions
 
+- **Single-binary deployment.** docker-commander ships as one binary
+  (`modernc.org/sqlite`, no CGO, no external services). CC needs Postgres
+  (RLS-based multi-tenancy) and MinIO/S3 (artifact storage), so `ccd` alone
+  isn't enough to run it — maintainer would like it to be, eventually.
+  Genuinely hard: Postgres can't be embedded the way SQLite can, and RLS is
+  load-bearing for the whole authz model (see cookbook). Would need either
+  an embedded-Postgres story (e.g. bundling/managing a Postgres process) or
+  rethinking multi-tenancy for a non-RLS backend — not a small change.
+  Raised 2026-09-02, not scoped yet.
 - **Packaging: copy-adapt vs. a shared template repo.** Parked on
   rule-of-three — only two sibling `koduj-dev`-style repos exist
   (docker-commander, context-commander) and their packaging will differ

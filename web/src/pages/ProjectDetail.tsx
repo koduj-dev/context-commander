@@ -64,8 +64,8 @@ export default function ProjectDetail() {
       {visibleTab === "Members" && <Members namespace={namespace} slug={slug} role={project.role} />}
       {visibleTab === "Artifacts" && <Artifacts namespace={namespace} slug={slug} />}
       {visibleTab === "Secrets" && <Secrets namespace={namespace} slug={slug} />}
-      {visibleTab === "Skills" && <Skills namespace={namespace} slug={slug} />}
-      {visibleTab === "Gates" && <Gates namespace={namespace} slug={slug} />}
+      {visibleTab === "Skills" && <Skills namespace={namespace} slug={slug} role={project.role} />}
+      {visibleTab === "Gates" && <Gates namespace={namespace} slug={slug} role={project.role} />}
       {visibleTab === "Audit" && <Audit namespace={namespace} slug={slug} />}
     </div>
   );

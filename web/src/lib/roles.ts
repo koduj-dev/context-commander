@@ -10,3 +10,18 @@ export function canReadAudit(role: string): boolean {
 export function canManageMembers(role: string): boolean {
   return role === "ADMIN" || role === "OWNER";
 }
+
+// CapGateManage (internal/auth/capability.go) is ADMIN/OWNER-only.
+export function canManageGates(role: string): boolean {
+  return role === "ADMIN" || role === "OWNER";
+}
+
+// CapSkillInstall/CapSkillPublish are granted to CONTRIBUTOR and up.
+export function canManageSkills(role: string): boolean {
+  return role === "CONTRIBUTOR" || role === "ADMIN" || role === "OWNER";
+}
+
+// CapSkillOverride (shadowing an org/installation binding) is ADMIN/OWNER-only.
+export function canOverrideSkills(role: string): boolean {
+  return role === "ADMIN" || role === "OWNER";
+}
