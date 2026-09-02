@@ -1,0 +1,12 @@
+title = "gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "fixture secrets used to test the secret-scanner gate itself, not real credentials"
+paths = [
+  '''internal/gates/secretscanner_test\.go''',
+  '''internal/gates/engine_integration_test\.go''',
+  '''internal/artifacts/service_integration_test\.go''',
+]
