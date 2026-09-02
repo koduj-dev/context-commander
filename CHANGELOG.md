@@ -12,6 +12,34 @@ link definition at the bottom of the file.
 
 ### Added
 
+- **Web UI v1 follow-ups:** the four items deliberately left out of v1
+  (`NEXT.md`) now ship.
+  - Gates/Skills tabs gained write actions (bind/unbind, publish/install/
+    override/pin/unpin) — the HTTP endpoints already existed; this was a
+    frontend-only change (`web/src/pages/project/Gates.tsx`, `Skills.tsx`).
+    Also fixed a latent bug found while touching it: the Skills tab read a
+    `skill_name` field the backend's `skillBindingResponse` never had, so
+    every installed skill's name silently rendered blank.
+  - `internal/projects.Store.ListMembers` plus `GET /v1/projects/{ns}/{slug}/members`
+    and an MCP `project.list_members` tool — the Members tab was previously
+    add-only, with no way to see who's already a member. Gated by
+    `auth.CapMemberRead` (granted to every role, unlike `CapMemberManage`),
+    so the Members tab now shows the list to a READER too, not just
+    ADMIN/OWNER.
+  - Self-service PAT issuance, listing, and revocation — `POST/GET
+    /v1/me/tokens`, `DELETE /v1/me/tokens/{id}`, a new `/tokens` page in the
+    web UI. Deliberately self-only: `internal/identity` has no authz layer
+    and `client_credentials` has no RLS, so every handler uses
+    `principalIDFrom(ctx)` as the sole target and never a principal id from
+    the request body — `RevokeCredential`'s `WHERE id=$1 AND
+    principal_id=$2` is what actually enforces this, not a separate
+    ownership check. `internal/identity.ValidateExpiresAt` rejects a
+    past `expires_at`.
+  - Real keyset pagination for the audit log: `internal/audit.QueryOptions.BeforeID`
+    (`AND id < $N`, matching `ORDER BY ts DESC, id DESC`), exposed as
+    `?before_id=` and driving a "Load more" button on the Audit tab —
+    replacing the old hard 500-row cap with no way to see further back.
+
 - **Web management UI (v1):** a React/Vite frontend (`web/`), embedded into
   the `ccd` binary via `go:embed` and served as the SPA fallback of `ccd
   serve` (skip with `--dev` to run `cd web && npm run dev` separately
