@@ -149,6 +149,14 @@ export interface Membership {
   role: string;
 }
 
+export interface Member {
+  principal_id: string;
+  role: string;
+  created_at: string;
+  email?: string;
+  display_name?: string;
+}
+
 export const api = {
   me: () => req<Me>("GET", "/v1/me"),
   myProjects: () => req<MyProject[]>("GET", "/v1/me/projects"),
@@ -160,6 +168,8 @@ export const api = {
     req<Project>("GET", `/v1/projects/${namespace}/${slug}/`),
   addMember: (namespace: string, slug: string, principalId: string, role: string) =>
     req<void>("POST", `/v1/projects/${namespace}/${slug}/members`, { principal_id: principalId, role }),
+  listMembers: (namespace: string, slug: string) =>
+    req<Member[]>("GET", `/v1/projects/${namespace}/${slug}/members`),
 
   listArtifacts: (namespace: string, slug: string) =>
     req<Artifact[]>("GET", `/v1/projects/${namespace}/${slug}/artifacts`),

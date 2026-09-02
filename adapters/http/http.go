@@ -90,6 +90,7 @@ func NewHandler(deps Deps) http.Handler {
 
 			r.Get("/", deps.getProject)
 			r.Post("/members", deps.addMember)
+			r.Get("/members", deps.listMembers)
 
 			r.Get("/artifacts", deps.listArtifacts)
 			r.Get("/artifacts/stat", deps.statArtifact)

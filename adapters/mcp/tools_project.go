@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -127,5 +128,77 @@ func registerProjectTools(server *sdkmcp.Server, deps Deps, principalID, clientI
 			return nil, addMemberResult{}, err
 		}
 		return nil, addMemberResult{Added: true}, nil
+	})
+
+	type listMembersArgs struct {
+		Project string `json:"project" jsonschema:"project path \"namespace/slug\""`
+	}
+	type memberResult struct {
+		PrincipalID string `json:"principal_id"`
+		Role        string `json:"role"`
+		CreatedAt   string `json:"created_at"`
+		Email       string `json:"email,omitempty"`
+		DisplayName string `json:"display_name,omitempty"`
+	}
+	type listMembersResult struct {
+		Members []memberResult `json:"members"`
+	}
+	sdkmcp.AddTool(server, &sdkmcp.Tool{
+		Name:        "project.list_members",
+		Description: "List every member of a project you're already a member of, with their role.",
+	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, args listMembersArgs) (*sdkmcp.CallToolResult, listMembersResult, error) {
+		var project projects.Project
+		err := db.WithPrincipal(ctx, deps.Pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+			var err error
+			project, err = deps.Projects.Resolve(ctx, tx, args.Project)
+			return err
+		})
+		if err != nil {
+			return nil, listMembersResult{}, err
+		}
+
+		allowed, err := deps.Authz.Can(ctx, principalID, project.ID, auth.CapMemberRead)
+		if err != nil {
+			return nil, listMembersResult{}, err
+		}
+		if !allowed {
+			return nil, listMembersResult{}, errors.New("you do not have permission to read members on this project")
+		}
+
+		var members []projects.Membership
+		err = db.WithPrincipal(ctx, deps.Pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+			var err error
+			members, err = deps.Projects.ListMembers(ctx, tx, project.ID)
+			return err
+		})
+		if err != nil {
+			return nil, listMembersResult{}, err
+		}
+
+		principalIDs := make([]uuid.UUID, len(members))
+		for i, m := range members {
+			principalIDs[i] = m.PrincipalID
+		}
+		var users map[uuid.UUID]identity.User
+		if len(principalIDs) > 0 {
+			err := db.WithPrincipal(ctx, deps.Pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+				var err error
+				users, err = identity.NewStore().GetUsersForPrincipals(ctx, tx, principalIDs)
+				return err
+			})
+			if err != nil {
+				return nil, listMembersResult{}, err
+			}
+		}
+
+		out := make([]memberResult, len(members))
+		for i, m := range members {
+			out[i] = memberResult{PrincipalID: m.PrincipalID.String(), Role: string(m.Role), CreatedAt: m.CreatedAt.Format(time.RFC3339)}
+			if u, ok := users[m.PrincipalID]; ok {
+				out[i].Email = u.Email
+				out[i].DisplayName = u.DisplayName
+			}
+		}
+		return nil, listMembersResult{Members: out}, nil
 	})
 }

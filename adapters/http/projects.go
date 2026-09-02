@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -119,6 +120,77 @@ func (d Deps) addMember(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+type memberResponse struct {
+	PrincipalID string  `json:"principal_id"`
+	Role        string  `json:"role"`
+	CreatedAt   string  `json:"created_at"`
+	Email       *string `json:"email,omitempty"`
+	DisplayName *string `json:"display_name,omitempty"`
+}
+
+// listMembers is the mirror image of addMember: CapMemberRead (unlike
+// CapMemberManage) is granted to every role including READER, so any
+// project member can see who else is on the project even if they can't add
+// or remove anyone. Emails are batch-resolved the same way queryAudit
+// resolves actor emails — a service-principal member has no User row and
+// so no email/display_name in the response.
+func (d Deps) listMembers(w http.ResponseWriter, r *http.Request) {
+	project := projectFrom(r.Context())
+	principalID := principalIDFrom(r.Context())
+
+	allowed, err := d.Authz.Can(r.Context(), principalID, project.ID, auth.CapMemberRead)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "authorization check failed")
+		return
+	}
+	if !allowed {
+		writeError(w, http.StatusForbidden, "forbidden", "you do not have permission to read members on this project")
+		return
+	}
+
+	var members []projects.Membership
+	err = db.WithPrincipal(r.Context(), d.Pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+		var err error
+		members, err = d.Projects.ListMembers(r.Context(), tx, project.ID)
+		return err
+	})
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	principalIDs := make([]uuid.UUID, len(members))
+	for i, m := range members {
+		principalIDs[i] = m.PrincipalID
+	}
+	var users map[uuid.UUID]identity.User
+	if len(principalIDs) > 0 {
+		err := db.WithPrincipal(r.Context(), d.Pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+			var err error
+			users, err = identity.NewStore().GetUsersForPrincipals(r.Context(), tx, principalIDs)
+			return err
+		})
+		if err != nil {
+			writeDomainError(w, err)
+			return
+		}
+	}
+
+	out := make([]memberResponse, len(members))
+	for i, m := range members {
+		out[i] = memberResponse{PrincipalID: m.PrincipalID.String(), Role: string(m.Role), CreatedAt: m.CreatedAt.Format(time.RFC3339)}
+		if u, ok := users[m.PrincipalID]; ok {
+			email := u.Email
+			out[i].Email = &email
+			if u.DisplayName != "" {
+				displayName := u.DisplayName
+				out[i].DisplayName = &displayName
+			}
+		}
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 func toProjectResponse(p projects.Project, namespaceSlug string) projectResponse {

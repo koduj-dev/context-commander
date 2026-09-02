@@ -220,6 +220,35 @@ func (s *Store) GetMembership(ctx context.Context, tx pgx.Tx, projectID, princip
 	return m, nil
 }
 
+// ListMembers lists every member of a project, driven by the project_id
+// half of project_members' primary key — the mirror image of
+// ListForPrincipal. RLS (project_members_select, migration 000004) already
+// scopes this to a caller who is themselves a member of projectID.
+func (s *Store) ListMembers(ctx context.Context, tx pgx.Tx, projectID uuid.UUID) ([]Membership, error) {
+	rows, err := tx.Query(ctx,
+		`SELECT project_id, principal_id, role, created_at FROM project_members
+		 WHERE project_id = $1 ORDER BY created_at ASC`,
+		projectID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("projects: list members: %w", err)
+	}
+	defer rows.Close()
+
+	var out []Membership
+	for rows.Next() {
+		var m Membership
+		if err := rows.Scan(&m.ProjectID, &m.PrincipalID, &m.Role, &m.CreatedAt); err != nil {
+			return nil, fmt.Errorf("projects: list members: scan: %w", err)
+		}
+		out = append(out, m)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("projects: list members: %w", err)
+	}
+	return out, nil
+}
+
 // MembershipWithProject is one row of ListForPrincipal — a project the
 // principal belongs to, its namespace slug (needed to render the
 // "namespace/slug" path), and the principal's role on it.
