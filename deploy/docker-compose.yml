@@ -40,6 +40,41 @@ services:
       timeout: 3s
       retries: 10
 
+  app:
+    # Opt-in: `make dev-up` / a plain `docker compose ... up` (used by
+    # everyday Go dev and `make test`) must keep only starting Postgres +
+    # MinIO, unchanged. Bring this service up explicitly with
+    # `docker compose -f deploy/docker-compose.yml --profile app up -d --build`.
+    profiles: ["app"]
+    build:
+      # Repo root (this file's parent), where the Dockerfile and go.mod
+      # live — deploy/ only holds compose/deployment config, not the build
+      # itself.
+      context: ..
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # cc_app is the only role the running server connects as (RLS-enforced,
+      # see docs/adr/0002) — migrations and the first user/PAT are NOT run
+      # automatically here, same as the bare-binary flow in the README: run
+      # them once via
+      #   docker compose -f deploy/docker-compose.yml run --rm \
+      #     -e CC_DATABASE_URL=postgres://cc_owner:cc_owner_dev_password@postgres:5432/context_commander?sslmode=disable \
+      #     app migrate
+      #   docker compose -f deploy/docker-compose.yml run --rm app \
+      #     bootstrap --email you@example.com --name "Your Name"
+      CC_DATABASE_URL: postgres://cc_app:cc_app_dev_password@postgres:5432/context_commander?sslmode=disable
+      # Dev-only convenience key — never reuse outside a disposable local
+      # environment (docs/adr/0005). Required, no default: a real deployment
+      # must not silently start with a fixed/known key.
+      CC_ROOT_KEY: ${CC_ROOT_KEY:?set CC_ROOT_KEY in the environment or a .env file next to this compose file, e.g. $(openssl rand -base64 32)}
+    ports:
+      - "127.0.0.1:8490:8490"
+    volumes:
+      - cc_app_storage:/data
+
 volumes:
   # Named volumes, managed by Docker outside the repo tree — a container-owned
   # bind-mount under the repo (e.g. ./data/postgres) breaks `go build ./...`
@@ -47,3 +82,4 @@ volumes:
   # wrong place for engine-owned data files anyway.
   cc_postgres_data:
   cc_minio_data:
+  cc_app_storage:

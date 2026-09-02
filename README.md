@@ -73,6 +73,26 @@ export CC_DATABASE_URL=postgres://cc_app:cc_app_dev_password@localhost:5432/cont
 ./bin/ccd bootstrap --email you@example.com --name "Your Name"
 ```
 
+### Running entirely in Docker
+
+`make dev-up` only starts Postgres/MinIO — everyday Go dev and `make test` don't need the app
+itself containerized. To run `ccd` (server + embedded web UI) in Docker too, opt into the `app`
+profile explicitly:
+
+```bash
+cd deploy
+cp .env.example .env               # then fill in CC_ROOT_KEY, e.g. `openssl rand -base64 32`
+docker compose up -d postgres      # if not already running
+docker compose --profile app run --rm \
+  -e CC_DATABASE_URL=postgres://cc_owner:cc_owner_dev_password@postgres:5432/context_commander?sslmode=disable \
+  app migrate
+docker compose --profile app run --rm app bootstrap --email you@example.com --name "Your Name"
+docker compose --profile app up -d --build app
+```
+
+The UI is then at <http://127.0.0.1:8490>. Rerun the last command (with `--build`) after pulling
+code changes.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow and review discipline, and

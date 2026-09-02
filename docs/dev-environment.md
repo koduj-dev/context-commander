@@ -52,3 +52,21 @@ test proves nothing.
   (testcontainers).
 - `make lint` → `golangci-lint run ./...` (must be installed separately).
 - `make tidy` → `go mod tidy`.
+
+## Running `ccd` itself in Docker
+
+`Dockerfile` (repo root) builds a static, distroless image — the committed
+`web/dist` is embedded via `go:embed` at build time, so the image needs no
+Node stage. `deploy/docker-compose.yml`'s `app` service runs it, but sits
+behind a `profiles: ["app"]` gate so a plain `docker compose ... up` (what
+`make dev-up` runs) keeps only starting Postgres/MinIO — bring `app` up with
+`--profile app` explicitly. See the README's "Running entirely in Docker"
+for the exact commands; port `8490` (not `8080`) to leave room next to
+docker-commander's `8470` if both run on the same host.
+
+`ccd serve`'s own refusal to bind a non-loopback address without TLS
+(`isLoopbackAddr` in `adapters/cli/serve.go`) is why the image's `CMD` passes
+`--insecure-allow-cleartext` — `0.0.0.0` inside the container is not
+loopback, but the port is only published to `127.0.0.1` on the host (same
+posture as postgres/minio above), so Docker's own network isolation is the
+actual boundary, same as it is for those two.

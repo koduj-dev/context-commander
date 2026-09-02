@@ -12,6 +12,15 @@ link definition at the bottom of the file.
 
 ### Added
 
+- **Dockerized dev deployment:** a root `Dockerfile` (distroless, static,
+  embeds the committed `web/dist` — no Node stage) plus an opt-in `app`
+  service in `deploy/docker-compose.yml`, gated behind `profiles: ["app"]`
+  so `make dev-up`/`make test` keep only starting Postgres/MinIO. Serves on
+  `:8490` (not `8470`, to leave room next to docker-commander on the same
+  host) with `--insecure-allow-cleartext` since `0.0.0.0` inside the
+  container isn't loopback — Docker's own network isolation (the port is
+  published to `127.0.0.1` only) is the actual boundary, same as
+  postgres/minio already have. See README "Running entirely in Docker".
 - **Web UI v1 follow-ups:** the four items deliberately left out of v1
   (`NEXT.md`) now ship.
   - Gates/Skills tabs gained write actions (bind/unbind, publish/install/

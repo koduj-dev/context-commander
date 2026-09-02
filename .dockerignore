@@ -1,0 +1,15 @@
+# Keep the build context small. The Go build embeds web/dist (committed), so
+# the UI does NOT need rebuilding here — but node_modules, build outputs,
+# local data and IDE files are never needed and would bloat the context.
+.git
+.github
+web/node_modules
+/bin
+/ccd
+*.test
+*.out
+/data
+/deploy/data
+.idea
+.vscode
+.DS_Store

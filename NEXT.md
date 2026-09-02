@@ -59,9 +59,14 @@ Same "sibling project" doc style, adopted as the repo actually grows into it:
 ### Packaging and distribution
 
 - [x] OS packaging scaffolding (`deploy/nfpm.yaml`, `deploy/packaging/`).
+- [x] Dev Docker image (`Dockerfile`, repo root) + opt-in `app` service in
+  `deploy/docker-compose.yml` (2026-09-02) — see README "Running entirely in
+  Docker". Not a release artifact (no registry publish, no version
+  tagging beyond `docker` as a placeholder `-X main.version=`) — that's
+  the release-workflow item below.
 - [ ] **Not yet wired to a release workflow** — no `release.yml` builds or
-  publishes the packages, and there's no man page. Revisit once CC is near a
-  shippable state.
+  publishes the packages (OS packages or the Docker image), and there's no
+  man page. Revisit once CC is near a shippable state.
 
 ---
 
@@ -91,7 +96,10 @@ Same "sibling project" doc style, adopted as the repo actually grows into it:
   load-bearing for the whole authz model (see cookbook). Would need either
   an embedded-Postgres story (e.g. bundling/managing a Postgres process) or
   rethinking multi-tenancy for a non-RLS backend — not a small change.
-  Raised 2026-09-02, not scoped yet.
+  Raised 2026-09-02, not scoped yet. The new `Dockerfile`/`app` compose
+  service (same date, see Packaging above) is the "one `docker compose up`"
+  answer for now — still two containers (Postgres + `ccd`) plus MinIO, not
+  the single-binary-no-deps story this question is actually about.
 - **Packaging: copy-adapt vs. a shared template repo.** Parked on
   rule-of-three — only two sibling `koduj-dev`-style repos exist
   (docker-commander, context-commander) and their packaging will differ
