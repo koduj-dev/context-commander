@@ -265,6 +265,70 @@ func TestQueryIsolatedAcrossProjects(t *testing.T) {
 	}
 }
 
+// TestQueryBeforeIDPagesBackward is the cursor the web UI's Audit tab
+// "Load more" button relies on: paging with limit=1 and BeforeID set to the
+// previous page's last row id must walk every row exactly once, oldest
+// last, matching plain unpaginated Query's order.
+func TestQueryBeforeIDPagesBackward(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	f.write(t, ctx, "artifact.write", "artifact_version")
+	f.write(t, ctx, "artifact.delete", "artifact_version")
+	f.write(t, ctx, "handoff.create", "handoff")
+
+	var want []audit.Record
+	err := db.WithPrincipal(ctx, f.appPool, db.Principal{ID: f.ownerPrincipal}, func(tx pgx.Tx) error {
+		var err error
+		want, err = audit.Query(ctx, tx, f.projectID, audit.QueryOptions{})
+		return err
+	})
+	if err != nil {
+		t.Fatalf("Query (unpaginated): %v", err)
+	}
+	if len(want) != 3 {
+		t.Fatalf("Query (unpaginated) returned %d rows, want 3", len(want))
+	}
+
+	var got []audit.Record
+	var beforeID *int64
+	err = db.WithPrincipal(ctx, f.appPool, db.Principal{ID: f.ownerPrincipal}, func(tx pgx.Tx) error {
+		for i := 0; i < len(want); i++ {
+			page, err := audit.Query(ctx, tx, f.projectID, audit.QueryOptions{Limit: 1, BeforeID: beforeID})
+			if err != nil {
+				return err
+			}
+			if len(page) != 1 {
+				t.Fatalf("page %d: got %d rows, want 1", i, len(page))
+			}
+			got = append(got, page[0])
+			id := page[0].ID
+			beforeID = &id
+		}
+		// One more page past the last row must come back empty, not error
+		// or repeat.
+		last, err := audit.Query(ctx, tx, f.projectID, audit.QueryOptions{Limit: 1, BeforeID: beforeID})
+		if err != nil {
+			return err
+		}
+		if len(last) != 0 {
+			t.Errorf("page past the last row = %+v, want empty", last)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("paginate: %v", err)
+	}
+
+	if len(got) != len(want) {
+		t.Fatalf("paginated through %d rows, want %d", len(got), len(want))
+	}
+	for i := range want {
+		if got[i].ID != want[i].ID {
+			t.Errorf("page %d id = %d, want %d (order must match unpaginated Query)", i, got[i].ID, want[i].ID)
+		}
+	}
+}
+
 func TestServiceQueryDeniedForContributor(t *testing.T) {
 	f := newFixture(t)
 	ctx := context.Background()

@@ -65,12 +65,15 @@ type Record struct {
 // QueryOptions filters a Query call. Action/ResourceType are exact-match,
 // empty means "no filter"; Since/Until are inclusive bounds on ts. Limit
 // defaults to 100 and is capped at 500 to keep a single call bounded.
+// BeforeID pages backward through results already seen: pass the last
+// row's ID from a previous page to get the next older page.
 type QueryOptions struct {
 	Action       string
 	ResourceType string
 	Since        *time.Time
 	Until        *time.Time
 	Limit        int
+	BeforeID     *int64
 }
 
 // Query returns audit_log rows for projectID, most recent first. Every
@@ -102,6 +105,17 @@ func Query(ctx context.Context, tx pgx.Tx, projectID uuid.UUID, opts QueryOption
 	if opts.Until != nil {
 		args = append(args, *opts.Until)
 		query += fmt.Sprintf(" AND ts <= $%d", len(args))
+	}
+	if opts.BeforeID != nil {
+		// A plain "id < $N" against ORDER BY ts DESC, id DESC is a
+		// deliberate simplification, not a strict (ts, id) keyset: id is a
+		// bigserial that only ever increases with insertion order, and ts
+		// is assigned at insertion too, so "id < last seen id" and
+		// "(ts, id) < (last seen ts, last seen id)" agree in practice. A
+		// stricter composite cursor isn't worth it unless that stops
+		// holding (e.g. ts is ever backfilled/edited).
+		args = append(args, *opts.BeforeID)
+		query += fmt.Sprintf(" AND id < $%d", len(args))
 	}
 	args = append(args, limit)
 	query += fmt.Sprintf(" ORDER BY ts DESC, id DESC LIMIT $%d", len(args))

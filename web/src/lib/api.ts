@@ -241,7 +241,7 @@ export const api = {
   queryAudit: (
     namespace: string,
     slug: string,
-    opts: { action?: string; resource_type?: string; since?: string; until?: string; limit?: number } = {},
+    opts: { action?: string; resource_type?: string; since?: string; until?: string; limit?: number; before_id?: number } = {},
   ) => {
     const params = new URLSearchParams();
     if (opts.action) params.set("action", opts.action);
@@ -249,6 +249,7 @@ export const api = {
     if (opts.since) params.set("since", opts.since);
     if (opts.until) params.set("until", opts.until);
     if (opts.limit) params.set("limit", String(opts.limit));
+    if (opts.before_id) params.set("before_id", String(opts.before_id));
     const qs = params.toString();
     return req<AuditRecord[]>("GET", `/v1/projects/${namespace}/${slug}/audit${qs ? `?${qs}` : ""}`);
   },

@@ -53,6 +53,14 @@ func (d Deps) queryAudit(w http.ResponseWriter, r *http.Request) {
 		}
 		opts.Limit = v
 	}
+	if raw := r.URL.Query().Get("before_id"); raw != "" {
+		v, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "invalid_request", "?before_id= must be an integer")
+			return
+		}
+		opts.BeforeID = &v
+	}
 
 	project := projectFrom(r.Context())
 	principalID := principalIDFrom(r.Context())
