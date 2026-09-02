@@ -50,6 +50,18 @@ link definition at the bottom of the file.
 
 ### Fixed
 
+- **CI:** `ci` workflow (`lint`, `gitleaks`) failed on every push since
+  2026-08-27. `golangci-lint-action@v6` installed the last v1.x binary
+  (v1.64.8, built with go1.24), which refuses to run against `go.mod`'s
+  `go 1.27.0` and can't load the v2-format `.golangci.yml`; bumped to
+  `@v9`, which installs golangci-lint v2. `gitleaks/gitleaks-action@v2`
+  requires a paid `GITLEAKS_LICENSE` for org-owned repos; replaced it with a
+  direct `gitleaks` CLI install/run step (same open-source scanner, no
+  license). The real scan then flagged fixture credentials in
+  `secretscanner_test.go`/`engine_integration_test.go`/
+  `service_integration_test.go` as false positives — added `.gitleaks.toml`
+  allowlisting those three test files. Also bumped `actions/checkout` and
+  `actions/setup-go` to v7 (clears the Node 20 deprecation warnings).
 - **Security:** organization-scope gate bindings were hidden by RLS from a
   principal who belonged to a project under the organization but had no
   separate `organization_members` row, so a mandatory organization-wide gate

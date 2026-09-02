@@ -47,6 +47,23 @@ v1, not silently dropped:
   the Audit tab shows a "narrow your filters" hint once it hits the cap
   rather than paging.
 
+### CI/pipeline hardening (blocked on going public)
+
+`ci` workflow (`lint`/`test`/`gitleaks`) is green again as of 2026-09-02 (see
+CHANGELOG). Left over, blocked on the planned move to a public repo:
+
+- [ ] **Branch protection / rulesets on `main`** — `koduj-dev` is on the
+  GitHub Free org plan; branch protection on a *private* repo 403s
+  ("Upgrade to Pro"). Free once the repo goes public. Add required status
+  checks (`lint`, `test`, `gitleaks`) at that point.
+- [ ] **Native GitHub secret scanning / push protection** — same story,
+  requires GitHub Advanced Security on a private repo, free automatically on
+  public. `gitleaks` in CI covers the gap meanwhile.
+- [ ] **Restrict `allowed_actions` from `all`** — currently any Action from
+  any source can run in this repo's workflows; worth narrowing to verified
+  creators once public and visible to more eyes.
+- [ ] `CODEOWNERS` — not critical with a single maintainer, but cheap to add.
+
 ### Engineering docs parity with docker-commander
 
 Same "sibling project" doc style, adopted as the repo actually grows into it:
