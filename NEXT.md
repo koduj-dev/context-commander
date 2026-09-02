@@ -28,6 +28,50 @@ maintainer decides to harden or extend next.
 
 ## 🔭 Open work
 
+### UI redesign per docs/context-commander-ui-spec.md
+
+The maintainer added a full UI spec (`docs/context-commander-ui-spec.md`,
+2026-09-02) describing a much larger target than what exists today —
+brand/theme system, shared component library, new top-level nav
+(Projects/Organizations/Skill Registry/Administration), new project tabs
+(Overview/Handoffs/Conversations/Events/Integrations/Settings), and an
+Administration surface for admin-driven user creation + agent (Service
+Principal) registration. Phased rather than built at once — see
+[`docs/plans/2026-09-02-design-system-phase-1.md`](docs/plans/2026-09-02-design-system-phase-1.md)
+for the approved, not-yet-implemented phase 1 plan (design system +
+component library, no backend/new pages).
+
+- [ ] **Phase 1 — design system + component library.** Plan approved
+  2026-09-02, not started. See the plan doc above.
+- [ ] **Phase 2 (not yet planned) — wire existing-but-unused backend into
+  new project tabs.** Handoffs/Conversations/Events already have working
+  HTTP/MCP/CLI adapters (`internal/handoffs`, `internal/history`,
+  `internal/events`) with no UI tab at all — same shape as this session's
+  Gates/Skills UI work, cheap once phase 1's components exist.
+- [ ] **Phase 3 (not yet planned, architecturally significant) —
+  Administration: admin user creation, Service Principal (agent)
+  registration, cross-principal credential management.** Confirmed via
+  audit (2026-09-02): **no installation-admin role/capability exists
+  anywhere in `internal/auth`** — `roleCapabilities` is keyed solely on
+  project roles (Reader/Contributor/Admin/Owner), nothing above
+  organization. `identity.CreateServicePrincipal` exists in the Store but
+  is called from zero adapters (HTTP/MCP/CLI) — agents cannot be
+  registered through any interface today, not even CLI.
+  `identity.CreateUser`/`CreatePrincipalForUser` are CLI-bootstrap-only,
+  no HTTP/MCP path. This needs an actual authorization-model decision
+  (who/what makes a principal an "installation admin"?) before any
+  endpoint work — likely ADR-worthy, not just an implementation plan.
+  `installation` scope already exists in the gates/skills schema/domain
+  types but every Service mutation rejects it
+  (`ErrUnsupportedScope`, "v1 has no installation-admin capability
+  model... operator-seeded only") — the same missing tier blocks that too.
+- [ ] **Organization "list members" endpoint** — same gap this session
+  just closed for projects (`internal/projects.Store.ListMembers`,
+  `GET .../members`) doesn't exist yet for `internal/organizations`;
+  `POST /v1/organizations/{id}/members` (add) exists, list doesn't. Small,
+  same pattern to mirror — candidate for whichever phase touches
+  Organizations UI.
+
 ### CI/pipeline hardening (blocked on going public)
 
 `ci` workflow (`lint`/`test`/`gitleaks`) is green again as of 2026-09-02 (see
