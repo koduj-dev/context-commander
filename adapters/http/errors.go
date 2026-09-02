@@ -11,6 +11,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/gates"
 	"github.com/koduj-dev/context-commander/internal/handoffs"
 	"github.com/koduj-dev/context-commander/internal/history"
+	"github.com/koduj-dev/context-commander/internal/identity"
 	"github.com/koduj-dev/context-commander/internal/organizations"
 	"github.com/koduj-dev/context-commander/internal/projects"
 	"github.com/koduj-dev/context-commander/internal/secrets"
@@ -68,7 +69,8 @@ func writeDomainError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, artifacts.ErrNotFound), errors.Is(err, artifacts.ErrDeleted), errors.Is(err, projects.ErrNotFound),
 		errors.Is(err, organizations.ErrNotFound), errors.Is(err, handoffs.ErrNotFound), errors.Is(err, history.ErrNotFound),
-		errors.Is(err, skills.ErrNotFound), errors.Is(err, gates.ErrNotFound), errors.Is(err, secrets.ErrNotFound):
+		errors.Is(err, skills.ErrNotFound), errors.Is(err, gates.ErrNotFound), errors.Is(err, secrets.ErrNotFound),
+		errors.Is(err, identity.ErrNotFound):
 		// A deleted artifact reads as "not found," not a distinct state —
 		// same reasoning as a non-member's Resolve: don't hand out more
 		// information than "you can't have this."
@@ -95,7 +97,7 @@ func writeDomainError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusBadRequest, "invalid_request", "gate_name is not a registered provider")
 	case errors.Is(err, history.ErrInvalidReference):
 		writeError(w, http.StatusBadRequest, "invalid_request", "referenced conversation/session/derived_from object does not belong to this project/conversation")
-	case errors.Is(err, projects.ErrInvalidResolvePath), errors.Is(err, secrets.ErrInvalidName):
+	case errors.Is(err, projects.ErrInvalidResolvePath), errors.Is(err, secrets.ErrInvalidName), errors.Is(err, identity.ErrInvalidExpiry):
 		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
 	default:
 		writeError(w, http.StatusInternalServerError, "internal", "internal error")

@@ -20,6 +20,9 @@ export default function Shell() {
           <Link to="/" className="rounded px-2 py-1.5 hover:bg-neutral-900">
             Dashboard
           </Link>
+          <Link to="/tokens" className="rounded px-2 py-1.5 hover:bg-neutral-900">
+            API Tokens
+          </Link>
         </nav>
         <div className="mt-auto pt-4 text-xs text-neutral-500">
           <div className="mb-2 truncate">{user?.email ?? user?.name}</div>

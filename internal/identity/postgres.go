@@ -228,3 +228,57 @@ func (s *Store) TouchCredentialLastUsed(ctx context.Context, tx pgx.Tx, id uuid.
 	}
 	return nil
 }
+
+// ListCredentialsForPrincipal lists every PAT (including revoked/expired
+// ones — the caller decides what to show) belonging to principalID. This
+// package has no authz layer of its own (see ADR-0009's consequences): a
+// caller wanting "list only *my* tokens" must pass its own principal id
+// here, never one read from a request body.
+func (s *Store) ListCredentialsForPrincipal(ctx context.Context, tx pgx.Tx, principalID uuid.UUID) ([]ClientCredential, error) {
+	rows, err := tx.Query(ctx,
+		`SELECT id, principal_id, client_type, token_hash, created_at, last_used_at, expires_at, revoked_at
+		 FROM client_credentials WHERE principal_id = $1 ORDER BY created_at DESC`,
+		principalID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("identity: list credentials: %w", err)
+	}
+	defer rows.Close()
+
+	var out []ClientCredential
+	for rows.Next() {
+		var c ClientCredential
+		if err := rows.Scan(&c.ID, &c.PrincipalID, &c.ClientType, &c.TokenHash,
+			&c.CreatedAt, &c.LastUsedAt, &c.ExpiresAt, &c.RevokedAt); err != nil {
+			return nil, fmt.Errorf("identity: list credentials: scan: %w", err)
+		}
+		out = append(out, c)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("identity: list credentials: %w", err)
+	}
+	return out, nil
+}
+
+// RevokeCredential revokes a PAT — but only if it belongs to principalID.
+// The ownership check is in the WHERE clause, not a separate fetch+compare,
+// so "doesn't exist" and "exists but isn't yours" are indistinguishable
+// from the caller's side (ErrNotFound either way) — same reasoning as
+// project.resolve for a non-member (adapters/mcp/tools_project.go): don't
+// hand out more information than "you can't have this." Revoking an
+// already-revoked credential is also ErrNotFound (0 rows match
+// revoked_at IS NULL), which is fine — the end state is identical.
+func (s *Store) RevokeCredential(ctx context.Context, tx pgx.Tx, id, principalID uuid.UUID) error {
+	tag, err := tx.Exec(ctx,
+		`UPDATE client_credentials SET revoked_at = now()
+		 WHERE id = $1 AND principal_id = $2 AND revoked_at IS NULL`,
+		id, principalID,
+	)
+	if err != nil {
+		return fmt.Errorf("identity: revoke credential: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}

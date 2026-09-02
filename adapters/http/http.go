@@ -79,6 +79,9 @@ func NewHandler(deps Deps) http.Handler {
 		r.Get("/me", deps.getMe)
 		r.Get("/me/projects", deps.listMyProjects)
 		r.Get("/me/organizations", deps.listMyOrganizations)
+		r.Post("/me/tokens", deps.issueToken)
+		r.Get("/me/tokens", deps.listTokens)
+		r.Delete("/me/tokens/{id}", deps.revokeToken)
 
 		r.Post("/projects", deps.createProject)
 

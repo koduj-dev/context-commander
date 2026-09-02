@@ -157,10 +157,31 @@ export interface Member {
   display_name?: string;
 }
 
+export interface IssuedToken {
+  token: string;
+  credential_id: string;
+  client_type: string;
+  expires_at?: string;
+}
+
+export interface Credential {
+  id: string;
+  client_type: string;
+  created_at: string;
+  last_used_at?: string;
+  expires_at?: string;
+  revoked_at?: string;
+}
+
 export const api = {
   me: () => req<Me>("GET", "/v1/me"),
   myProjects: () => req<MyProject[]>("GET", "/v1/me/projects"),
   myOrganizations: () => req<MyOrganization[]>("GET", "/v1/me/organizations"),
+
+  issueToken: (clientType: string, expiresInSeconds?: number) =>
+    req<IssuedToken>("POST", "/v1/me/tokens", { client_type: clientType, expires_in_seconds: expiresInSeconds }),
+  listTokens: () => req<Credential[]>("GET", "/v1/me/tokens"),
+  revokeToken: (id: string) => req<void>("DELETE", `/v1/me/tokens/${id}`),
 
   createProject: (project: string, name: string) =>
     req<Project>("POST", "/v1/projects", { project, name }),
