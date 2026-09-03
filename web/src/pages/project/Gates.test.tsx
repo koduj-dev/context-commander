@@ -75,6 +75,15 @@ describe("Gates", () => {
       unbind.click();
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
+    expect(bound).toBe(true);
+
+    const confirmUnbind = Array.from(document.querySelectorAll("button")).find(
+      (b) => b.textContent === "Unbind" && !container.contains(b),
+    )!;
+    await act(async () => {
+      confirmUnbind.click();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
     expect(container.textContent).toContain("No gates bound.");
   });
 

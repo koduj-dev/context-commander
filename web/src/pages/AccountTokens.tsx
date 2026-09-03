@@ -1,5 +1,9 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { api, ApiError, type Credential } from "../lib/api";
+import PageHeader from "../components/PageHeader";
+import EmptyState from "../components/EmptyState";
+import StatusBadge from "../components/StatusBadge";
+import ConfirmDialog from "../components/ConfirmDialog";
 
 export default function AccountTokens() {
   const [tokens, setTokens] = useState<Credential[] | null>(null);
@@ -9,6 +13,7 @@ export default function AccountTokens() {
   const [expiresInDays, setExpiresInDays] = useState("");
   const [revealed, setRevealed] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [confirmRevoke, setConfirmRevoke] = useState<string | null>(null);
 
   async function refresh() {
     try {
@@ -60,37 +65,50 @@ export default function AccountTokens() {
 
   return (
     <div className="max-w-2xl space-y-4">
-      <h1 className="text-lg font-semibold">API Tokens</h1>
-      <p className="text-sm text-neutral-500">Personal access tokens for this account. Each is shown once, at issuance.</p>
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      <PageHeader title="API Tokens" description="Personal access tokens for this account. Each is shown once, at issuance." />
+      {error && <p className="text-sm text-cc-danger">{error}</p>}
 
       {revealed && (
-        <div className="rounded border border-amber-700 bg-amber-950/40 p-3 text-sm">
-          <p className="mb-2 text-amber-300">Copy this token now — it will not be shown again.</p>
+        <div className="rounded border border-cc-warning/40 bg-cc-surface-2 p-3 text-sm">
+          <p className="mb-2 text-cc-warning">Copy this token now — it will not be shown again.</p>
           <div className="flex items-center gap-2">
-            <code className="flex-1 select-all break-all rounded bg-neutral-950 px-2 py-1 text-xs">{revealed}</code>
-            <button onClick={() => void onCopy()} className="rounded bg-neutral-100 px-2 py-1 text-xs font-medium text-neutral-900">
+            <code className="flex-1 select-all break-all rounded bg-cc-surface-1 px-2 py-1 text-xs text-cc-text">{revealed}</code>
+            <button onClick={() => void onCopy()} className="rounded bg-cc-accent-primary px-2 py-1 text-xs font-medium text-cc-void">
               {copied ? "Copied" : "Copy"}
             </button>
           </div>
-          <button onClick={() => setRevealed(null)} className="mt-2 text-xs text-neutral-400 hover:text-neutral-200">
+          <button onClick={() => setRevealed(null)} className="mt-2 text-xs text-cc-text-muted hover:text-cc-text">
             Dismiss
           </button>
         </div>
       )}
 
-      <ul className="divide-y divide-neutral-800 rounded border border-neutral-800 text-sm">
-        {tokens === null && <li className="px-3 py-2 text-neutral-500">Loading…</li>}
-        {tokens?.length === 0 && <li className="px-3 py-2 text-neutral-500">No tokens yet.</li>}
+      <ul className="divide-y divide-cc-border rounded border border-cc-border text-sm">
+        {tokens === null && (
+          <li>
+            <EmptyState message="Loading…" />
+          </li>
+        )}
+        {tokens?.length === 0 && (
+          <li>
+            <EmptyState message="No tokens yet." />
+          </li>
+        )}
         {tokens?.map((c) => (
           <li key={c.id} className="flex items-center justify-between px-3 py-2">
             <span>
-              {c.client_type} <span className="text-xs text-neutral-500">created {c.created_at.slice(0, 10)}</span>
+              {c.client_type} <span className="text-xs text-cc-text-muted">created {c.created_at.slice(0, 10)}</span>
             </span>
-            <span className="flex items-center gap-3 text-xs text-neutral-500">
-              {c.revoked_at ? "revoked" : c.expires_at ? `expires ${c.expires_at.slice(0, 10)}` : "no expiry"}
+            <span className="flex items-center gap-3 text-xs">
+              {c.revoked_at ? (
+                <StatusBadge tone="danger">revoked</StatusBadge>
+              ) : c.expires_at ? (
+                <StatusBadge tone="neutral">{`expires ${c.expires_at.slice(0, 10)}`}</StatusBadge>
+              ) : (
+                <StatusBadge tone="success">no expiry</StatusBadge>
+              )}
               {!c.revoked_at && (
-                <button onClick={() => void onRevoke(c.id)} className="text-red-400 hover:text-red-300">
+                <button onClick={() => setConfirmRevoke(c.id)} className="text-cc-danger hover:opacity-80">
                   Revoke
                 </button>
               )}
@@ -99,13 +117,13 @@ export default function AccountTokens() {
         ))}
       </ul>
 
-      <form onSubmit={onIssue} className="flex flex-col gap-2 rounded border border-neutral-800 bg-neutral-950 p-3">
+      <form onSubmit={onIssue} className="flex flex-col gap-2 rounded border border-cc-border bg-cc-surface-1 p-3">
         <div className="flex gap-2">
           <input
             value={clientType}
             onChange={(e) => setClientType(e.target.value)}
             placeholder="client_type (e.g. cli, mcp)"
-            className="flex-1 rounded border border-neutral-700 bg-neutral-950 px-2 py-1.5 text-sm outline-none focus:border-neutral-500"
+            className="flex-1 rounded border border-cc-border bg-cc-surface-2 px-2 py-1.5 text-sm text-cc-text outline-none focus:border-cc-border-strong"
           />
           <input
             value={expiresInDays}
@@ -113,17 +131,30 @@ export default function AccountTokens() {
             placeholder="expires in days (optional)"
             type="number"
             min="1"
-            className="w-48 rounded border border-neutral-700 bg-neutral-950 px-2 py-1.5 text-sm outline-none focus:border-neutral-500"
+            className="w-48 rounded border border-cc-border bg-cc-surface-2 px-2 py-1.5 text-sm text-cc-text outline-none focus:border-cc-border-strong"
           />
         </div>
         <button
           type="submit"
           disabled={!clientType.trim()}
-          className="self-start rounded bg-neutral-100 px-3 py-1.5 text-sm font-medium text-neutral-900 disabled:opacity-50"
+          className="self-start rounded bg-cc-accent-primary px-3 py-1.5 text-sm font-medium text-cc-void disabled:opacity-50"
         >
           Issue token
         </button>
       </form>
+      <ConfirmDialog
+        open={confirmRevoke !== null}
+        title="Revoke token"
+        message="Revoke this token? Any client using it will immediately lose access."
+        confirmLabel="Revoke"
+        danger
+        onCancel={() => setConfirmRevoke(null)}
+        onConfirm={() => {
+          const target = confirmRevoke!;
+          setConfirmRevoke(null);
+          void onRevoke(target);
+        }}
+      />
     </div>
   );
 }

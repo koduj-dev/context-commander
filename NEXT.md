@@ -41,8 +41,8 @@ Principal) registration. Phased rather than built at once — see
 for the approved, not-yet-implemented phase 1 plan (design system +
 component library, no backend/new pages).
 
-- [ ] **Phase 1 — design system + component library.** Plan approved
-  2026-09-02, not started. See the plan doc above.
+- [x] **Phase 1 — design system + component library.** Shipped 2026-09-03 —
+  see `CHANGELOG.md`.
 - [ ] **Phase 2 (not yet planned) — wire existing-but-unused backend into
   new project tabs.** Handoffs/Conversations/Events already have working
   HTTP/MCP/CLI adapters (`internal/handoffs`, `internal/history`,

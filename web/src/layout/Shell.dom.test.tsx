@@ -9,6 +9,9 @@ const logout = vi.fn();
 vi.mock("../auth/AuthContext", () => ({
   useAuth: () => ({ user: { email: "shell-test@example.test" }, logout, loading: false, login: vi.fn() }),
 }));
+vi.mock("../theme/ThemeContext", () => ({
+  useTheme: () => ({ theme: "dark", setTheme: vi.fn(), resolvedTheme: "dark" }),
+}));
 
 describe("Shell", () => {
   let container: HTMLDivElement;

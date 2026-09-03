@@ -81,6 +81,13 @@ describe("AccountTokens", () => {
 
     const revokeBtn = Array.from(container.querySelectorAll("button")).find((b) => b.textContent === "Revoke")!;
     await flush(() => revokeBtn.click());
+    expect(revoked).toBe(false);
+
+    const confirmBtn = Array.from(document.querySelectorAll("button")).find(
+      (b) => b.textContent === "Revoke" && !container.contains(b),
+    )!;
+    await flush(() => confirmBtn.click());
+
     expect(container.textContent).toContain("revoked");
     expect(Array.from(container.querySelectorAll("button")).some((b) => b.textContent === "Revoke")).toBe(false);
   });

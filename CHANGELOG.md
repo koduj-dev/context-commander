@@ -12,6 +12,18 @@ link definition at the bottom of the file.
 
 ### Added
 
+- **Web UI design system (phase 1 of `docs/context-commander-ui-spec.md`):**
+  brand tokens (`docs/brand/tokens/*`) wired into Tailwind as `cc-*` utility
+  classes, live System/Light/Dark theme switching (`web/src/theme/`,
+  persisted to `localStorage`), the real brand logo/favicon (`web/public/brand/`)
+  replacing the plain-text header, and a shared component library
+  (`web/src/components/`: `PageHeader`, `ProjectContextHeader`, `DataTable`,
+  `StatusBadge`, `ScopeBadge`, `PrincipalBadge`, `EmptyState`,
+  `ConfirmDialog`) retrofitted onto all 11 existing pages plus `Shell.tsx`.
+  Destructive actions (delete secret, revoke token, unbind gate) now go
+  through a confirm dialog instead of firing immediately. No backend
+  changes, no new pages/routes — see
+  `docs/plans/2026-09-02-design-system-phase-1.md`.
 - **Dockerized dev deployment:** a root `Dockerfile` (distroless, static,
   embeds the committed `web/dist` — no Node stage) plus an opt-in `app`
   service in `deploy/docker-compose.yml`, gated behind `profiles: ["app"]`

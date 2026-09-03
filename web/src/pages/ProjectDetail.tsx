@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { api, ApiError, type MyProject } from "../lib/api";
 import { canReadAudit } from "../lib/roles";
+import ProjectContextHeader from "../components/ProjectContextHeader";
 import Members from "./project/Members";
 import Artifacts from "./project/Artifacts";
 import Secrets from "./project/Secrets";
@@ -32,29 +33,22 @@ export default function ProjectDetail() {
       .catch((err) => setError(err instanceof ApiError ? err.message : "failed to load project"));
   }, [namespace, slug]);
 
-  if (error) return <p className="text-sm text-red-400">{error}</p>;
-  if (!project) return <p className="text-sm text-neutral-500">Loading…</p>;
+  if (error) return <p className="text-sm text-cc-danger">{error}</p>;
+  if (!project) return <p className="text-sm text-cc-text-muted">Loading…</p>;
 
   const visibleTabs = TABS.filter((t) => t !== "Audit" || canReadAudit(project.role));
   const visibleTab = visibleTabs.includes(tab) ? tab : visibleTabs[0];
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-lg font-semibold">
-          {namespace}/{slug}
-        </h1>
-        <p className="text-sm text-neutral-500">
-          {project.name} · your role: {project.role}
-        </p>
-      </div>
-      <div className="mb-4 flex gap-1 border-b border-neutral-800">
+      <ProjectContextHeader namespace={namespace} slug={slug} name={project.name} visibility={project.visibility} role={project.role} />
+      <div className="mb-4 flex gap-1 border-b border-cc-border">
         {visibleTabs.map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
             className={`px-3 py-2 text-sm ${
-              visibleTab === t ? "border-b-2 border-neutral-100 text-neutral-100" : "text-neutral-500 hover:text-neutral-300"
+              visibleTab === t ? "border-b-2 border-cc-accent-primary text-cc-text" : "text-cc-text-muted hover:text-cc-text-secondary"
             }`}
           >
             {t}

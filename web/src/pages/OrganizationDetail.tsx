@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useParams } from "react-router-dom";
 import { api, ApiError, type MyOrganization } from "../lib/api";
+import PageHeader from "../components/PageHeader";
 
 export default function OrganizationDetail() {
   const { id = "" } = useParams();
@@ -33,15 +34,14 @@ export default function OrganizationDetail() {
     }
   }
 
-  if (error) return <p className="text-sm text-red-400">{error}</p>;
-  if (!org) return <p className="text-sm text-neutral-500">Loading…</p>;
+  if (error) return <p className="text-sm text-cc-danger">{error}</p>;
+  if (!org) return <p className="text-sm text-cc-text-muted">Loading…</p>;
 
   const canManage = org.role === "OWNER" || org.role === "ADMIN";
 
   return (
     <div className="max-w-md">
-      <h1 className="mb-1 text-lg font-semibold">{org.name}</h1>
-      <p className="mb-6 text-sm text-neutral-500">your role: {org.role}</p>
+      <PageHeader title={org.name} description={`your role: ${org.role}`} />
 
       {canManage ? (
         <form onSubmit={onAddMember} className="flex flex-col gap-2">
@@ -49,12 +49,12 @@ export default function OrganizationDetail() {
             value={userId}
             onChange={(e) => setUserId(e.target.value)}
             placeholder="user id (UUID)"
-            className="rounded border border-neutral-700 bg-neutral-950 px-2 py-1.5 text-sm outline-none focus:border-neutral-500"
+            className="rounded border border-cc-border bg-cc-surface-2 px-2 py-1.5 text-sm text-cc-text outline-none focus:border-cc-border-strong"
           />
           <select
             value={role}
             onChange={(e) => setRole(e.target.value)}
-            className="rounded border border-neutral-700 bg-neutral-950 px-2 py-1.5 text-sm outline-none focus:border-neutral-500"
+            className="rounded border border-cc-border bg-cc-surface-2 px-2 py-1.5 text-sm text-cc-text outline-none focus:border-cc-border-strong"
           >
             <option value="MEMBER">MEMBER</option>
             <option value="ADMIN">ADMIN</option>
@@ -63,15 +63,15 @@ export default function OrganizationDetail() {
           <button
             type="submit"
             disabled={!userId.trim()}
-            className="self-start rounded bg-neutral-100 px-3 py-1.5 text-sm font-medium text-neutral-900 disabled:opacity-50"
+            className="self-start rounded bg-cc-accent-primary px-3 py-1.5 text-sm font-medium text-cc-void disabled:opacity-50"
           >
             Add member
           </button>
         </form>
       ) : (
-        <p className="text-sm text-neutral-500">Only an OWNER or ADMIN can add members.</p>
+        <p className="text-sm text-cc-text-muted">Only an OWNER or ADMIN can add members.</p>
       )}
-      {status && <p className="mt-3 text-sm text-neutral-400">{status}</p>}
+      {status && <p className="mt-3 text-sm text-cc-text-muted">{status}</p>}
     </div>
   );
 }

@@ -1,6 +1,10 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { api, ApiError, type Member } from "../../lib/api";
 import { canManageMembers } from "../../lib/roles";
+import DataTable from "../../components/DataTable";
+import PrincipalBadge from "../../components/PrincipalBadge";
+import StatusBadge from "../../components/StatusBadge";
+import EmptyState from "../../components/EmptyState";
 
 const ROLES = ["OWNER", "ADMIN", "CONTRIBUTOR", "READER"];
 
@@ -38,17 +42,16 @@ export default function Members({ namespace, slug, role }: { namespace: string; 
 
   return (
     <div className="max-w-md space-y-4">
-      {error && <p className="text-sm text-red-400">{error}</p>}
-      <ul className="divide-y divide-neutral-800 rounded border border-neutral-800 text-sm">
-        {members === null && <li className="px-3 py-2 text-neutral-500">Loading…</li>}
-        {members?.length === 0 && <li className="px-3 py-2 text-neutral-500">No members.</li>}
-        {members?.map((m) => (
-          <li key={m.principal_id} className="flex items-center justify-between px-3 py-2">
-            <span>{m.email ?? m.principal_id}</span>
-            <span className="text-xs text-neutral-500">{m.role}</span>
-          </li>
-        ))}
-      </ul>
+      {error && <p className="text-sm text-cc-danger">{error}</p>}
+      <DataTable
+        columns={[
+          { key: "principal", header: "Principal", render: (m) => <PrincipalBadge principalId={m.principal_id} email={m.email} displayName={m.display_name} /> },
+          { key: "role", header: "Role", render: (m) => <StatusBadge tone="neutral">{m.role}</StatusBadge> },
+        ]}
+        rows={members}
+        getRowKey={(m) => m.principal_id}
+        emptyState={<EmptyState message="No members." />}
+      />
 
       {canManageMembers(role) && (
         <form onSubmit={onAdd} className="flex flex-col gap-2">
@@ -56,12 +59,12 @@ export default function Members({ namespace, slug, role }: { namespace: string; 
             value={principalId}
             onChange={(e) => setPrincipalId(e.target.value)}
             placeholder="principal id (UUID)"
-            className="rounded border border-neutral-700 bg-neutral-950 px-2 py-1.5 text-sm outline-none focus:border-neutral-500"
+            className="rounded border border-cc-border bg-cc-surface-2 px-2 py-1.5 text-sm text-cc-text outline-none focus:border-cc-border-strong"
           />
           <select
             value={newRole}
             onChange={(e) => setNewRole(e.target.value)}
-            className="rounded border border-neutral-700 bg-neutral-950 px-2 py-1.5 text-sm outline-none focus:border-neutral-500"
+            className="rounded border border-cc-border bg-cc-surface-2 px-2 py-1.5 text-sm text-cc-text outline-none focus:border-cc-border-strong"
           >
             {ROLES.map((r) => (
               <option key={r} value={r}>
@@ -72,13 +75,13 @@ export default function Members({ namespace, slug, role }: { namespace: string; 
           <button
             type="submit"
             disabled={!principalId.trim()}
-            className="self-start rounded bg-neutral-100 px-3 py-1.5 text-sm font-medium text-neutral-900 disabled:opacity-50"
+            className="self-start rounded bg-cc-accent-primary px-3 py-1.5 text-sm font-medium text-cc-void disabled:opacity-50"
           >
             Add member
           </button>
         </form>
       )}
-      {status && <p className="text-sm text-neutral-400">{status}</p>}
+      {status && <p className="text-sm text-cc-text-muted">{status}</p>}
     </div>
   );
 }

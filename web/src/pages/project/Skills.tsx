@@ -1,6 +1,9 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { api, ApiError, type SkillBinding } from "../../lib/api";
 import { canManageSkills, canOverrideSkills } from "../../lib/roles";
+import EmptyState from "../../components/EmptyState";
+import ScopeBadge from "../../components/ScopeBadge";
+import StatusBadge from "../../components/StatusBadge";
 
 export default function Skills({ namespace, slug, role }: { namespace: string; slug: string; role: string }) {
   const [bindings, setBindings] = useState<SkillBinding[] | null>(null);
@@ -120,23 +123,31 @@ export default function Skills({ namespace, slug, role }: { namespace: string; s
 
   return (
     <div className="max-w-2xl space-y-4">
-      {error && <p className="text-sm text-red-400">{error}</p>}
-      <ul className="divide-y divide-neutral-800 rounded border border-neutral-800 text-sm">
-        {bindings === null && <li className="px-3 py-2 text-neutral-500">Loading…</li>}
-        {bindings?.length === 0 && <li className="px-3 py-2 text-neutral-500">No skills installed.</li>}
+      {error && <p className="text-sm text-cc-danger">{error}</p>}
+      <ul className="divide-y divide-cc-border rounded border border-cc-border text-sm">
+        {bindings === null && (
+          <li>
+            <EmptyState message="Loading…" />
+          </li>
+        )}
+        {bindings?.length === 0 && (
+          <li>
+            <EmptyState message="No skills installed." />
+          </li>
+        )}
         {bindings?.map((b) => (
           <li key={b.id} className="flex items-center justify-between px-3 py-2">
-            <span className="font-mono text-xs">{b.skill_id.slice(0, 8)}…</span>
-            <span className="flex items-center gap-3 text-xs text-neutral-500">
-              {b.scope}
-              {b.pinned ? " · pinned" : ""}
+            <span className="font-mono text-xs text-cc-text">{b.skill_id.slice(0, 8)}…</span>
+            <span className="flex items-center gap-3 text-xs text-cc-text-muted">
+              <ScopeBadge scope={b.scope} />
+              {b.pinned && <StatusBadge tone="neutral">pinned</StatusBadge>}
               {canManage && (
-                <button onClick={() => void onTogglePin(b)} className="text-neutral-300 hover:text-neutral-100">
+                <button onClick={() => void onTogglePin(b)} className="text-cc-text-secondary hover:text-cc-text">
                   {b.pinned ? "Unpin" : "Pin"}
                 </button>
               )}
               {canOverride && b.scope !== "project" && (
-                <button onClick={() => void onOverride(b)} className="text-neutral-300 hover:text-neutral-100">
+                <button onClick={() => void onOverride(b)} className="text-cc-text-secondary hover:text-cc-text">
                   Override
                 </button>
               )}
@@ -146,26 +157,26 @@ export default function Skills({ namespace, slug, role }: { namespace: string; s
       </ul>
 
       {canManage && (
-        <form onSubmit={onPublish} className="flex flex-col gap-2 rounded border border-neutral-800 bg-neutral-950 p-3">
-          <p className="text-xs text-neutral-500">Publish a new skill version</p>
+        <form onSubmit={onPublish} className="flex flex-col gap-2 rounded border border-cc-border bg-cc-surface-1 p-3">
+          <p className="text-xs text-cc-text-muted">Publish a new skill version</p>
           <div className="flex gap-2">
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="name"
-              className="flex-1 rounded border border-neutral-700 bg-neutral-950 px-2 py-1.5 text-sm outline-none focus:border-neutral-500"
+              className="flex-1 rounded border border-cc-border bg-cc-surface-2 px-2 py-1.5 text-sm text-cc-text outline-none focus:border-cc-border-strong"
             />
             <input
               value={author}
               onChange={(e) => setAuthor(e.target.value)}
               placeholder="author"
-              className="flex-1 rounded border border-neutral-700 bg-neutral-950 px-2 py-1.5 text-sm outline-none focus:border-neutral-500"
+              className="flex-1 rounded border border-cc-border bg-cc-surface-2 px-2 py-1.5 text-sm text-cc-text outline-none focus:border-cc-border-strong"
             />
             <input
               value={origin}
               onChange={(e) => setOrigin(e.target.value)}
               placeholder="origin"
-              className="flex-1 rounded border border-neutral-700 bg-neutral-950 px-2 py-1.5 text-sm outline-none focus:border-neutral-500"
+              className="flex-1 rounded border border-cc-border bg-cc-surface-2 px-2 py-1.5 text-sm text-cc-text outline-none focus:border-cc-border-strong"
             />
           </div>
           <textarea
@@ -173,12 +184,12 @@ export default function Skills({ namespace, slug, role }: { namespace: string; s
             onChange={(e) => setContent(e.target.value)}
             placeholder="skill content"
             rows={3}
-            className="rounded border border-neutral-700 bg-neutral-950 px-2 py-1.5 font-mono text-sm outline-none focus:border-neutral-500"
+            className="rounded border border-cc-border bg-cc-surface-2 px-2 py-1.5 font-mono text-sm text-cc-text outline-none focus:border-cc-border-strong"
           />
           <button
             type="submit"
             disabled={!name.trim() || !author.trim() || !content.trim()}
-            className="self-start rounded bg-neutral-100 px-3 py-1.5 text-sm font-medium text-neutral-900 disabled:opacity-50"
+            className="self-start rounded bg-cc-accent-primary px-3 py-1.5 text-sm font-medium text-cc-void disabled:opacity-50"
           >
             Publish
           </button>
@@ -186,13 +197,13 @@ export default function Skills({ namespace, slug, role }: { namespace: string; s
       )}
 
       {canManage && (
-        <form onSubmit={onInstall} className="flex flex-col gap-2 rounded border border-neutral-800 bg-neutral-950 p-3">
-          <p className="text-xs text-neutral-500">Install a skill version</p>
+        <form onSubmit={onInstall} className="flex flex-col gap-2 rounded border border-cc-border bg-cc-surface-1 p-3">
+          <p className="text-xs text-cc-text-muted">Install a skill version</p>
           <div className="flex gap-2">
             <select
               value={installScope}
               onChange={(e) => setInstallScope(e.target.value)}
-              className="rounded border border-neutral-700 bg-neutral-950 px-2 py-1.5 text-sm outline-none focus:border-neutral-500"
+              className="rounded border border-cc-border bg-cc-surface-2 px-2 py-1.5 text-sm text-cc-text outline-none focus:border-cc-border-strong"
             >
               <option value="project">project</option>
               <option value="organization">organization</option>
@@ -201,7 +212,7 @@ export default function Skills({ namespace, slug, role }: { namespace: string; s
               value={installScopeRef}
               onChange={(e) => setInstallScopeRef(e.target.value)}
               placeholder="scope_ref (project or organization id)"
-              className="flex-1 rounded border border-neutral-700 bg-neutral-950 px-2 py-1.5 text-sm outline-none focus:border-neutral-500"
+              className="flex-1 rounded border border-cc-border bg-cc-surface-2 px-2 py-1.5 text-sm text-cc-text outline-none focus:border-cc-border-strong"
             />
           </div>
           <div className="flex gap-2">
@@ -209,23 +220,23 @@ export default function Skills({ namespace, slug, role }: { namespace: string; s
               value={installSkillId}
               onChange={(e) => setInstallSkillId(e.target.value)}
               placeholder="skill_id"
-              className="flex-1 rounded border border-neutral-700 bg-neutral-950 px-2 py-1.5 text-sm outline-none focus:border-neutral-500"
+              className="flex-1 rounded border border-cc-border bg-cc-surface-2 px-2 py-1.5 text-sm text-cc-text outline-none focus:border-cc-border-strong"
             />
             <input
               value={installSkillVersionId}
               onChange={(e) => setInstallSkillVersionId(e.target.value)}
               placeholder="skill_version_id"
-              className="flex-1 rounded border border-neutral-700 bg-neutral-950 px-2 py-1.5 text-sm outline-none focus:border-neutral-500"
+              className="flex-1 rounded border border-cc-border bg-cc-surface-2 px-2 py-1.5 text-sm text-cc-text outline-none focus:border-cc-border-strong"
             />
           </div>
-          <label className="flex items-center gap-2 text-xs text-neutral-400">
+          <label className="flex items-center gap-2 text-xs text-cc-text-muted">
             <input type="checkbox" checked={installOverridable} onChange={(e) => setInstallOverridable(e.target.checked)} />
             overridable by a narrower scope
           </label>
           <button
             type="submit"
             disabled={!installSkillId.trim() || !installSkillVersionId.trim() || !installScopeRef.trim()}
-            className="self-start rounded bg-neutral-100 px-3 py-1.5 text-sm font-medium text-neutral-900 disabled:opacity-50"
+            className="self-start rounded bg-cc-accent-primary px-3 py-1.5 text-sm font-medium text-cc-void disabled:opacity-50"
           >
             Install
           </button>

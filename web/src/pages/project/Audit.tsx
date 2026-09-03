@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
 import { api, ApiError, type AuditRecord } from "../../lib/api";
+import DataTable from "../../components/DataTable";
+import StatusBadge from "../../components/StatusBadge";
+import EmptyState from "../../components/EmptyState";
 
 const PAGE_SIZE = 100;
 
@@ -66,70 +69,44 @@ export default function Audit({ namespace, slug }: { namespace: string; slug: st
           value={action}
           onChange={(e) => setAction(e.target.value)}
           placeholder="filter by action"
-          className="rounded border border-neutral-700 bg-neutral-950 px-2 py-1.5 text-sm outline-none focus:border-neutral-500"
+          className="rounded border border-cc-border bg-cc-surface-2 px-2 py-1.5 text-sm text-cc-text outline-none focus:border-cc-border-strong"
         />
         <input
           value={resourceType}
           onChange={(e) => setResourceType(e.target.value)}
           placeholder="filter by resource type"
-          className="rounded border border-neutral-700 bg-neutral-950 px-2 py-1.5 text-sm outline-none focus:border-neutral-500"
+          className="rounded border border-cc-border bg-cc-surface-2 px-2 py-1.5 text-sm text-cc-text outline-none focus:border-cc-border-strong"
         />
-        <button type="submit" className="rounded bg-neutral-100 px-3 py-1.5 text-sm font-medium text-neutral-900">
+        <button type="submit" className="rounded bg-cc-accent-primary px-3 py-1.5 text-sm font-medium text-cc-void">
           Filter
         </button>
       </form>
-      {error && <p className="text-sm text-red-400">{error}</p>}
-      <div className="overflow-x-auto rounded border border-neutral-800">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-neutral-900 text-xs uppercase tracking-wide text-neutral-500">
-            <tr>
-              <th className="px-3 py-2">When</th>
-              <th className="px-3 py-2">Actor</th>
-              <th className="px-3 py-2">Action</th>
-              <th className="px-3 py-2">Resource</th>
-              <th className="px-3 py-2">Result</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-neutral-800">
-            {records === null && (
-              <tr>
-                <td className="px-3 py-2 text-neutral-500" colSpan={5}>
-                  Loading…
-                </td>
-              </tr>
-            )}
-            {records?.length === 0 && (
-              <tr>
-                <td className="px-3 py-2 text-neutral-500" colSpan={5}>
-                  No audit records.
-                </td>
-              </tr>
-            )}
-            {records?.map((r) => (
-              <tr key={r.id}>
-                <td className="whitespace-nowrap px-3 py-2 text-neutral-400">{new Date(r.timestamp).toLocaleString()}</td>
-                <td className="px-3 py-2">{r.actor_email ?? r.principal_id ?? "—"}</td>
-                <td className="px-3 py-2">{r.action}</td>
-                <td className="px-3 py-2 text-neutral-400">{r.resource_type}</td>
-                <td className="px-3 py-2">
-                  <span
-                    className={
-                      r.result === "allow" ? "text-emerald-400" : r.result === "deny" ? "text-amber-400" : "text-red-400"
-                    }
-                  >
-                    {r.result}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {error && <p className="text-sm text-cc-danger">{error}</p>}
+      <DataTable
+        columns={[
+          { key: "when", header: "When", render: (r) => <span className="whitespace-nowrap text-cc-text-muted">{new Date(r.timestamp).toLocaleString()}</span> },
+          { key: "actor", header: "Actor", render: (r) => r.actor_email ?? r.principal_id ?? "—" },
+          { key: "action", header: "Action" },
+          { key: "resource", header: "Resource", render: (r) => <span className="text-cc-text-muted">{r.resource_type}</span> },
+          {
+            key: "result",
+            header: "Result",
+            render: (r) => (
+              <StatusBadge tone={r.result === "allow" ? "success" : r.result === "deny" ? "warning" : "danger"}>
+                {r.result}
+              </StatusBadge>
+            ),
+          },
+        ]}
+        rows={records}
+        getRowKey={(r) => String(r.id)}
+        emptyState={<EmptyState message="No audit records." />}
+      />
       {hasMore && (
         <button
           onClick={() => void onLoadMore()}
           disabled={loadingMore}
-          className="rounded border border-neutral-700 px-3 py-1.5 text-sm text-neutral-300 hover:bg-neutral-900 disabled:opacity-50"
+          className="rounded border border-cc-border px-3 py-1.5 text-sm text-cc-text-secondary hover:bg-cc-surface-2 disabled:opacity-50"
         >
           {loadingMore ? "Loading…" : "Load more"}
         </button>
