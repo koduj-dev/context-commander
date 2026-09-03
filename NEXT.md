@@ -38,16 +38,21 @@ brand/theme system, shared component library, new top-level nav
 Administration surface for admin-driven user creation + agent (Service
 Principal) registration. Phased rather than built at once — see
 [`docs/plans/2026-09-02-design-system-phase-1.md`](docs/plans/2026-09-02-design-system-phase-1.md)
-for the approved, not-yet-implemented phase 1 plan (design system +
-component library, no backend/new pages).
+for the phase 1 plan (design system + component library, no backend/new
+pages). Phases 1 and 2 have since shipped — see `CHANGELOG.md`.
 
 - [x] **Phase 1 — design system + component library.** Shipped 2026-09-03 —
   see `CHANGELOG.md`.
-- [ ] **Phase 2 (not yet planned) — wire existing-but-unused backend into
-  new project tabs.** Handoffs/Conversations/Events already have working
-  HTTP/MCP/CLI adapters (`internal/handoffs`, `internal/history`,
-  `internal/events`) with no UI tab at all — same shape as this session's
-  Gates/Skills UI work, cheap once phase 1's components exist.
+- [x] **Phase 2 — wire existing-but-unused backend into new project tabs.**
+  Shipped 2026-09-03 — see `CHANGELOG.md`. Surfaced a real backend gap while
+  building the Conversations tab: **there is no "list conversations"
+  endpoint** (`internal/history` only exposes create + operate-on-a-known-id;
+  same for external sessions, which have no list endpoint either). The tab
+  works around this the same way Skills' install form already does for
+  "no browse skills endpoint" — create or paste an id directly — but a
+  project with existing conversations has no way to discover them from the
+  UI. Worth a real `GET .../conversations` (and maybe `.../sessions`) list
+  endpoint in a later pass.
 - [ ] **Phase 3 (not yet planned, architecturally significant) —
   Administration: admin user creation, Service Principal (agent)
   registration, cross-principal credential management.** Confirmed via

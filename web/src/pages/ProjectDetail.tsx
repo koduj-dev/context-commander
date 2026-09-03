@@ -5,12 +5,15 @@ import { canReadAudit } from "../lib/roles";
 import ProjectContextHeader from "../components/ProjectContextHeader";
 import Members from "./project/Members";
 import Artifacts from "./project/Artifacts";
+import Handoffs from "./project/Handoffs";
+import Conversations from "./project/Conversations";
+import Events from "./project/Events";
 import Secrets from "./project/Secrets";
 import Skills from "./project/Skills";
 import Gates from "./project/Gates";
 import Audit from "./project/Audit";
 
-const TABS = ["Members", "Artifacts", "Secrets", "Skills", "Gates", "Audit"] as const;
+const TABS = ["Members", "Artifacts", "Handoffs", "Conversations", "Events", "Secrets", "Skills", "Gates", "Audit"] as const;
 type Tab = (typeof TABS)[number];
 
 export default function ProjectDetail() {
@@ -57,6 +60,9 @@ export default function ProjectDetail() {
       </div>
       {visibleTab === "Members" && <Members namespace={namespace} slug={slug} role={project.role} />}
       {visibleTab === "Artifacts" && <Artifacts namespace={namespace} slug={slug} />}
+      {visibleTab === "Handoffs" && <Handoffs namespace={namespace} slug={slug} role={project.role} />}
+      {visibleTab === "Conversations" && <Conversations namespace={namespace} slug={slug} role={project.role} />}
+      {visibleTab === "Events" && <Events namespace={namespace} slug={slug} />}
       {visibleTab === "Secrets" && <Secrets namespace={namespace} slug={slug} />}
       {visibleTab === "Skills" && <Skills namespace={namespace} slug={slug} role={project.role} />}
       {visibleTab === "Gates" && <Gates namespace={namespace} slug={slug} role={project.role} />}

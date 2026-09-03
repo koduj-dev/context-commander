@@ -173,6 +173,62 @@ export interface Credential {
   revoked_at?: string;
 }
 
+export interface Handoff {
+  id: string;
+  source_session_id?: string;
+  status: string;
+  created_at: string;
+}
+
+export interface HandoffDetail extends Handoff {
+  summary: string;
+  completed_work: string;
+  next_actions: string;
+  referenced_artifacts?: string[];
+  referenced_tasks?: string[];
+}
+
+export interface Conversation {
+  id: string;
+  created_at: string;
+}
+
+export interface ExternalSession {
+  id: string;
+  conversation_id: string;
+  provider: string;
+  client: string;
+  provider_session_id: string;
+  parent_external_session_id?: string;
+  relation: string;
+  started_at: string;
+}
+
+export interface HistoryObject {
+  id: string;
+  external_session_id: string;
+  type: string;
+  derived_from?: string;
+  content_hash: string;
+  content: string; // base64-encoded plaintext — decrypted server-side, not re-encoded for transport encoding reasons
+  created_at: string;
+}
+
+export interface LineageEdge {
+  from_id: string;
+  to_id: string;
+  kind: string;
+}
+
+export interface ProjectEvent {
+  seq: number;
+  event_id: string;
+  type: string;
+  resource_type: string;
+  resource_id?: string;
+  payload_kind: string;
+}
+
 export const api = {
   me: () => req<Me>("GET", "/v1/me"),
   myProjects: () => req<MyProject[]>("GET", "/v1/me/projects"),
@@ -252,6 +308,55 @@ export const api = {
     if (opts.before_id) params.set("before_id", String(opts.before_id));
     const qs = params.toString();
     return req<AuditRecord[]>("GET", `/v1/projects/${namespace}/${slug}/audit${qs ? `?${qs}` : ""}`);
+  },
+
+  listHandoffs: (namespace: string, slug: string, status?: string) =>
+    req<Handoff[]>("GET", `/v1/projects/${namespace}/${slug}/handoffs/${status ? `?status=${encodeURIComponent(status)}` : ""}`),
+  getHandoff: (namespace: string, slug: string, id: string) =>
+    req<HandoffDetail>("GET", `/v1/projects/${namespace}/${slug}/handoffs/${id}`),
+  createHandoff: (
+    namespace: string,
+    slug: string,
+    body: {
+      source_session_id?: string;
+      summary: string;
+      completed_work: string;
+      next_actions: string;
+      referenced_artifacts?: string[];
+      referenced_tasks?: string[];
+    },
+  ) => req<HandoffDetail>("POST", `/v1/projects/${namespace}/${slug}/handoffs/`, body),
+
+  // No "list conversations" endpoint exists server-side (only create + operate
+  // on a known id) — same "no browse endpoint yet" shape as Skills' install
+  // form, so the UI creates or is given an id directly.
+  createConversation: (namespace: string, slug: string) =>
+    req<Conversation>("POST", `/v1/projects/${namespace}/${slug}/conversations/`),
+  createExternalSession: (
+    namespace: string,
+    slug: string,
+    conversationId: string,
+    body: { provider: string; client: string; provider_session_id: string; parent_external_session_id?: string; relation: string },
+  ) => req<ExternalSession>("POST", `/v1/projects/${namespace}/${slug}/conversations/${conversationId}/sessions`, body),
+  appendHistoryObject: (
+    namespace: string,
+    slug: string,
+    conversationId: string,
+    body: { external_session_id: string; type: string; derived_from?: string; content: string },
+  ) => req<HistoryObject>("POST", `/v1/projects/${namespace}/${slug}/conversations/${conversationId}/objects`, body),
+  listHistoryObjects: (namespace: string, slug: string, conversationId: string) =>
+    req<HistoryObject[]>("GET", `/v1/projects/${namespace}/${slug}/conversations/${conversationId}/objects`),
+  getLineage: (namespace: string, slug: string, conversationId: string) =>
+    req<LineageEdge[]>("GET", `/v1/projects/${namespace}/${slug}/conversations/${conversationId}/lineage`),
+
+  // Forward-only resume cursor (after_seq / ascending seq) — the opposite
+  // direction from audit's before_id/descending keyset pagination above.
+  listEvents: (namespace: string, slug: string, opts: { after_seq?: number; limit?: number } = {}) => {
+    const params = new URLSearchParams();
+    if (opts.after_seq) params.set("after_seq", String(opts.after_seq));
+    if (opts.limit) params.set("limit", String(opts.limit));
+    const qs = params.toString();
+    return req<ProjectEvent[]>("GET", `/v1/projects/${namespace}/${slug}/events${qs ? `?${qs}` : ""}`);
   },
 
   createOrganization: (name: string) => req<MyOrganization>("POST", "/v1/organizations", { name }),

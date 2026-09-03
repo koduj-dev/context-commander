@@ -12,6 +12,30 @@ link definition at the bottom of the file.
 
 ### Added
 
+- **Web UI phase 2 — Handoffs/Conversations/Events project tabs:** wired
+  three domains that already had working HTTP/MCP/CLI adapters but no UI
+  (`internal/handoffs`, `internal/history`, `internal/events`) into three
+  new `ProjectDetail` tabs, built on phase 1's component library.
+  - **Handoffs:** list (with a status filter) + detail view, and a create
+    form for CONTRIBUTOR+ (`CapHandoffWrite`). The backend never
+    transitions a handoff out of `"open"` — there's no claim/close
+    endpoint anywhere — so the UI only ever shows/creates, matching what
+    the API actually supports.
+  - **Conversations:** create-or-load-by-id (there is no "list
+    conversations" endpoint, same "no browse endpoint yet" shape already
+    used by Skills' install form — see `NEXT.md`), then create external
+    sessions, append history objects (content is encrypted server-side;
+    the response's base64 content is decoded client-side for preview),
+    and view the lineage graph as a flat edge list.
+  - **Events:** read-only outbox feed using `after_seq`/ascending
+    pagination — the opposite cursor direction from Audit's
+    `before_id`/descending keyset pagination, so it's a separate "Load
+    more" implementation, not a reused hook.
+  - `web/src/lib/api.ts` gained the `Handoff`/`HandoffDetail`/
+    `Conversation`/`ExternalSession`/`HistoryObject`/`LineageEdge`/
+    `ProjectEvent` types and matching client methods; `web/src/lib/roles.ts`
+    gained `canWriteHandoffs`/`canWriteHistory` (CONTRIBUTOR+, mirroring
+    `internal/auth`'s `CapHandoffWrite`/`CapHistoryWrite` grants).
 - **Web UI design system (phase 1 of `docs/context-commander-ui-spec.md`):**
   brand tokens (`docs/brand/tokens/*`) wired into Tailwind as `cc-*` utility
   classes, live System/Light/Dark theme switching (`web/src/theme/`,

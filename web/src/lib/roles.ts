@@ -25,3 +25,13 @@ export function canManageSkills(role: string): boolean {
 export function canOverrideSkills(role: string): boolean {
   return role === "ADMIN" || role === "OWNER";
 }
+
+// CapHandoffWrite is granted to CONTRIBUTOR and up.
+export function canWriteHandoffs(role: string): boolean {
+  return role === "CONTRIBUTOR" || role === "ADMIN" || role === "OWNER";
+}
+
+// CapHistoryWrite is granted to CONTRIBUTOR and up.
+export function canWriteHistory(role: string): boolean {
+  return role === "CONTRIBUTOR" || role === "ADMIN" || role === "OWNER";
+}
