@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	cchttp "github.com/koduj-dev/context-commander/adapters/http"
@@ -273,6 +274,22 @@ func (f *fixture) userIDByEmail(email string) string {
 		f.t.Fatalf("userIDByEmail(%q): %v", email, err)
 	}
 	return id
+}
+
+// grantInstallationAdmin makes email an installation admin directly against
+// ownerPool — the test equivalent of `ccd installation grant-admin`
+// (docs/adr/0017).
+func (f *fixture) grantInstallationAdmin(email string) {
+	f.t.Helper()
+	ctx := context.Background()
+	userID := f.userIDByEmail(email)
+	err := db.WithoutPrincipal(ctx, f.ownerPool, func(tx pgx.Tx) error {
+		_, err := installation.NewStore().Grant(ctx, tx, uuid.MustParse(userID), nil)
+		return err
+	})
+	if err != nil {
+		f.t.Fatalf("grantInstallationAdmin(%q): %v", email, err)
+	}
 }
 
 func TestOrganizationCreateAndAddMember(t *testing.T) {

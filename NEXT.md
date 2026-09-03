@@ -39,9 +39,9 @@ Administration surface for admin-driven user creation + agent (Service
 Principal) registration. Phased rather than built at once — see
 [`docs/plans/2026-09-02-design-system-phase-1.md`](docs/plans/2026-09-02-design-system-phase-1.md)
 for the phase 1 plan (design system + component library, no backend/new
-pages). Phases 1 and 2 have since shipped, and so has phase 3's backend
-half — see `CHANGELOG.md`. Phase 3's UI half (the Administration page
-itself) is still open, below.
+pages). All three phases have since shipped — see `CHANGELOG.md`. What's
+left of the original spec is Organizations/Skill Registry top-level nav and
+the remaining project tabs (Integrations/Settings) — not yet planned.
 
 - [x] **Phase 1 — design system + component library.** Shipped 2026-09-03 —
   see `CHANGELOG.md`.
@@ -68,17 +68,16 @@ itself) is still open, below.
   `--database-url`-only (`ccd installation grant-admin`/`revoke-admin`) —
   no HTTP/MCP path lets one admin mint another, a deliberate choice, not an
   oversight (ADR 0017).
-- [ ] **Phase 3 UI — Administration page.** Not started. Needs a web UI
-  screen (or screens) over the backend above: an admin-only nav entry,
-  forms for create-user/create-service-principal, a credential-management
-  view per principal, and an admins list. No design-system work needed
-  (phase 1's component library already covers it) — this is the same shape
-  as phase 2's Handoffs/Conversations/Events tabs, just under a new
-  top-level "Administration" nav entry gated on `installation.CapAdminRead`
-  (`GET /v1/installation/admins` succeeding is the signal the UI has to
-  gate the whole nav entry on, since there is no cheaper "am I an admin"
-  endpoint yet — worth adding one, e.g. a boolean on `GET /v1/me`, before
-  building this).
+- [x] **Phase 3 UI — Administration page.** Shipped 2026-09-03 — see
+  `CHANGELOG.md`. `GET /v1/me` gained `is_installation_admin` (a second,
+  separate transaction from the rest of `getMe`, via the new
+  `installation.Service.IsAdmin`, ungated — it's the caller's own status,
+  same reasoning as `organizations.Service.ListMine`) — the web UI's only
+  signal for whether to show the "Administration" nav entry / route at
+  all. `web/src/pages/Administration.tsx`: admins list (read-only — no
+  grant/revoke button, by design), create-user form, register-service-
+  principal form, and a "load a principal's tokens" section reusing
+  `ConfirmDialog` for revoke, same as `AccountTokens.tsx`.
 - [ ] **Organization "list members" endpoint** — same gap this session
   just closed for projects (`internal/projects.Store.ListMembers`,
   `GET .../members`) doesn't exist yet for `internal/organizations`;

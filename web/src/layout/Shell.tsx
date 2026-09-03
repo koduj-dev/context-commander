@@ -35,6 +35,11 @@ export default function Shell() {
           <Link to="/tokens" className="rounded px-2 py-1.5 hover:bg-cc-surface-2">
             API Tokens
           </Link>
+          {user?.is_installation_admin && (
+            <Link to="/administration" className="rounded px-2 py-1.5 hover:bg-cc-surface-2">
+              Administration
+            </Link>
+          )}
         </nav>
         <div className="mt-auto pt-4 text-xs text-cc-text-muted">
           <div className="mb-2 flex gap-1">

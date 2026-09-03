@@ -33,6 +33,32 @@ func TestGetMeReturnsCallerIdentity(t *testing.T) {
 	}
 }
 
+// TestGetMeReportsInstallationAdminStatus is the web UI's only signal for
+// whether to show the Administration nav entry at all (docs/adr/0017 has
+// no cheaper "am I an admin" endpoint than this).
+func TestGetMeReportsInstallationAdminStatus(t *testing.T) {
+	f := newFixture(t)
+	plainToken := f.newUserWithToken("plain-admin-check@example.test")
+	adminToken := f.newUserWithToken("admin-admin-check@example.test")
+	f.grantInstallationAdmin("admin-admin-check@example.test")
+
+	resp := f.do(http.MethodGet, "/v1/me", plainToken, nil)
+	var plainMe map[string]any
+	_ = json.NewDecoder(resp.Body).Decode(&plainMe)
+	_ = resp.Body.Close()
+	if plainMe["is_installation_admin"] != false {
+		t.Errorf("plain user is_installation_admin = %+v, want false", plainMe["is_installation_admin"])
+	}
+
+	resp = f.do(http.MethodGet, "/v1/me", adminToken, nil)
+	var adminMe map[string]any
+	_ = json.NewDecoder(resp.Body).Decode(&adminMe)
+	_ = resp.Body.Close()
+	if adminMe["is_installation_admin"] != true {
+		t.Errorf("installation admin is_installation_admin = %+v, want true", adminMe["is_installation_admin"])
+	}
+}
+
 func TestListMyProjectsOnlyReturnsMemberships(t *testing.T) {
 	f := newFixture(t)
 	aliceToken := f.newUserWithToken("alice-me@example.test")

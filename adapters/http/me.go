@@ -11,22 +11,27 @@ import (
 )
 
 type meResponse struct {
-	PrincipalID string `json:"principal_id"`
-	Kind        string `json:"kind"` // "user" | "service"
-	Email       string `json:"email,omitempty"`
-	DisplayName string `json:"display_name,omitempty"`
-	Name        string `json:"name,omitempty"` // set for a ServicePrincipal instead of email/display_name
+	PrincipalID         string `json:"principal_id"`
+	Kind                string `json:"kind"` // "user" | "service"
+	Email               string `json:"email,omitempty"`
+	DisplayName         string `json:"display_name,omitempty"`
+	Name                string `json:"name,omitempty"` // set for a ServicePrincipal instead of email/display_name
+	IsInstallationAdmin bool   `json:"is_installation_admin"`
 }
 
 // getMe resolves the authenticated caller's own identity — the web UI's
 // login flow uses this to validate a pasted PAT and to render "signed in
 // as ...". There is no dedicated session/login endpoint (docs/adr/0009: PAT
 // issuance is CLI-only); this is the read-only counterpart every adapter
-// still needed and none had.
+// still needed and none had. IsInstallationAdmin is the web UI's only way
+// to decide whether to show the Administration nav entry at all —
+// docs/adr/0017 deliberately has no cheaper way to ask "am I an admin"
+// than this.
 func (d Deps) getMe(w http.ResponseWriter, r *http.Request) {
 	principalID := principalIDFrom(r.Context())
 
 	var resp meResponse
+	var callerUserID *uuid.UUID
 	err := db.WithPrincipal(r.Context(), d.Pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
 		identityStore := identity.NewStore()
 		p, err := identityStore.GetPrincipal(r.Context(), tx, principalID)
@@ -44,6 +49,7 @@ func (d Deps) getMe(w http.ResponseWriter, r *http.Request) {
 			}
 			resp.Email = u.Email
 			resp.DisplayName = u.DisplayName
+			callerUserID = p.UserID
 		case identity.PrincipalKindService:
 			sp, err := identityStore.GetServicePrincipal(r.Context(), tx, *p.ServicePrincipalID)
 			if err != nil {
@@ -57,6 +63,21 @@ func (d Deps) getMe(w http.ResponseWriter, r *http.Request) {
 		writeDomainError(w, err)
 		return
 	}
+
+	// A second, separate transaction — not nested inside the one above,
+	// which risks pool exhaustion/deadlock under a small connection pool
+	// (same reasoning as internal/skills/internal/gates' checkScopeTarget
+	// calling installation.Store directly instead of going through
+	// Service inside an already-open tx).
+	if callerUserID != nil {
+		isAdmin, err := d.Installation.IsAdmin(r.Context(), principalID, *callerUserID)
+		if err != nil {
+			writeDomainError(w, err)
+			return
+		}
+		resp.IsInstallationAdmin = isAdmin
+	}
+
 	writeJSON(w, http.StatusOK, resp)
 }
 

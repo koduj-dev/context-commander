@@ -56,6 +56,24 @@ func (s *Service) checkCapability(ctx context.Context, principalID, callerUserID
 	return nil
 }
 
+// IsAdmin reports whether callerUserID is themselves an installation admin
+// — no capability check, mirroring internal/organizations.Service.ListMine's
+// reasoning: this is the caller's own status, not access to someone else's
+// data, so there is nothing to gate. GET /v1/me's only caller: it needs
+// this to decide whether to show the Administration nav entry at all.
+func (s *Service) IsAdmin(ctx context.Context, principalID, callerUserID uuid.UUID) (bool, error) {
+	var isAdmin bool
+	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+		var err error
+		isAdmin, err = s.store.IsAdmin(ctx, tx, callerUserID)
+		return err
+	})
+	if err != nil {
+		return false, fmt.Errorf("installation: is admin: %w", err)
+	}
+	return isAdmin, nil
+}
+
 // ListAdmins returns every installation admin, after checking callerUserID
 // holds CapAdminRead (granted to any admin — this is a read of the admin
 // list itself, not an escalation path: no method in this package lets one

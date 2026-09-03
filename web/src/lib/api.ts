@@ -62,6 +62,7 @@ export interface Me {
   email?: string;
   display_name?: string;
   name?: string;
+  is_installation_admin: boolean;
 }
 
 export interface MyProject {
@@ -229,6 +230,27 @@ export interface ProjectEvent {
   payload_kind: string;
 }
 
+export interface InstallationUser {
+  id: string;
+  email: string;
+  display_name: string;
+  created_at: string;
+}
+
+export interface ServicePrincipal {
+  id: string;
+  name: string;
+  description?: string;
+  created_at: string;
+}
+
+export interface InstallationAdmin {
+  user_id: string;
+  role: string;
+  granted_by?: string;
+  granted_at: string;
+}
+
 export const api = {
   me: () => req<Me>("GET", "/v1/me"),
   myProjects: () => req<MyProject[]>("GET", "/v1/me/projects"),
@@ -358,6 +380,23 @@ export const api = {
     const qs = params.toString();
     return req<ProjectEvent[]>("GET", `/v1/projects/${namespace}/${slug}/events${qs ? `?${qs}` : ""}`);
   },
+
+  // Installation-admin endpoints (docs/adr/0017) — every call here is
+  // gated server-side on the caller actually being an installation admin;
+  // there is no client-side gate beyond hiding the nav entry when
+  // Me.is_installation_admin is false.
+  createInstallationUser: (email: string, displayName: string) =>
+    req<InstallationUser>("POST", "/v1/installation/users", { email, display_name: displayName }),
+  createServicePrincipal: (name: string, description?: string) =>
+    req<ServicePrincipal>("POST", "/v1/installation/service-principals", { name, description }),
+  issueCredentialFor: (principalId: string, clientType: string, expiresInSeconds?: number) =>
+    req<IssuedToken>("POST", `/v1/installation/principals/${principalId}/tokens`, {
+      client_type: clientType,
+      expires_in_seconds: expiresInSeconds,
+    }),
+  listCredentialsFor: (principalId: string) => req<Credential[]>("GET", `/v1/installation/principals/${principalId}/tokens`),
+  revokeCredentialFor: (credentialId: string) => req<void>("DELETE", `/v1/installation/tokens/${credentialId}`),
+  listInstallationAdmins: () => req<InstallationAdmin[]>("GET", "/v1/installation/admins"),
 
   createOrganization: (name: string) => req<MyOrganization>("POST", "/v1/organizations", { name }),
   addOrganizationMember: (orgId: string, userId: string, role: string) =>

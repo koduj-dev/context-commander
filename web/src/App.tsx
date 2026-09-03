@@ -6,6 +6,7 @@ import Dashboard from "./pages/Dashboard";
 import ProjectDetail from "./pages/ProjectDetail";
 import OrganizationDetail from "./pages/OrganizationDetail";
 import AccountTokens from "./pages/AccountTokens";
+import Administration from "./pages/Administration";
 
 export default function App() {
   const { loading, user } = useAuth();
@@ -29,6 +30,7 @@ export default function App() {
         <Route path="/projects/:namespace/:slug" element={<ProjectDetail />} />
         <Route path="/organizations/:id" element={<OrganizationDetail />} />
         <Route path="/tokens" element={<AccountTokens />} />
+        {user.is_installation_admin && <Route path="/administration" element={<Administration />} />}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

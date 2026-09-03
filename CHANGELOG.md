@@ -12,6 +12,19 @@ link definition at the bottom of the file.
 
 ### Added
 
+- **Administration page (web UI):** `GET /v1/me` gained
+  `is_installation_admin` (a second, separate transaction from the rest of
+  `getMe` — nesting it in the first would risk pool exhaustion, same
+  reasoning as `internal/skills`/`internal/gates`' `checkScopeTarget` —
+  backed by a new, ungated `installation.Service.IsAdmin`: this is the
+  caller's own status, not access to someone else's data, same reasoning
+  `organizations.Service.ListMine` already uses). It's the web UI's only
+  signal for whether to show the "Administration" nav entry/route at all.
+  `web/src/pages/Administration.tsx`: a read-only installation-admins
+  list (no grant/revoke button — that stays CLI-only, docs/adr/0017), a
+  create-user form, a register-service-principal form, and a "load a
+  principal's tokens" section (issue/list/revoke, `ConfirmDialog` on
+  revoke, same shape as `AccountTokens.tsx`'s self-service page).
 - **Installation-admin authorization tier (docs/adr/0017):** a new
   `internal/installation` package closes the last unbuilt piece of the
   identity model — `installation_admins` (migration 000017), keyed by
