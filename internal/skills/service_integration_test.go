@@ -12,6 +12,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/auth"
 	"github.com/koduj-dev/context-commander/internal/db"
 	"github.com/koduj-dev/context-commander/internal/dbtest"
+	"github.com/koduj-dev/context-commander/internal/installation"
 	"github.com/koduj-dev/context-commander/internal/organizations"
 	"github.com/koduj-dev/context-commander/internal/projects"
 	"github.com/koduj-dev/context-commander/internal/skills"
@@ -35,16 +36,32 @@ func (failingStore) Delete(context.Context, string) error                       
 func (failingStore) List(context.Context, string) ([]storage.ObjectInfo, error) { return nil, nil }
 
 type fixture struct {
-	t           *testing.T
-	ctx         context.Context
-	ownerPool   *db.Pool
-	appPool     *db.Pool
-	svc         *skills.Service
-	orgs        *organizations.Store
-	orgSvc      *organizations.Service
-	projectID   uuid.UUID
-	principalID uuid.UUID
-	userID      uuid.UUID
+	t                  *testing.T
+	ctx                context.Context
+	ownerPool          *db.Pool
+	appPool            *db.Pool
+	svc                *skills.Service
+	orgs               *organizations.Store
+	orgSvc             *organizations.Service
+	installationAdmins *installation.Store
+	projectID          uuid.UUID
+	principalID        uuid.UUID
+	userID             uuid.UUID
+}
+
+// grantInstallationAdmin makes f.userID an installation admin directly
+// against ownerPool — the equivalent of `ccd installation grant-admin` for
+// tests, bypassing the chicken-and-egg problem the real CLI command exists
+// to solve (docs/adr/0017).
+func (f *fixture) grantInstallationAdmin() {
+	f.t.Helper()
+	err := db.WithoutPrincipal(f.ctx, f.ownerPool, func(tx pgx.Tx) error {
+		_, err := f.installationAdmins.Grant(f.ctx, tx, f.userID, nil)
+		return err
+	})
+	if err != nil {
+		f.t.Fatalf("grant installation admin: %v", err)
+	}
 }
 
 func newFixture(t *testing.T) *fixture {
@@ -99,15 +116,17 @@ func newFixture(t *testing.T) *fixture {
 	orgStore := organizations.NewStore()
 	projStore := projects.NewStore()
 	authz := auth.NewAuthzService(appPool, projStore)
+	installationStore := installation.NewStore()
 
 	return &fixture{
 		t: t, ctx: ctx, ownerPool: ownerPool, appPool: appPool,
-		svc:         skills.NewService(appPool, authz, orgStore, projStore, store),
-		orgs:        orgStore,
-		orgSvc:      organizations.NewService(appPool, orgStore),
-		projectID:   projectID,
-		principalID: principalID,
-		userID:      userID,
+		svc:                skills.NewService(appPool, authz, orgStore, projStore, store, installationStore),
+		orgs:               orgStore,
+		orgSvc:             organizations.NewService(appPool, orgStore),
+		installationAdmins: installationStore,
+		projectID:          projectID,
+		principalID:        principalID,
+		userID:             userID,
 	}
 }
 
@@ -356,7 +375,7 @@ func TestInstallDeniedForNonMemberOfScopeRefProject(t *testing.T) {
 	}
 }
 
-func TestInstallInstallationScopeRejected(t *testing.T) {
+func TestInstallInstallationScopeRequiresAdmin(t *testing.T) {
 	f := newFixture(t)
 
 	v, err := f.svc.Publish(f.ctx, f.principalID, f.projectID, nil, "git-workflow", "acme", "local", []byte("content"), nil)
@@ -365,8 +384,31 @@ func TestInstallInstallationScopeRejected(t *testing.T) {
 	}
 
 	_, err = f.svc.Install(f.ctx, f.principalID, f.userID, f.projectID, skills.ScopeInstallation, nil, v.SkillID, v.ID, false, true)
-	if !errors.Is(err, skills.ErrUnsupportedScope) {
-		t.Fatalf("Install at installation scope: got err=%v, want ErrUnsupportedScope", err)
+	if !errors.Is(err, skills.ErrForbidden) {
+		t.Fatalf("Install at installation scope as a non-admin: got err=%v, want ErrForbidden", err)
+	}
+}
+
+// TestInstallInstallationScopeAllowedForAdmin is the positive
+// counterpart — docs/adr/0017 replaced the old "operator-seeded only"
+// hard rejection (ErrUnsupportedScope) with a real capability check, so an
+// installation admin must actually be able to install at installation
+// scope through the Service now, not just via direct-database seeding.
+func TestInstallInstallationScopeAllowedForAdmin(t *testing.T) {
+	f := newFixture(t)
+	f.grantInstallationAdmin()
+
+	v, err := f.svc.Publish(f.ctx, f.principalID, f.projectID, nil, "git-workflow", "acme", "local", []byte("content"), nil)
+	if err != nil {
+		t.Fatalf("Publish: %v", err)
+	}
+
+	b, err := f.svc.Install(f.ctx, f.principalID, f.userID, f.projectID, skills.ScopeInstallation, nil, v.SkillID, v.ID, false, true)
+	if err != nil {
+		t.Fatalf("Install at installation scope as an admin: %v", err)
+	}
+	if b.Scope != skills.ScopeInstallation {
+		t.Errorf("b.Scope = %q, want %q", b.Scope, skills.ScopeInstallation)
 	}
 }
 
@@ -421,7 +463,7 @@ func TestOverrideRejectsMismatchedSkillVersion(t *testing.T) {
 func TestPublishUploadFailureLeavesNoInstallableVersion(t *testing.T) {
 	f := newFixture(t)
 
-	svc := skills.NewService(f.appPool, auth.NewAuthzService(f.appPool, projects.NewStore()), organizations.NewStore(), projects.NewStore(), failingStore{})
+	svc := skills.NewService(f.appPool, auth.NewAuthzService(f.appPool, projects.NewStore()), organizations.NewStore(), projects.NewStore(), failingStore{}, installation.NewStore())
 
 	const name = "broken-upload"
 	_, err := svc.Publish(f.ctx, f.principalID, f.projectID, nil, name, "acme", "local", []byte("content"), nil)

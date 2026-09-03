@@ -11,6 +11,7 @@ import (
 
 	"github.com/koduj-dev/context-commander/internal/auth"
 	"github.com/koduj-dev/context-commander/internal/db"
+	"github.com/koduj-dev/context-commander/internal/installation"
 	"github.com/koduj-dev/context-commander/internal/organizations"
 	"github.com/koduj-dev/context-commander/internal/projects"
 	"github.com/koduj-dev/context-commander/internal/skills"
@@ -99,7 +100,7 @@ func setupSkillContext(cmd *cobra.Command) (*skillContext, error) {
 	}
 
 	authz := auth.NewAuthzService(pool, projStore)
-	svc := skills.NewService(pool, authz, organizations.NewStore(), projStore, store)
+	svc := skills.NewService(pool, authz, organizations.NewStore(), projStore, store, installation.NewStore())
 
 	return &skillContext{svc: svc, principalID: principalID, userID: userID, project: project, pool: pool}, nil
 }

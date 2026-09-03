@@ -12,6 +12,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/db"
 	"github.com/koduj-dev/context-commander/internal/dbtest"
 	"github.com/koduj-dev/context-commander/internal/gates"
+	"github.com/koduj-dev/context-commander/internal/installation"
 	"github.com/koduj-dev/context-commander/internal/organizations"
 	"github.com/koduj-dev/context-commander/internal/projects"
 )
@@ -204,11 +205,25 @@ func TestEngineOrganizationBindingVisibleThroughProjectMembershipButNotMutable(t
 type adminFixture struct {
 	*engineFixture
 	admin               *gates.AdminService
+	installationAdmins  *installation.Store
 	userID              uuid.UUID
 	contributorID       uuid.UUID
 	contributorUserID   uuid.UUID
 	organizationID      uuid.UUID
 	organizationOwnerID uuid.UUID
+}
+
+// grantInstallationAdmin makes f.userID an installation admin — the
+// equivalent of `ccd installation grant-admin` for tests (docs/adr/0017).
+func (f *adminFixture) grantInstallationAdmin() {
+	f.t.Helper()
+	err := db.WithoutPrincipal(f.ctx, f.ownerPool, func(tx pgx.Tx) error {
+		_, err := f.installationAdmins.Grant(f.ctx, tx, f.userID, nil)
+		return err
+	})
+	if err != nil {
+		f.t.Fatalf("grant installation admin: %v", err)
+	}
 }
 
 func newAdminFixture(t *testing.T) *adminFixture {
@@ -254,10 +269,12 @@ func newAdminFixture(t *testing.T) *adminFixture {
 
 	projStore := projects.NewStore()
 	authz := auth.NewAuthzService(f.appPool, projStore)
+	installationStore := installation.NewStore()
 
 	return &adminFixture{
 		engineFixture:       f,
-		admin:               gates.NewAdminService(f.appPool, authz, organizations.NewStore(), projStore),
+		admin:               gates.NewAdminService(f.appPool, authz, organizations.NewStore(), projStore, installationStore),
+		installationAdmins:  installationStore,
 		userID:              userID,
 		contributorID:       contributorID,
 		contributorUserID:   contributorUserID,
@@ -286,12 +303,28 @@ func TestAdminBindAndListBindingsProjectScope(t *testing.T) {
 	}
 }
 
-func TestAdminBindRejectsInstallationScope(t *testing.T) {
+func TestAdminBindInstallationScopeRequiresAdmin(t *testing.T) {
 	f := newAdminFixture(t)
 
 	_, err := f.admin.Bind(f.ctx, f.principalID, f.userID, f.projectID, gates.ScopeInstallation, nil, "secret-scanner", "artifact.before_write", nil)
-	if !errors.Is(err, gates.ErrUnsupportedScope) {
-		t.Fatalf("got %v, want ErrUnsupportedScope", err)
+	if !errors.Is(err, gates.ErrForbidden) {
+		t.Fatalf("Bind at installation scope as a non-admin: got %v, want ErrForbidden", err)
+	}
+}
+
+// TestAdminBindInstallationScopeAllowedForAdmin is the positive
+// counterpart — docs/adr/0017 replaced the old "operator-seeded only" hard
+// rejection with a real capability check.
+func TestAdminBindInstallationScopeAllowedForAdmin(t *testing.T) {
+	f := newAdminFixture(t)
+	f.grantInstallationAdmin()
+
+	b, err := f.admin.Bind(f.ctx, f.principalID, f.userID, f.projectID, gates.ScopeInstallation, nil, "secret-scanner", "artifact.before_write", nil)
+	if err != nil {
+		t.Fatalf("Bind at installation scope as an admin: %v", err)
+	}
+	if b.Scope != gates.ScopeInstallation {
+		t.Errorf("b.Scope = %q, want %q", b.Scope, gates.ScopeInstallation)
 	}
 }
 

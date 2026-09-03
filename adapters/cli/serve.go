@@ -25,6 +25,8 @@ import (
 	"github.com/koduj-dev/context-commander/internal/gates"
 	"github.com/koduj-dev/context-commander/internal/handoffs"
 	"github.com/koduj-dev/context-commander/internal/history"
+	"github.com/koduj-dev/context-commander/internal/identity"
+	"github.com/koduj-dev/context-commander/internal/installation"
 	"github.com/koduj-dev/context-commander/internal/organizations"
 	"github.com/koduj-dev/context-commander/internal/projects"
 	"github.com/koduj-dev/context-commander/internal/secrets"
@@ -143,8 +145,10 @@ func newServeCmd() *cobra.Command {
 			auditSvc := audit.NewService(pool, authz)
 			handoffsSvc := handoffs.NewService(pool, cryptoProvider, authz)
 			historySvc := history.NewService(pool, cryptoProvider, authz)
-			skillsSvc := skills.NewService(pool, authz, orgStore, projStore, store)
-			gatesAdmin := gates.NewAdminService(pool, authz, orgStore, projStore)
+			installationStore := installation.NewStore()
+			skillsSvc := skills.NewService(pool, authz, orgStore, projStore, store, installationStore)
+			gatesAdmin := gates.NewAdminService(pool, authz, orgStore, projStore, installationStore)
+			installationSvc := installation.NewService(pool, installationStore, identity.NewStore())
 			secretsBackend := secrets.NewLocalEncryptedBackend(pool, cryptoProvider)
 			secretsSvc := secrets.NewService(pool, authz, secretsBackend)
 
@@ -167,13 +171,15 @@ func newServeCmd() *cobra.Command {
 				Events: eventsSvc, Organizations: orgSvc, Audit: auditSvc,
 				Handoffs: handoffsSvc, History: historySvc,
 				Skills: skillsSvc, Gates: gatesAdmin, Secrets: secretsSvc,
+				Installation: installationSvc,
 			}))
 			mux.Handle("/", cchttp.NewHandler(cchttp.Deps{
 				Pool: pool, Projects: projStore, Authz: authz, Artifacts: artifactsSvc,
 				Events: eventsSvc, Organizations: orgSvc, Audit: auditSvc,
 				Handoffs: handoffsSvc, History: historySvc,
 				Skills: skillsSvc, Gates: gatesAdmin, Secrets: secretsSvc,
-				WebFS: webFS,
+				Installation: installationSvc,
+				WebFS:        webFS,
 			}))
 
 			server := &http.Server{

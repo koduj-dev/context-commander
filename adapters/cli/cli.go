@@ -17,6 +17,7 @@ import (
 
 	"github.com/koduj-dev/context-commander/internal/db"
 	"github.com/koduj-dev/context-commander/internal/identity"
+	"github.com/koduj-dev/context-commander/internal/installation"
 )
 
 const databaseURLEnv = "CC_DATABASE_URL"
@@ -40,6 +41,7 @@ func NewCommand() []*cobra.Command {
 		newSkillCmd(),
 		newGateCmd(),
 		newSecretCmd(),
+		newInstallationCmd(),
 		newServeCmd(),
 	}
 }
@@ -195,18 +197,27 @@ func newBootstrapCmd() *cobra.Command {
 			defer pool.Close()
 
 			store := identity.NewStore()
+			installationStore := installation.NewStore()
 			err = db.WithoutPrincipal(cmd.Context(), pool, func(tx pgx.Tx) error {
 				u, err := store.CreateUser(cmd.Context(), tx, email, name)
 				if err != nil {
 					return err
 				}
-				_, err = store.CreatePrincipalForUser(cmd.Context(), tx, u.ID)
+				if _, err := store.CreatePrincipalForUser(cmd.Context(), tx, u.ID); err != nil {
+					return err
+				}
+				// The bootstrap user becomes the first installation admin —
+				// otherwise nobody could ever become one without direct
+				// database access (docs/adr/0017). grantedBy is nil: there
+				// is no admin yet to have granted it.
+				_, err = installationStore.Grant(cmd.Context(), tx, u.ID, nil)
 				return err
 			})
 			if err != nil {
 				return err
 			}
 
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s is now an installation admin\n", email)
 			token, err := issueTokenForUserEmail(cmd.Context(), pool, email, "cli", 0)
 			if err != nil {
 				return err

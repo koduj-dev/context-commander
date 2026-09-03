@@ -23,6 +23,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/handoffs"
 	"github.com/koduj-dev/context-commander/internal/history"
 	"github.com/koduj-dev/context-commander/internal/identity"
+	"github.com/koduj-dev/context-commander/internal/installation"
 	"github.com/koduj-dev/context-commander/internal/organizations"
 	"github.com/koduj-dev/context-commander/internal/projects"
 	"github.com/koduj-dev/context-commander/internal/secrets"
@@ -76,8 +77,10 @@ func newFixture(t *testing.T) *fixture {
 	auditSvc := audit.NewService(appPool, authz)
 	handoffsSvc := handoffs.NewService(appPool, cryptoProvider, authz)
 	historySvc := history.NewService(appPool, cryptoProvider, authz)
-	skillsSvc := skills.NewService(appPool, authz, orgStore, projStore, store)
-	gatesAdmin := gates.NewAdminService(appPool, authz, orgStore, projStore)
+	installationStore := installation.NewStore()
+	skillsSvc := skills.NewService(appPool, authz, orgStore, projStore, store, installationStore)
+	gatesAdmin := gates.NewAdminService(appPool, authz, orgStore, projStore, installationStore)
+	installationSvc := installation.NewService(appPool, installationStore, identity.NewStore())
 	secretsSvc := secrets.NewService(appPool, authz, secrets.NewLocalEncryptedBackend(appPool, cryptoProvider))
 
 	handler := cchttp.NewHandler(cchttp.Deps{
@@ -85,6 +88,7 @@ func newFixture(t *testing.T) *fixture {
 		Events: eventsSvc, Organizations: orgSvc, Audit: auditSvc,
 		Handoffs: handoffsSvc, History: historySvc,
 		Skills: skillsSvc, Gates: gatesAdmin, Secrets: secretsSvc,
+		Installation: installationSvc,
 	})
 	server := httptest.NewServer(handler)
 	t.Cleanup(server.Close)

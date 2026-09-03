@@ -12,6 +12,7 @@ import (
 
 	"github.com/koduj-dev/context-commander/internal/auth"
 	"github.com/koduj-dev/context-commander/internal/db"
+	"github.com/koduj-dev/context-commander/internal/installation"
 	"github.com/koduj-dev/context-commander/internal/organizations"
 	"github.com/koduj-dev/context-commander/internal/projects"
 )
@@ -32,13 +33,6 @@ const (
 var (
 	ErrNotFound  = errors.New("gates: not found")
 	ErrForbidden = errors.New("gates: forbidden")
-
-	// ErrUnsupportedScope is returned by AdminService.Bind for
-	// scope == ScopeInstallation — same reasoning as
-	// internal/skills.ErrUnsupportedScope: v1 has no installation-admin
-	// capability model, so installation-scope bindings are operator-seeded
-	// directly in the database, never created through this service.
-	ErrUnsupportedScope = errors.New("gates: installation-scope bindings are operator-seeded only in v1, not creatable through AdminService")
 
 	// ErrScopeRefRequired is returned by AdminService.Bind when scope is
 	// "organization" or "project" but no scope_ref was given — a client
@@ -75,14 +69,18 @@ type Binding struct {
 // action. Splitting them also means adding this service required no change
 // to Engine's constructor or any of its existing call sites.
 type AdminService struct {
-	pool     *db.Pool
-	authz    *auth.AuthzService
-	orgs     *organizations.Store
-	projects *projects.Store
+	pool               *db.Pool
+	authz              *auth.AuthzService
+	orgs               *organizations.Store
+	projects           *projects.Store
+	installationAdmins *installation.Store
 }
 
-func NewAdminService(pool *db.Pool, authz *auth.AuthzService, orgs *organizations.Store, projectsStore *projects.Store) *AdminService {
-	return &AdminService{pool: pool, authz: authz, orgs: orgs, projects: projectsStore}
+func NewAdminService(
+	pool *db.Pool, authz *auth.AuthzService, orgs *organizations.Store, projectsStore *projects.Store,
+	installationAdmins *installation.Store,
+) *AdminService {
+	return &AdminService{pool: pool, authz: authz, orgs: orgs, projects: projectsStore, installationAdmins: installationAdmins}
 }
 
 func (s *AdminService) checkCapability(ctx context.Context, principalID, projectID uuid.UUID) error {
@@ -103,12 +101,19 @@ func (s *AdminService) checkCapability(ctx context.Context, principalID, project
 // independently checked against scopeRef itself — projectID (the anchor
 // used for the earlier capability check) and scopeRef are caller-supplied
 // and not required to be equal, so the anchor check alone does not prove
-// the caller may manage gates on scopeRef; ScopeInstallation is rejected
-// outright.
+// the caller may manage gates on scopeRef; ScopeInstallation requires
+// userID to hold installation.RoleAdmin (docs/adr/0017).
 func (s *AdminService) checkScopeTarget(ctx context.Context, tx pgx.Tx, principalID, userID uuid.UUID, scope Scope, scopeRef *uuid.UUID) error {
 	switch scope {
 	case ScopeInstallation:
-		return ErrUnsupportedScope
+		isAdmin, err := s.installationAdmins.IsAdmin(ctx, tx, userID)
+		if err != nil {
+			return fmt.Errorf("gates: check installation admin: %w", err)
+		}
+		if !isAdmin {
+			return ErrForbidden
+		}
+		return nil
 	case ScopeOrganization:
 		if scopeRef == nil {
 			return ErrScopeRefRequired

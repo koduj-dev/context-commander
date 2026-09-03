@@ -12,6 +12,39 @@ link definition at the bottom of the file.
 
 ### Added
 
+- **Installation-admin authorization tier (docs/adr/0017):** a new
+  `internal/installation` package closes the last unbuilt piece of the
+  identity model — `installation_admins` (migration 000017), keyed by
+  `user_id` (a ServicePrincipal can never hold installation-admin rights),
+  with its own `Capability`/`RoleCan`, mirroring `internal/organizations`'
+  authorization shape (docs/adr/0006). `ccd bootstrap`'s first user is now
+  automatically granted installation-admin rights — otherwise nobody could
+  ever become one without direct database access. Every later grant is
+  `ccd installation grant-admin --email <email>`, a `--database-url`-only
+  operator command with no HTTP/MCP equivalent: no installation admin can
+  mint another over the network, a deliberate scope decision confirmed
+  with the maintainer before implementation, not an oversight.
+  - New HTTP endpoints (all installation-admin-gated): `POST
+    /v1/installation/users` (admin-driven user creation),
+    `POST /v1/installation/service-principals` (agent registration —
+    `identity.CreateServicePrincipal`/`CreatePrincipalForService` had zero
+    callers before this), `POST`/`GET`/`DELETE
+    /v1/installation/principals/{id}/tokens` and `/v1/installation/tokens/{id}`
+    (cross-principal credential management, deliberately separate from
+    `/v1/me/tokens`'s self-only endpoints — `internal/identity` gained
+    `RevokeCredentialByID`, with no ownership check, for this), and
+    `GET /v1/installation/admins`. Matching `ccd installation ...` CLI
+    subcommands and `installation.*` MCP tools.
+  - `internal/skills` and `internal/gates` installation-scope bindings now
+    go through a real capability check (`installation.Store.IsAdmin`)
+    instead of the old hard-coded `ErrUnsupportedScope` rejection
+    ("operator-seeded only") — `skills.NewService`/`gates.NewAdminService`
+    both gained a required `*installation.Store` parameter. A non-admin
+    gets the ordinary `ErrForbidden` every other denied scope check
+    already returns; a real installation admin can now actually create an
+    installation-scope skill/gate binding through the API, not just via
+    direct-database seeding.
+  - Backend only — no web UI yet (`NEXT.md`'s Phase 3 UI is still open).
 - **Web UI phase 2 — Handoffs/Conversations/Events project tabs:** wired
   three domains that already had working HTTP/MCP/CLI adapters but no UI
   (`internal/handoffs`, `internal/history`, `internal/events`) into three

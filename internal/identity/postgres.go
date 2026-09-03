@@ -58,6 +58,24 @@ func (s *Store) GetUser(ctx context.Context, tx pgx.Tx, id uuid.UUID) (User, err
 	return u, nil
 }
 
+// GetUserByEmail looks up a User by email — used wherever an operator
+// names a user by email rather than id (e.g. `ccd installation
+// grant-admin`, mirroring `ccd token create --user <email>`'s existing
+// convention).
+func (s *Store) GetUserByEmail(ctx context.Context, tx pgx.Tx, email string) (User, error) {
+	var u User
+	err := tx.QueryRow(ctx,
+		`SELECT id, email, display_name, created_at FROM users WHERE email = $1`, email,
+	).Scan(&u.ID, &u.Email, &u.DisplayName, &u.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return User{}, ErrNotFound
+	}
+	if err != nil {
+		return User{}, fmt.Errorf("identity: get user by email: %w", err)
+	}
+	return u, nil
+}
+
 // GetUsersForPrincipals batch-resolves Principal ids to their Users, keyed
 // by *principal* id (not user id) — the shape the audit log view needs to
 // label a page of audit_log rows (which carry principal_id) with actor
@@ -276,6 +294,25 @@ func (s *Store) RevokeCredential(ctx context.Context, tx pgx.Tx, id, principalID
 	)
 	if err != nil {
 		return fmt.Errorf("identity: revoke credential: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// RevokeCredentialByID revokes a PAT by id alone, with no ownership check —
+// the cross-principal counterpart to RevokeCredential, for an installation
+// admin managing a principal that is not themselves
+// (internal/installation.Service.RevokeCredentialFor is the only caller;
+// it does its own CapCredentialManage check before reaching here).
+func (s *Store) RevokeCredentialByID(ctx context.Context, tx pgx.Tx, id uuid.UUID) error {
+	tag, err := tx.Exec(ctx,
+		`UPDATE client_credentials SET revoked_at = now() WHERE id = $1 AND revoked_at IS NULL`,
+		id,
+	)
+	if err != nil {
+		return fmt.Errorf("identity: revoke credential by id: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
 		return ErrNotFound

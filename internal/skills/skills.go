@@ -31,14 +31,6 @@ var (
 	// quietly shadowing a mandated security-review skill").
 	ErrNotOverridable = errors.New("skills: shadowed binding is not overridable")
 
-	// ErrUnsupportedScope is returned by Service mutation methods for
-	// scope == ScopeInstallation. v1 has no installation-admin capability
-	// model (every other capability in this codebase is anchored to a
-	// project or an organization) — installation-scope bindings can exist
-	// (ListEffective reads them) but are only ever seeded by an operator
-	// directly, never created through this Service. See docs/gotchas.md.
-	ErrUnsupportedScope = errors.New("skills: installation-scope bindings are operator-seeded only in v1, not creatable through Service")
-
 	// ErrScopeRefRequired is returned by Service.Install when scope is
 	// "organization" or "project" but no scope_ref was given — a client
 	// input mistake, not a server fault, so it must map to 400 rather than

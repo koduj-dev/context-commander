@@ -11,6 +11,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/auth"
 	"github.com/koduj-dev/context-commander/internal/db"
 	"github.com/koduj-dev/context-commander/internal/gates"
+	"github.com/koduj-dev/context-commander/internal/installation"
 	"github.com/koduj-dev/context-commander/internal/organizations"
 	"github.com/koduj-dev/context-commander/internal/projects"
 )
@@ -81,7 +82,7 @@ func setupGateContext(cmd *cobra.Command) (*gateContext, error) {
 	}
 
 	authz := auth.NewAuthzService(pool, projStore)
-	admin := gates.NewAdminService(pool, authz, organizations.NewStore(), projStore)
+	admin := gates.NewAdminService(pool, authz, organizations.NewStore(), projStore, installation.NewStore())
 
 	return &gateContext{admin: admin, principalID: principalID, userID: userID, project: project, pool: pool}, nil
 }

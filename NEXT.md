@@ -39,7 +39,9 @@ Administration surface for admin-driven user creation + agent (Service
 Principal) registration. Phased rather than built at once — see
 [`docs/plans/2026-09-02-design-system-phase-1.md`](docs/plans/2026-09-02-design-system-phase-1.md)
 for the phase 1 plan (design system + component library, no backend/new
-pages). Phases 1 and 2 have since shipped — see `CHANGELOG.md`.
+pages). Phases 1 and 2 have since shipped, and so has phase 3's backend
+half — see `CHANGELOG.md`. Phase 3's UI half (the Administration page
+itself) is still open, below.
 
 - [x] **Phase 1 — design system + component library.** Shipped 2026-09-03 —
   see `CHANGELOG.md`.
@@ -53,23 +55,30 @@ pages). Phases 1 and 2 have since shipped — see `CHANGELOG.md`.
   project with existing conversations has no way to discover them from the
   UI. Worth a real `GET .../conversations` (and maybe `.../sessions`) list
   endpoint in a later pass.
-- [ ] **Phase 3 (not yet planned, architecturally significant) —
-  Administration: admin user creation, Service Principal (agent)
-  registration, cross-principal credential management.** Confirmed via
-  audit (2026-09-02): **no installation-admin role/capability exists
-  anywhere in `internal/auth`** — `roleCapabilities` is keyed solely on
-  project roles (Reader/Contributor/Admin/Owner), nothing above
-  organization. `identity.CreateServicePrincipal` exists in the Store but
-  is called from zero adapters (HTTP/MCP/CLI) — agents cannot be
-  registered through any interface today, not even CLI.
-  `identity.CreateUser`/`CreatePrincipalForUser` are CLI-bootstrap-only,
-  no HTTP/MCP path. This needs an actual authorization-model decision
-  (who/what makes a principal an "installation admin"?) before any
-  endpoint work — likely ADR-worthy, not just an implementation plan.
-  `installation` scope already exists in the gates/skills schema/domain
-  types but every Service mutation rejects it
-  (`ErrUnsupportedScope`, "v1 has no installation-admin capability
-  model... operator-seeded only") — the same missing tier blocks that too.
+- [x] **Phase 3 backend — installation-admin authorization tier.** Shipped
+  2026-09-03 — see `CHANGELOG.md` and `docs/adr/0017-installation-admin-tier.md`.
+  Backend only (confirmed with the maintainer before starting): a new
+  `internal/installation` package, `POST /v1/installation/users`,
+  `POST /v1/installation/service-principals`, cross-principal token
+  issue/list/revoke, `GET /v1/installation/admins`, matching CLI
+  (`ccd installation ...`) and MCP tools, and `internal/skills`/
+  `internal/gates`' installation-scope bindings now go through a real
+  capability check instead of the old hard `ErrUnsupportedScope` rejection.
+  Granting/revoking installation-admin rights stays CLI/
+  `--database-url`-only (`ccd installation grant-admin`/`revoke-admin`) —
+  no HTTP/MCP path lets one admin mint another, a deliberate choice, not an
+  oversight (ADR 0017).
+- [ ] **Phase 3 UI — Administration page.** Not started. Needs a web UI
+  screen (or screens) over the backend above: an admin-only nav entry,
+  forms for create-user/create-service-principal, a credential-management
+  view per principal, and an admins list. No design-system work needed
+  (phase 1's component library already covers it) — this is the same shape
+  as phase 2's Handoffs/Conversations/Events tabs, just under a new
+  top-level "Administration" nav entry gated on `installation.CapAdminRead`
+  (`GET /v1/installation/admins` succeeding is the signal the UI has to
+  gate the whole nav entry on, since there is no cheaper "am I an admin"
+  endpoint yet — worth adding one, e.g. a boolean on `GET /v1/me`, before
+  building this).
 - [ ] **Organization "list members" endpoint** — same gap this session
   just closed for projects (`internal/projects.Store.ListMembers`,
   `GET .../members`) doesn't exist yet for `internal/organizations`;

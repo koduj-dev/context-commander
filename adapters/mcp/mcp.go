@@ -22,6 +22,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/handoffs"
 	"github.com/koduj-dev/context-commander/internal/history"
 	"github.com/koduj-dev/context-commander/internal/identity"
+	"github.com/koduj-dev/context-commander/internal/installation"
 	"github.com/koduj-dev/context-commander/internal/organizations"
 	"github.com/koduj-dev/context-commander/internal/projects"
 	"github.com/koduj-dev/context-commander/internal/secrets"
@@ -43,6 +44,7 @@ type Deps struct {
 	Skills        *skills.Service
 	Gates         *gates.AdminService
 	Secrets       *secrets.Service
+	Installation  *installation.Service
 }
 
 type credKey struct{}
@@ -104,6 +106,7 @@ func newServer(deps Deps, principalID, clientID uuid.UUID) *sdkmcp.Server {
 	registerSkillTools(server, deps, principalID, clientID)
 	registerGateTools(server, deps, principalID, clientID)
 	registerSecretTools(server, deps, principalID, clientID)
+	registerInstallationTools(server, deps, principalID, clientID)
 
 	return server
 }

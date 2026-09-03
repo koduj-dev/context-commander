@@ -12,6 +12,7 @@ import (
 
 	"github.com/koduj-dev/context-commander/internal/auth"
 	"github.com/koduj-dev/context-commander/internal/db"
+	"github.com/koduj-dev/context-commander/internal/installation"
 	"github.com/koduj-dev/context-commander/internal/organizations"
 	"github.com/koduj-dev/context-commander/internal/projects"
 	"github.com/koduj-dev/context-commander/internal/storage"
@@ -19,24 +20,27 @@ import (
 
 // Service is skills' authorization chokepoint (docs/adr/0014). Every
 // mutation needs an anchor project (projectID) to check a capability
-// against, even for organization/installation-scope bindings — this
-// codebase has no separate "organization admin" or "installation admin"
-// capability model outside of internal/organizations' own OWNER/ADMIN
-// roles, and Publish (cookbook §12.2) is framed as something an agent does
-// while working on a specific project, so anchoring every mutation to a
-// project the caller actually holds a role on is the honest v1 model, not
-// a shortcut. See ErrUnsupportedScope for the one case (installation-scope
-// bindings) this does not cover at all.
+// against, even for organization/installation-scope bindings — Publish
+// (cookbook §12.2) is framed as something an agent does while working on a
+// specific project, so anchoring every mutation to a project the caller
+// actually holds a role on is the v1 model. installation-scope bindings are
+// the one case that isn't anchored to a project at all: checkScopeTarget
+// checks installation.RoleAdmin via installationAdmins instead — see
+// docs/adr/0017.
 type Service struct {
-	pool     *db.Pool
-	authz    *auth.AuthzService
-	orgs     *organizations.Store
-	projects *projects.Store
-	store    storage.ObjectStore
+	pool               *db.Pool
+	authz              *auth.AuthzService
+	orgs               *organizations.Store
+	projects           *projects.Store
+	store              storage.ObjectStore
+	installationAdmins *installation.Store
 }
 
-func NewService(pool *db.Pool, authz *auth.AuthzService, orgs *organizations.Store, projectsStore *projects.Store, store storage.ObjectStore) *Service {
-	return &Service{pool: pool, authz: authz, orgs: orgs, projects: projectsStore, store: store}
+func NewService(
+	pool *db.Pool, authz *auth.AuthzService, orgs *organizations.Store, projectsStore *projects.Store,
+	store storage.ObjectStore, installationAdmins *installation.Store,
+) *Service {
+	return &Service{pool: pool, authz: authz, orgs: orgs, projects: projectsStore, store: store, installationAdmins: installationAdmins}
 }
 
 // resolveProjectOrgID returns projectID's owning organization, or nil if it
@@ -96,12 +100,20 @@ func (s *Service) checkCapability(ctx context.Context, principalID, projectID uu
 // independently checked against scopeRef itself — projectID (the anchor
 // used for the earlier capability check) and scopeRef are caller-supplied
 // and not required to be equal, so the anchor check alone does not prove
-// the caller may install into scopeRef. ScopeStore installation is
-// rejected outright — see ErrUnsupportedScope.
+// the caller may install into scopeRef. ScopeInstallation requires userID
+// to hold installation.RoleAdmin (docs/adr/0017) — scopeRef is always nil
+// for it (migrations/000007's CHECK), so there is nothing else to verify.
 func (s *Service) checkScopeTarget(ctx context.Context, tx pgx.Tx, principalID, userID uuid.UUID, scope Scope, scopeRef *uuid.UUID) error {
 	switch scope {
 	case ScopeInstallation:
-		return ErrUnsupportedScope
+		isAdmin, err := s.installationAdmins.IsAdmin(ctx, tx, userID)
+		if err != nil {
+			return fmt.Errorf("skills: check installation admin: %w", err)
+		}
+		if !isAdmin {
+			return ErrForbidden
+		}
+		return nil
 	case ScopeOrganization:
 		if scopeRef == nil {
 			return ErrScopeRefRequired

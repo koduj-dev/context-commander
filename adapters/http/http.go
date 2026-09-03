@@ -24,6 +24,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/gates"
 	"github.com/koduj-dev/context-commander/internal/handoffs"
 	"github.com/koduj-dev/context-commander/internal/history"
+	"github.com/koduj-dev/context-commander/internal/installation"
 	"github.com/koduj-dev/context-commander/internal/organizations"
 	"github.com/koduj-dev/context-commander/internal/projects"
 	"github.com/koduj-dev/context-commander/internal/secrets"
@@ -45,6 +46,7 @@ type Deps struct {
 	Skills        *skills.Service
 	Gates         *gates.AdminService
 	Secrets       *secrets.Service
+	Installation  *installation.Service
 	// WebFS is the embedded web UI build (web.DistFS()), served as the
 	// SPA fallback for any request under "/" that isn't "/v1/*" or
 	// "/healthz". Left nil in dev mode (`serve --dev`), where the UI is
@@ -87,6 +89,15 @@ func NewHandler(deps Deps) http.Handler {
 
 		r.Post("/organizations", deps.createOrganization)
 		r.Post("/organizations/{id}/members", deps.addOrganizationMember)
+
+		r.Route("/installation", func(r chi.Router) {
+			r.Get("/admins", deps.listInstallationAdmins)
+			r.Post("/users", deps.createInstallationUser)
+			r.Post("/service-principals", deps.createServicePrincipal)
+			r.Post("/principals/{id}/tokens", deps.issueCredentialFor)
+			r.Get("/principals/{id}/tokens", deps.listCredentialsFor)
+			r.Delete("/tokens/{id}", deps.revokeCredentialFor)
+		})
 
 		r.Route("/projects/{namespace}/{slug}", func(r chi.Router) {
 			r.Use(deps.resolveProjectMiddleware)

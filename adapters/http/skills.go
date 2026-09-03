@@ -169,15 +169,3 @@ func (d Deps) listEffectiveSkills(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, out)
 }
-
-// The following case block still needs to be merged into errors.go's
-// writeDomainError switch (a shared file this fork does not edit):
-//
-//	case errors.Is(err, skills.ErrNotFound):
-//		writeError(w, http.StatusNotFound, "not_found", "not found")
-//	case errors.Is(err, skills.ErrForbidden):
-//		writeError(w, http.StatusForbidden, "forbidden", "forbidden")
-//	case errors.Is(err, skills.ErrNotOverridable):
-//		writeError(w, http.StatusConflict, "conflict", "shadowed binding is not overridable")
-//	case errors.Is(err, skills.ErrUnsupportedScope):
-//		writeError(w, http.StatusBadRequest, "invalid_request", "installation-scope bindings are operator-seeded only")
