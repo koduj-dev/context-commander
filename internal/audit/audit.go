@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/koduj-dev/context-commander/internal/crypto"
+	"github.com/koduj-dev/context-commander/internal/paging"
 )
 
 type Result string
@@ -63,28 +64,29 @@ type Record struct {
 }
 
 // QueryOptions filters a Query call. Action/ResourceType are exact-match,
-// empty means "no filter"; Since/Until are inclusive bounds on ts. Limit
-// defaults to 100 and is capped at 500 to keep a single call bounded.
-// BeforeID pages backward through results already seen: pass the last
-// row's ID from a previous page to get the next older page.
+// empty means "no filter"; Since/Until are inclusive bounds on ts. Paging
+// carries the limit and the cursor, the same opaque token every other list
+// in this codebase uses (internal/paging) — audit predates that package and
+// used a raw before_id, which made it the one endpoint a client had to page
+// differently from all the others.
 type QueryOptions struct {
 	Action       string
 	ResourceType string
 	Since        *time.Time
 	Until        *time.Time
-	Limit        int
-	BeforeID     *int64
+	Paging       paging.Options
 }
 
 // Query returns audit_log rows for projectID, most recent first. Every
 // caller-facing entry point (adapters, future internal/audit.Service) must
 // scope this by project — there is no unscoped "query everything" here,
 // matching the same project-first shape as every other domain's List.
-func Query(ctx context.Context, tx pgx.Tx, projectID uuid.UUID, opts QueryOptions) ([]Record, error) {
-	limit := opts.Limit
-	if limit <= 0 || limit > 500 {
-		limit = 100
+func Query(ctx context.Context, tx pgx.Tx, projectID uuid.UUID, opts QueryOptions) (paging.Page[Record], error) {
+	beforeID, hasCursor, err := opts.Paging.DecodeSeq()
+	if err != nil {
+		return paging.Page[Record]{}, err
 	}
+	limit := opts.Paging.ClampedLimit()
 
 	query := `SELECT id, ts, project_id, principal_id, client_id, action, resource_type, resource_id, result, request_id, event_id
 		FROM audit_log WHERE project_id = $1`
@@ -106,7 +108,7 @@ func Query(ctx context.Context, tx pgx.Tx, projectID uuid.UUID, opts QueryOption
 		args = append(args, *opts.Until)
 		query += fmt.Sprintf(" AND ts <= $%d", len(args))
 	}
-	if opts.BeforeID != nil {
+	if hasCursor {
 		// A plain "id < $N" against ORDER BY ts DESC, id DESC is a
 		// deliberate simplification, not a strict (ts, id) keyset: id is a
 		// bigserial that only ever increases with insertion order, and ts
@@ -114,31 +116,37 @@ func Query(ctx context.Context, tx pgx.Tx, projectID uuid.UUID, opts QueryOption
 		// "(ts, id) < (last seen ts, last seen id)" agree in practice. A
 		// stricter composite cursor isn't worth it unless that stops
 		// holding (e.g. ts is ever backfilled/edited).
-		args = append(args, *opts.BeforeID)
+		args = append(args, beforeID)
 		query += fmt.Sprintf(" AND id < $%d", len(args))
 	}
-	args = append(args, limit)
+	args = append(args, limit+1)
 	query += fmt.Sprintf(" ORDER BY ts DESC, id DESC LIMIT $%d", len(args))
 
 	rows, err := tx.Query(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("audit: query: %w", err)
+		return paging.Page[Record]{}, fmt.Errorf("audit: query: %w", err)
 	}
 	defer rows.Close()
 
-	var out []Record
+	out := make([]Record, 0, limit)
 	for rows.Next() {
 		var r Record
 		if err := rows.Scan(&r.ID, &r.Timestamp, &r.ProjectID, &r.PrincipalID, &r.ClientID,
 			&r.Action, &r.ResourceType, &r.ResourceID, &r.Result, &r.RequestID, &r.EventID); err != nil {
-			return nil, fmt.Errorf("audit: scan: %w", err)
+			return paging.Page[Record]{}, fmt.Errorf("audit: scan: %w", err)
 		}
 		out = append(out, r)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("audit: iterate: %w", err)
+		return paging.Page[Record]{}, fmt.Errorf("audit: iterate: %w", err)
 	}
-	return out, nil
+
+	items, hasMore := paging.More(out, limit)
+	page := paging.Page[Record]{Items: items}
+	if hasMore {
+		page.NextCursor = paging.EncodeSeq(items[len(items)-1].ID)
+	}
+	return page, nil
 }
 
 // WriteWithPayload is Write plus a CONTENT PAYLOAD side table for callers

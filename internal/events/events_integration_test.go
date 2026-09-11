@@ -12,6 +12,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/db"
 	"github.com/koduj-dev/context-commander/internal/dbtest"
 	"github.com/koduj-dev/context-commander/internal/events"
+	"github.com/koduj-dev/context-commander/internal/paging"
 	"github.com/koduj-dev/context-commander/internal/projects"
 )
 
@@ -199,7 +200,7 @@ func TestServiceListDeniedForNonMember(t *testing.T) {
 		t.Fatalf("seed outsider: %v", err)
 	}
 
-	_, err = f.svc.List(ctx, outsiderID, f.projectID, 0, 10)
+	_, err = f.svc.List(ctx, outsiderID, f.projectID, paging.Options{Limit: 10})
 	if !errors.Is(err, events.ErrForbidden) {
 		t.Fatalf("List by non-member: got err=%v, want ErrForbidden", err)
 	}
@@ -210,10 +211,11 @@ func TestServiceListAllowedForMember(t *testing.T) {
 	ctx := context.Background()
 	f.publish(t, ctx, 2)
 
-	got, err := f.svc.List(ctx, f.principalID, f.projectID, 0, 10)
+	gotPage, err := f.svc.List(ctx, f.principalID, f.projectID, paging.Options{Limit: 10})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
+	got := gotPage.Items
 	if len(got) != 2 {
 		t.Fatalf("List returned %d events, want 2", len(got))
 	}

@@ -220,21 +220,23 @@ func newHistoryListObjectsCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("invalid conversation id: %w", err)
 			}
-			list, err := hc.svc.ListHistoryObjects(cmd.Context(), hc.principalID, hc.project.ID, conversationID)
+			page, err := hc.svc.ListHistoryObjects(cmd.Context(), hc.principalID, hc.project.ID, conversationID, pagingOptionsFrom(cmd))
 			if err != nil {
 				return err
 			}
-			if len(list) == 0 {
+			if len(page.Items) == 0 {
 				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "(no history objects)")
 				return nil
 			}
-			for _, obj := range list {
+			for _, obj := range page.Items {
 				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%-36s %-10s created %s\n", obj.ID, obj.Type, obj.CreatedAt.Format(time.RFC3339))
 			}
+			printNextCursor(cmd, page.NextCursor)
 			return nil
 		},
 	}
 	projectFlag(cmd)
+	pagingFlags(cmd)
 	return cmd
 }
 

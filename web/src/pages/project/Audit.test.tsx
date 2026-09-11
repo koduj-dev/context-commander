@@ -38,16 +38,17 @@ describe("Audit", () => {
     vi.unstubAllGlobals();
   });
 
-  it("shows Load more only when a full page came back, and appends the next page", async () => {
+  // The button follows next_cursor, so a short first page still offers it —
+  // and the cursor the UI sends back is the server's own opaque token, never
+  // something the client derives from a row.
+  it("shows Load more while the server offers a cursor, and echoes it back verbatim", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = new URL(String(input), "http://localhost");
-      const beforeID = url.searchParams.get("before_id");
-      if (!beforeID) {
-        // first page: exactly PAGE_SIZE (100) rows, so "Load more" should appear
-        return jsonResponse(Array.from({ length: 100 }, (_, i) => record(200 - i)));
+      const cursor = url.searchParams.get("cursor");
+      if (!cursor) {
+        return jsonResponse({ items: [record(200), record(199)], next_cursor: "opaque-cursor-1" });
       }
-      // second page: fewer than PAGE_SIZE, so "Load more" should then disappear
-      return jsonResponse([record(50), record(49)]);
+      return jsonResponse({ items: [record(50), record(49)] });
     });
     vi.stubGlobal("fetch", fetchMock);
 
@@ -64,13 +65,13 @@ describe("Audit", () => {
 
     const lastCall = fetchMock.mock.calls[fetchMock.mock.calls.length - 1];
     const calledUrl = new URL(String(lastCall[0]), "http://localhost");
-    expect(calledUrl.searchParams.get("before_id")).toBe("101");
+    expect(calledUrl.searchParams.get("cursor")).toBe("opaque-cursor-1");
   });
 
-  it("does not show Load more when the first page is short", async () => {
+  it("does not show Load more when the server sends no cursor", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => jsonResponse([record(1)])),
+      vi.fn(async () => jsonResponse({ items: [record(1)] })),
     );
 
     await flush(() => root.render(<Audit namespace="ns" slug="sl" />));

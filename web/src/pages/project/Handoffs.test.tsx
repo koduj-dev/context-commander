@@ -44,10 +44,11 @@ describe("Handoffs", () => {
   it("lets a CONTRIBUTOR create a handoff and view its detail", async () => {
     let created = false;
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
+      // Paginated list URLs now carry ?limit=…, so route on the path only.
+      const url = String(input).split("?")[0];
       const method = init?.method ?? "GET";
       if (method === "GET" && url.endsWith("/handoffs/")) {
-        return jsonResponse(created ? [{ id: "h1", status: "open", created_at: "2026-01-01T00:00:00Z" }] : []);
+        return jsonResponse({ items: created ? [{ id: "h1", status: "open", created_at: "2026-01-01T00:00:00Z" }] : [] });
       }
       if (method === "POST" && url.endsWith("/handoffs/")) {
         created = true;
@@ -97,7 +98,7 @@ describe("Handoffs", () => {
   it("hides the create form for a READER", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => jsonResponse([])),
+      vi.fn(async () => jsonResponse({ items: [] })),
     );
 
     await flush(() => root.render(<Handoffs namespace="ns" slug="sl" role="READER" />));

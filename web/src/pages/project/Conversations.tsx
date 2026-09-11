@@ -8,6 +8,7 @@ import {
 } from "../../lib/api";
 import { canWriteHistory } from "../../lib/roles";
 import EmptyState from "../../components/EmptyState";
+import LoadMore from "../../components/LoadMore";
 
 function decodeContent(base64: string): string {
   try {
@@ -29,6 +30,8 @@ export default function Conversations({ namespace, slug, role }: { namespace: st
   // the tab, same "no browse endpoint yet" shape as Skills' install form.
   const [sessions, setSessions] = useState<ExternalSession[]>([]);
   const [objects, setObjects] = useState<HistoryObject[] | null>(null);
+  const [objectsCursor, setObjectsCursor] = useState<string | undefined>(undefined);
+  const [loadingMoreObjects, setLoadingMoreObjects] = useState(false);
   const [lineage, setLineage] = useState<LineageEdge[] | null>(null);
 
   const [provider, setProvider] = useState("");
@@ -46,6 +49,7 @@ export default function Conversations({ namespace, slug, role }: { namespace: st
     setConversationId(id);
     setSessions([]);
     setObjects(null);
+    setObjectsCursor(undefined);
     setLineage(null);
     setObjectSessionId("");
   }
@@ -71,11 +75,31 @@ export default function Conversations({ namespace, slug, role }: { namespace: st
     await refreshLineage(id);
   }
 
+  // A conversation is read forward, one page at a time: objectsCursor holds
+  // where the last page stopped, and "Load more" continues from there rather
+  // than re-reading the whole transcript.
   async function refreshObjects(id: string) {
     try {
-      setObjects(await api.listHistoryObjects(namespace, slug, id));
+      const page = await api.listHistoryObjects(namespace, slug, id);
+      setObjects(page.items);
+      setObjectsCursor(page.next_cursor);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "failed to load history objects");
+    }
+  }
+
+  async function loadMoreObjects() {
+    if (!conversationId || !objectsCursor) return;
+    setLoadingMoreObjects(true);
+    setError(null);
+    try {
+      const page = await api.listHistoryObjects(namespace, slug, conversationId, { cursor: objectsCursor });
+      setObjects((prev) => [...(prev ?? []), ...page.items]);
+      setObjectsCursor(page.next_cursor);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "failed to load more history objects");
+    } finally {
+      setLoadingMoreObjects(false);
     }
   }
 
@@ -315,6 +339,13 @@ export default function Conversations({ namespace, slug, role }: { namespace: st
                 </li>
               ))}
             </ul>
+            <div className="mt-2">
+              <LoadMore
+                hasMore={objectsCursor !== undefined}
+                loading={loadingMoreObjects}
+                onClick={() => void loadMoreObjects()}
+              />
+            </div>
           </div>
 
           <div>

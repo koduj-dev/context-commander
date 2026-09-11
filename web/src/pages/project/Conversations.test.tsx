@@ -73,8 +73,8 @@ describe("Conversations", () => {
         ];
         return jsonResponse(objects[0]);
       }
-      if (method === "GET" && url.endsWith("/conversations/c1/objects")) {
-        return jsonResponse(objects);
+      if (method === "GET" && url.includes("/conversations/c1/objects")) {
+        return jsonResponse({ items: objects });
       }
       if (method === "GET" && url.endsWith("/conversations/c1/lineage")) {
         return jsonResponse([]);

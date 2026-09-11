@@ -14,6 +14,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/db"
 	"github.com/koduj-dev/context-commander/internal/dbtest"
 	"github.com/koduj-dev/context-commander/internal/history"
+	"github.com/koduj-dev/context-commander/internal/paging"
 	"github.com/koduj-dev/context-commander/internal/projects"
 )
 
@@ -119,10 +120,11 @@ func TestLineageGraphAcrossCompaction(t *testing.T) {
 		t.Fatalf("AppendHistoryObject compacted: %v", err)
 	}
 
-	objs, err := f.svc.ListHistoryObjects(ctx, principalID, projectID, conv.ID)
+	objsPage, err := f.svc.ListHistoryObjects(ctx, principalID, projectID, conv.ID, paging.Options{})
 	if err != nil {
 		t.Fatalf("ListHistoryObjects: %v", err)
 	}
+	objs := objsPage.Items
 	if len(objs) != 2 {
 		t.Fatalf("ListHistoryObjects returned %d objects, want 2", len(objs))
 	}
@@ -208,14 +210,15 @@ func TestRLSIsolationBetweenProjects(t *testing.T) {
 		t.Fatalf("CreateConversation: %v", err)
 	}
 
-	if _, err := f.svc.ListHistoryObjects(ctx, principalB, projectA, conv.ID); !errors.Is(err, history.ErrForbidden) {
+	if _, err := f.svc.ListHistoryObjects(ctx, principalB, projectA, conv.ID, paging.Options{}); !errors.Is(err, history.ErrForbidden) {
 		t.Fatalf("cross-project ListHistoryObjects: got %v, want ErrForbidden", err)
 	}
 
-	listB, err := f.svc.ListHistoryObjects(ctx, principalB, projectB, conv.ID)
+	listBPage, err := f.svc.ListHistoryObjects(ctx, principalB, projectB, conv.ID, paging.Options{})
 	if err != nil {
 		t.Fatalf("ListHistoryObjects (own project): %v", err)
 	}
+	listB := listBPage.Items
 	if len(listB) != 0 {
 		t.Fatalf("projectB should see 0 history objects for a foreign conversation ID, got %d", len(listB))
 	}

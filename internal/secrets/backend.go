@@ -4,6 +4,8 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+
+	"github.com/koduj-dev/context-commander/internal/paging"
 )
 
 // Backend stores and retrieves the plaintext a Reference points to.
@@ -18,8 +20,15 @@ type Backend interface {
 	Store(ctx context.Context, principalID uuid.UUID, ref Reference, plaintext []byte) error
 	Fetch(ctx context.Context, principalID uuid.UUID, ref Reference) ([]byte, error)
 	Delete(ctx context.Context, principalID uuid.UUID, ref Reference) error
-	// List returns the names stored under (scope, scopeRef) — never
-	// values. Part of Backend, not a Postgres-only query bolted onto
-	// Service, so a non-Postgres backend can serve secret.list too.
-	List(ctx context.Context, principalID uuid.UUID, scope string, scopeRef uuid.UUID) ([]string, error)
+	// List returns one page of the names stored under (scope, scopeRef) —
+	// never values, ordered by name. Part of Backend, not a Postgres-only
+	// query bolted onto Service, so a non-Postgres backend can serve
+	// secret.list too; paging is in the interface for the same reason,
+	// since a backend that cannot page in its own store would otherwise
+	// have to fetch everything and slice in memory.
+	//
+	// Names are ordered rather than timestamped because that is the key a
+	// secret store can be relied on to have: a Vault mount lists paths, not
+	// creation times.
+	List(ctx context.Context, principalID uuid.UUID, scope string, scopeRef uuid.UUID, opts paging.Options) (paging.Page[string], error)
 }

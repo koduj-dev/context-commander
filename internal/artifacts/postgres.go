@@ -12,6 +12,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/auth"
 	"github.com/koduj-dev/context-commander/internal/db"
 	"github.com/koduj-dev/context-commander/internal/events"
+	"github.com/koduj-dev/context-commander/internal/paging"
 )
 
 // upsertArtifactStub inserts the Artifact row if this is the first write
@@ -125,19 +126,31 @@ func (s *Service) Stat(ctx context.Context, principalID uuid.UUID, projectID uui
 	return a, nil
 }
 
-// List returns non-deleted artifacts in a project, newest-updated first.
-func (s *Service) List(ctx context.Context, principalID uuid.UUID, projectID uuid.UUID) ([]Artifact, error) {
+// List returns one page of non-deleted artifacts in a project,
+// newest-updated first. Keyed on (updated_at, id): updated_at alone is not
+// unique — two artifacts written in the same microsecond would make a
+// timestamp-only cursor skip or repeat one — so the row-value comparison
+// carries the id as the tiebreaker, matching the ORDER BY exactly.
+func (s *Service) List(ctx context.Context, principalID uuid.UUID, projectID uuid.UUID, opts paging.Options) (paging.Page[Artifact], error) {
 	if err := s.checkCapability(ctx, principalID, projectID, auth.CapArtifactRead); err != nil {
-		return nil, err
+		return paging.Page[Artifact]{}, err
 	}
+	cursorTime, cursorID, hasCursor, err := opts.DecodeTimeUUID()
+	if err != nil {
+		return paging.Page[Artifact]{}, err
+	}
+	limit := opts.ClampedLimit()
 
-	var out []Artifact
-	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+	out := make([]Artifact, 0, limit)
+	err = db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
 		rows, err := tx.Query(ctx,
 			`SELECT id, project_id, logical_path, content_type, current_version,
 			        created_by_principal, created_by_client, created_at, updated_at, deleted_at
-			 FROM artifacts WHERE project_id = $1 AND deleted_at IS NULL ORDER BY updated_at DESC`,
-			projectID)
+			 FROM artifacts
+			 WHERE project_id = $1 AND deleted_at IS NULL
+			   AND (NOT $2::bool OR (updated_at, id) < ($3::timestamptz, $4::uuid))
+			 ORDER BY updated_at DESC, id DESC LIMIT $5`,
+			projectID, hasCursor, cursorTime, cursorID, limit+1)
 		if err != nil {
 			return err
 		}
@@ -153,9 +166,16 @@ func (s *Service) List(ctx context.Context, principalID uuid.UUID, projectID uui
 		return rows.Err()
 	})
 	if err != nil {
-		return nil, fmt.Errorf("artifacts: list: %w", err)
+		return paging.Page[Artifact]{}, fmt.Errorf("artifacts: list: %w", err)
 	}
-	return out, nil
+
+	items, hasMore := paging.More(out, limit)
+	page := paging.Page[Artifact]{Items: items}
+	if hasMore {
+		last := items[len(items)-1]
+		page.NextCursor = paging.EncodeTimeUUID(last.UpdatedAt, last.ID)
+	}
+	return page, nil
 }
 
 // History returns every version of an artifact, oldest first.

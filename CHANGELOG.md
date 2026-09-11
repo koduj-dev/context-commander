@@ -167,6 +167,45 @@ link definition at the bottom of the file.
   against the RLS-subject `cc_app` role, and where adversarial/negative
   tests live.
 
+### Changed
+
+- **Unified keyset pagination across every growing list** — the last Phase 0
+  release blocker. `artifacts`, `handoffs` and `secrets` had no pagination at
+  all (a project with more rows than a screen had no way to reach the rest);
+  `history.ListHistoryObjects` was hard-capped at 1000 rows with nothing past
+  it reachable; `events` and `audit` each had their own cursor shape. All six
+  now share one contract — `limit` + an opaque `cursor` in, rows +
+  `next_cursor` out — over HTTP, MCP and the CLI. See cookbook §22.1.
+  - **Breaking response shape:** list endpoints return
+    `{"items": [...], "next_cursor": "..."}` instead of a bare JSON array. An
+    array has nowhere to put "there is more, continue from here", which is the
+    whole problem. `next_cursor` is omitted on the last page, so "is there
+    more" is a field's presence rather than a guess from the row count.
+  - **Breaking query params:** audit's `?before_id=` and events' `?after_seq=`
+    are replaced by `?cursor=`. `ccd event list --after-seq` survives as a
+    shorthand, because every output line starts with the event's seq and
+    resuming from one you just read shouldn't require saving a cursor.
+  - New `internal/paging` holds the shared primitives. Cursors are opaque and
+    carry their own kind, so one echoed to a differently-ordered endpoint is
+    rejected (HTTP 400) rather than reinterpreted as a position it never
+    meant.
+  - Timestamp-ordered lists key on `(timestamp, id)` as a row-value
+    comparison, not on the timestamp alone: two rows can share a `created_at`
+    to the microsecond, and a timestamp-only cursor then skips every row but
+    one of the colliding group. The regression tests force that collision
+    explicitly — writing rows in a tight loop does *not* produce it, and the
+    first version of those tests passed against a deliberately broken cursor
+    because of that.
+  - Services ask the database for `limit + 1` rows, so a cursor is returned
+    only when another row actually exists. The web UI's "Load more" follows
+    that, replacing a `page.length >= PAGE_SIZE` guess that both hid rows
+    behind a missing button and offered a button that returned nothing.
+  - Web UI: `useCursorList` + `LoadMore` give Artifacts, Handoffs,
+    Conversations and Secrets the "Load more" that only Audit and Events had.
+  - Deliberately not paginated, with reasons in cookbook §22.1:
+    `skill.list_effective` (composition happens after the read, so paging
+    would change which binding wins) and the member lists (bounded sets).
+
 ### Fixed
 
 - **Concurrent writes to the same secret silently lost one.**

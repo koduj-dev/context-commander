@@ -15,6 +15,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/installation"
 	"github.com/koduj-dev/context-commander/internal/members"
 	"github.com/koduj-dev/context-commander/internal/organizations"
+	"github.com/koduj-dev/context-commander/internal/paging"
 	"github.com/koduj-dev/context-commander/internal/projects"
 	"github.com/koduj-dev/context-commander/internal/secrets"
 	"github.com/koduj-dev/context-commander/internal/skills"
@@ -101,7 +102,8 @@ func writeDomainError(w http.ResponseWriter, err error) {
 	case errors.Is(err, history.ErrInvalidReference):
 		writeError(w, http.StatusBadRequest, "invalid_request", "referenced conversation/session/derived_from object does not belong to this project/conversation")
 	case errors.Is(err, projects.ErrInvalidResolvePath), errors.Is(err, secrets.ErrInvalidName), errors.Is(err, identity.ErrInvalidExpiry),
-		errors.Is(err, members.ErrInvalidRole), errors.Is(err, organizations.ErrInvalidRole):
+		errors.Is(err, members.ErrInvalidRole), errors.Is(err, organizations.ErrInvalidRole),
+		errors.Is(err, paging.ErrInvalidCursor):
 		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
 	default:
 		writeError(w, http.StatusInternalServerError, "internal", "internal error")

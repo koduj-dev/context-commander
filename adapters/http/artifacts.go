@@ -24,17 +24,21 @@ func (d Deps) listArtifacts(w http.ResponseWriter, r *http.Request) {
 	project := projectFrom(r.Context())
 	principalID := principalIDFrom(r.Context())
 
-	list, err := d.Artifacts.List(r.Context(), principalID, project.ID)
+	opts, ok := pagingFrom(w, r)
+	if !ok {
+		return
+	}
+	page, err := d.Artifacts.List(r.Context(), principalID, project.ID, opts)
 	if err != nil {
 		writeDomainError(w, err)
 		return
 	}
 
-	out := make([]artifactResponse, len(list))
-	for i, a := range list {
+	out := make([]artifactResponse, len(page.Items))
+	for i, a := range page.Items {
 		out[i] = artifactResponse{LogicalPath: a.LogicalPath, ContentType: a.ContentType, CurrentVersion: a.CurrentVersion}
 	}
-	writeJSON(w, http.StatusOK, out)
+	writeList(w, out, page.NextCursor)
 }
 
 func (d Deps) statArtifact(w http.ResponseWriter, r *http.Request) {

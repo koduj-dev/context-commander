@@ -44,10 +44,11 @@ describe("Secrets", () => {
     let created = false;
     let deleted = false;
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
+      // Paginated list URLs now carry ?limit=…, so route on the path only.
+      const url = String(input).split("?")[0];
       const method = init?.method ?? "GET";
       if (method === "GET" && url.endsWith("/secrets")) {
-        return jsonResponse(created && !deleted ? [{ name: "api-key", reference: "secret://ns/sl/api-key" }] : []);
+        return jsonResponse({ items: created && !deleted ? [{ name: "api-key", reference: "secret://ns/sl/api-key" }] : [] });
       }
       if (method === "POST" && url.endsWith("/secrets")) {
         created = true;

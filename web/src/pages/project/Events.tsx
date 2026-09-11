@@ -1,45 +1,21 @@
-import { useEffect, useState } from "react";
-import { api, ApiError, type ProjectEvent } from "../../lib/api";
+import { api, type ProjectEvent } from "../../lib/api";
+import { useCursorList } from "../../lib/useCursorList";
 import DataTable from "../../components/DataTable";
 import EmptyState from "../../components/EmptyState";
-
-const PAGE_SIZE = 100;
+import LoadMore from "../../components/LoadMore";
 
 export default function Events({ namespace, slug }: { namespace: string; slug: string }) {
-  const [events, setEvents] = useState<ProjectEvent[] | null>(null);
-  const [hasMore, setHasMore] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function refresh() {
-    try {
-      const page = await api.listEvents(namespace, slug, { after_seq: 0, limit: PAGE_SIZE });
-      setEvents(page);
-      setHasMore(page.length >= PAGE_SIZE);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "failed to load events");
-    }
-  }
-
-  useEffect(() => {
-    void refresh();
-  }, [namespace, slug]);
-
-  async function onLoadMore() {
-    if (!events || events.length === 0) return;
-    setLoadingMore(true);
-    setError(null);
-    try {
-      const lastSeq = events[events.length - 1].seq;
-      const page = await api.listEvents(namespace, slug, { after_seq: lastSeq, limit: PAGE_SIZE });
-      setEvents((prev) => [...(prev ?? []), ...page]);
-      setHasMore(page.length >= PAGE_SIZE);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "failed to load more events");
-    } finally {
-      setLoadingMore(false);
-    }
-  }
+  const {
+    items: events,
+    error,
+    hasMore,
+    loadingMore,
+    loadMore,
+  } = useCursorList<ProjectEvent>(
+    (opts) => api.listEvents(namespace, slug, opts),
+    [namespace, slug],
+    "failed to load events",
+  );
 
   return (
     <div className="space-y-4">
@@ -59,15 +35,7 @@ export default function Events({ namespace, slug }: { namespace: string; slug: s
         getRowKey={(e) => String(e.seq)}
         emptyState={<EmptyState message="No events yet." />}
       />
-      {hasMore && (
-        <button
-          onClick={() => void onLoadMore()}
-          disabled={loadingMore}
-          className="rounded border border-cc-border px-3 py-1.5 text-sm text-cc-text-secondary hover:bg-cc-surface-2 disabled:opacity-50"
-        >
-          {loadingMore ? "Loading…" : "Load more"}
-        </button>
-      )}
+      <LoadMore hasMore={hasMore} loading={loadingMore} onClick={() => void loadMore()} />
     </div>
   );
 }

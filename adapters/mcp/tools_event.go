@@ -34,33 +34,29 @@ func registerEventTools(server *sdkmcp.Server, deps Deps, principalID, _ uuid.UU
 	}
 
 	type listArgs struct {
-		Project  string `json:"project" jsonschema:"project path \"namespace/slug\""`
-		AfterSeq int64  `json:"after_seq,omitempty" jsonschema:"only return events with seq greater than this (default: 0)"`
-		Limit    int    `json:"limit,omitempty" jsonschema:"max events to return (default: 100)"`
+		Project string `json:"project" jsonschema:"project path \"namespace/slug\""`
+		Limit   int    `json:"limit,omitempty" jsonschema:"max events to return (default 100, max 500)"`
+		Cursor  string `json:"cursor,omitempty" jsonschema:"next_cursor from a previous call, to continue after the last event returned"`
 	}
 	sdkmcp.AddTool(server, &sdkmcp.Tool{
 		Name:        "event.list",
-		Description: "List project events (the transactional outbox) after a given sequence number.",
-	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, args listArgs) (*sdkmcp.CallToolResult, []eventResult, error) {
+		Description: "List project events (the transactional outbox), oldest first. Returns one page plus next_cursor when more remain — echo it back to follow the feed forward.",
+	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, args listArgs) (*sdkmcp.CallToolResult, pagedResult[eventResult], error) {
 		projectID, err := resolve(ctx, args.Project)
 		if err != nil {
-			return nil, nil, err
+			return nil, pagedResult[eventResult]{}, err
 		}
-		limit := args.Limit
-		if limit <= 0 {
-			limit = 100
-		}
-		list, err := deps.Events.List(ctx, principalID, projectID, args.AfterSeq, limit)
+		page, err := deps.Events.List(ctx, principalID, projectID, pagingOptions(args.Limit, args.Cursor))
 		if err != nil {
-			return nil, nil, err
+			return nil, pagedResult[eventResult]{}, err
 		}
-		out := make([]eventResult, len(list))
-		for i, e := range list {
+		out := make([]eventResult, len(page.Items))
+		for i, e := range page.Items {
 			out[i] = eventResult{Seq: e.Seq, EventID: e.EventID.String(), Type: e.Type, ResourceType: e.ResourceType, PayloadKind: string(e.PayloadKind)}
 			if e.ResourceID != nil {
 				out[i].ResourceID = e.ResourceID.String()
 			}
 		}
-		return nil, out, nil
+		return nil, paged(out, page.NextCursor), nil
 	})
 }

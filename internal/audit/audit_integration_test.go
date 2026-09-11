@@ -14,6 +14,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/crypto"
 	"github.com/koduj-dev/context-commander/internal/db"
 	"github.com/koduj-dev/context-commander/internal/dbtest"
+	"github.com/koduj-dev/context-commander/internal/paging"
 	"github.com/koduj-dev/context-commander/internal/projects"
 )
 
@@ -136,7 +137,7 @@ func TestWriteAndQueryRoundTrip(t *testing.T) {
 	f.write(t, ctx, "artifact.delete", "artifact_version")
 	f.write(t, ctx, "handoff.create", "handoff")
 
-	var all []audit.Record
+	var all paging.Page[audit.Record]
 	err := db.WithPrincipal(ctx, f.appPool, db.Principal{ID: f.ownerPrincipal}, func(tx pgx.Tx) error {
 		var err error
 		all, err = audit.Query(ctx, tx, f.projectID, audit.QueryOptions{})
@@ -145,15 +146,15 @@ func TestWriteAndQueryRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Query: %v", err)
 	}
-	if len(all) != 3 {
-		t.Fatalf("Query returned %d rows, want 3", len(all))
+	if len(all.Items) != 3 {
+		t.Fatalf("Query returned %d rows, want 3", len(all.Items))
 	}
 	// most-recent-first
-	if all[0].Action != "handoff.create" {
-		t.Errorf("first row action = %q, want handoff.create (most recent first)", all[0].Action)
+	if all.Items[0].Action != "handoff.create" {
+		t.Errorf("first row action = %q, want handoff.create (most recent first)", all.Items[0].Action)
 	}
 
-	var filtered []audit.Record
+	var filtered paging.Page[audit.Record]
 	err = db.WithPrincipal(ctx, f.appPool, db.Principal{ID: f.ownerPrincipal}, func(tx pgx.Tx) error {
 		var err error
 		filtered, err = audit.Query(ctx, tx, f.projectID, audit.QueryOptions{ResourceType: "artifact_version"})
@@ -162,11 +163,11 @@ func TestWriteAndQueryRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Query filtered: %v", err)
 	}
-	if len(filtered) != 2 {
-		t.Fatalf("Query(resource_type=artifact_version) returned %d rows, want 2", len(filtered))
+	if len(filtered.Items) != 2 {
+		t.Fatalf("Query(resource_type=artifact_version) returned %d rows, want 2", len(filtered.Items))
 	}
 
-	var byAction []audit.Record
+	var byAction paging.Page[audit.Record]
 	err = db.WithPrincipal(ctx, f.appPool, db.Principal{ID: f.ownerPrincipal}, func(tx pgx.Tx) error {
 		var err error
 		byAction, err = audit.Query(ctx, tx, f.projectID, audit.QueryOptions{Action: "artifact.delete"})
@@ -175,8 +176,8 @@ func TestWriteAndQueryRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Query by action: %v", err)
 	}
-	if len(byAction) != 1 {
-		t.Fatalf("Query(action=artifact.delete) returned %d rows, want 1", len(byAction))
+	if len(byAction.Items) != 1 {
+		t.Fatalf("Query(action=artifact.delete) returned %d rows, want 1", len(byAction.Items))
 	}
 }
 
@@ -186,7 +187,7 @@ func TestQueryTimeRangeFilter(t *testing.T) {
 	f.write(t, ctx, "artifact.write", "artifact_version")
 
 	future := time.Now().Add(time.Hour)
-	var empty []audit.Record
+	var empty paging.Page[audit.Record]
 	err := db.WithPrincipal(ctx, f.appPool, db.Principal{ID: f.ownerPrincipal}, func(tx pgx.Tx) error {
 		var err error
 		empty, err = audit.Query(ctx, tx, f.projectID, audit.QueryOptions{Since: &future})
@@ -195,8 +196,8 @@ func TestQueryTimeRangeFilter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Query since future: %v", err)
 	}
-	if len(empty) != 0 {
-		t.Fatalf("Query(since=future) returned %d rows, want 0", len(empty))
+	if len(empty.Items) != 0 {
+		t.Fatalf("Query(since=future) returned %d rows, want 0", len(empty.Items))
 	}
 }
 
@@ -220,10 +221,10 @@ func TestWriteWithPayloadRoundTrip(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		if len(rows) != 1 {
-			t.Fatalf("expected 1 row after WriteWithPayload, got %d", len(rows))
+		if len(rows.Items) != 1 {
+			t.Fatalf("expected 1 row after WriteWithPayload, got %d", len(rows.Items))
 		}
-		auditLogID = rows[0].ID
+		auditLogID = rows.Items[0].ID
 		return nil
 	})
 	if err != nil {
@@ -255,8 +256,8 @@ func TestQueryIsolatedAcrossProjects(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		if len(rows) != 0 {
-			t.Errorf("Query for an unrelated project returned %d rows, want 0", len(rows))
+		if len(rows.Items) != 0 {
+			t.Errorf("Query for an unrelated project returned %d rows, want 0", len(rows.Items))
 		}
 		return nil
 	})
@@ -265,53 +266,61 @@ func TestQueryIsolatedAcrossProjects(t *testing.T) {
 	}
 }
 
-// TestQueryBeforeIDPagesBackward is the cursor the web UI's Audit tab
-// "Load more" button relies on: paging with limit=1 and BeforeID set to the
-// previous page's last row id must walk every row exactly once, oldest
-// last, matching plain unpaginated Query's order.
-func TestQueryBeforeIDPagesBackward(t *testing.T) {
+// TestQueryCursorPagesBackward is the cursor the web UI's Audit tab "Load
+// more" button relies on: walking with limit=1 and the previous page's
+// NextCursor must visit every row exactly once, in the same order a single
+// unpaginated call returns them.
+//
+// The last page carries the load-bearing assertion. NextCursor must be
+// empty there — not a cursor that merely happens to return nothing — because
+// the UI shows or hides "Load more" on that emptiness, so a service that
+// always hands one back leaves the button on screen forever.
+func TestQueryCursorPagesBackward(t *testing.T) {
 	f := newFixture(t)
 	ctx := context.Background()
 	f.write(t, ctx, "artifact.write", "artifact_version")
 	f.write(t, ctx, "artifact.delete", "artifact_version")
 	f.write(t, ctx, "handoff.create", "handoff")
 
-	var want []audit.Record
+	var want paging.Page[audit.Record]
 	err := db.WithPrincipal(ctx, f.appPool, db.Principal{ID: f.ownerPrincipal}, func(tx pgx.Tx) error {
 		var err error
 		want, err = audit.Query(ctx, tx, f.projectID, audit.QueryOptions{})
 		return err
 	})
 	if err != nil {
-		t.Fatalf("Query (unpaginated): %v", err)
+		t.Fatalf("Query (single page): %v", err)
 	}
-	if len(want) != 3 {
-		t.Fatalf("Query (unpaginated) returned %d rows, want 3", len(want))
+	if len(want.Items) != 3 {
+		t.Fatalf("Query (single page) returned %d rows, want 3", len(want.Items))
+	}
+	if want.NextCursor != "" {
+		t.Errorf("a page holding every row still offered NextCursor %q", want.NextCursor)
 	}
 
 	var got []audit.Record
-	var beforeID *int64
 	err = db.WithPrincipal(ctx, f.appPool, db.Principal{ID: f.ownerPrincipal}, func(tx pgx.Tx) error {
-		for i := 0; i < len(want); i++ {
-			page, err := audit.Query(ctx, tx, f.projectID, audit.QueryOptions{Limit: 1, BeforeID: beforeID})
+		cursor := ""
+		for i := range want.Items {
+			page, err := audit.Query(ctx, tx, f.projectID, audit.QueryOptions{
+				Paging: paging.Options{Limit: 1, Cursor: cursor},
+			})
 			if err != nil {
 				return err
 			}
-			if len(page) != 1 {
-				t.Fatalf("page %d: got %d rows, want 1", i, len(page))
+			if len(page.Items) != 1 {
+				t.Fatalf("page %d: got %d rows, want 1", i, len(page.Items))
 			}
-			got = append(got, page[0])
-			id := page[0].ID
-			beforeID = &id
-		}
-		// One more page past the last row must come back empty, not error
-		// or repeat.
-		last, err := audit.Query(ctx, tx, f.projectID, audit.QueryOptions{Limit: 1, BeforeID: beforeID})
-		if err != nil {
-			return err
-		}
-		if len(last) != 0 {
-			t.Errorf("page past the last row = %+v, want empty", last)
+			got = append(got, page.Items[0])
+
+			onLastRow := i == len(want.Items)-1
+			if onLastRow && page.NextCursor != "" {
+				t.Errorf("final page offered NextCursor %q, want none", page.NextCursor)
+			}
+			if !onLastRow && page.NextCursor == "" {
+				t.Fatalf("page %d offered no NextCursor but %d rows remain", i, len(want.Items)-1-i)
+			}
+			cursor = page.NextCursor
 		}
 		return nil
 	})
@@ -319,12 +328,12 @@ func TestQueryBeforeIDPagesBackward(t *testing.T) {
 		t.Fatalf("paginate: %v", err)
 	}
 
-	if len(got) != len(want) {
-		t.Fatalf("paginated through %d rows, want %d", len(got), len(want))
+	if len(got) != len(want.Items) {
+		t.Fatalf("paginated through %d rows, want %d", len(got), len(want.Items))
 	}
-	for i := range want {
-		if got[i].ID != want[i].ID {
-			t.Errorf("page %d id = %d, want %d (order must match unpaginated Query)", i, got[i].ID, want[i].ID)
+	for i := range want.Items {
+		if got[i].ID != want.Items[i].ID {
+			t.Errorf("page %d id = %d, want %d (order must match the single-page Query)", i, got[i].ID, want.Items[i].ID)
 		}
 	}
 }
@@ -351,7 +360,7 @@ func TestServiceQueryAllowedForOwner(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Query by OWNER: %v", err)
 	}
-	if len(rows) != 1 {
-		t.Fatalf("Query returned %d rows, want 1", len(rows))
+	if len(rows.Items) != 1 {
+		t.Fatalf("Query returned %d rows, want 1", len(rows.Items))
 	}
 }

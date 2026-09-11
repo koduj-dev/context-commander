@@ -163,25 +163,27 @@ func registerHistoryTools(server *sdkmcp.Server, deps Deps, principalID, clientI
 	type listObjectsArgs struct {
 		Project        string `json:"project" jsonschema:"project path \"namespace/slug\""`
 		ConversationID string `json:"conversation_id" jsonschema:"conversation to list objects for"`
+		Limit          int    `json:"limit,omitempty" jsonschema:"max objects to return (default 100, max 500)"`
+		Cursor         string `json:"cursor,omitempty" jsonschema:"next_cursor from a previous call, to continue further into the conversation"`
 	}
 	sdkmcp.AddTool(server, &sdkmcp.Tool{
 		Name:        "history.list_objects",
-		Description: "List a conversation's history objects, decrypted, oldest first.",
-	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, args listObjectsArgs) (*sdkmcp.CallToolResult, []historyObjectResult, error) {
+		Description: "List a conversation's history objects, decrypted, oldest first. Returns one page plus next_cursor when more remain — a long conversation is read by following it.",
+	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, args listObjectsArgs) (*sdkmcp.CallToolResult, pagedResult[historyObjectResult], error) {
 		projectID, err := resolve(ctx, args.Project)
 		if err != nil {
-			return nil, nil, err
+			return nil, pagedResult[historyObjectResult]{}, err
 		}
 		conversationID, err := uuid.Parse(args.ConversationID)
 		if err != nil {
-			return nil, nil, err
+			return nil, pagedResult[historyObjectResult]{}, err
 		}
-		list, err := deps.History.ListHistoryObjects(ctx, principalID, projectID, conversationID)
+		page, err := deps.History.ListHistoryObjects(ctx, principalID, projectID, conversationID, pagingOptions(args.Limit, args.Cursor))
 		if err != nil {
-			return nil, nil, err
+			return nil, pagedResult[historyObjectResult]{}, err
 		}
-		out := make([]historyObjectResult, len(list))
-		for i, obj := range list {
+		out := make([]historyObjectResult, len(page.Items))
+		for i, obj := range page.Items {
 			out[i] = historyObjectResult{
 				ID: obj.ID.String(), ExternalSessionID: obj.ExternalSessionID.String(), Type: obj.Type,
 				ContentHash: obj.ContentHash, Content: base64.StdEncoding.EncodeToString(obj.Body), CreatedAt: obj.CreatedAt.Format(time.RFC3339),
@@ -190,7 +192,7 @@ func registerHistoryTools(server *sdkmcp.Server, deps Deps, principalID, clientI
 				out[i].DerivedFrom = obj.DerivedFrom.String()
 			}
 		}
-		return nil, out, nil
+		return nil, paged(out, page.NextCursor), nil
 	})
 
 	type lineageEdgeResult struct {

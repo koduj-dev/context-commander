@@ -1,8 +1,10 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { api, ApiError, type Handoff, type HandoffDetail } from "../../lib/api";
 import { canWriteHandoffs } from "../../lib/roles";
+import { useCursorList } from "../../lib/useCursorList";
 import EmptyState from "../../components/EmptyState";
 import StatusBadge from "../../components/StatusBadge";
+import LoadMore from "../../components/LoadMore";
 
 const STATUSES = ["", "open", "closed"];
 
@@ -15,9 +17,7 @@ function splitIds(input: string): string[] | undefined {
 }
 
 export default function Handoffs({ namespace, slug, role }: { namespace: string; slug: string; role: string }) {
-  const [handoffs, setHandoffs] = useState<Handoff[] | null>(null);
   const [statusFilter, setStatusFilter] = useState("");
-  const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [detail, setDetail] = useState<HandoffDetail | null>(null);
 
@@ -28,18 +28,22 @@ export default function Handoffs({ namespace, slug, role }: { namespace: string;
   const [referencedArtifacts, setReferencedArtifacts] = useState("");
   const [referencedTasks, setReferencedTasks] = useState("");
 
-  async function refresh() {
-    try {
-      setHandoffs(await api.listHandoffs(namespace, slug, statusFilter || undefined));
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "failed to load handoffs");
-    }
-  }
-
-  useEffect(() => {
-    void refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [namespace, slug]);
+  // statusFilter is a dep, not something the form refreshes by hand: the
+  // cursor is a position within one filter's ordering, so changing the filter
+  // has to start a new walk rather than continue the old one.
+  const {
+    items: handoffs,
+    error,
+    setError,
+    hasMore,
+    loadingMore,
+    loadMore,
+    refresh,
+  } = useCursorList<Handoff>(
+    (opts) => api.listHandoffs(namespace, slug, statusFilter || undefined, opts),
+    [namespace, slug, statusFilter],
+    "failed to load handoffs",
+  );
 
   async function open(id: string) {
     setSelected(id);
@@ -79,18 +83,12 @@ export default function Handoffs({ namespace, slug, role }: { namespace: string;
   return (
     <div className="grid grid-cols-[320px_1fr] gap-6">
       <div className="space-y-4">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            void refresh();
-          }}
-        >
+        <form onSubmit={(e) => e.preventDefault()}>
           <select
             value={statusFilter}
             onChange={(e) => {
               setStatusFilter(e.target.value);
             }}
-            onBlur={() => void refresh()}
             className="w-full rounded border border-cc-border bg-cc-surface-2 px-2 py-1.5 text-sm text-cc-text outline-none focus:border-cc-border-strong"
           >
             {STATUSES.map((s) => (
@@ -126,6 +124,7 @@ export default function Handoffs({ namespace, slug, role }: { namespace: string;
             </li>
           ))}
         </ul>
+        <LoadMore hasMore={hasMore} loading={loadingMore} onClick={() => void loadMore()} />
 
         {canWriteHandoffs(role) && (
           <form onSubmit={onCreate} className="flex flex-col gap-2 rounded border border-cc-border bg-cc-surface-1 p-3">

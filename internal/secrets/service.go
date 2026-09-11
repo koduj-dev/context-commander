@@ -10,6 +10,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/audit"
 	"github.com/koduj-dev/context-commander/internal/auth"
 	"github.com/koduj-dev/context-commander/internal/db"
+	"github.com/koduj-dev/context-commander/internal/paging"
 )
 
 // Service is the authorization chokepoint for secrets (docs/adr/0014):
@@ -97,21 +98,22 @@ func (s *Service) Resolve(ctx context.Context, principalID, projectID uuid.UUID,
 	return plaintext, nil
 }
 
-// List returns projectID's secret references — names only, never values.
-func (s *Service) List(ctx context.Context, principalID, projectID uuid.UUID) ([]Reference, error) {
+// List returns one page of projectID's secret references — names only,
+// never values.
+func (s *Service) List(ctx context.Context, principalID, projectID uuid.UUID, opts paging.Options) (paging.Page[Reference], error) {
 	if err := s.checkCapability(ctx, principalID, projectID, auth.CapSecretRead); err != nil {
-		return nil, err
+		return paging.Page[Reference]{}, err
 	}
 
-	names, err := s.backend.List(ctx, principalID, "project", projectID)
+	names, err := s.backend.List(ctx, principalID, "project", projectID, opts)
 	if err != nil {
-		return nil, fmt.Errorf("secrets: list: %w", err)
+		return paging.Page[Reference]{}, fmt.Errorf("secrets: list: %w", err)
 	}
-	out := make([]Reference, len(names))
-	for i, name := range names {
+	out := make([]Reference, len(names.Items))
+	for i, name := range names.Items {
 		out[i] = NewProjectReference(projectID, name)
 	}
-	return out, nil
+	return paging.Page[Reference]{Items: out, NextCursor: names.NextCursor}, nil
 }
 
 // Delete removes a secret value. Uses CapSecretWrite, same as Create —

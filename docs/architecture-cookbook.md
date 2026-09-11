@@ -1589,6 +1589,41 @@ event.publish
 
 Do not implement every future concept in the first PR.
 
+## 22.1 Pagination contract
+
+Every list that grows without bound shares one contract, across HTTP, MCP and
+the CLI: a caller passes `limit` and `cursor`, and gets back the rows plus a
+`next_cursor` when — and only when — more remain.
+
+**Keyset, never offset.** `OFFSET` re-scans and then skips, so rows shift under
+a caller whenever the underlying set changes between pages. For an
+append-heavy store that is the normal case, not an edge case. Each list orders
+by a key that only moves one way and asks for the rows past a position in it.
+
+**The cursor is opaque.** Callers echo `next_cursor` back and never construct
+or parse one. The encodings differ underneath — `(timestamp, uuid)` for the
+UUID-keyed tables, a `seq`/`id` integer for the bigserial ones, the name itself
+for secrets — but a client sees one mechanism. Each cursor names its own kind,
+so one pasted into a differently-ordered endpoint is rejected rather than
+reinterpreted as a position it never meant.
+
+**A timestamp alone is not a key.** Two rows can share a `created_at` to the
+microsecond, and a `created_at < cursor` comparison then skips every row but
+one of the colliding group. The comparison is a row value over
+`(timestamp, id)` matching the `ORDER BY` exactly.
+
+**"There is more" is a fact, not a guess.** Services query `limit + 1` rows and
+return a cursor only if the extra one came back. Inferring it from a full page
+is wrong in both directions: it hides rows behind an absent button when a page
+is short, and offers a button that returns nothing when the row count happens
+to be a multiple of the page size.
+
+`internal/paging` holds the shared primitives. Not everything is paginated:
+`skill.list_effective` composes project-over-organization-over-installation
+bindings *after* reading them, so paging it would change which binding wins —
+and the set is bounded by what a project has installed. Project and
+organization member lists are bounded the same way.
+
 ---
 
 # 23. MVP recommendation

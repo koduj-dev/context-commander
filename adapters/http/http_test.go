@@ -181,8 +181,7 @@ func TestCreateProjectWriteReadArtifact(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("list artifacts: status=%d", resp.StatusCode)
 	}
-	var list []map[string]any
-	_ = json.NewDecoder(resp.Body).Decode(&list)
+	list, _ := decodeList(t, resp)
 	_ = resp.Body.Close()
 	if len(list) != 1 {
 		t.Fatalf("list artifacts: got %d entries, want 1", len(list))
@@ -236,6 +235,21 @@ func (f *fixture) createProject(token, path, name string) {
 	}
 }
 
+// decodeList unwraps the {items, next_cursor} envelope every paginated list
+// endpoint returns, so a test that only cares about the rows says so. The
+// second return is the cursor, for the tests that do care.
+func decodeList(t *testing.T, r *http.Response) ([]map[string]any, string) {
+	t.Helper()
+	var body struct {
+		Items      []map[string]any `json:"items"`
+		NextCursor string           `json:"next_cursor"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		t.Fatalf("decode list envelope: %v", err)
+	}
+	return body.Items, body.NextCursor
+}
+
 func TestEventsListAfterArtifactWrite(t *testing.T) {
 	f := newFixture(t)
 	token := f.newUserWithToken("events@example.test")
@@ -252,8 +266,7 @@ func TestEventsListAfterArtifactWrite(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("list events: status=%d", resp.StatusCode)
 	}
-	var list []map[string]any
-	_ = json.NewDecoder(resp.Body).Decode(&list)
+	list, _ := decodeList(t, resp)
 	if len(list) == 0 {
 		t.Fatal("expected at least one event after artifact.write, got none")
 	}
@@ -344,8 +357,7 @@ func TestAuditListAfterArtifactWrite(t *testing.T) {
 		b, _ := io.ReadAll(resp.Body)
 		t.Fatalf("list audit: status=%d body=%s", resp.StatusCode, b)
 	}
-	var list []map[string]any
-	_ = json.NewDecoder(resp.Body).Decode(&list)
+	list, _ := decodeList(t, resp)
 	if len(list) == 0 {
 		t.Fatal("expected at least one audit record after artifact.write, got none")
 	}
@@ -394,8 +406,7 @@ func TestHandoffCreateGetListRoundTrip(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("list handoffs: status=%d", resp.StatusCode)
 	}
-	var list []map[string]any
-	_ = json.NewDecoder(resp.Body).Decode(&list)
+	list, _ := decodeList(t, resp)
 	if len(list) != 1 {
 		t.Fatalf("list handoffs: got %d entries, want 1", len(list))
 	}
@@ -455,8 +466,7 @@ func TestHistoryConversationSessionObjectLineage(t *testing.T) {
 	}
 
 	resp = f.do(http.MethodGet, "/v1/projects/history/proj/conversations/"+conversationID+"/objects", token, nil)
-	var objects []map[string]any
-	_ = json.NewDecoder(resp.Body).Decode(&objects)
+	objects, _ := decodeList(t, resp)
 	_ = resp.Body.Close()
 	if len(objects) != 2 {
 		t.Fatalf("list history objects: got %d, want 2", len(objects))
@@ -596,8 +606,11 @@ func TestSecretCreateListDeleteNeverReturnsValue(t *testing.T) {
 	if bytes.Contains(raw, []byte("ghp_supersecret")) {
 		t.Fatalf("list secrets response leaked the plaintext value: %s", raw)
 	}
-	var refs []map[string]any
-	_ = json.Unmarshal(raw, &refs)
+	var secretsEnvelope struct {
+		Items []map[string]any `json:"items"`
+	}
+	_ = json.Unmarshal(raw, &secretsEnvelope)
+	refs := secretsEnvelope.Items
 	if len(refs) != 1 {
 		t.Fatalf("list secrets: got %d entries, want 1", len(refs))
 	}

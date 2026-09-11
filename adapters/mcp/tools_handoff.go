@@ -129,28 +129,30 @@ func registerHandoffTools(server *sdkmcp.Server, deps Deps, principalID, clientI
 	type listArgs struct {
 		Project string `json:"project" jsonschema:"project path \"namespace/slug\""`
 		Status  string `json:"status,omitempty" jsonschema:"filter by status: open or closed"`
+		Limit   int    `json:"limit,omitempty" jsonschema:"max handoffs to return (default 100, max 500)"`
+		Cursor  string `json:"cursor,omitempty" jsonschema:"next_cursor from a previous call with the SAME status filter, to continue into older handoffs"`
 	}
 	sdkmcp.AddTool(server, &sdkmcp.Tool{
 		Name:        "handoff.list",
-		Description: "List handoffs in a project, most recent first.",
-	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, args listArgs) (*sdkmcp.CallToolResult, []handoffResult, error) {
+		Description: "List handoffs in a project, most recent first. Returns one page plus next_cursor when more remain.",
+	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, args listArgs) (*sdkmcp.CallToolResult, pagedResult[handoffResult], error) {
 		projectID, err := resolve(ctx, args.Project)
 		if err != nil {
-			return nil, nil, err
+			return nil, pagedResult[handoffResult]{}, err
 		}
 		var statusFilter *string
 		if args.Status != "" {
 			statusFilter = &args.Status
 		}
-		list, err := deps.Handoffs.List(ctx, principalID, projectID, statusFilter)
+		page, err := deps.Handoffs.List(ctx, principalID, projectID, statusFilter, pagingOptions(args.Limit, args.Cursor))
 		if err != nil {
-			return nil, nil, err
+			return nil, pagedResult[handoffResult]{}, err
 		}
-		out := make([]handoffResult, len(list))
-		for i, h := range list {
+		out := make([]handoffResult, len(page.Items))
+		for i, h := range page.Items {
 			out[i] = toHandoffResult(h)
 		}
-		return nil, out, nil
+		return nil, paged(out, page.NextCursor), nil
 	})
 }
 

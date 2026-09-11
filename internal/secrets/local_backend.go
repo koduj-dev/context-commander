@@ -10,6 +10,7 @@ import (
 
 	"github.com/koduj-dev/context-commander/internal/crypto"
 	"github.com/koduj-dev/context-commander/internal/db"
+	"github.com/koduj-dev/context-commander/internal/paging"
 )
 
 // LocalEncryptedBackend is the v1 (and, for now, only) Backend: it stores
@@ -141,13 +142,26 @@ func (b *LocalEncryptedBackend) Delete(ctx context.Context, principalID uuid.UUI
 	})
 }
 
-func (b *LocalEncryptedBackend) List(ctx context.Context, principalID uuid.UUID, scope string, scopeRef uuid.UUID) ([]string, error) {
-	var names []string
-	err := db.WithPrincipal(ctx, b.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+// List pages through a project's secret names in name order. (project_id,
+// name) is unique, so the name alone is a complete keyset position — no
+// tiebreaker needed, unlike the timestamp-ordered lists elsewhere.
+func (b *LocalEncryptedBackend) List(ctx context.Context, principalID uuid.UUID, scope string, scopeRef uuid.UUID, opts paging.Options) (paging.Page[string], error) {
+	afterName, hasCursor, err := opts.DecodeString()
+	if err != nil {
+		return paging.Page[string]{}, err
+	}
+	limit := opts.ClampedLimit()
+
+	names := make([]string, 0, limit)
+	err = db.WithPrincipal(ctx, b.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
 		if scope != "project" {
 			return fmt.Errorf("secrets: list: unsupported scope %q", scope)
 		}
-		rows, err := tx.Query(ctx, `SELECT name FROM secret_values WHERE project_id = $1 ORDER BY name`, scopeRef)
+		rows, err := tx.Query(ctx,
+			`SELECT name FROM secret_values
+			 WHERE project_id = $1 AND (NOT $2::bool OR name > $3::text)
+			 ORDER BY name LIMIT $4`,
+			scopeRef, hasCursor, afterName, limit+1)
 		if err != nil {
 			return err
 		}
@@ -162,7 +176,13 @@ func (b *LocalEncryptedBackend) List(ctx context.Context, principalID uuid.UUID,
 		return rows.Err()
 	})
 	if err != nil {
-		return nil, fmt.Errorf("secrets: list: %w", err)
+		return paging.Page[string]{}, fmt.Errorf("secrets: list: %w", err)
 	}
-	return names, nil
+
+	items, hasMore := paging.More(names, limit)
+	page := paging.Page[string]{Items: items}
+	if hasMore {
+		page.NextCursor = paging.EncodeString(items[len(items)-1])
+	}
+	return page, nil
 }

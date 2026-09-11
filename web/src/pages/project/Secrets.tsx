@@ -1,26 +1,31 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { api, ApiError, type SecretRef } from "../../lib/api";
+import { useCursorList } from "../../lib/useCursorList";
 import EmptyState from "../../components/EmptyState";
 import ConfirmDialog from "../../components/ConfirmDialog";
+import LoadMore from "../../components/LoadMore";
 
 export default function Secrets({ namespace, slug }: { namespace: string; slug: string }) {
-  const [secrets, setSecrets] = useState<SecretRef[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [value, setValue] = useState("");
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
-  async function refresh() {
-    try {
-      setSecrets(await api.listSecrets(namespace, slug));
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "failed to load secrets");
-    }
-  }
-
-  useEffect(() => {
-    void refresh();
-  }, [namespace, slug]);
+  // Creating or deleting a secret refreshes back to the first page rather
+  // than patching the loaded list: names are ordered, so a new one can belong
+  // anywhere, including on a page that has not been loaded.
+  const {
+    items: secrets,
+    error,
+    setError,
+    hasMore,
+    loadingMore,
+    loadMore,
+    refresh,
+  } = useCursorList<SecretRef>(
+    (opts) => api.listSecrets(namespace, slug, opts),
+    [namespace, slug],
+    "failed to load secrets",
+  );
 
   async function onCreate(e: FormEvent) {
     e.preventDefault();
@@ -69,6 +74,7 @@ export default function Secrets({ namespace, slug }: { namespace: string; slug: 
           </li>
         ))}
       </ul>
+      <LoadMore hasMore={hasMore} loading={loadingMore} onClick={() => void loadMore()} />
       <form onSubmit={onCreate} className="flex flex-col gap-2">
         <input
           value={name}

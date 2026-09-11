@@ -29,7 +29,6 @@ func newAuditListCmd() *cobra.Command {
 			}
 			action, _ := cmd.Flags().GetString("action")
 			resourceType, _ := cmd.Flags().GetString("resource-type")
-			limit, _ := cmd.Flags().GetInt("limit")
 
 			dsn, err := resolveDatabaseURL(cmd)
 			if err != nil {
@@ -64,22 +63,24 @@ func newAuditListCmd() *cobra.Command {
 			authz := auth.NewAuthzService(pool, projStore)
 			svc := audit.NewService(pool, authz)
 
-			list, err := svc.Query(cmd.Context(), principalID, project.ID, audit.QueryOptions{
-				Action: action, ResourceType: resourceType, Limit: limit,
+			page, err := svc.Query(cmd.Context(), principalID, project.ID, audit.QueryOptions{
+				Action: action, ResourceType: resourceType,
+				Paging: pagingOptionsFrom(cmd),
 			})
 			if err != nil {
 				return err
 			}
-			for _, rec := range list {
+			for _, rec := range page.Items {
 				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%d\t%s\t%s\t%s\t%s\n", rec.ID, rec.Timestamp.Format(timeLayoutRFC3339), rec.Action, rec.ResourceType, rec.Result)
 			}
+			printNextCursor(cmd, page.NextCursor)
 			return nil
 		},
 	}
 	cmd.Flags().String("project", "", `project path "namespace/slug" (required)`)
 	cmd.Flags().String("action", "", "exact-match action filter")
 	cmd.Flags().String("resource-type", "", "exact-match resource type filter")
-	cmd.Flags().Int("limit", 100, "max records to return (max 500)")
+	pagingFlags(cmd)
 	databaseURLFlag(cmd)
 	tokenFlag(cmd)
 	return cmd

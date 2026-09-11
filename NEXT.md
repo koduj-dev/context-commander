@@ -76,12 +76,9 @@ safe, measurable story — **store state → hand off work → resume exactly**.
 
 ### Phase 0 — trustworthy foundation (release blocker)
 
-The remaining P1 findings from the 2026-09-01 review. Each was re-verified
-against `main` on 2026-09-11; the ones that shipped are gone from this list.
-
-- [ ] **Unified keyset pagination** — see Backlog below. Listed here too
-  because without it we cannot promise history stays reachable under real use,
-  and that is a release-blocking claim, not a nice-to-have.
+**Done.** Every P1 finding from the 2026-09-01 review is fixed, each with a
+regression test — see CHANGELOG for what shipped. Kept as a heading only so
+the phase numbering below still reads in order; delete it once Phase 1 starts.
 
 Already fixed, kept only so the next reader doesn't re-derive it: MCP sessions
 are bound to the authenticated principal per HTTP request
@@ -94,7 +91,9 @@ now requires OWNER at both project and organization scope, checked in
 adapter (see CHANGELOG); the secret read-modify-write is serialized on
 `(project_id, name)`, and the same race in `internal/crypto.ensureProjectKey`
 — which affected every encrypting domain, not just secrets — is serialized per
-project (`internal/db/advisory.go`).
+project (`internal/db/advisory.go`); every growing list endpoint takes a limit
+and an opaque cursor and reports whether more remain (`internal/paging`,
+cookbook §22.1).
 
 ### Phase 1 — the first genuinely usable vertical slice
 
@@ -229,15 +228,6 @@ on the planned move to a public repo:
   `audit.Write` in the same transaction as the insert, the pattern
   `internal/artifacts.Service.Write` already uses. Deliberately left out of
   the escalation fix to keep that change to the security boundary.
-- **Real cursor pagination for list endpoints.** `internal/audit.Query` got a
-  real keyset cursor (`before_id`, 2026-09-02) wired through to the web UI's
-  Audit tab "Load more" — the pattern to copy.
-  `history.Service.ListHistoryObjects` is still just capped at `MaxListLimit`
-  (1000 rows/call), `events.Service.List` caps `limit` the same pre-audit way,
-  and `artifacts`/`handoffs`/`secrets` listing have no pagination at all. A
-  project with more than one page of rows has no way to see the rest. Keyset,
-  not offset. Promoted into Phase 0 above as a release blocker.
-
 ---
 
 ## 🎯 Definition of Done for v0.1
@@ -342,9 +332,9 @@ feature.
 
 **Confirm with the maintainer before starting.** In order:
 
-1. **Phase 0** — keyset pagination. Release-blocking, with a regression test.
-   (ADMIN→OWNER escalation and the secret/project-key write races: done, see
-   CHANGELOG.)
+1. ~~**Phase 0**~~ — done. ADMIN→OWNER escalation, the secret and project-key
+   write races, and unified keyset pagination all shipped with regression
+   tests (see CHANGELOG).
 2. **Phase 1** — `skill.get`, `context.bootstrap`, handoff lifecycle,
    quickstart, two named MCP clients, E2E scenario, storage-backend honesty.
 3. **Phase 2 onward** — only after the core loop is measured with real design

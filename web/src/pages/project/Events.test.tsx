@@ -38,14 +38,18 @@ describe("Events", () => {
     vi.unstubAllGlobals();
   });
 
-  it("shows Load more only when a full page came back, and appends the next page", async () => {
+  // "Load more" is driven by next_cursor, not by whether a page came back
+  // full — so the first page here is deliberately NOT full (2 rows) yet still
+  // offers a cursor. Under the old page-size guess this case showed no button
+  // and the remaining rows were unreachable.
+  it("shows Load more while the server offers a cursor, and appends the next page", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = new URL(String(input), "http://localhost");
-      const afterSeq = url.searchParams.get("after_seq");
-      if (afterSeq === "0" || afterSeq === null) {
-        return jsonResponse(Array.from({ length: 100 }, (_, i) => event(i + 1)));
+      const cursor = url.searchParams.get("cursor");
+      if (cursor === null) {
+        return jsonResponse({ items: [event(1), event(2)], next_cursor: "cursor-page-2" });
       }
-      return jsonResponse([event(101), event(102)]);
+      return jsonResponse({ items: [event(101), event(102)] });
     });
     vi.stubGlobal("fetch", fetchMock);
 
@@ -61,10 +65,24 @@ describe("Events", () => {
     expect(loadMore).toBeUndefined();
   });
 
+  // The mirror case: a page that happens to be exactly the page size but has
+  // nothing behind it must not offer the button. That is what the old
+  // `page.length >= PAGE_SIZE` check got wrong.
+  it("hides Load more on a full page with no cursor", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => jsonResponse({ items: Array.from({ length: 100 }, (_, i) => event(i + 1)) })),
+    );
+
+    await flush(() => root.render(<Events namespace="ns" slug="sl" />));
+    const loadMore = Array.from(container.querySelectorAll("button")).find((b) => b.textContent === "Load more");
+    expect(loadMore).toBeUndefined();
+  });
+
   it("shows an empty state with no events", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => jsonResponse([])),
+      vi.fn(async () => jsonResponse({ items: [] })),
     );
 
     await flush(() => root.render(<Events namespace="ns" slug="sl" />));

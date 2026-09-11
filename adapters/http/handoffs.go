@@ -101,14 +101,18 @@ func (d Deps) listHandoffs(w http.ResponseWriter, r *http.Request) {
 		statusFilter = &s
 	}
 
-	list, err := d.Handoffs.List(r.Context(), principalID, project.ID, statusFilter)
+	opts, ok := pagingFrom(w, r)
+	if !ok {
+		return
+	}
+	page, err := d.Handoffs.List(r.Context(), principalID, project.ID, statusFilter, opts)
 	if err != nil {
 		writeDomainError(w, err)
 		return
 	}
-	out := make([]handoffResponse, len(list))
-	for i, h := range list {
+	out := make([]handoffResponse, len(page.Items))
+	for i, h := range page.Items {
 		out[i] = toHandoffResponse(h)
 	}
-	writeJSON(w, http.StatusOK, out)
+	writeList(w, out, page.NextCursor)
 }

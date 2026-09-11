@@ -16,6 +16,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/db"
 	"github.com/koduj-dev/context-commander/internal/dbtest"
 	"github.com/koduj-dev/context-commander/internal/gates"
+	"github.com/koduj-dev/context-commander/internal/paging"
 	"github.com/koduj-dev/context-commander/internal/projects"
 	"github.com/koduj-dev/context-commander/internal/storage"
 	"github.com/koduj-dev/context-commander/internal/storage/filesystem"
@@ -306,10 +307,11 @@ func TestListStatAndDelete(t *testing.T) {
 		t.Fatalf("Write b: %v", err)
 	}
 
-	list, err := f.svc.List(ctx, f.principalID, f.projectID)
+	listPage, err := f.svc.List(ctx, f.principalID, f.projectID, paging.Options{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
+	list := listPage.Items
 	if len(list) != 2 {
 		t.Fatalf("List returned %d artifacts, want 2", len(list))
 	}
@@ -326,10 +328,11 @@ func TestListStatAndDelete(t *testing.T) {
 		t.Fatalf("Delete: %v", err)
 	}
 
-	listAfterDelete, err := f.svc.List(ctx, f.principalID, f.projectID)
+	listAfterDeletePage, err := f.svc.List(ctx, f.principalID, f.projectID, paging.Options{})
 	if err != nil {
 		t.Fatalf("List after delete: %v", err)
 	}
+	listAfterDelete := listAfterDeletePage.Items
 	if len(listAfterDelete) != 1 {
 		t.Fatalf("List after deleting one of two artifacts returned %d, want 1", len(listAfterDelete))
 	}

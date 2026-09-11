@@ -13,6 +13,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/crypto"
 	"github.com/koduj-dev/context-commander/internal/db"
 	"github.com/koduj-dev/context-commander/internal/dbtest"
+	"github.com/koduj-dev/context-commander/internal/paging"
 	"github.com/koduj-dev/context-commander/internal/projects"
 	"github.com/koduj-dev/context-commander/internal/secrets"
 )
@@ -180,10 +181,11 @@ func TestListReturnsNamesOnly(t *testing.T) {
 	// secrets.Reference has no value field at all — List's return type
 	// makes leaking a value a compile error, not just a runtime one. This
 	// test only needs to check List resolves the right names/scope.
-	refs, err := f.svc.List(ctx, principalID, projectID)
+	refsPage, err := f.svc.List(ctx, principalID, projectID, paging.Options{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
+	refs := refsPage.Items
 	if len(refs) != 2 {
 		t.Fatalf("List returned %d references, want 2", len(refs))
 	}
@@ -240,10 +242,11 @@ func TestRLSIsolationBetweenProjects(t *testing.T) {
 		t.Fatalf("mismatched-scope Resolve: got %v, want ErrForbidden", err)
 	}
 
-	refsB, err := f.svc.List(ctx, principalB, projectB)
+	refsBPage, err := f.svc.List(ctx, principalB, projectB, paging.Options{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
+	refsB := refsBPage.Items
 	if len(refsB) != 0 {
 		t.Fatalf("projectB should see 0 secrets, got %d (RLS isolation broken)", len(refsB))
 	}
@@ -257,7 +260,7 @@ func TestRBACReaderCannotReadOrWriteSecrets(t *testing.T) {
 	if _, err := f.svc.Create(ctx, readerID, projectID, "github", []byte("x")); !errors.Is(err, secrets.ErrForbidden) {
 		t.Fatalf("READER Create: got %v, want ErrForbidden", err)
 	}
-	if _, err := f.svc.List(ctx, readerID, projectID); !errors.Is(err, secrets.ErrForbidden) {
+	if _, err := f.svc.List(ctx, readerID, projectID, paging.Options{}); !errors.Is(err, secrets.ErrForbidden) {
 		t.Fatalf("READER List: got %v, want ErrForbidden", err)
 	}
 	if _, err := f.svc.Resolve(ctx, readerID, projectID, secrets.NewProjectReference(projectID, "github")); !errors.Is(err, secrets.ErrForbidden) {
@@ -274,7 +277,7 @@ func TestWriteAuditRecordHasNoSecretValue(t *testing.T) {
 		t.Fatalf("Create: %v", err)
 	}
 
-	var records []audit.Record
+	var records paging.Page[audit.Record]
 	err := db.WithoutPrincipal(ctx, f.ownerPool, func(tx pgx.Tx) error {
 		var err error
 		records, err = audit.Query(ctx, tx, projectID, audit.QueryOptions{Action: "secret.write"})
@@ -283,7 +286,7 @@ func TestWriteAuditRecordHasNoSecretValue(t *testing.T) {
 	if err != nil {
 		t.Fatalf("audit.Query: %v", err)
 	}
-	if len(records) == 0 {
+	if len(records.Items) == 0 {
 		t.Fatal("expected at least one secret.write audit record")
 	}
 	// audit_log's schema is a fixed allowlist of columns (docs/adr/0011) —

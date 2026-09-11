@@ -41,24 +41,26 @@ func registerArtifactTools(server *sdkmcp.Server, deps Deps, principalID, client
 
 	type listArgs struct {
 		Project string `json:"project" jsonschema:"project path \"namespace/slug\""`
+		Limit   int    `json:"limit,omitempty" jsonschema:"max artifacts to return (default 100, max 500)"`
+		Cursor  string `json:"cursor,omitempty" jsonschema:"next_cursor from a previous call, to continue past the last artifact returned"`
 	}
 	sdkmcp.AddTool(server, &sdkmcp.Tool{
 		Name:        "artifact.list",
-		Description: "List non-deleted artifacts in a project.",
-	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, args listArgs) (*sdkmcp.CallToolResult, []artifactResult, error) {
+		Description: "List non-deleted artifacts in a project, most recently updated first. Returns one page plus next_cursor when more remain.",
+	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, args listArgs) (*sdkmcp.CallToolResult, pagedResult[artifactResult], error) {
 		projectID, err := resolve(ctx, args.Project)
 		if err != nil {
-			return nil, nil, err
+			return nil, pagedResult[artifactResult]{}, err
 		}
-		list, err := deps.Artifacts.List(ctx, principalID, projectID)
+		page, err := deps.Artifacts.List(ctx, principalID, projectID, pagingOptions(args.Limit, args.Cursor))
 		if err != nil {
-			return nil, nil, err
+			return nil, pagedResult[artifactResult]{}, err
 		}
-		out := make([]artifactResult, len(list))
-		for i, a := range list {
+		out := make([]artifactResult, len(page.Items))
+		for i, a := range page.Items {
 			out[i] = artifactResult{LogicalPath: a.LogicalPath, ContentType: a.ContentType, CurrentVersion: a.CurrentVersion}
 		}
-		return nil, out, nil
+		return nil, paged(out, page.NextCursor), nil
 	})
 
 	type pathArgs struct {

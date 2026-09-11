@@ -15,6 +15,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/crypto"
 	"github.com/koduj-dev/context-commander/internal/db"
 	"github.com/koduj-dev/context-commander/internal/events"
+	"github.com/koduj-dev/context-commander/internal/paging"
 )
 
 // Service is the authorization chokepoint for handoffs (docs/adr/0014):
@@ -146,19 +147,30 @@ func (s *Service) Get(ctx context.Context, principalID, projectID, handoffID uui
 	return h, body, nil
 }
 
-// List returns metadata only — no decryption — mirroring how
-// internal/artifacts.Service.List never returns content.
-func (s *Service) List(ctx context.Context, principalID, projectID uuid.UUID, statusFilter *string) ([]Handoff, error) {
+// List returns one page of metadata only — no decryption — mirroring how
+// internal/artifacts.Service.List never returns content. Keyed on
+// (created_at, id), newest first; statusFilter narrows the set without
+// affecting the cursor, so a cursor stays valid only for the same filter
+// the caller paged with.
+func (s *Service) List(ctx context.Context, principalID, projectID uuid.UUID, statusFilter *string, opts paging.Options) (paging.Page[Handoff], error) {
 	if err := s.checkCapability(ctx, principalID, projectID, auth.CapHandoffRead); err != nil {
-		return nil, err
+		return paging.Page[Handoff]{}, err
 	}
+	cursorTime, cursorID, hasCursor, err := opts.DecodeTimeUUID()
+	if err != nil {
+		return paging.Page[Handoff]{}, err
+	}
+	limit := opts.ClampedLimit()
 
-	var out []Handoff
-	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+	out := make([]Handoff, 0, limit)
+	err = db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
 		rows, err := tx.Query(ctx,
 			`SELECT id, project_id, created_by_principal, created_by_client, source_session_id, status, created_at
-			 FROM handoffs WHERE project_id = $1 AND ($2::text IS NULL OR status = $2) ORDER BY created_at DESC`,
-			projectID, statusFilter,
+			 FROM handoffs
+			 WHERE project_id = $1 AND ($2::text IS NULL OR status = $2)
+			   AND (NOT $3::bool OR (created_at, id) < ($4::timestamptz, $5::uuid))
+			 ORDER BY created_at DESC, id DESC LIMIT $6`,
+			projectID, statusFilter, hasCursor, cursorTime, cursorID, limit+1,
 		)
 		if err != nil {
 			return fmt.Errorf("handoffs: list: %w", err)
@@ -174,7 +186,14 @@ func (s *Service) List(ctx context.Context, principalID, projectID uuid.UUID, st
 		return rows.Err()
 	})
 	if err != nil {
-		return nil, err
+		return paging.Page[Handoff]{}, err
 	}
-	return out, nil
+
+	items, hasMore := paging.More(out, limit)
+	page := paging.Page[Handoff]{Items: items}
+	if hasMore {
+		last := items[len(items)-1]
+		page.NextCursor = paging.EncodeTimeUUID(last.CreatedAt, last.ID)
+	}
+	return page, nil
 }

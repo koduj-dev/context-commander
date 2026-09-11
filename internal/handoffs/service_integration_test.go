@@ -13,6 +13,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/db"
 	"github.com/koduj-dev/context-commander/internal/dbtest"
 	"github.com/koduj-dev/context-commander/internal/handoffs"
+	"github.com/koduj-dev/context-commander/internal/paging"
 	"github.com/koduj-dev/context-commander/internal/projects"
 )
 
@@ -135,19 +136,21 @@ func TestListFiltersByStatus(t *testing.T) {
 	}
 
 	open := "open"
-	list, err := f.svc.List(ctx, principalID, projectID, &open)
+	listPage, err := f.svc.List(ctx, principalID, projectID, &open, paging.Options{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
+	list := listPage.Items
 	if len(list) != 2 {
 		t.Fatalf("List returned %d handoffs, want 2", len(list))
 	}
 
 	closed := "closed"
-	none, err := f.svc.List(ctx, principalID, projectID, &closed)
+	nonePage, err := f.svc.List(ctx, principalID, projectID, &closed, paging.Options{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
+	none := nonePage.Items
 	if len(none) != 0 {
 		t.Fatalf("List(closed) returned %d handoffs, want 0", len(none))
 	}
@@ -178,10 +181,11 @@ func TestRLSIsolationBetweenProjects(t *testing.T) {
 		t.Fatalf("cross-project Get: got %v, want ErrForbidden", err)
 	}
 
-	listB, err := f.svc.List(ctx, principalB, projectB, nil)
+	listBPage, err := f.svc.List(ctx, principalB, projectB, nil, paging.Options{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
+	listB := listBPage.Items
 	if len(listB) != 0 {
 		t.Fatalf("projectB should see 0 handoffs, got %d (RLS isolation broken)", len(listB))
 	}

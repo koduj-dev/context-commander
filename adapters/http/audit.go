@@ -2,7 +2,6 @@ package http
 
 import (
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -45,27 +44,16 @@ func (d Deps) queryAudit(w http.ResponseWriter, r *http.Request) {
 		}
 		opts.Until = &t
 	}
-	if raw := r.URL.Query().Get("limit"); raw != "" {
-		v, err := strconv.Atoi(raw)
-		if err != nil {
-			writeError(w, http.StatusBadRequest, "invalid_request", "?limit= must be an integer")
-			return
-		}
-		opts.Limit = v
+	pagingOpts, ok := pagingFrom(w, r)
+	if !ok {
+		return
 	}
-	if raw := r.URL.Query().Get("before_id"); raw != "" {
-		v, err := strconv.ParseInt(raw, 10, 64)
-		if err != nil {
-			writeError(w, http.StatusBadRequest, "invalid_request", "?before_id= must be an integer")
-			return
-		}
-		opts.BeforeID = &v
-	}
+	opts.Paging = pagingOpts
 
 	project := projectFrom(r.Context())
 	principalID := principalIDFrom(r.Context())
 
-	list, err := d.Audit.Query(r.Context(), principalID, project.ID, opts)
+	page, err := d.Audit.Query(r.Context(), principalID, project.ID, opts)
 	if err != nil {
 		writeDomainError(w, err)
 		return
@@ -77,7 +65,7 @@ func (d Deps) queryAudit(w http.ResponseWriter, r *http.Request) {
 	// drop entirely.
 	seen := make(map[uuid.UUID]bool)
 	var principalIDs []uuid.UUID
-	for _, rec := range list {
+	for _, rec := range page.Items {
 		if rec.PrincipalID != nil && !seen[*rec.PrincipalID] {
 			seen[*rec.PrincipalID] = true
 			principalIDs = append(principalIDs, *rec.PrincipalID)
@@ -96,8 +84,8 @@ func (d Deps) queryAudit(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	out := make([]auditRecordResponse, len(list))
-	for i, rec := range list {
+	out := make([]auditRecordResponse, len(page.Items))
+	for i, rec := range page.Items {
 		out[i] = auditRecordResponse{
 			ID: rec.ID, Timestamp: rec.Timestamp.Format(time.RFC3339),
 			Action: rec.Action, ResourceType: rec.ResourceType, Result: string(rec.Result),
@@ -114,5 +102,5 @@ func (d Deps) queryAudit(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	writeJSON(w, http.StatusOK, out)
+	writeList(w, out, page.NextCursor)
 }

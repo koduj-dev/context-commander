@@ -9,6 +9,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/auth"
 	"github.com/koduj-dev/context-commander/internal/db"
 	"github.com/koduj-dev/context-commander/internal/events"
+	"github.com/koduj-dev/context-commander/internal/paging"
 	"github.com/koduj-dev/context-commander/internal/projects"
 )
 
@@ -28,7 +29,6 @@ func newEventListCmd() *cobra.Command {
 				return fmt.Errorf("--project is required")
 			}
 			afterSeq, _ := cmd.Flags().GetInt64("after-seq")
-			limit, _ := cmd.Flags().GetInt("limit")
 
 			dsn, err := resolveDatabaseURL(cmd)
 			if err != nil {
@@ -63,19 +63,29 @@ func newEventListCmd() *cobra.Command {
 			authz := auth.NewAuthzService(pool, projStore)
 			svc := events.NewService(pool, authz)
 
-			list, err := svc.List(cmd.Context(), principalID, project.ID, afterSeq, limit)
+			// --after-seq is kept as the ergonomic front door: every line
+			// of output starts with the event's seq, so resuming from one
+			// you just read should not require a cursor you have to save.
+			// It is translated into the same cursor the rest of the API
+			// uses; an explicit --cursor wins if both are given.
+			opts := pagingOptionsFrom(cmd)
+			if opts.Cursor == "" && afterSeq > 0 {
+				opts.Cursor = paging.EncodeSeq(afterSeq)
+			}
+			page, err := svc.List(cmd.Context(), principalID, project.ID, opts)
 			if err != nil {
 				return err
 			}
-			for _, e := range list {
+			for _, e := range page.Items {
 				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%d\t%s\t%s\t%s\n", e.Seq, e.EventID, e.Type, e.ResourceType)
 			}
+			printNextCursor(cmd, page.NextCursor)
 			return nil
 		},
 	}
 	cmd.Flags().String("project", "", `project path "namespace/slug" (required)`)
-	cmd.Flags().Int64("after-seq", 0, "only list events with seq greater than this")
-	cmd.Flags().Int("limit", 100, "max events to return")
+	cmd.Flags().Int64("after-seq", 0, "only list events with seq greater than this (shorthand for --cursor)")
+	pagingFlags(cmd)
 	databaseURLFlag(cmd)
 	tokenFlag(cmd)
 	return cmd

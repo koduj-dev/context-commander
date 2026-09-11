@@ -2,7 +2,6 @@ package http
 
 import (
 	"net/http"
-	"strconv"
 )
 
 type eventResponse struct {
@@ -15,36 +14,21 @@ type eventResponse struct {
 }
 
 func (d Deps) listEvents(w http.ResponseWriter, r *http.Request) {
-	var afterSeq int64
-	if raw := r.URL.Query().Get("after_seq"); raw != "" {
-		v, err := strconv.ParseInt(raw, 10, 64)
-		if err != nil {
-			writeError(w, http.StatusBadRequest, "invalid_request", "?after_seq= must be an integer")
-			return
-		}
-		afterSeq = v
-	}
-	limit := 100
-	if raw := r.URL.Query().Get("limit"); raw != "" {
-		v, err := strconv.Atoi(raw)
-		if err != nil {
-			writeError(w, http.StatusBadRequest, "invalid_request", "?limit= must be an integer")
-			return
-		}
-		limit = v
-	}
-
 	project := projectFrom(r.Context())
 	principalID := principalIDFrom(r.Context())
 
-	list, err := d.Events.List(r.Context(), principalID, project.ID, afterSeq, limit)
+	opts, ok := pagingFrom(w, r)
+	if !ok {
+		return
+	}
+	page, err := d.Events.List(r.Context(), principalID, project.ID, opts)
 	if err != nil {
 		writeDomainError(w, err)
 		return
 	}
 
-	out := make([]eventResponse, len(list))
-	for i, e := range list {
+	out := make([]eventResponse, len(page.Items))
+	for i, e := range page.Items {
 		out[i] = eventResponse{
 			Seq: e.Seq, EventID: e.EventID.String(), Type: e.Type,
 			ResourceType: e.ResourceType, PayloadKind: string(e.PayloadKind),
@@ -54,5 +38,5 @@ func (d Deps) listEvents(w http.ResponseWriter, r *http.Request) {
 			out[i].ResourceID = &id
 		}
 	}
-	writeJSON(w, http.StatusOK, out)
+	writeList(w, out, page.NextCursor)
 }

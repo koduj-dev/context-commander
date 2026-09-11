@@ -244,21 +244,23 @@ func newArtifactListCmd() *cobra.Command {
 			}
 			defer ac.pool.Close()
 
-			list, err := ac.svc.List(cmd.Context(), ac.principalID, ac.project.ID)
+			page, err := ac.svc.List(cmd.Context(), ac.principalID, ac.project.ID, pagingOptionsFrom(cmd))
 			if err != nil {
 				return err
 			}
-			if len(list) == 0 {
+			if len(page.Items) == 0 {
 				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "(no artifacts)")
 				return nil
 			}
-			for _, a := range list {
+			for _, a := range page.Items {
 				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%-40s v%-4d %-24s updated %s\n",
 					a.LogicalPath, a.CurrentVersion, a.ContentType, a.UpdatedAt.Format(time.RFC3339))
 			}
+			printNextCursor(cmd, page.NextCursor)
 			return nil
 		},
 	}
 	projectAndStorageFlags(cmd)
+	pagingFlags(cmd)
 	return cmd
 }

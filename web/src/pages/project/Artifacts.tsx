@@ -1,20 +1,26 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { api, ApiError, type Artifact, type ArtifactVersion } from "../../lib/api";
+import { useCursorList } from "../../lib/useCursorList";
 import EmptyState from "../../components/EmptyState";
+import LoadMore from "../../components/LoadMore";
 
 export default function Artifacts({ namespace, slug }: { namespace: string; slug: string }) {
-  const [artifacts, setArtifacts] = useState<Artifact[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [content, setContent] = useState<string | null>(null);
   const [history, setHistory] = useState<ArtifactVersion[] | null>(null);
 
-  useEffect(() => {
-    api
-      .listArtifacts(namespace, slug)
-      .then(setArtifacts)
-      .catch((err) => setError(err instanceof ApiError ? err.message : "failed to load artifacts"));
-  }, [namespace, slug]);
+  const {
+    items: artifacts,
+    error,
+    setError,
+    hasMore,
+    loadingMore,
+    loadMore,
+  } = useCursorList<Artifact>(
+    (opts) => api.listArtifacts(namespace, slug, opts),
+    [namespace, slug],
+    "failed to load artifacts",
+  );
 
   async function open(path: string) {
     setSelected(path);
@@ -60,6 +66,9 @@ export default function Artifacts({ namespace, slug }: { namespace: string; slug
             </li>
           ))}
         </ul>
+        <div className="mt-2">
+          <LoadMore hasMore={hasMore} loading={loadingMore} onClick={() => void loadMore()} />
+        </div>
       </div>
       <div>
         {selected === null ? (

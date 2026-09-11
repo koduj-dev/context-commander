@@ -15,6 +15,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/auth"
 	"github.com/koduj-dev/context-commander/internal/crypto"
 	"github.com/koduj-dev/context-commander/internal/db"
+	"github.com/koduj-dev/context-commander/internal/paging"
 )
 
 // foreignKeyViolation is Postgres's SQLSTATE for a foreign key constraint
@@ -153,22 +154,29 @@ func (s *Service) AppendHistoryObject(
 	}, nil
 }
 
-// MaxListLimit bounds a single ListHistoryObjects call — before this, the
-// query had no LIMIT at all, so a large conversation made a single call
-// buffer every matching encrypted row and then every decrypted plaintext
-// body in memory inside one transaction. Same convention as
-// internal/audit.QueryOptions.Limit and internal/events.Service.List's cap.
-const MaxListLimit = 1000
-
-// ListHistoryObjects returns up to MaxListLimit of a conversation's history
-// objects, decrypted, oldest first.
-func (s *Service) ListHistoryObjects(ctx context.Context, principalID, projectID, conversationID uuid.UUID) ([]HistoryObject, error) {
+// ListHistoryObjects returns one page of a conversation's history objects,
+// decrypted, oldest first — keyed on (created_at, id) ascending, so a
+// caller reading a long conversation walks forward through it rather than
+// being silently cut off at a cap.
+//
+// The cap this replaces (MaxListLimit, 1000) was there because the query
+// had no LIMIT at all and a large conversation buffered every encrypted row
+// and then every decrypted plaintext body in one transaction. Both bounds
+// still apply per call — paging.MaxLimit is the ceiling now — the
+// difference is that the rows past it are reachable instead of invisible.
+func (s *Service) ListHistoryObjects(ctx context.Context, principalID, projectID, conversationID uuid.UUID, opts paging.Options) (paging.Page[HistoryObject], error) {
 	if err := s.checkCapability(ctx, principalID, projectID, auth.CapHistoryRead); err != nil {
-		return nil, err
+		return paging.Page[HistoryObject]{}, err
 	}
+	cursorTime, cursorID, hasCursor, err := opts.DecodeTimeUUID()
+	if err != nil {
+		return paging.Page[HistoryObject]{}, err
+	}
+	limit := opts.ClampedLimit()
 
-	var out []HistoryObject
-	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+	out := make([]HistoryObject, 0, limit)
+	var hasMore bool
+	err = db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
 		// The envelope rows are fully buffered before any Decrypt call: pgx
 		// refuses a second query (crypto.Decrypt needs one, to resolve the
 		// project key) on the same tx while a Rows from an earlier query is
@@ -182,8 +190,11 @@ func (s *Service) ListHistoryObjects(ctx context.Context, principalID, projectID
 
 		rows, err := tx.Query(ctx,
 			`SELECT id, project_id, conversation_id, external_session_id, type, derived_from, content_hash, ciphertext, nonce, wrapped_dek, project_key_version, created_at
-			 FROM history_objects WHERE project_id = $1 AND conversation_id = $2 ORDER BY created_at ASC LIMIT $3`,
-			projectID, conversationID, MaxListLimit,
+			 FROM history_objects
+			 WHERE project_id = $1 AND conversation_id = $2
+			   AND (NOT $3::bool OR (created_at, id) > ($4::timestamptz, $5::uuid))
+			 ORDER BY created_at ASC, id ASC LIMIT $6`,
+			projectID, conversationID, hasCursor, cursorTime, cursorID, limit+1,
 		)
 		if err != nil {
 			return fmt.Errorf("history: list: %w", err)
@@ -203,6 +214,11 @@ func (s *Service) ListHistoryObjects(ctx context.Context, principalID, projectID
 			return fmt.Errorf("history: iterate: %w", rowsErr)
 		}
 
+		// Trim the limit+1 probe row before decrypting: it exists only to
+		// answer "is there another page", and decrypting a row the caller
+		// will never see is work and an audit-relevant read for nothing.
+		rowsBuf, hasMore = paging.More(rowsBuf, limit)
+
 		for _, r := range rowsBuf {
 			ec := crypto.EncryptionContext{
 				ProjectID: projectID, ResourceType: "history_object",
@@ -218,9 +234,15 @@ func (s *Service) ListHistoryObjects(ctx context.Context, principalID, projectID
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return paging.Page[HistoryObject]{}, err
 	}
-	return out, nil
+
+	page := paging.Page[HistoryObject]{Items: out}
+	if hasMore {
+		last := out[len(out)-1]
+		page.NextCursor = paging.EncodeTimeUUID(last.CreatedAt, last.ID)
+	}
+	return page, nil
 }
 
 // GetLineage returns the lineage graph edges for a conversation: one edge

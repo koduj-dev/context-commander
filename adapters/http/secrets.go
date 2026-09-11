@@ -49,16 +49,20 @@ func (d Deps) listSecrets(w http.ResponseWriter, r *http.Request) {
 	project := projectFrom(r.Context())
 	principalID := principalIDFrom(r.Context())
 
-	refs, err := d.Secrets.List(r.Context(), principalID, project.ID)
+	opts, ok := pagingFrom(w, r)
+	if !ok {
+		return
+	}
+	page, err := d.Secrets.List(r.Context(), principalID, project.ID, opts)
 	if err != nil {
 		writeDomainError(w, err)
 		return
 	}
-	out := make([]secretReferenceResponse, len(refs))
-	for i, ref := range refs {
+	out := make([]secretReferenceResponse, len(page.Items))
+	for i, ref := range page.Items {
 		out[i] = secretReferenceResponse{Reference: ref.String(), Name: ref.Name}
 	}
-	writeJSON(w, http.StatusOK, out)
+	writeList(w, out, page.NextCursor)
 }
 
 func (d Deps) deleteSecret(w http.ResponseWriter, r *http.Request) {

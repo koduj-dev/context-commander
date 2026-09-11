@@ -168,21 +168,23 @@ func newHandoffListCmd() *cobra.Command {
 			if s, _ := cmd.Flags().GetString("status"); s != "" {
 				statusFilter = &s
 			}
-			list, err := hc.svc.List(cmd.Context(), hc.principalID, hc.project.ID, statusFilter)
+			page, err := hc.svc.List(cmd.Context(), hc.principalID, hc.project.ID, statusFilter, pagingOptionsFrom(cmd))
 			if err != nil {
 				return err
 			}
-			if len(list) == 0 {
+			if len(page.Items) == 0 {
 				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "(no handoffs)")
 				return nil
 			}
-			for _, h := range list {
+			for _, h := range page.Items {
 				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%-36s %-8s created %s\n", h.ID, h.Status, h.CreatedAt.Format(time.RFC3339))
 			}
+			printNextCursor(cmd, page.NextCursor)
 			return nil
 		},
 	}
 	cmd.Flags().String("status", "", "filter by status: open or closed")
 	projectFlag(cmd)
+	pagingFlags(cmd)
 	return cmd
 }

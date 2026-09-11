@@ -59,24 +59,26 @@ func registerSecretTools(server *sdkmcp.Server, deps Deps, principalID, clientID
 
 	type listArgs struct {
 		Project string `json:"project" jsonschema:"project path \"namespace/slug\""`
+		Limit   int    `json:"limit,omitempty" jsonschema:"max references to return (default 100, max 500)"`
+		Cursor  string `json:"cursor,omitempty" jsonschema:"next_cursor from a previous call, to continue past the last name returned"`
 	}
 	sdkmcp.AddTool(server, &sdkmcp.Tool{
 		Name:        "secret.list",
-		Description: "List a project's secret references — names only, never values.",
-	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, args listArgs) (*sdkmcp.CallToolResult, []secretReferenceResult, error) {
+		Description: "List a project's secret references in name order — names only, never values. Returns one page plus next_cursor when more remain.",
+	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, args listArgs) (*sdkmcp.CallToolResult, pagedResult[secretReferenceResult], error) {
 		projectID, err := resolveProject(ctx, args.Project)
 		if err != nil {
-			return nil, nil, err
+			return nil, pagedResult[secretReferenceResult]{}, err
 		}
-		refs, err := deps.Secrets.List(ctx, principalID, projectID)
+		page, err := deps.Secrets.List(ctx, principalID, projectID, pagingOptions(args.Limit, args.Cursor))
 		if err != nil {
-			return nil, nil, err
+			return nil, pagedResult[secretReferenceResult]{}, err
 		}
-		out := make([]secretReferenceResult, len(refs))
-		for i, ref := range refs {
+		out := make([]secretReferenceResult, len(page.Items))
+		for i, ref := range page.Items {
 			out[i] = secretReferenceResult{Reference: ref.String(), Name: ref.Name}
 		}
-		return nil, out, nil
+		return nil, paged(out, page.NextCursor), nil
 	})
 
 	type deleteArgs struct {

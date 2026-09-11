@@ -39,29 +39,31 @@ func registerAuditTools(server *sdkmcp.Server, deps Deps, principalID, _ uuid.UU
 		Project      string `json:"project" jsonschema:"project path \"namespace/slug\""`
 		Action       string `json:"action,omitempty" jsonschema:"exact-match action filter"`
 		ResourceType string `json:"resource_type,omitempty" jsonschema:"exact-match resource type filter"`
-		Limit        int    `json:"limit,omitempty" jsonschema:"max records to return (default: 100, max: 500)"`
+		Limit        int    `json:"limit,omitempty" jsonschema:"max records to return (default 100, max 500)"`
+		Cursor       string `json:"cursor,omitempty" jsonschema:"next_cursor from a previous call, to continue into older records"`
 	}
 	sdkmcp.AddTool(server, &sdkmcp.Tool{
 		Name:        "audit.list",
-		Description: "Query the project's audit trail. Requires ADMIN or OWNER on the project.",
-	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, args listArgs) (*sdkmcp.CallToolResult, []auditRecordResult, error) {
+		Description: "Query the project's audit trail, newest first. Returns one page plus next_cursor when more remain. Requires ADMIN or OWNER on the project.",
+	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, args listArgs) (*sdkmcp.CallToolResult, pagedResult[auditRecordResult], error) {
 		projectID, err := resolve(ctx, args.Project)
 		if err != nil {
-			return nil, nil, err
+			return nil, pagedResult[auditRecordResult]{}, err
 		}
-		list, err := deps.Audit.Query(ctx, principalID, projectID, audit.QueryOptions{
-			Action: args.Action, ResourceType: args.ResourceType, Limit: args.Limit,
+		page, err := deps.Audit.Query(ctx, principalID, projectID, audit.QueryOptions{
+			Action: args.Action, ResourceType: args.ResourceType,
+			Paging: pagingOptions(args.Limit, args.Cursor),
 		})
 		if err != nil {
-			return nil, nil, err
+			return nil, pagedResult[auditRecordResult]{}, err
 		}
-		out := make([]auditRecordResult, len(list))
-		for i, rec := range list {
+		out := make([]auditRecordResult, len(page.Items))
+		for i, rec := range page.Items {
 			out[i] = auditRecordResult{ID: rec.ID, Timestamp: rec.Timestamp.Format(time.RFC3339), Action: rec.Action, ResourceType: rec.ResourceType, Result: string(rec.Result)}
 			if rec.ResourceID != nil {
 				out[i].ResourceID = rec.ResourceID.String()
 			}
 		}
-		return nil, out, nil
+		return nil, paged(out, page.NextCursor), nil
 	})
 }

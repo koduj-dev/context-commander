@@ -1,60 +1,36 @@
-import { useEffect, useState } from "react";
-import { api, ApiError, type AuditRecord } from "../../lib/api";
+import { useState } from "react";
+import { api, type AuditRecord } from "../../lib/api";
+import { useCursorList } from "../../lib/useCursorList";
 import DataTable from "../../components/DataTable";
 import StatusBadge from "../../components/StatusBadge";
 import EmptyState from "../../components/EmptyState";
-
-const PAGE_SIZE = 100;
+import LoadMore from "../../components/LoadMore";
 
 export default function Audit({ namespace, slug }: { namespace: string; slug: string }) {
-  const [records, setRecords] = useState<AuditRecord[] | null>(null);
-  const [hasMore, setHasMore] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [action, setAction] = useState("");
   const [resourceType, setResourceType] = useState("");
 
-  async function refresh() {
-    try {
-      const page = await api.queryAudit(namespace, slug, {
+  // The filters are read at call time, not listed as deps: the Filter button
+  // drives an explicit refresh, so typing in a field must not re-query on
+  // every keystroke — and a cursor taken under one filter is meaningless
+  // under another, which refresh() resetting the cursor is what handles.
+  const {
+    items: records,
+    error,
+    hasMore,
+    loadingMore,
+    loadMore,
+    refresh,
+  } = useCursorList<AuditRecord>(
+    (opts) =>
+      api.queryAudit(namespace, slug, {
+        ...opts,
         action: action || undefined,
         resource_type: resourceType || undefined,
-        limit: PAGE_SIZE,
-      });
-      setRecords(page);
-      setHasMore(page.length >= PAGE_SIZE);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "failed to load audit log");
-    }
-  }
-
-  useEffect(() => {
-    void refresh();
-    // Intentionally re-fetches only on namespace/slug change, not on every
-    // filter keystroke — the form's Filter button drives an explicit refresh.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [namespace, slug]);
-
-  async function onLoadMore() {
-    if (!records || records.length === 0) return;
-    setLoadingMore(true);
-    setError(null);
-    try {
-      const lastID = records[records.length - 1].id;
-      const page = await api.queryAudit(namespace, slug, {
-        action: action || undefined,
-        resource_type: resourceType || undefined,
-        limit: PAGE_SIZE,
-        before_id: lastID,
-      });
-      setRecords((prev) => [...(prev ?? []), ...page]);
-      setHasMore(page.length >= PAGE_SIZE);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "failed to load more audit records");
-    } finally {
-      setLoadingMore(false);
-    }
-  }
+      }),
+    [namespace, slug],
+    "failed to load audit log",
+  );
 
   return (
     <div className="space-y-4">
@@ -102,15 +78,7 @@ export default function Audit({ namespace, slug }: { namespace: string; slug: st
         getRowKey={(r) => String(r.id)}
         emptyState={<EmptyState message="No audit records." />}
       />
-      {hasMore && (
-        <button
-          onClick={() => void onLoadMore()}
-          disabled={loadingMore}
-          className="rounded border border-cc-border px-3 py-1.5 text-sm text-cc-text-secondary hover:bg-cc-surface-2 disabled:opacity-50"
-        >
-          {loadingMore ? "Loading…" : "Load more"}
-        </button>
-      )}
+      <LoadMore hasMore={hasMore} loading={loadingMore} onClick={() => void loadMore()} />
     </div>
   );
 }

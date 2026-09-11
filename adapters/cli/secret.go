@@ -146,17 +146,19 @@ func newSecretListCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			refs, err := sc.svc.List(cmd.Context(), sc.principalID, sc.project.ID)
+			page, err := sc.svc.List(cmd.Context(), sc.principalID, sc.project.ID, pagingOptionsFrom(cmd))
 			if err != nil {
 				return err
 			}
-			for _, ref := range refs {
+			for _, ref := range page.Items {
 				_, _ = fmt.Fprintln(cmd.OutOrStdout(), ref.String())
 			}
+			printNextCursor(cmd, page.NextCursor)
 			return nil
 		},
 	}
 	secretFlags(cmd)
+	pagingFlags(cmd)
 	return cmd
 }
 

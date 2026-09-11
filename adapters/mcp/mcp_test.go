@@ -164,6 +164,19 @@ func callTool[Out any](t *testing.T, ctx context.Context, session *sdkmcp.Client
 	return out
 }
 
+// pagedResult mirrors the envelope every list tool returns — the rows plus
+// a cursor when more remain. Tests that only care about the rows call
+// callToolList and get them directly.
+type pagedResult[T any] struct {
+	Items      []T    `json:"items"`
+	NextCursor string `json:"next_cursor"`
+}
+
+func callToolList[T any](t *testing.T, ctx context.Context, session *sdkmcp.ClientSession, name string, args map[string]any) []T {
+	t.Helper()
+	return callTool[pagedResult[T]](t, ctx, session, name, args).Items
+}
+
 type projectResult struct {
 	ID         string `json:"id"`
 	Namespace  string `json:"namespace"`
@@ -216,7 +229,7 @@ func TestProjectCreateAndArtifactRoundTrip(t *testing.T) {
 		t.Fatalf("artifact.read content = %q", read.Content)
 	}
 
-	list := callTool[[]map[string]any](t, ctx, session, "artifact.list", map[string]any{
+	list := callToolList[map[string]any](t, ctx, session, "artifact.list", map[string]any{
 		"project": "filip/es-migration",
 	})
 	if len(list) != 1 {
@@ -288,7 +301,7 @@ func TestEventListAfterArtifactWrite(t *testing.T) {
 		"project": "mcp-events/proj", "path": "f.txt", "content": "v1", "expected_version": 0,
 	})
 
-	eventList := callTool[[]map[string]any](t, ctx, session, "event.list", map[string]any{"project": "mcp-events/proj"})
+	eventList := callToolList[map[string]any](t, ctx, session, "event.list", map[string]any{"project": "mcp-events/proj"})
 	if len(eventList) == 0 {
 		t.Fatal("event.list returned no events after artifact.write")
 	}
@@ -342,7 +355,7 @@ func TestAuditListAfterArtifactWrite(t *testing.T) {
 		"project": "mcp-audit/proj", "path": "f.txt", "content": "v1", "expected_version": 0,
 	})
 
-	records := callTool[[]map[string]any](t, ctx, session, "audit.list", map[string]any{"project": "mcp-audit/proj"})
+	records := callToolList[map[string]any](t, ctx, session, "audit.list", map[string]any{"project": "mcp-audit/proj"})
 	if len(records) == 0 {
 		t.Fatal("audit.list returned no records after artifact.write")
 	}
@@ -380,7 +393,7 @@ func TestHandoffCreateGetListMCP(t *testing.T) {
 		t.Fatalf("handoff.get summary = %q", got.Summary)
 	}
 
-	list := callTool[[]handoffResult](t, ctx, session, "handoff.list", map[string]any{"project": "mcp-handoff/proj"})
+	list := callToolList[handoffResult](t, ctx, session, "handoff.list", map[string]any{"project": "mcp-handoff/proj"})
 	if len(list) != 1 {
 		t.Fatalf("handoff.list: got %d, want 1", len(list))
 	}
@@ -423,7 +436,7 @@ func TestHistoryLineageMCP(t *testing.T) {
 		"type": "compacted", "derived_from": raw.ID, "content": "hello",
 	})
 
-	objects := callTool[[]historyObjectResult](t, ctx, session, "history.list_objects", map[string]any{
+	objects := callToolList[historyObjectResult](t, ctx, session, "history.list_objects", map[string]any{
 		"project": "mcp-history/proj", "conversation_id": conv.ID,
 	})
 	if len(objects) != 2 {
@@ -544,7 +557,7 @@ func TestSecretCreateListDeleteNeverReturnsValueMCP(t *testing.T) {
 		t.Fatalf("secret.create: name = %q", created.Name)
 	}
 
-	list := callTool[[]secretReferenceResult](t, ctx, session, "secret.list", map[string]any{"project": "mcp-secrets/proj"})
+	list := callToolList[secretReferenceResult](t, ctx, session, "secret.list", map[string]any{"project": "mcp-secrets/proj"})
 	if len(list) != 1 {
 		t.Fatalf("secret.list: got %d, want 1", len(list))
 	}

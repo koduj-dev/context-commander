@@ -251,6 +251,26 @@ export interface InstallationAdmin {
   granted_at: string;
 }
 
+// Page is the envelope every paginated list endpoint returns. next_cursor is
+// absent on the last page, which is how a caller knows to stop offering
+// "Load more" — never by checking whether a page came back full.
+export type Page<T> = { items: T[]; next_cursor?: string };
+
+// PageOpts is what a caller passes to ask for one page. The cursor is opaque
+// — echo back next_cursor, never construct one.
+export type PageOpts = { limit?: number; cursor?: string };
+
+function pageParams(opts: PageOpts, params = new URLSearchParams()): URLSearchParams {
+  if (opts.limit) params.set("limit", String(opts.limit));
+  if (opts.cursor) params.set("cursor", opts.cursor);
+  return params;
+}
+
+function withQuery(path: string, params: URLSearchParams): string {
+  const qs = params.toString();
+  return qs ? `${path}?${qs}` : path;
+}
+
 export const api = {
   me: () => req<Me>("GET", "/v1/me"),
   myProjects: () => req<MyProject[]>("GET", "/v1/me/projects"),
@@ -270,15 +290,15 @@ export const api = {
   listMembers: (namespace: string, slug: string) =>
     req<Member[]>("GET", `/v1/projects/${namespace}/${slug}/members`),
 
-  listArtifacts: (namespace: string, slug: string) =>
-    req<Artifact[]>("GET", `/v1/projects/${namespace}/${slug}/artifacts`),
+  listArtifacts: (namespace: string, slug: string, opts: PageOpts = {}) =>
+    req<Page<Artifact>>("GET", withQuery(`/v1/projects/${namespace}/${slug}/artifacts`, pageParams(opts))),
   artifactHistory: (namespace: string, slug: string, path: string) =>
     req<ArtifactVersion[]>("GET", `/v1/projects/${namespace}/${slug}/artifacts/history?path=${encodeURIComponent(path)}`),
   readArtifact: (namespace: string, slug: string, path: string) =>
     req<string>("GET", `/v1/projects/${namespace}/${slug}/artifacts/content?path=${encodeURIComponent(path)}`),
 
-  listSecrets: (namespace: string, slug: string) =>
-    req<SecretRef[]>("GET", `/v1/projects/${namespace}/${slug}/secrets`),
+  listSecrets: (namespace: string, slug: string, opts: PageOpts = {}) =>
+    req<Page<SecretRef>>("GET", withQuery(`/v1/projects/${namespace}/${slug}/secrets`, pageParams(opts))),
   createSecret: (namespace: string, slug: string, name: string, value: string) =>
     req<SecretRef>("POST", `/v1/projects/${namespace}/${slug}/secrets`, { name, value }),
   deleteSecret: (namespace: string, slug: string, name: string) =>
@@ -319,21 +339,21 @@ export const api = {
   queryAudit: (
     namespace: string,
     slug: string,
-    opts: { action?: string; resource_type?: string; since?: string; until?: string; limit?: number; before_id?: number } = {},
+    opts: PageOpts & { action?: string; resource_type?: string; since?: string; until?: string } = {},
   ) => {
     const params = new URLSearchParams();
     if (opts.action) params.set("action", opts.action);
     if (opts.resource_type) params.set("resource_type", opts.resource_type);
     if (opts.since) params.set("since", opts.since);
     if (opts.until) params.set("until", opts.until);
-    if (opts.limit) params.set("limit", String(opts.limit));
-    if (opts.before_id) params.set("before_id", String(opts.before_id));
-    const qs = params.toString();
-    return req<AuditRecord[]>("GET", `/v1/projects/${namespace}/${slug}/audit${qs ? `?${qs}` : ""}`);
+    return req<Page<AuditRecord>>("GET", withQuery(`/v1/projects/${namespace}/${slug}/audit`, pageParams(opts, params)));
   },
 
-  listHandoffs: (namespace: string, slug: string, status?: string) =>
-    req<Handoff[]>("GET", `/v1/projects/${namespace}/${slug}/handoffs/${status ? `?status=${encodeURIComponent(status)}` : ""}`),
+  listHandoffs: (namespace: string, slug: string, status?: string, opts: PageOpts = {}) => {
+    const params = new URLSearchParams();
+    if (status) params.set("status", status);
+    return req<Page<Handoff>>("GET", withQuery(`/v1/projects/${namespace}/${slug}/handoffs/`, pageParams(opts, params)));
+  },
   getHandoff: (namespace: string, slug: string, id: string) =>
     req<HandoffDetail>("GET", `/v1/projects/${namespace}/${slug}/handoffs/${id}`),
   createHandoff: (
@@ -366,20 +386,19 @@ export const api = {
     conversationId: string,
     body: { external_session_id: string; type: string; derived_from?: string; content: string },
   ) => req<HistoryObject>("POST", `/v1/projects/${namespace}/${slug}/conversations/${conversationId}/objects`, body),
-  listHistoryObjects: (namespace: string, slug: string, conversationId: string) =>
-    req<HistoryObject[]>("GET", `/v1/projects/${namespace}/${slug}/conversations/${conversationId}/objects`),
+  listHistoryObjects: (namespace: string, slug: string, conversationId: string, opts: PageOpts = {}) =>
+    req<Page<HistoryObject>>(
+      "GET",
+      withQuery(`/v1/projects/${namespace}/${slug}/conversations/${conversationId}/objects`, pageParams(opts)),
+    ),
   getLineage: (namespace: string, slug: string, conversationId: string) =>
     req<LineageEdge[]>("GET", `/v1/projects/${namespace}/${slug}/conversations/${conversationId}/lineage`),
 
-  // Forward-only resume cursor (after_seq / ascending seq) — the opposite
-  // direction from audit's before_id/descending keyset pagination above.
-  listEvents: (namespace: string, slug: string, opts: { after_seq?: number; limit?: number } = {}) => {
-    const params = new URLSearchParams();
-    if (opts.after_seq) params.set("after_seq", String(opts.after_seq));
-    if (opts.limit) params.set("limit", String(opts.limit));
-    const qs = params.toString();
-    return req<ProjectEvent[]>("GET", `/v1/projects/${namespace}/${slug}/events${qs ? `?${qs}` : ""}`);
-  },
+  // Events run oldest-first while audit runs newest-first, but both use the
+  // same opaque cursor — the direction is the server's business, not the
+  // caller's.
+  listEvents: (namespace: string, slug: string, opts: PageOpts = {}) =>
+    req<Page<ProjectEvent>>("GET", withQuery(`/v1/projects/${namespace}/${slug}/events`, pageParams(opts))),
 
   // Installation-admin endpoints (docs/adr/0017) — every call here is
   // gated server-side on the caller actually being an installation admin;

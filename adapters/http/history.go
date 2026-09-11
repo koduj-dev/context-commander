@@ -136,19 +136,23 @@ func (d Deps) listHistoryObjects(w http.ResponseWriter, r *http.Request) {
 	project := projectFrom(r.Context())
 	principalID := principalIDFrom(r.Context())
 
-	list, err := d.History.ListHistoryObjects(r.Context(), principalID, project.ID, conversationID)
+	opts, ok := pagingFrom(w, r)
+	if !ok {
+		return
+	}
+	page, err := d.History.ListHistoryObjects(r.Context(), principalID, project.ID, conversationID, opts)
 	if err != nil {
 		writeDomainError(w, err)
 		return
 	}
-	out := make([]historyObjectResponse, len(list))
-	for i, obj := range list {
+	out := make([]historyObjectResponse, len(page.Items))
+	for i, obj := range page.Items {
 		out[i] = historyObjectResponse{
 			ID: obj.ID, ExternalSessionID: obj.ExternalSessionID, Type: obj.Type, DerivedFrom: obj.DerivedFrom,
 			ContentHash: obj.ContentHash, Content: base64.StdEncoding.EncodeToString(obj.Body), CreatedAt: obj.CreatedAt.Format(time.RFC3339),
 		}
 	}
-	writeJSON(w, http.StatusOK, out)
+	writeList(w, out, page.NextCursor)
 }
 
 type lineageEdgeResponse struct {
