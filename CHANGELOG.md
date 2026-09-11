@@ -169,6 +169,43 @@ link definition at the bottom of the file.
 
 ### Fixed
 
+- **Concurrent writes to the same secret silently lost one.**
+  `internal/secrets.LocalEncryptedBackend.Store` read the current version and
+  then upserted version+1 with nothing serializing the two steps, so N
+  concurrent rotations all read version *N* and all wrote *N+1*. Confirmed
+  before fixing: 8 concurrent rotations left the stored version at 4 instead
+  of 9. Nothing surfaced it, because the AEAD associated data stays
+  self-consistent (both writers bind *N+1*) and the surviving value decrypts
+  normally. Now serialized per `(project_id, name)` with a transaction-scoped
+  advisory lock. `SELECT ... FOR UPDATE` would not have covered it: on a
+  secret's first write there is no row to lock yet, and that is the worse
+  case — two writers that both see no row each mint their own `id` and bind it
+  into the AAD, while the upsert's `DO UPDATE` leaves the first inserter's
+  `id` on the row, so a ciphertext can end up bound to an `id` the row no
+  longer carries and stop decrypting at all.
+- **The first two concurrent writes to a new project could both fail.**
+  Found while fixing the above, and the broader of the two:
+  `internal/crypto.Provider.ensureProjectKey` had the same read-then-insert
+  shape, so writes arriving together at a brand-new project all saw
+  `ErrNoProjectKey` and all inserted `key_version` 1. All but one failed on
+  `project_keys`' unique constraint, surfacing as an opaque SQLSTATE 23505 —
+  and because every encrypting domain (artifacts, handoffs, history, secrets)
+  provisions the key lazily through this one path, it was not a secrets
+  problem at all. Reproduced at 4 failures out of 16 concurrent writers.
+  The lock is taken only on the path that would insert, and the key is
+  re-read under it, so the common case — a project whose key already exists —
+  still takes no lock and no extra round trip. `RotateProjectKey` takes the
+  same lock, for the same read-then-insert reason.
+  - New shared primitive `db.AdvisoryXactLock` with a `LockClass` registry
+    (`internal/db/advisory.go`): advisory locks share one flat, cluster-wide
+    key space, so every class used anywhere is declared in one const block,
+    with the nesting order (secret value, then project key — never the
+    reverse) documented where it can be checked.
+  - Regression tests for both, each verified to fail against the unfixed
+    code. `docs/gotchas.md` records why the first version of one of them
+    passed anyway: a barrier placed around the transaction rather than
+    inside it tests connection setup, not concurrency.
+
 - **Security — an ADMIN could escalate to OWNER by adding a principal they
   control.** Both `POST /v1/projects/{ns}/{slug}/members` and the
   `project.add_member` MCP tool accepted any of the four roles once the

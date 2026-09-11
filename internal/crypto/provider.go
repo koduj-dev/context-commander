@@ -10,6 +10,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+
+	"github.com/koduj-dev/context-commander/internal/db"
 )
 
 // Provider is the Postgres-backed CryptoProvider. Encrypt/Decrypt need a
@@ -97,6 +99,12 @@ func (p *Provider) Decrypt(ctx context.Context, tx pgx.Tx, ec EncryptionContext,
 // version they were encrypted under (project_keys rows are never deleted),
 // so nothing needs rewrapping as a consequence of rotating.
 func (p *Provider) RotateProjectKey(ctx context.Context, tx pgx.Tx, projectID uuid.UUID) error {
+	// Same read-then-insert as ensureProjectKey's slow path, and the same
+	// lock: two concurrent rotations would otherwise both read version N
+	// and both try to insert N+1.
+	if err := db.AdvisoryXactLock(ctx, tx, db.LockClassProjectKey, projectID.String()); err != nil {
+		return err
+	}
 	_, _, err := p.newProjectKeyVersion(ctx, tx, projectID)
 	return err
 }
@@ -188,10 +196,34 @@ func (p *Provider) RotateRootKey(ctx context.Context, tx pgx.Tx, previous RootKe
 	return nil
 }
 
+// ensureProjectKey returns the project's current key, creating version 1 on
+// the first encryption for that project.
+//
+// Creating it is a read-then-insert, so it is serialized per project with an
+// advisory lock — but only on the path that would insert. The common case,
+// where the key already exists, takes no lock at all: holding one would
+// serialize every encrypting write to the project against every other, for a
+// row that is written once in the project's lifetime.
+//
+// Without the lock, two concurrent first writes to a brand-new project both
+// see ErrNoProjectKey and both insert key_version 1, so one of them fails on
+// project_keys' unique constraint with a raw SQLSTATE 23505 surfacing as an
+// opaque internal error. That affects every encrypting domain — artifacts,
+// handoffs, history, secrets — since they all reach encryption through here.
+// Re-reading under the lock is what makes the second writer adopt the key the
+// first one committed instead of minting a rival.
 func (p *Provider) ensureProjectKey(ctx context.Context, tx pgx.Tx, projectID uuid.UUID) ([KeySize]byte, int, error) {
 	row, err := p.keys.Latest(ctx, tx, projectID)
 	if errors.Is(err, ErrNoProjectKey) {
-		return p.newProjectKeyVersion(ctx, tx, projectID)
+		if lockErr := db.AdvisoryXactLock(ctx, tx, db.LockClassProjectKey, projectID.String()); lockErr != nil {
+			return [KeySize]byte{}, 0, lockErr
+		}
+		// Double-checked: another writer may have created it while we
+		// waited for the lock.
+		row, err = p.keys.Latest(ctx, tx, projectID)
+		if errors.Is(err, ErrNoProjectKey) {
+			return p.newProjectKeyVersion(ctx, tx, projectID)
+		}
 	}
 	if err != nil {
 		return [KeySize]byte{}, 0, err

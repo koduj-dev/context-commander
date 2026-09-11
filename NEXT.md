@@ -79,14 +79,6 @@ safe, measurable story — **store state → hand off work → resume exactly**.
 The remaining P1 findings from the 2026-09-01 review. Each was re-verified
 against `main` on 2026-09-11; the ones that shipped are gone from this list.
 
-- [ ] **Concurrent writes to the same secret lose one.**
-  `internal/secrets.LocalEncryptedBackend.Store` does `SELECT id, version` and
-  then an `INSERT ... ON CONFLICT DO UPDATE` in the same transaction with no
-  `FOR UPDATE` and no advisory lock, so two writers rotating the same secret
-  both read version *N*, both write *N+1*, and one value is silently dropped.
-  The AAD stays consistent (both bound *N+1*), so this is a lost update, not a
-  decryption failure — which is exactly why nothing surfaces it. Serialize on
-  `(project_id, name)`.
 - [ ] **Unified keyset pagination** — see Backlog below. Listed here too
   because without it we cannot promise history stays reachable under real use,
   and that is a release-blocking claim, not a nice-to-have.
@@ -99,7 +91,10 @@ not a client parameter (`internal/gates/admin.go`); PAT list/revoke shipped
 and `identity.ValidateExpiresAt` rejects a non-future expiry; granting OWNER
 now requires OWNER at both project and organization scope, checked in
 `internal/members.Service`/`internal/organizations.Service` rather than in each
-adapter (see CHANGELOG).
+adapter (see CHANGELOG); the secret read-modify-write is serialized on
+`(project_id, name)`, and the same race in `internal/crypto.ensureProjectKey`
+— which affected every encrypting domain, not just secrets — is serialized per
+project (`internal/db/advisory.go`).
 
 ### Phase 1 — the first genuinely usable vertical slice
 
@@ -347,9 +342,9 @@ feature.
 
 **Confirm with the maintainer before starting.** In order:
 
-1. **Phase 0** — secret write serialization, keyset pagination.
-   Release-blocking, each with a regression test. (ADMIN→OWNER escalation:
-   done, see CHANGELOG.)
+1. **Phase 0** — keyset pagination. Release-blocking, with a regression test.
+   (ADMIN→OWNER escalation and the secret/project-key write races: done, see
+   CHANGELOG.)
 2. **Phase 1** — `skill.get`, `context.bootstrap`, handoff lifecycle,
    quickstart, two named MCP clients, E2E scenario, storage-backend honesty.
 3. **Phase 2 onward** — only after the core loop is measured with real design

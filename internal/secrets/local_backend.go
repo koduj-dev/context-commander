@@ -35,8 +35,24 @@ func NewLocalEncryptedBackend(pool *db.Pool, cryptoProvider *crypto.Provider) *L
 // (crypto.EncryptionContext.ResourceVersion) binds each ciphertext to
 // exactly the update that produced it — the same reason artifact versions
 // carry their own version number into AAD (docs/adr/0005 §AAD).
+//
+// The read of the current version and the write of version+1 are one
+// read-modify-write, so they are serialized per (project_id, name) with an
+// advisory lock. Without it two writers rotating the same secret both read
+// version N and both write N+1, and one value is silently dropped — a lost
+// update nothing surfaces, because the AAD stays self-consistent (both bind
+// N+1) and the survivor decrypts fine. `SELECT ... FOR UPDATE` would not do:
+// on the first write there is no row yet to lock, and that case is the worse
+// one — two writers that both see no row each mint their own `id` and bind
+// it into the AAD, while the upsert's DO UPDATE leaves the first inserter's
+// `id` on the row, so a ciphertext can end up bound to an `id` the row no
+// longer has and stop decrypting altogether.
 func (b *LocalEncryptedBackend) Store(ctx context.Context, principalID uuid.UUID, ref Reference, plaintext []byte) error {
 	return db.WithPrincipal(ctx, b.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+		if err := db.AdvisoryXactLock(ctx, tx, db.LockClassSecretValue, ref.ScopeRef.String(), ref.Name); err != nil {
+			return fmt.Errorf("secrets: store: %w", err)
+		}
+
 		var id uuid.UUID
 		var version int
 		err := tx.QueryRow(ctx,

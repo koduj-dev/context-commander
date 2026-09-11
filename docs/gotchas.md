@@ -32,3 +32,35 @@ two-tier trust story.
 things that should be encrypted — that stays open until an
 installation-level key primitive exists. Don't assume skill content is
 protected the way artifact/handoff/history content is.
+
+## A concurrency test must hold its transactions open before the barrier
+
+Releasing N goroutines from a `sync.WaitGroup` barrier and *then* letting each
+open its own transaction does not test concurrency — it mostly tests that
+`pgxpool` opens connections one at a time. The first goroutine gets a warm
+connection and finishes its entire transaction while the rest are still doing
+TCP setup and authentication, so a read-modify-write race is never reached.
+
+`TestConcurrentFirstEncryptProvisionsOneProjectKey`
+(`internal/crypto/concurrency_integration_test.go`) passed against genuinely
+broken code for exactly this reason before the barrier moved *inside* the
+`db.WithoutPrincipal` callback, where every writer signals only once its
+transaction is open. With the barrier in the right place, 4 of 16 writers fail
+on the unique constraint every run.
+
+Two consequences worth copying into the next such test:
+
+- the pool needs `MaxConns >= writers` (via `db.NewPoolFromConfig`), or
+  goroutines holding transactions deadlock against goroutines that cannot get a
+  connection;
+- before trusting a concurrency regression test, run it against the *unfixed*
+  code and watch it fail. Several tests written for this file looked correct
+  and proved nothing.
+
+## Advisory lock classes live in one registry
+
+Postgres advisory locks share one flat, cluster-wide key space, so unrelated
+call sites can serialize against each other — or deadlock — by accident.
+`internal/db/advisory.go` declares every `LockClass` used anywhere in the
+codebase in a single const block for that reason. Add new ones there, and
+check the nesting order documented on `AdvisoryXactLock` before taking two.
