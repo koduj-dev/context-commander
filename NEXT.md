@@ -79,16 +79,6 @@ safe, measurable story — **store state → hand off work → resume exactly**.
 The remaining P1 findings from the 2026-09-01 review. Each was re-verified
 against `main` on 2026-09-11; the ones that shipped are gone from this list.
 
-- [ ] **ADMIN can grant OWNER.** `adapters/http/projects.go`'s `addMember` and
-  `adapters/mcp/tools_project.go` accept any of the four roles once the caller
-  passes `auth.CapMemberManage` — which `RoleAdmin` holds
-  (`internal/auth/capability.go`). So an ADMIN, who deliberately does *not*
-  hold `CapProjectDelete`, can add a principal they control as OWNER and
-  inherit it that way. `projects.Store.AddMember` is a plain `INSERT` with no
-  `ON CONFLICT`, so an ADMIN cannot rewrite their *own* existing row — the
-  escalation needs a second principal, which is why this is a real hole rather
-  than a trivial one. Fix belongs in the domain service (ADR 0014), not in the
-  two adapters: granting OWNER requires OWNER.
 - [ ] **Concurrent writes to the same secret lose one.**
   `internal/secrets.LocalEncryptedBackend.Store` does `SELECT id, version` and
   then an `INSERT ... ON CONFLICT DO UPDATE` in the same transaction with no
@@ -106,7 +96,10 @@ are bound to the authenticated principal per HTTP request
 (`adapters/mcp/mcp.go`, the server is constructed closed over `cred.PrincipalID`);
 organization-scope gate bindings are derived from the caller's org membership,
 not a client parameter (`internal/gates/admin.go`); PAT list/revoke shipped
-and `identity.ValidateExpiresAt` rejects a non-future expiry.
+and `identity.ValidateExpiresAt` rejects a non-future expiry; granting OWNER
+now requires OWNER at both project and organization scope, checked in
+`internal/members.Service`/`internal/organizations.Service` rather than in each
+adapter (see CHANGELOG).
 
 ### Phase 1 — the first genuinely usable vertical slice
 
@@ -232,6 +225,15 @@ on the planned move to a public repo:
 
 ## 📦 Backlog
 
+- **Adding or removing a project/organization member writes no audit row.**
+  Surfaced while closing the ADMIN→OWNER escalation: granting a role is
+  exactly the kind of privilege change `internal/audit` exists to record, and
+  "trace the origin of a change without SQL" is a stated v0.1 metric below —
+  but neither `internal/members.Service.Add` nor
+  `organizations.Service.AddMember` calls `audit.Write`. Cheap: one
+  `audit.Write` in the same transaction as the insert, the pattern
+  `internal/artifacts.Service.Write` already uses. Deliberately left out of
+  the escalation fix to keep that change to the security boundary.
 - **Real cursor pagination for list endpoints.** `internal/audit.Query` got a
   real keyset cursor (`before_id`, 2026-09-02) wired through to the web UI's
   Audit tab "Load more" — the pattern to copy.
@@ -345,8 +347,9 @@ feature.
 
 **Confirm with the maintainer before starting.** In order:
 
-1. **Phase 0** — ADMIN→OWNER escalation, secret write serialization, keyset
-   pagination. Release-blocking, each with a regression test.
+1. **Phase 0** — secret write serialization, keyset pagination.
+   Release-blocking, each with a regression test. (ADMIN→OWNER escalation:
+   done, see CHANGELOG.)
 2. **Phase 1** — `skill.get`, `context.bootstrap`, handoff lifecycle,
    quickstart, two named MCP clients, E2E scenario, storage-backend honesty.
 3. **Phase 2 onward** — only after the core loop is measured with real design

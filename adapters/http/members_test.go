@@ -91,3 +91,79 @@ func TestListMembersRejectsNonMember(t *testing.T) {
 		t.Fatalf("list members as outsider: status=%d, want 404 or 403", resp.StatusCode)
 	}
 }
+
+// TestAdminCannotGrantOwnerOverHTTP is the end-to-end regression test for
+// the privilege escalation the /members endpoint used to allow: the handler
+// checked only CapMemberManage, which ADMIN holds, so an ADMIN could POST a
+// principal they control with role OWNER and inherit ownership through it.
+// internal/members.Service now requires CapMemberGrantOwner (OWNER-only) on
+// top; this test pins the behavior at the transport the hole was reachable
+// from.
+func TestAdminCannotGrantOwnerOverHTTP(t *testing.T) {
+	f := newFixture(t)
+	ownerToken := f.newUserWithToken("owner-escalation@example.test")
+	adminToken := f.newUserWithToken("admin-escalation@example.test")
+	accompliceToken := f.newUserWithToken("accomplice-escalation@example.test")
+	f.createProject(ownerToken, "escalation/proj", "Escalation Proj")
+
+	adminPrincipalID := f.principalIDViaMe(adminToken)
+	accomplicePrincipalID := f.principalIDViaMe(accompliceToken)
+
+	addBody, _ := json.Marshal(map[string]string{"principal_id": adminPrincipalID, "role": "ADMIN"})
+	resp := f.do(http.MethodPost, "/v1/projects/escalation/proj/members", ownerToken, addBody)
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("owner adds admin: status=%d", resp.StatusCode)
+	}
+
+	// The escalation attempt: ADMIN adds a principal it controls as OWNER.
+	addBody, _ = json.Marshal(map[string]string{"principal_id": accomplicePrincipalID, "role": "OWNER"})
+	resp = f.do(http.MethodPost, "/v1/projects/escalation/proj/members", adminToken, addBody)
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("admin grants OWNER: status=%d, want 403", resp.StatusCode)
+	}
+
+	// ADMIN keeps ordinary member management.
+	addBody, _ = json.Marshal(map[string]string{"principal_id": accomplicePrincipalID, "role": "CONTRIBUTOR"})
+	resp = f.do(http.MethodPost, "/v1/projects/escalation/proj/members", adminToken, addBody)
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("admin grants CONTRIBUTOR: status=%d, want 204", resp.StatusCode)
+	}
+
+	// No OWNER row was written despite the 403 — a check that denies but
+	// writes anyway would still be an escalation.
+	resp = f.do(http.MethodGet, "/v1/projects/escalation/proj/members", ownerToken, nil)
+	defer func() { _ = resp.Body.Close() }()
+	var list []map[string]any
+	_ = json.NewDecoder(resp.Body).Decode(&list)
+	owners := 0
+	for _, m := range list {
+		if m["role"] == "OWNER" {
+			owners++
+		}
+	}
+	if owners != 1 {
+		t.Fatalf("OWNER rows = %d, want 1 (only the original owner); members = %+v", owners, list)
+	}
+}
+
+// TestAddMemberRejectsUnknownRole pins the 400 an unrecognized role gets.
+// The check moved from the handler into internal/members.Service, so this
+// guards that the domain error still maps back to invalid_request rather
+// than a 500.
+func TestAddMemberRejectsUnknownRole(t *testing.T) {
+	f := newFixture(t)
+	ownerToken := f.newUserWithToken("owner-badrole-http@example.test")
+	targetToken := f.newUserWithToken("target-badrole-http@example.test")
+	f.createProject(ownerToken, "badrole/proj", "Bad Role Proj")
+
+	addBody, _ := json.Marshal(map[string]string{"principal_id": f.principalIDViaMe(targetToken), "role": "SUPERUSER"})
+	resp := f.do(http.MethodPost, "/v1/projects/badrole/proj/members", ownerToken, addBody)
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusBadRequest {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("unknown role: status=%d body=%s, want 400", resp.StatusCode, b)
+	}
+}

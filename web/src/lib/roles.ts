@@ -11,6 +11,14 @@ export function canManageMembers(role: string): boolean {
   return role === "ADMIN" || role === "OWNER";
 }
 
+// CapMemberGrantOwner / CapOrgGrantOwner are OWNER-only, deliberately
+// narrower than manage-members: an ADMIN who could hand out OWNER could
+// promote an account they control and inherit ownership that way. The same
+// predicate covers both scopes — "OWNER" means OWNER in each.
+export function canGrantOwnerRole(role: string): boolean {
+  return role === "OWNER";
+}
+
 // CapGateManage (internal/auth/capability.go) is ADMIN/OWNER-only.
 export function canManageGates(role: string): boolean {
   return role === "ADMIN" || role === "OWNER";

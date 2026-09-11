@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useParams } from "react-router-dom";
 import { api, ApiError, type MyOrganization } from "../lib/api";
 import PageHeader from "../components/PageHeader";
+import { canGrantOwnerRole } from "../lib/roles";
 
 export default function OrganizationDetail() {
   const { id = "" } = useParams();
@@ -58,7 +59,8 @@ export default function OrganizationDetail() {
           >
             <option value="MEMBER">MEMBER</option>
             <option value="ADMIN">ADMIN</option>
-            <option value="OWNER">OWNER</option>
+            {/* Only an OWNER may grant OWNER — organizations.CapOrgGrantOwner. */}
+            {canGrantOwnerRole(org.role) && <option value="OWNER">OWNER</option>}
           </select>
           <button
             type="submit"

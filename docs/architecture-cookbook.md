@@ -485,7 +485,12 @@ Suggested meaning:
 - member management,
 - project configuration,
 - skills/integrations,
-- no ownership transfer unless explicitly permitted.
+- no ownership transfer unless explicitly permitted — including **no granting
+  of the OWNER role**. Member management and ownership transfer are separate
+  capabilities (`member.manage` vs. `member.grant_owner`) precisely because
+  collapsing them lets an ADMIN promote a principal they control and inherit
+  ownership through it. The same split applies at organization scope
+  (`org.manage_members` vs. `org.grant_owner`).
 
 ### CONTRIBUTOR
 
@@ -508,6 +513,7 @@ project.delete
 
 member.read
 member.manage
+member.grant_owner
 
 artifact.read
 artifact.write

@@ -14,6 +14,15 @@ const (
 
 	CapMemberRead   Capability = "member.read"
 	CapMemberManage Capability = "member.manage"
+	// CapMemberGrantOwner is deliberately separate from CapMemberManage
+	// and OWNER-only. ADMIN holds CapMemberManage but not
+	// CapProjectDelete, because ownership-level actions are OWNER's — yet
+	// with a single member.manage capability an ADMIN could add a
+	// principal they control as OWNER and inherit ownership that way,
+	// which is the same privilege by a longer route. Granting OWNER is
+	// therefore its own capability, checked on top of CapMemberManage by
+	// internal/members.Service.Add.
+	CapMemberGrantOwner Capability = "member.grant_owner"
 
 	CapArtifactRead   Capability = "artifact.read"
 	CapArtifactWrite  Capability = "artifact.write"
@@ -96,9 +105,12 @@ var roleCapabilities = map[projects.Role]map[Capability]bool{
 		CapSecretRead, CapSecretWrite,
 		CapSkillPublish, CapSkillOverride, CapGateManage,
 		CapHandoffRead, CapHandoffWrite, CapHistoryRead, CapHistoryWrite,
-		// No CapProjectDelete — ownership-level action, OWNER only
+		// No CapProjectDelete and no CapMemberGrantOwner — both are
+		// ownership-level actions, OWNER only
 		// (docs/architecture-cookbook.md §7.1: "no ownership transfer
-		// unless explicitly permitted").
+		// unless explicitly permitted"). Granting OWNER is listed here
+		// explicitly as an absence because it is the non-obvious half:
+		// ADMIN *can* manage members, just not mint another owner.
 	),
 	projects.RoleOwner: setOf(
 		CapProjectRead, CapMemberRead, CapArtifactRead, CapSkillRead,
@@ -110,7 +122,7 @@ var roleCapabilities = map[projects.Role]map[Capability]bool{
 		CapSecretRead, CapSecretWrite,
 		CapSkillPublish, CapSkillOverride, CapGateManage,
 		CapHandoffRead, CapHandoffWrite, CapHistoryRead, CapHistoryWrite,
-		CapProjectDelete,
+		CapProjectDelete, CapMemberGrantOwner,
 	),
 }
 

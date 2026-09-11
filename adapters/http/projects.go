@@ -10,7 +10,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/koduj-dev/context-commander/internal/auth"
 	"github.com/koduj-dev/context-commander/internal/db"
 	"github.com/koduj-dev/context-commander/internal/identity"
 	"github.com/koduj-dev/context-commander/internal/projects"
@@ -89,33 +88,14 @@ func (d Deps) addMember(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid_request", "principal_id must be a UUID")
 		return
 	}
-	role := projects.Role(req.Role)
-	switch role {
-	case projects.RoleOwner, projects.RoleAdmin, projects.RoleContributor, projects.RoleReader:
-	default:
-		writeError(w, http.StatusBadRequest, "invalid_request", "role must be one of OWNER, ADMIN, CONTRIBUTOR, READER")
-		return
-	}
-
 	project := projectFrom(r.Context())
 	principalID := principalIDFrom(r.Context())
 
-	allowed, err := d.Authz.Can(r.Context(), principalID, project.ID, auth.CapMemberManage)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal_error", "authorization check failed")
-		return
-	}
-	if !allowed {
-		writeError(w, http.StatusForbidden, "forbidden", "you do not have permission to manage members on this project")
-		return
-	}
-
-	err = db.WithPrincipal(r.Context(), d.Pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
-		_, err := d.Projects.AddMember(r.Context(), tx, project.ID, targetPrincipalID, role)
-		return err
-	})
-	if err != nil {
-		writeError(w, http.StatusForbidden, "forbidden", "could not add member: "+err.Error())
+	// Both the role check and the "granting OWNER requires OWNER" rule
+	// live in internal/members.Service (docs/adr/0014) — this handler only
+	// parses and maps errors.
+	if err := d.Members.Add(r.Context(), principalID, project.ID, targetPrincipalID, projects.Role(req.Role)); err != nil {
+		writeDomainError(w, err)
 		return
 	}
 
@@ -140,22 +120,7 @@ func (d Deps) listMembers(w http.ResponseWriter, r *http.Request) {
 	project := projectFrom(r.Context())
 	principalID := principalIDFrom(r.Context())
 
-	allowed, err := d.Authz.Can(r.Context(), principalID, project.ID, auth.CapMemberRead)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal_error", "authorization check failed")
-		return
-	}
-	if !allowed {
-		writeError(w, http.StatusForbidden, "forbidden", "you do not have permission to read members on this project")
-		return
-	}
-
-	var members []projects.Membership
-	err = db.WithPrincipal(r.Context(), d.Pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
-		var err error
-		members, err = d.Projects.ListMembers(r.Context(), tx, project.ID)
-		return err
-	})
+	members, err := d.Members.List(r.Context(), principalID, project.ID)
 	if err != nil {
 		writeDomainError(w, err)
 		return

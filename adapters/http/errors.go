@@ -13,6 +13,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/history"
 	"github.com/koduj-dev/context-commander/internal/identity"
 	"github.com/koduj-dev/context-commander/internal/installation"
+	"github.com/koduj-dev/context-commander/internal/members"
 	"github.com/koduj-dev/context-commander/internal/organizations"
 	"github.com/koduj-dev/context-commander/internal/projects"
 	"github.com/koduj-dev/context-commander/internal/secrets"
@@ -79,7 +80,7 @@ func writeDomainError(w http.ResponseWriter, err error) {
 	case errors.Is(err, artifacts.ErrForbidden), errors.Is(err, events.ErrForbidden), errors.Is(err, organizations.ErrForbidden),
 		errors.Is(err, audit.ErrForbidden), errors.Is(err, handoffs.ErrForbidden), errors.Is(err, history.ErrForbidden),
 		errors.Is(err, skills.ErrForbidden), errors.Is(err, gates.ErrForbidden), errors.Is(err, secrets.ErrForbidden),
-		errors.Is(err, installation.ErrForbidden):
+		errors.Is(err, installation.ErrForbidden), errors.Is(err, members.ErrForbidden):
 		writeError(w, http.StatusForbidden, "forbidden", "forbidden")
 	case errors.Is(err, installation.ErrAlreadyAdmin):
 		writeError(w, http.StatusConflict, "conflict", "user is already an installation admin")
@@ -99,7 +100,8 @@ func writeDomainError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusBadRequest, "invalid_request", "gate_name is not a registered provider")
 	case errors.Is(err, history.ErrInvalidReference):
 		writeError(w, http.StatusBadRequest, "invalid_request", "referenced conversation/session/derived_from object does not belong to this project/conversation")
-	case errors.Is(err, projects.ErrInvalidResolvePath), errors.Is(err, secrets.ErrInvalidName), errors.Is(err, identity.ErrInvalidExpiry):
+	case errors.Is(err, projects.ErrInvalidResolvePath), errors.Is(err, secrets.ErrInvalidName), errors.Is(err, identity.ErrInvalidExpiry),
+		errors.Is(err, members.ErrInvalidRole), errors.Is(err, organizations.ErrInvalidRole):
 		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
 	default:
 		writeError(w, http.StatusInternalServerError, "internal", "internal error")

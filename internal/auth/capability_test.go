@@ -28,10 +28,16 @@ func TestRoleCanMatrix(t *testing.T) {
 		{projects.RoleAdmin, auth.CapMemberManage, true},
 		{projects.RoleAdmin, auth.CapArtifactWrite, true},
 		{projects.RoleAdmin, auth.CapProjectDelete, false}, // ownership-level, OWNER only
+		// An ADMIN manages members but must not be able to mint another
+		// OWNER — the two capabilities are deliberately not the same one.
+		{projects.RoleAdmin, auth.CapMemberGrantOwner, false},
+		{projects.RoleContributor, auth.CapMemberGrantOwner, false},
+		{projects.RoleReader, auth.CapMemberGrantOwner, false},
 
 		{projects.RoleOwner, auth.CapProjectDelete, true},
 		{projects.RoleOwner, auth.CapProjectUpdate, true},
 		{projects.RoleOwner, auth.CapArtifactWrite, true},
+		{projects.RoleOwner, auth.CapMemberGrantOwner, true},
 
 		{"NOT_A_ROLE", auth.CapArtifactRead, false}, // unknown role -> deny, not panic
 	}

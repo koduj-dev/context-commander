@@ -13,12 +13,21 @@ type Capability string
 const (
 	CapOrgRead          Capability = "org.read"
 	CapOrgManageMembers Capability = "org.manage_members"
+	// CapOrgGrantOwner is OWNER-only, and split out of
+	// CapOrgManageMembers for the same reason
+	// internal/auth.CapMemberGrantOwner is split out of
+	// CapMemberManage: otherwise an ADMIN can add an account they
+	// control as OWNER and inherit ownership through it, which is an
+	// escalation dressed up as ordinary member management.
+	CapOrgGrantOwner Capability = "org.grant_owner"
 )
 
 var roleCapabilities = map[Role]map[Capability]bool{
 	RoleMember: setOf(CapOrgRead),
-	RoleAdmin:  setOf(CapOrgRead, CapOrgManageMembers),
-	RoleOwner:  setOf(CapOrgRead, CapOrgManageMembers),
+	// ADMIN manages members but cannot mint another OWNER — the absence
+	// of CapOrgGrantOwner here is the whole point of the capability.
+	RoleAdmin: setOf(CapOrgRead, CapOrgManageMembers),
+	RoleOwner: setOf(CapOrgRead, CapOrgManageMembers, CapOrgGrantOwner),
 }
 
 func setOf(caps ...Capability) map[Capability]bool {

@@ -169,6 +169,41 @@ link definition at the bottom of the file.
 
 ### Fixed
 
+- **Security — an ADMIN could escalate to OWNER by adding a principal they
+  control.** Both `POST /v1/projects/{ns}/{slug}/members` and the
+  `project.add_member` MCP tool accepted any of the four roles once the
+  caller passed a bare `auth.CapMemberManage` check — which `RoleAdmin`
+  holds, deliberately *without* `CapProjectDelete`. An ADMIN could therefore
+  add a second principal as OWNER and exercise ownership through it, which is
+  ownership transfer by a longer route. `projects.Store.AddMember` is a plain
+  `INSERT` with no `ON CONFLICT`, so an ADMIN could not rewrite their own
+  membership row — the escalation needed a second principal, which is why
+  nothing surfaced it.
+  - Granting OWNER is now its own capability, `auth.CapMemberGrantOwner`,
+    held by `RoleOwner` alone and checked on top of `CapMemberManage`.
+  - The check lives in a new `internal/members.Service` — the domain
+    chokepoint ADR 0014 requires — not in the two adapters that each carried
+    their own copy, so a third adapter cannot reintroduce the hole by
+    forgetting it. It is a package of its own rather than a service inside
+    `internal/projects` because `internal/auth` imports `internal/projects`
+    for `projects.Role`; a `projects.Service` holding an `*auth.AuthzService`
+    would be an import cycle. `internal/projects` stays the store, with no
+    authorization of its own.
+  - The same hole existed at organization scope and is closed the same way:
+    `organizations.CapOrgGrantOwner` (OWNER-only) gates promoting anyone to
+    organization OWNER, on top of `CapOrgManageMembers`, which ADMIN holds.
+  - Both services now reject an unrecognized role (`ErrInvalidRole`, HTTP
+    400) instead of letting it reach the database, where `RoleCan` would
+    later map it to no capabilities at all.
+  - Web UI: the role select no longer offers OWNER to a caller who cannot
+    grant it (`canGrantOwnerRole` in `web/src/lib/roles.ts`), on both the
+    project Members tab and the organization detail page — a display
+    decision only; the server re-checks every request.
+  - Regression tests at all three levels: the pure capability matrices
+    (`internal/auth`, `internal/organizations`), the domain services against
+    a real Postgres, and end-to-end over HTTP — including that a denied
+    grant writes no row, not merely that it returns 403.
+
 - **CI:** `ci` workflow (`lint`, `gitleaks`) failed on every push since
   2026-08-27. `golangci-lint-action@v6` installed the last v1.x binary
   (v1.64.8, built with go1.24), which refuses to run against `go.mod`'s

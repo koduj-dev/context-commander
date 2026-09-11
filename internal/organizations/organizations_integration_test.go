@@ -119,6 +119,59 @@ func TestAddMemberRequiresManageCapability(t *testing.T) {
 	}
 }
 
+// TestAdminCannotGrantOwner is the organization-scoped twin of
+// internal/members.TestAdminCannotGrantOwner: CapOrgManageMembers lets an
+// ADMIN manage members, but promoting an account they control to OWNER
+// would be ownership transfer by another name.
+func TestAdminCannotGrantOwner(t *testing.T) {
+	f := newFixture(t)
+
+	owner := f.newUser("owner-grant-org@example.test")
+	admin := f.newUser("admin-grant-org@example.test")
+	accomplice := f.newUser("accomplice-grant-org@example.test")
+
+	org, err := f.svc.Create(f.ctx, owner.principalID, owner.userID, "Grant Corp")
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if _, err := f.svc.AddMember(f.ctx, owner.principalID, owner.userID, org.ID, admin.userID, organizations.RoleAdmin); err != nil {
+		t.Fatalf("owner AddMember admin: %v", err)
+	}
+
+	_, err = f.svc.AddMember(f.ctx, admin.principalID, admin.userID, org.ID, accomplice.userID, organizations.RoleOwner)
+	if !errors.Is(err, organizations.ErrForbidden) {
+		t.Fatalf("ADMIN granting OWNER: got err=%v, want ErrForbidden", err)
+	}
+
+	// ADMIN must still be able to do ordinary member management.
+	if _, err := f.svc.AddMember(f.ctx, admin.principalID, admin.userID, org.ID, accomplice.userID, organizations.RoleMember); err != nil {
+		t.Fatalf("ADMIN granting MEMBER: %v", err)
+	}
+
+	// And the OWNER keeps the legitimate co-ownership path.
+	coOwner := f.newUser("coowner-org@example.test")
+	if _, err := f.svc.AddMember(f.ctx, owner.principalID, owner.userID, org.ID, coOwner.userID, organizations.RoleOwner); err != nil {
+		t.Fatalf("OWNER granting OWNER: %v", err)
+	}
+}
+
+// TestAddMemberRejectsUnknownRole keeps an unrecognized role from reaching
+// the database, where RoleCan would later map it to no capabilities at all.
+func TestAddMemberRejectsUnknownRole(t *testing.T) {
+	f := newFixture(t)
+
+	owner := f.newUser("owner-badrole-org@example.test")
+	target := f.newUser("target-badrole-org@example.test")
+
+	org, err := f.svc.Create(f.ctx, owner.principalID, owner.userID, "Bad Role Corp")
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if _, err := f.svc.AddMember(f.ctx, owner.principalID, owner.userID, org.ID, target.userID, organizations.Role("SUPERUSER")); !errors.Is(err, organizations.ErrInvalidRole) {
+		t.Fatalf("unknown role: got err=%v, want ErrInvalidRole", err)
+	}
+}
+
 func TestNonMemberCannotReadOrganization(t *testing.T) {
 	f := newFixture(t)
 

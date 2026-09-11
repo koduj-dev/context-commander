@@ -52,6 +52,23 @@ describe("Members", () => {
     expect(container.querySelector("form")).toBeNull();
   });
 
+  it("does not offer the OWNER role to an ADMIN, but does to an OWNER", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => jsonResponse(MEMBERS)),
+    );
+
+    // Granting OWNER requires OWNER server-side (internal/members
+    // Service.Add); offering the option to an ADMIN would only yield a 403.
+    await flush(() => root.render(<Members namespace="ns" slug="sl" role="ADMIN" />));
+    const adminRoles = Array.from(container.querySelectorAll("option")).map((o) => o.value);
+    expect(adminRoles).toEqual(["ADMIN", "CONTRIBUTOR", "READER"]);
+
+    await flush(() => root.render(<Members namespace="ns" slug="sl" role="OWNER" />));
+    const ownerRoles = Array.from(container.querySelectorAll("option")).map((o) => o.value);
+    expect(ownerRoles).toContain("OWNER");
+  });
+
   it("shows the add form to an ADMIN and refreshes the list after adding", async () => {
     let added = false;
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {

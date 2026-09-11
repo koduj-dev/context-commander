@@ -17,6 +17,12 @@ import (
 // leak existence).
 var ErrForbidden = errors.New("organizations: forbidden")
 
+// ErrInvalidRole is returned for a role string that is not one of the three
+// organization roles. Without this guard an unrecognized role reaches the
+// database, and RoleCan would later map it to no capabilities at all —
+// a member row nobody can reason about.
+var ErrInvalidRole = errors.New(`organizations: role must be one of OWNER, ADMIN, MEMBER`)
+
 // Service is organizations' authorization chokepoint, mirroring every
 // other domain's Service (docs/adr/0014): every method checks membership
 // itself rather than trusting a caller to have checked already. It takes
@@ -119,9 +125,23 @@ func (s *Service) ListMine(ctx context.Context, principalID, userID uuid.UUID) (
 // AddMember adds newUserID to organizationID with role, after checking the
 // caller (principalID, callerUserID) holds CapOrgManageMembers on it —
 // OWNER or ADMIN, per roleCapabilities in capability.go.
+//
+// Granting OWNER additionally requires CapOrgGrantOwner, which only OWNER
+// holds: member management and ownership transfer are different privileges,
+// and collapsing them lets an ADMIN promote a second account they control.
 func (s *Service) AddMember(ctx context.Context, principalID, callerUserID, organizationID, newUserID uuid.UUID, role Role) (Membership, error) {
+	switch role {
+	case RoleOwner, RoleAdmin, RoleMember:
+	default:
+		return Membership{}, ErrInvalidRole
+	}
 	if err := s.checkCapability(ctx, principalID, callerUserID, organizationID, CapOrgManageMembers); err != nil {
 		return Membership{}, err
+	}
+	if role == RoleOwner {
+		if err := s.checkCapability(ctx, principalID, callerUserID, organizationID, CapOrgGrantOwner); err != nil {
+			return Membership{}, err
+		}
 	}
 	var m Membership
 	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {

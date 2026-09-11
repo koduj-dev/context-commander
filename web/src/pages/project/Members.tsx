@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { api, ApiError, type Member } from "../../lib/api";
-import { canManageMembers } from "../../lib/roles";
+import { canGrantOwnerRole, canManageMembers } from "../../lib/roles";
 import DataTable from "../../components/DataTable";
 import PrincipalBadge from "../../components/PrincipalBadge";
 import StatusBadge from "../../components/StatusBadge";
@@ -14,6 +14,10 @@ export default function Members({ namespace, slug, role }: { namespace: string; 
   const [principalId, setPrincipalId] = useState("");
   const [newRole, setNewRole] = useState("READER");
   const [status, setStatus] = useState<string | null>(null);
+
+  // An ADMIN can manage members but not grant OWNER (internal/members
+  // Service.Add) — offering the option would only produce a 403.
+  const assignableRoles = canGrantOwnerRole(role) ? ROLES : ROLES.filter((r) => r !== "OWNER");
 
   async function refresh() {
     try {
@@ -66,7 +70,7 @@ export default function Members({ namespace, slug, role }: { namespace: string; 
             onChange={(e) => setNewRole(e.target.value)}
             className="rounded border border-cc-border bg-cc-surface-2 px-2 py-1.5 text-sm text-cc-text outline-none focus:border-cc-border-strong"
           >
-            {ROLES.map((r) => (
+            {assignableRoles.map((r) => (
               <option key={r} value={r}>
                 {r}
               </option>

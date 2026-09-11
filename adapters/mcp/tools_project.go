@@ -10,7 +10,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	sdkmcp "github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/koduj-dev/context-commander/internal/auth"
 	"github.com/koduj-dev/context-commander/internal/db"
 	"github.com/koduj-dev/context-commander/internal/identity"
 	"github.com/koduj-dev/context-commander/internal/projects"
@@ -89,19 +88,12 @@ func registerProjectTools(server *sdkmcp.Server, deps Deps, principalID, clientI
 	}
 	sdkmcp.AddTool(server, &sdkmcp.Tool{
 		Name:        "project.add_member",
-		Description: "Add a principal to a project you're already a member of, with the given role.",
+		Description: "Add a principal to a project you're already a member of, with the given role. Requires ADMIN or OWNER; granting the OWNER role requires OWNER.",
 	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, args addMemberArgs) (*sdkmcp.CallToolResult, addMemberResult, error) {
 		targetPrincipalID, err := uuid.Parse(args.PrincipalID)
 		if err != nil {
 			return nil, addMemberResult{}, errors.New("principal_id must be a UUID")
 		}
-		role := projects.Role(args.Role)
-		switch role {
-		case projects.RoleOwner, projects.RoleAdmin, projects.RoleContributor, projects.RoleReader:
-		default:
-			return nil, addMemberResult{}, errors.New("role must be one of OWNER, ADMIN, CONTRIBUTOR, READER")
-		}
-
 		var project projects.Project
 		err = db.WithPrincipal(ctx, deps.Pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
 			var err error
@@ -112,19 +104,9 @@ func registerProjectTools(server *sdkmcp.Server, deps Deps, principalID, clientI
 			return nil, addMemberResult{}, err
 		}
 
-		allowed, err := deps.Authz.Can(ctx, principalID, project.ID, auth.CapMemberManage)
-		if err != nil {
-			return nil, addMemberResult{}, err
-		}
-		if !allowed {
-			return nil, addMemberResult{}, errors.New("you do not have permission to manage members on this project")
-		}
-
-		err = db.WithPrincipal(ctx, deps.Pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
-			_, err := deps.Projects.AddMember(ctx, tx, project.ID, targetPrincipalID, role)
-			return err
-		})
-		if err != nil {
+		// Role validation, the member.manage check and the OWNER-grants-
+		// OWNER rule all live in internal/members.Service (docs/adr/0014).
+		if err := deps.Members.Add(ctx, principalID, project.ID, targetPrincipalID, projects.Role(args.Role)); err != nil {
 			return nil, addMemberResult{}, err
 		}
 		return nil, addMemberResult{Added: true}, nil
@@ -157,20 +139,7 @@ func registerProjectTools(server *sdkmcp.Server, deps Deps, principalID, clientI
 			return nil, listMembersResult{}, err
 		}
 
-		allowed, err := deps.Authz.Can(ctx, principalID, project.ID, auth.CapMemberRead)
-		if err != nil {
-			return nil, listMembersResult{}, err
-		}
-		if !allowed {
-			return nil, listMembersResult{}, errors.New("you do not have permission to read members on this project")
-		}
-
-		var members []projects.Membership
-		err = db.WithPrincipal(ctx, deps.Pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
-			var err error
-			members, err = deps.Projects.ListMembers(ctx, tx, project.ID)
-			return err
-		})
+		members, err := deps.Members.List(ctx, principalID, project.ID)
 		if err != nil {
 			return nil, listMembersResult{}, err
 		}

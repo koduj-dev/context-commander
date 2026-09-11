@@ -27,6 +27,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/history"
 	"github.com/koduj-dev/context-commander/internal/identity"
 	"github.com/koduj-dev/context-commander/internal/installation"
+	"github.com/koduj-dev/context-commander/internal/members"
 	"github.com/koduj-dev/context-commander/internal/organizations"
 	"github.com/koduj-dev/context-commander/internal/projects"
 	"github.com/koduj-dev/context-commander/internal/secrets"
@@ -139,6 +140,7 @@ func newServeCmd() *cobra.Command {
 			}
 			artifactsSvc := artifacts.NewService(pool, cryptoProvider, store, authz, gatesEngine)
 
+			membersSvc := members.NewService(pool, projStore, authz)
 			orgStore := organizations.NewStore()
 			eventsSvc := events.NewService(pool, authz)
 			orgSvc := organizations.NewService(pool, orgStore)
@@ -167,14 +169,14 @@ func newServeCmd() *cobra.Command {
 
 			mux := http.NewServeMux()
 			mux.Handle("/mcp", ccmcp.NewHandler(ccmcp.Deps{
-				Pool: pool, Projects: projStore, Authz: authz, Artifacts: artifactsSvc,
+				Pool: pool, Projects: projStore, Members: membersSvc, Authz: authz, Artifacts: artifactsSvc,
 				Events: eventsSvc, Organizations: orgSvc, Audit: auditSvc,
 				Handoffs: handoffsSvc, History: historySvc,
 				Skills: skillsSvc, Gates: gatesAdmin, Secrets: secretsSvc,
 				Installation: installationSvc,
 			}))
 			mux.Handle("/", cchttp.NewHandler(cchttp.Deps{
-				Pool: pool, Projects: projStore, Authz: authz, Artifacts: artifactsSvc,
+				Pool: pool, Projects: projStore, Members: membersSvc, Authz: authz, Artifacts: artifactsSvc,
 				Events: eventsSvc, Organizations: orgSvc, Audit: auditSvc,
 				Handoffs: handoffsSvc, History: historySvc,
 				Skills: skillsSvc, Gates: gatesAdmin, Secrets: secretsSvc,
