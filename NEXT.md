@@ -196,6 +196,32 @@ on the planned move to a public repo:
 
 ## 📦 Backlog
 
+- **[security] Skill content is readable installation-wide.**
+  `skills`/`skill_versions` have no RLS and `skills.Service.GetVersion`
+  authorizes against an anchor project the caller already belongs to, so
+  anyone who knows a version UUID can read content published inside a
+  project they are not a member of. Verified with a probe, not theoretical.
+  migrations/000007 decided the *catalog* is installation-wide; it never
+  decided content was, and before `skill.get` shipped in Phase 1 the
+  content was simply unreachable, so the question went unanswered. Fix:
+  allow a read only when the caller can see a binding for that skill *or*
+  published the version themselves — the second half needs a `published_by`
+  column on `skill_versions`, which docs/adr/0012's supply-chain story
+  arguably wants anyway. Needs a decision on the skill trust model, hence
+  here rather than done. See docs/gotchas.md.
+- **[security] RLS is barely tested.** With `cc_app` granted `BYPASSRLS`,
+  only nine tests in the whole suite fail — everything else passes with
+  Row-Level Security effectively switched off, because it asserts through
+  the service layer, whose capability checks and explicit
+  `WHERE project_id = $1` produce the right answer on their own. RLS is
+  described as load-bearing defense in depth (docs/adr/0002) but is close to
+  unverified. `artifacts`, `handoffs`, `history` and `secrets` now have a
+  genuine assertion (a count through `cc_app` with no project filter, which
+  fails when the policy is disabled). Still uncovered: `domain_events`,
+  `audit_log`, `skill_bindings`, `gate_bindings`, `project_keys`. The cheap
+  check is to run the suite with `cc_app` given `BYPASSRLS` and see what
+  still passes.
+
 - **Adding or removing a project/organization member writes no audit row.**
   Surfaced while closing the ADMIN→OWNER escalation: granting a role is
   exactly the kind of privilege change `internal/audit` exists to record, and

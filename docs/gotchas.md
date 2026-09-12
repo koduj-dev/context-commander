@@ -64,3 +64,28 @@ call sites can serialize against each other — or deadlock — by accident.
 `internal/db/advisory.go` declares every `LockClass` used anywhere in the
 codebase in a single const block for that reason. Add new ones there, and
 check the nesting order documented on `AdvisoryXactLock` before taking two.
+
+## Skill content is readable installation-wide, not per-project
+
+`skills` and `skill_versions` have no RLS (migrations/000007), and
+`skills.Service.GetVersion` authorizes against an *anchor* project the caller
+holds `CapSkillRead` on — which every project role has — rather than against
+the skill being read. A principal who knows a skill version's UUID can
+therefore read its content even if it was published inside a project they are
+not a member of. Verified, not theoretical.
+
+migrations/000007 decided that the *catalog* is installation-wide ("every
+authenticated principal in this installation can see what skills exist"). It
+did not decide that content is, and until `skill.get` shipped in Phase 1 the
+content was unreachable through every adapter, so nobody had to answer the
+question. The read path answered it in the widest direction by default.
+
+**Until this is narrowed, do not put project secrets in skill content.** Use
+`internal/secrets` for anything that must stay inside one project — it is
+project-key-encrypted and RLS-scoped, which skill content is neither (see also
+the encryption note above: skill content is stored unencrypted because the key
+hierarchy has no installation-level key to anchor it to).
+
+Closing it means allowing a read only when the caller can see a binding for
+the skill or published the version themselves, which needs a `published_by`
+column on `skill_versions` — tracked in NEXT.md.

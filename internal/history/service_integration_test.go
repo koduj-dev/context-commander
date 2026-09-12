@@ -222,6 +222,38 @@ func TestRLSIsolationBetweenProjects(t *testing.T) {
 	if len(listB) != 0 {
 		t.Fatalf("projectB should see 0 history objects for a foreign conversation ID, got %d", len(listB))
 	}
+
+	// Everything above exercises internal/history.Service — capability
+	// checks and explicit project filters, none of which depend on
+	// Row-Level Security. This test passed with the conversations policy
+	// replaced by "USING (true)", despite its name.
+	//
+	// This is the assertion that actually exercises RLS: cc_app, the role
+	// the production server connects as, with principalB's identity set and
+	// no project filter of its own (docs/adr/0002 — the database mirrors
+	// the service's decision as defense in depth).
+	assertNoRowsVisible(t, ctx, f.appPool, principalB, "conversations")
+}
+
+// assertNoRowsVisible counts an entire table through cc_app as principalID,
+// with no WHERE clause to do the filtering for it. Any row that comes back
+// was let through by Row-Level Security itself.
+func assertNoRowsVisible(t *testing.T, ctx context.Context, appPool *db.Pool, principalID uuid.UUID, table string) {
+	t.Helper()
+	err := db.WithPrincipal(ctx, appPool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+		var n int
+		// The table name is a constant from the caller, never test input.
+		if err := tx.QueryRow(ctx, `SELECT count(*) FROM `+table).Scan(&n); err != nil {
+			return err
+		}
+		if n != 0 {
+			t.Fatalf("%s: cc_app sees %d row(s) belonging to another project — RLS is not isolating this table", table, n)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("count %s through cc_app: %v", table, err)
+	}
 }
 
 // The following four tests regression-guard migrations/000015's composite

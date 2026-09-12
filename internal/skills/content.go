@@ -57,14 +57,33 @@ type VersionWithContent struct {
 // until now nothing in any adapter could turn one into the bytes it names —
 // an agent could install a skill it was then unable to load.
 //
-// Authorization mirrors Publish (docs/adr/0014): projectID is an anchor the
-// caller must hold CapSkillRead on, not a filter on which skills exist. The
-// catalog is installation-wide and deliberately unauthenticated per-entry
-// (migrations/000007: "every authenticated principal in this installation
-// can see what skills exist"; the trust decision is per-binding), so
-// requiring the version to already be bound into projectID would only stop
-// a caller from inspecting a skill *before* installing it — the one moment
-// reading it matters most — without concealing anything.
+// SECURITY — KNOWN EXPOSURE, NOT YET DECIDED. Authorization mirrors Publish
+// (docs/adr/0014): projectID is an anchor the caller must hold CapSkillRead
+// on, and is NOT a filter on which skills may be read. `skills` and
+// `skill_versions` carry no RLS (migrations/000007), so any principal
+// holding CapSkillRead on any project — every role does — can read the
+// content of ANY skill version whose UUID it knows, including one published
+// inside a project it is not a member of.
+//
+// migrations/000007 decided that the *catalog* is installation-wide: "every
+// authenticated principal in this installation can see what skills exist
+// (the trust decision is per-binding)". That justifies seeing that a skill
+// exists. It does not decide that its CONTENT is installation-wide, and
+// before this method existed the content was unreachable through every
+// adapter, so the question never had to be answered. Adding the read path
+// answered it by accident, in the widest possible direction.
+//
+// Mitigating, but not a defense to rely on: version IDs are v4 UUIDs, so
+// there is nothing to enumerate — a caller needs an ID that reached it some
+// other way.
+//
+// Narrowing this to "a skill you can see a binding for, or one you
+// published yourself" would close it while keeping every flow that works
+// today, but it needs a published_by column on skill_versions (which
+// docs/adr/0012's supply-chain story arguably wants regardless) and is a
+// change to the skill trust model, so it is the maintainer's call rather
+// than something to slip in. Until then: do not put project secrets in
+// skill content.
 func (s *Service) GetVersion(ctx context.Context, principalID, projectID, skillVersionID uuid.UUID) (VersionWithContent, error) {
 	if err := s.checkCapability(ctx, principalID, projectID, auth.CapSkillRead); err != nil {
 		return VersionWithContent{}, err

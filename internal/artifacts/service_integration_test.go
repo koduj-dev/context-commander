@@ -23,8 +23,12 @@ import (
 )
 
 type fixture struct {
-	svc         *artifacts.Service
-	ownerPool   *db.Pool
+	svc       *artifacts.Service
+	ownerPool *db.Pool
+	// appPool is the same cc_app pool the Service runs on, exposed so a
+	// test can query a table directly — the only way to assert what RLS
+	// itself allows, rather than what the Service's own WHERE clauses do.
+	appPool     *db.Pool
 	store       storage.ObjectStore
 	projectID   uuid.UUID
 	principalID uuid.UUID
@@ -32,8 +36,11 @@ type fixture struct {
 }
 
 // newFixture connects the Service to cc_app, the same role the production
-// server uses — Write/Read/List/etc. below genuinely exercise RLS, not just
-// application logic (docs/adr/0002's testing requirement).
+// server uses (docs/adr/0002). That is necessary for an RLS test but not
+// sufficient on its own: every Service method also filters by project_id in
+// SQL, so a test going through the Service still passes with RLS disabled.
+// Only TestRLSIsolationBetweenProjects below queries without that filter and
+// therefore actually pins the policy.
 func newFixture(t *testing.T) *fixture {
 	t.Helper()
 	dsns := dbtest.New(t)
@@ -102,6 +109,7 @@ func newFixture(t *testing.T) *fixture {
 
 	return &fixture{
 		svc:         artifacts.NewService(appPool, cryptoProvider, store, auth.NewAuthzService(appPool, projects.NewStore()), gates.NewEngine(appPool)),
+		appPool:     appPool,
 		ownerPool:   ownerPool,
 		store:       store,
 		projectID:   projectID,
@@ -283,6 +291,62 @@ func TestReadDeniedForNonMember(t *testing.T) {
 	outsider := f.nonMemberPrincipal(t)
 	if _, _, err := f.svc.Read(ctx, outsider, f.projectID, "secret.md", nil); !errors.Is(err, artifacts.ErrForbidden) {
 		t.Fatalf("non-member Read: got err=%v, want ErrForbidden", err)
+	}
+}
+
+// TestRLSIsolationBetweenProjects pins the database half of the
+// authorization model for artifacts — the half docs/adr/0002 calls defense
+// in depth and which, before this test, nothing in this package actually
+// checked. Every other test here goes through the Service, whose capability
+// check and explicit "WHERE project_id = $1" produce the right answer with
+// RLS switched off entirely.
+//
+// Artifacts are the reason the policy matters most: this is where project
+// content lives, and a policy regression here means one tenant's rows
+// become reachable from another's session the moment any query forgets its
+// filter.
+func TestRLSIsolationBetweenProjects(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+
+	if _, err := f.svc.Write(ctx, f.principalID, f.clientID, f.projectID, "secret.md", "text/markdown", []byte("secret"), 0); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+
+	outsider := f.nonMemberPrincipal(t)
+
+	// cc_app, the outsider's identity, and deliberately no project filter:
+	// anything that comes back was let through by the policy itself.
+	for _, table := range []string{"artifacts", "artifact_versions"} {
+		err := db.WithPrincipal(ctx, f.appPool, db.Principal{ID: outsider}, func(tx pgx.Tx) error {
+			var n int
+			if err := tx.QueryRow(ctx, `SELECT count(*) FROM `+table).Scan(&n); err != nil {
+				return err
+			}
+			if n != 0 {
+				t.Fatalf("%s: a non-member's session sees %d row(s) — RLS is not isolating this table", table, n)
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("count %s through cc_app: %v", table, err)
+		}
+	}
+
+	// And the member still sees their own, so the policy is isolating
+	// rather than simply hiding everything from everyone.
+	err := db.WithPrincipal(ctx, f.appPool, db.Principal{ID: f.principalID}, func(tx pgx.Tx) error {
+		var n int
+		if err := tx.QueryRow(ctx, `SELECT count(*) FROM artifacts`).Scan(&n); err != nil {
+			return err
+		}
+		if n != 1 {
+			t.Fatalf("the project's own member sees %d artifacts, want 1", n)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("count artifacts as member: %v", err)
 	}
 }
 

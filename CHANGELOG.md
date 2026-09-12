@@ -319,6 +319,22 @@ link definition at the bottom of the file.
 
 ### Fixed
 
+- **Four "RLS isolation" tests did not test RLS.** `internal/handoffs`,
+  `internal/history` and `internal/secrets` each had a
+  `TestRLSIsolationBetweenProjects` that passed unchanged with the table's
+  policy replaced by `USING (true)`: they assert through the Service, whose
+  capability check and explicit `WHERE project_id = $1` produce the expected
+  result on their own. `internal/artifacts` — the domain that actually holds
+  project content — had no RLS test at all, while its fixture comment
+  claimed its tests "genuinely exercise RLS". All four now count a table
+  through `cc_app` with the caller's identity set and no project filter,
+  which is the only shape that can observe the policy; each was verified to
+  fail with RLS disabled.
+  - Found by granting `cc_app` `BYPASSRLS` and running the suite: **only
+    nine tests in the entire repo fail** with Row-Level Security effectively
+    off. `domain_events`, `audit_log`, `skill_bindings`, `gate_bindings` and
+    `project_keys` remain uncovered — logged in NEXT.md rather than fixed
+    here.
 - **Three defects in the Phase 1 context pack, found in code review before
   merge.** All three shared a shape: the pack told the caller something that
   was not true, in a way the caller could not detect.

@@ -248,7 +248,40 @@ func TestRLSIsolationBetweenProjects(t *testing.T) {
 	}
 	refsB := refsBPage.Items
 	if len(refsB) != 0 {
-		t.Fatalf("projectB should see 0 secrets, got %d (RLS isolation broken)", len(refsB))
+		t.Fatalf("projectB should see 0 secrets, got %d", len(refsB))
+	}
+
+	// Everything above exercises internal/secrets.Service — capability
+	// checks and an explicit scope comparison, none of which depend on
+	// Row-Level Security. This test passed with the secret_values policy
+	// replaced by "USING (true)", despite its name.
+	//
+	// This is the assertion that actually exercises RLS: cc_app, the role
+	// the production server connects as, with principalB's identity set and
+	// no project filter of its own. For secrets it is the most load-bearing
+	// of all — a ciphertext leaking to the wrong tenant is the one row in
+	// this schema you cannot un-leak (docs/adr/0002).
+	assertNoRowsVisible(t, ctx, f.appPool, principalB, "secret_values")
+}
+
+// assertNoRowsVisible counts an entire table through cc_app as principalID,
+// with no WHERE clause to do the filtering for it. Any row that comes back
+// was let through by Row-Level Security itself.
+func assertNoRowsVisible(t *testing.T, ctx context.Context, appPool *db.Pool, principalID uuid.UUID, table string) {
+	t.Helper()
+	err := db.WithPrincipal(ctx, appPool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+		var n int
+		// The table name is a constant from the caller, never test input.
+		if err := tx.QueryRow(ctx, `SELECT count(*) FROM `+table).Scan(&n); err != nil {
+			return err
+		}
+		if n != 0 {
+			t.Fatalf("%s: cc_app sees %d row(s) belonging to another project — RLS is not isolating this table", table, n)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("count %s through cc_app: %v", table, err)
 	}
 }
 
