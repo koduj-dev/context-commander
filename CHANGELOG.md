@@ -48,8 +48,8 @@ link definition at the bottom of the file.
   - **Discovery:** `skill.search` browses and searches by name
     (case-insensitive, LIKE metacharacters escaped), `skill.versions`
     enumerates a skill's versions. Both return exactly what the caller can
-    see, across every scope — the anchor project is a membership floor, not
-    a filter. Also `GET /v1/skills?q=`, `GET /v1/skills/{id}/versions`,
+    see, across every scope, and neither names a project. Also
+    `GET /v1/skills?q=`, `GET /v1/skills/{id}/versions`,
     `POST /v1/skills/promote`, and `ccd skill search|versions|promote`.
   - **Change detection is the checksum**, already carried by every
     `SkillVersion` and computed over the plaintext package. A catalog entry
