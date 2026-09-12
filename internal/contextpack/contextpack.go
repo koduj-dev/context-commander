@@ -57,6 +57,14 @@ const DefaultEventLimit = 20
 // than a change to this server.
 const ConventionalArtifactPrefix = "context/"
 
+// MaxConventionalArtifacts bounds how many artifacts the convention half of
+// the selection contributes. It counts only artifacts under
+// ConventionalArtifactPrefix — a project with more must-read files than this
+// has outgrown "everything under this prefix is required reading" and wants
+// the declarative manifest (Phase 2), not a larger pack. Hitting it is
+// reported in BudgetReport.Truncated, never silently absorbed.
+const MaxConventionalArtifacts = 100
+
 // Options tunes one assembly. The zero value is the supported default:
 // convention-selected artifacts, effective skills, DefaultBudget,
 // DefaultEventLimit.
@@ -123,10 +131,18 @@ type ProjectRef struct {
 // first), "claimed" means someone else already did and this is context, not
 // an assignment.
 type HandoffSection struct {
-	ID                  uuid.UUID   `json:"id"`
-	Status              string      `json:"status"`
-	CreatedAt           time.Time   `json:"created_at"`
-	ClaimedAt           *time.Time  `json:"claimed_at,omitempty"`
+	ID        uuid.UUID  `json:"id"`
+	Status    string     `json:"status"`
+	CreatedAt time.Time  `json:"created_at"`
+	ClaimedAt *time.Time `json:"claimed_at,omitempty"`
+
+	// Who holds it. Status alone cannot answer "is this mine?": a claim
+	// whose response was lost leaves the claimer seeing "claimed" on its
+	// retry with no way to tell itself from a competitor, and two clients
+	// can share a principal, so the client id is the half that actually
+	// distinguishes them.
+	ClaimedByPrincipal  *uuid.UUID  `json:"claimed_by_principal,omitempty"`
+	ClaimedByClient     *uuid.UUID  `json:"claimed_by_client,omitempty"`
 	Summary             string      `json:"summary"`
 	CompletedWork       string      `json:"completed_work"`
 	NextActions         string      `json:"next_actions"`

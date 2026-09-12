@@ -141,12 +141,18 @@ func TestE2ECrossClientHandoff(t *testing.T) {
 	// A, arriving again, must now see that the work is being continued
 	// rather than assume it is still waiting.
 	var currentForA struct {
-		ID     string `json:"id"`
-		Status string `json:"status"`
+		ID              string `json:"id"`
+		Status          string `json:"status"`
+		ClaimedByClient string `json:"claimed_by_client"`
 	}
 	f.mustDecode(http.MethodGet, base+"/handoffs/current", tokenA, nil, http.StatusOK, "A re-reads the current handoff", &currentForA)
 	if currentForA.Status != "claimed" {
 		t.Fatalf("A sees status %q after B claimed it, want claimed", currentForA.Status)
+	}
+	// Which client holds it, not just that someone does: A must be able to
+	// tell B's claim from a claim of its own whose response went missing.
+	if currentForA.ClaimedByClient == "" {
+		t.Fatal("the claimed handoff does not report which client claimed it")
 	}
 
 	// A second client racing for the same handoff loses — the coordination

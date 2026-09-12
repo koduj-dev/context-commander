@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -249,4 +250,82 @@ func (s *Service) Delete(ctx context.Context, principalID uuid.UUID, clientID *u
 			Result: audit.ResultAllow, EventID: &eventID,
 		})
 	})
+}
+
+// ListByPathPrefix returns one page of non-deleted artifacts whose logical
+// path starts with prefix, ordered by logical path.
+//
+// The prefix belongs in the query, not in a filter the caller applies to a
+// page of List's results. List orders by updated_at across *every* artifact
+// in the project, so filtering its first page finds only the prefix matches
+// that happen to be among the most recently updated artifacts overall — a
+// must-read file that nobody has touched lately silently disappears behind
+// a hundred unrelated writes. That is the bug this method exists to make
+// unrepresentable (found in review of internal/contextpack's convention
+// selection).
+//
+// Ordered by logical_path rather than by time: a "these are the files to
+// read" set has no meaningful recency, and path order is stable, unique per
+// project (migrations/000003's (project_id, logical_path) key), and
+// self-explanatory to a human reading the result — so the cursor is just
+// the last path returned.
+func (s *Service) ListByPathPrefix(
+	ctx context.Context, principalID uuid.UUID, projectID uuid.UUID, prefix string, opts paging.Options,
+) (paging.Page[Artifact], error) {
+	if err := s.checkCapability(ctx, principalID, projectID, auth.CapArtifactRead); err != nil {
+		return paging.Page[Artifact]{}, err
+	}
+	cursorPath, hasCursor, err := opts.DecodeString()
+	if err != nil {
+		return paging.Page[Artifact]{}, err
+	}
+	limit := opts.ClampedLimit()
+
+	out := make([]Artifact, 0, limit)
+	err = db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+		// LIKE with an escaped prefix, not a bare concatenation: a logical
+		// path may legitimately contain "%" or "_", and an unescaped one
+		// would turn a caller's literal prefix into a wildcard pattern
+		// matching paths it never named.
+		rows, err := tx.Query(ctx,
+			`SELECT id, project_id, logical_path, content_type, current_version,
+			        created_by_principal, created_by_client, created_at, updated_at, deleted_at
+			 FROM artifacts
+			 WHERE project_id = $1 AND deleted_at IS NULL
+			   AND logical_path LIKE $2 ESCAPE '\'
+			   AND (NOT $3::bool OR logical_path > $4::text)
+			 ORDER BY logical_path ASC LIMIT $5`,
+			projectID, escapeLikePrefix(prefix)+"%", hasCursor, cursorPath, limit+1)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var a Artifact
+			if err := rows.Scan(&a.ID, &a.ProjectID, &a.LogicalPath, &a.ContentType, &a.CurrentVersion,
+				&a.CreatedByPrincipal, &a.CreatedByClient, &a.CreatedAt, &a.UpdatedAt, &a.DeletedAt); err != nil {
+				return err
+			}
+			out = append(out, a)
+		}
+		return rows.Err()
+	})
+	if err != nil {
+		return paging.Page[Artifact]{}, fmt.Errorf("artifacts: list by path prefix: %w", err)
+	}
+
+	items, hasMore := paging.More(out, limit)
+	page := paging.Page[Artifact]{Items: items}
+	if hasMore {
+		page.NextCursor = paging.EncodeString(items[len(items)-1].LogicalPath)
+	}
+	return page, nil
+}
+
+// escapeLikePrefix makes a literal string safe to use as a LIKE prefix.
+// Backslash first: escaping it after the wildcards would double-escape the
+// backslashes this function itself introduced.
+func escapeLikePrefix(prefix string) string {
+	r := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
+	return r.Replace(prefix)
 }

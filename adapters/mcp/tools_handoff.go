@@ -17,11 +17,30 @@ type handoffResult struct {
 	SourceSessionID string `json:"source_session_id,omitempty"`
 	Status          string `json:"status"`
 	CreatedAt       string `json:"created_at"`
-	ClaimedAt       string `json:"claimed_at,omitempty"`
-	ClosedAt        string `json:"closed_at,omitempty"`
+
+	ClaimedAt          string `json:"claimed_at,omitempty"`
+	ClaimedByPrincipal string `json:"claimed_by_principal,omitempty"`
+	ClaimedByClient    string `json:"claimed_by_client,omitempty"`
+
+	// ClaimedByYou is the field an agent should actually branch on. Status
+	// says the handoff is claimed; only this says by whom. It matters
+	// because a claim whose response was lost is indistinguishable, from
+	// the caller's side, from a claim someone else won: the retry gets
+	// "already claimed" either way, and the recommended follow-up read
+	// would otherwise show a "claimed" handoff the agent has no way to
+	// recognize as its own. A principal id would not settle it either —
+	// two clients can act as the same principal — so this compares the
+	// client credential this MCP session authenticated with.
+	ClaimedByYou bool `json:"claimed_by_you"`
+
+	ClosedAt          string `json:"closed_at,omitempty"`
+	ClosedByPrincipal string `json:"closed_by_principal,omitempty"`
+	ClosedByClient    string `json:"closed_by_client,omitempty"`
 }
 
-func toHandoffResult(h handoffs.Handoff) handoffResult {
+// toHandoffResult takes the session's own client id so it can answer
+// "is this mine?" rather than leaving every client to compare UUIDs itself.
+func toHandoffResult(h handoffs.Handoff, thisClientID uuid.UUID) handoffResult {
 	r := handoffResult{ID: h.ID.String(), Status: h.Status, CreatedAt: h.CreatedAt.Format(time.RFC3339)}
 	if h.SourceSessionID != nil {
 		r.SourceSessionID = h.SourceSessionID.String()
@@ -29,8 +48,21 @@ func toHandoffResult(h handoffs.Handoff) handoffResult {
 	if h.ClaimedAt != nil {
 		r.ClaimedAt = h.ClaimedAt.Format(time.RFC3339)
 	}
+	if h.ClaimedByPrincipal != nil {
+		r.ClaimedByPrincipal = h.ClaimedByPrincipal.String()
+	}
+	if h.ClaimedByClient != nil {
+		r.ClaimedByClient = h.ClaimedByClient.String()
+		r.ClaimedByYou = *h.ClaimedByClient == thisClientID
+	}
 	if h.ClosedAt != nil {
 		r.ClosedAt = h.ClosedAt.Format(time.RFC3339)
+	}
+	if h.ClosedByPrincipal != nil {
+		r.ClosedByPrincipal = h.ClosedByPrincipal.String()
+	}
+	if h.ClosedByClient != nil {
+		r.ClosedByClient = h.ClosedByClient.String()
 	}
 	return r
 }
@@ -106,7 +138,7 @@ func registerHandoffTools(server *sdkmcp.Server, deps Deps, principalID, clientI
 		if err != nil {
 			return nil, handoffResult{}, err
 		}
-		return nil, toHandoffResult(h), nil
+		return nil, toHandoffResult(h, clientID), nil
 	})
 
 	type getArgs struct {
@@ -130,7 +162,7 @@ func registerHandoffTools(server *sdkmcp.Server, deps Deps, principalID, clientI
 			return nil, handoffDetailResult{}, err
 		}
 		return nil, handoffDetailResult{
-			handoffResult:       toHandoffResult(h),
+			handoffResult:       toHandoffResult(h, clientID),
 			Summary:             body.Summary,
 			CompletedWork:       body.CompletedWork,
 			NextActions:         body.NextActions,
@@ -163,7 +195,7 @@ func registerHandoffTools(server *sdkmcp.Server, deps Deps, principalID, clientI
 		}
 		out := make([]handoffResult, len(page.Items))
 		for i, h := range page.Items {
-			out[i] = toHandoffResult(h)
+			out[i] = toHandoffResult(h, clientID)
 		}
 		return nil, paged(out, page.NextCursor), nil
 	})
@@ -176,7 +208,9 @@ func registerHandoffTools(server *sdkmcp.Server, deps Deps, principalID, clientI
 		Description: "Get the handoff to continue from — the most recent one still open or claimed, with its " +
 			"full body. Use this instead of handoff.list when picking up work: a list of IDs does not say " +
 			"which one is current. Status \"open\" means nobody has taken it yet (claim it with handoff.claim); " +
-			"\"claimed\" means another client already did, so treat it as context rather than as an assignment. " +
+			"\"claimed\" means some client has — check claimed_by_you to see whether that client is you (it will " +
+			"be, if an earlier claim of yours succeeded but its response never reached you), and if it is not, " +
+			"treat the handoff as context rather than as an assignment. " +
 			"Returns an error when every handoff is closed — that means there is nothing to take over.",
 	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, args currentArgs) (*sdkmcp.CallToolResult, handoffDetailResult, error) {
 		projectID, err := resolve(ctx, args.Project)
@@ -192,7 +226,7 @@ func registerHandoffTools(server *sdkmcp.Server, deps Deps, principalID, clientI
 			return nil, handoffDetailResult{}, err
 		}
 		return nil, handoffDetailResult{
-			handoffResult:       toHandoffResult(h),
+			handoffResult:       toHandoffResult(h, clientID),
 			Summary:             body.Summary,
 			CompletedWork:       body.CompletedWork,
 			NextActions:         body.NextActions,
@@ -210,8 +244,9 @@ func registerHandoffTools(server *sdkmcp.Server, deps Deps, principalID, clientI
 		Description: "Take responsibility for continuing a handoff's work: open -> claimed, recorded against " +
 			"this client. Do this before starting, so another agent picking up the same project can see the " +
 			"work is already being continued. Fails if another client claimed it first — that is the " +
-			"coordination answer, not an error in your request: re-read it with handoff.current and decide " +
-			"whether the work is still yours to do.",
+			"coordination answer, not an error in your request: re-read it with handoff.current and check " +
+			"claimed_by_you — if it is true, your own earlier claim went through and you should carry on; if " +
+			"false, another client holds it and the work is not yours to do.",
 	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, args transitionArgs) (*sdkmcp.CallToolResult, handoffResult, error) {
 		projectID, handoffID, err := resolveHandoffTarget(ctx, resolve, args.Project, args.ID)
 		if err != nil {
@@ -221,7 +256,7 @@ func registerHandoffTools(server *sdkmcp.Server, deps Deps, principalID, clientI
 		if err != nil {
 			return nil, handoffResult{}, err
 		}
-		return nil, toHandoffResult(h), nil
+		return nil, toHandoffResult(h, clientID), nil
 	})
 
 	sdkmcp.AddTool(server, &sdkmcp.Tool{
@@ -239,7 +274,7 @@ func registerHandoffTools(server *sdkmcp.Server, deps Deps, principalID, clientI
 		if err != nil {
 			return nil, handoffResult{}, err
 		}
-		return nil, toHandoffResult(h), nil
+		return nil, toHandoffResult(h, clientID), nil
 	})
 }
 

@@ -19,10 +19,15 @@ type handoffResponse struct {
 	// Lifecycle attribution, omitted while the handoff is still open —
 	// a field that is absent says "this hasn't happened" more clearly than
 	// one carrying a zero timestamp.
+	// The client ids travel alongside the principal ids, not instead of
+	// them: two clients may act as the same principal, so "who claimed
+	// this" is only answerable at client granularity.
 	ClaimedAt          string     `json:"claimed_at,omitempty"`
 	ClaimedByPrincipal *uuid.UUID `json:"claimed_by_principal,omitempty"`
+	ClaimedByClient    *uuid.UUID `json:"claimed_by_client,omitempty"`
 	ClosedAt           string     `json:"closed_at,omitempty"`
 	ClosedByPrincipal  *uuid.UUID `json:"closed_by_principal,omitempty"`
+	ClosedByClient     *uuid.UUID `json:"closed_by_client,omitempty"`
 }
 
 type handoffDetailResponse struct {
@@ -42,10 +47,12 @@ func toHandoffResponse(h handoffs.Handoff) handoffResponse {
 	if h.ClaimedAt != nil {
 		r.ClaimedAt = h.ClaimedAt.Format(time.RFC3339)
 		r.ClaimedByPrincipal = h.ClaimedByPrincipal
+		r.ClaimedByClient = h.ClaimedByClient
 	}
 	if h.ClosedAt != nil {
 		r.ClosedAt = h.ClosedAt.Format(time.RFC3339)
 		r.ClosedByPrincipal = h.ClosedByPrincipal
+		r.ClosedByClient = h.ClosedByClient
 	}
 	return r
 }

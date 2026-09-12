@@ -36,10 +36,17 @@ type contextProjectResult struct {
 }
 
 type contextHandoffResult struct {
-	ID                  string   `json:"id"`
-	Status              string   `json:"status"`
-	CreatedAt           string   `json:"created_at"`
-	ClaimedAt           string   `json:"claimed_at,omitempty"`
+	ID        string `json:"id"`
+	Status    string `json:"status"`
+	CreatedAt string `json:"created_at"`
+
+	ClaimedAt          string `json:"claimed_at,omitempty"`
+	ClaimedByPrincipal string `json:"claimed_by_principal,omitempty"`
+	ClaimedByClient    string `json:"claimed_by_client,omitempty"`
+	// See handoffResult.ClaimedByYou — the same question, asked at the
+	// moment an agent is deciding whether this handoff is its assignment.
+	ClaimedByYou bool `json:"claimed_by_you"`
+
 	Summary             string   `json:"summary"`
 	CompletedWork       string   `json:"completed_work"`
 	NextActions         string   `json:"next_actions"`
@@ -95,7 +102,7 @@ type contextTruncationResult struct {
 // bug waiting to be blamed on the model.
 const rfc3339 = time.RFC3339
 
-func toContextPackResult(p contextpack.Pack) contextPackResult {
+func toContextPackResult(p contextpack.Pack, thisClientID uuid.UUID) contextPackResult {
 	out := contextPackResult{
 		Project: contextProjectResult{ID: p.Project.ID.String(), Path: p.Project.Path, Name: p.Project.Name},
 		Role:    p.Role, Capabilities: p.Capabilities,
@@ -113,6 +120,13 @@ func toContextPackResult(p contextpack.Pack) contextPackResult {
 		}
 		if p.Handoff.ClaimedAt != nil {
 			h.ClaimedAt = p.Handoff.ClaimedAt.Format(rfc3339)
+		}
+		if p.Handoff.ClaimedByPrincipal != nil {
+			h.ClaimedByPrincipal = p.Handoff.ClaimedByPrincipal.String()
+		}
+		if p.Handoff.ClaimedByClient != nil {
+			h.ClaimedByClient = p.Handoff.ClaimedByClient.String()
+			h.ClaimedByYou = *p.Handoff.ClaimedByClient == thisClientID
 		}
 		out.Handoff = &h
 	}
@@ -156,7 +170,9 @@ func toContextPackResult(p contextpack.Pack) contextPackResult {
 // require knowing the domain model, which is the difference between a
 // server an agent can use and a server an agent needs a tutorial for.
 func registerContextTools(server *sdkmcp.Server, deps Deps, principalID, clientID uuid.UUID) {
-	_ = clientID // reading assembles nothing attributable to a client; kept for signature symmetry
+	// clientID is not attribution here — nothing in a read is attributable —
+	// but the pack reports whether the current handoff is held by THIS
+	// client, which only this session knows.
 
 	resolve := func(ctx context.Context, projectPath string) (uuid.UUID, error) {
 		var id uuid.UUID
@@ -187,7 +203,8 @@ func registerContextTools(server *sdkmcp.Server, deps Deps, principalID, clientI
 			"Call this FIRST when joining a project — the per-domain tools (handoff.*, artifact.*, skill.*, " +
 			"event.list) are for everything after that first step. Content is capped by an explicit byte " +
 			"budget; whatever did not fit is listed in budget.truncated with the tool that fetches it, so an " +
-			"empty truncated list means you have the whole picture.",
+			"empty truncated list means you have the whole picture. If the handoff comes back already claimed, " +
+			"handoff.claimed_by_you says whether the client holding it is you.",
 	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, args bootstrapArgs) (*sdkmcp.CallToolResult, contextPackResult, error) {
 		projectID, err := resolve(ctx, args.Project)
 		if err != nil {
@@ -203,6 +220,6 @@ func registerContextTools(server *sdkmcp.Server, deps Deps, principalID, clientI
 		if err != nil {
 			return nil, contextPackResult{}, err
 		}
-		return nil, toContextPackResult(pack), nil
+		return nil, toContextPackResult(pack, clientID), nil
 	})
 }

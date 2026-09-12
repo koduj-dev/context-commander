@@ -293,6 +293,46 @@ link definition at the bottom of the file.
 
 ### Fixed
 
+- **Three defects in the Phase 1 context pack, found in code review before
+  merge.** All three shared a shape: the pack told the caller something that
+  was not true, in a way the caller could not detect.
+  - **Convention-selected artifacts vanished behind unrelated activity.**
+    `internal/contextpack` listed artifacts with the general listing —
+    ordered by `updated_at` across *every* artifact in the project, default
+    limit 100 — and filtered the `context/` prefix afterwards, so a
+    must-read file nobody had touched lately fell off the end of that page.
+    One old `context/instructions.md` plus a hundred newer unrelated writes
+    produced a pack with no instructions in it and an empty
+    `budget.truncated` claiming it was complete. The prefix is now filtered
+    in SQL by a new `artifacts.Service.ListByPathPrefix` (keyset-paginated
+    by logical path, `LIKE` prefix properly escaped so a path containing
+    `%` or `_` can't act as a wildcard), and the cap now counts only
+    artifacts under the prefix — which is what makes "a project with more
+    must-read files than this has outgrown the convention" a true statement
+    rather than the misleading comment it was. Hitting it is reported.
+  - **The continuation cursor could outrun the pack's own content.** The
+    event boundary was captured *last*, after every content section had
+    been read in its own transaction, so a write landing mid-assembly was
+    missing from the content *and* behind a cursor that would never report
+    it — invisible from both directions, the one outcome an agent cannot
+    recover from. The boundary is now taken before any content is read: the
+    cursor may replay an event the pack already reflects, which costs a
+    wasted call, instead of losing one, which costs a wrong answer. Pinned
+    by an internal test that lands a write in exactly that window (verified
+    to fail against the previous ordering).
+  - **Nothing said *who* held a claimed handoff.** The lifecycle recorded
+    `claimed_by_principal` and `claimed_by_client`, but MCP returned
+    neither, the context pack returned neither, and HTTP omitted the client
+    id. A claim whose response was lost therefore left the claimer unable
+    to recognize its own work on the retry — `handoff.current` showed
+    "claimed" either way, and a principal id would not have settled it
+    since two clients can share one. Both ids now travel through HTTP, MCP
+    and the pack, and MCP additionally answers the question directly with
+    `claimed_by_you`, computed against the client credential the session
+    authenticated with. The `handoff.current`/`handoff.claim` tool
+    descriptions asserted the opposite ("claimed means another client
+    already did") and were corrected — a wrong description steers the model
+    as surely as wrong data.
 - **The Docker image could not write artifacts at all.** `/data` (the
   filesystem ObjectStore root, `$CC_STORAGE_DIR`) did not exist in the
   image, so Docker created the volume mount point as `root:root` while the

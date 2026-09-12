@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -111,6 +111,25 @@ func (s *Service) Bootstrap(ctx context.Context, principalID, projectID uuid.UUI
 		return Pack{}, err
 	}
 
+	// Events FIRST, before any content is read — the order is load-bearing,
+	// not stylistic.
+	//
+	// Each section below reads in its own transaction, so the pack is not a
+	// single consistent snapshot of the project. The continuation cursor
+	// therefore has to mark a point that everything in the pack is at least
+	// as new as. Taken here, a write that lands while the rest of the pack
+	// is being assembled is *after* the cursor: the pack may carry the old
+	// version, and event.list from the cursor will still report the change.
+	// Taken last (the original order, found in review), the same write
+	// lands *before* the cursor while its content is missing from the pack —
+	// invisible from both sides, which is the one outcome an agent cannot
+	// recover from.
+	//
+	// The cost of this order is that the cursor may replay events already
+	// reflected in the pack. Re-reading something twice is a wasted call;
+	// never learning it changed is a wrong answer.
+	s.fillEvents(ctx, principalID, projectID, opts, &pack, b)
+
 	referenced := s.fillHandoff(ctx, principalID, projectID, &pack, b)
 	if !opts.SkipSkills {
 		s.fillSkills(ctx, principalID, projectID, &pack, b)
@@ -118,7 +137,18 @@ func (s *Service) Bootstrap(ctx context.Context, principalID, projectID uuid.UUI
 	if !opts.SkipArtifacts {
 		s.fillArtifacts(ctx, principalID, projectID, opts, referenced, &pack, b)
 	}
-	s.fillEvents(ctx, principalID, projectID, opts, &pack, b)
+
+	// A seam for the interleaving test in boundary_internal_test.go: nil in
+	// production, so this costs one nil check.
+	//
+	// It sits here, after the content and where the event read used to be,
+	// because this is the window the bug lived in: a write landing at this
+	// exact point was missing from the content AND behind a cursor taken
+	// after it. Nothing in an assembly publishes an event of its own, so
+	// there is no way to reproduce that from outside the package.
+	if hookAfterContentRead != nil {
+		hookAfterContentRead()
+	}
 
 	// Non-nil empty slices: a client iterating a section should not have to
 	// special-case null, and "this project has no skills" is a real answer
@@ -214,6 +244,7 @@ func (s *Service) fillHandoff(ctx context.Context, principalID, projectID uuid.U
 
 	pack.Handoff = &HandoffSection{
 		ID: h.ID, Status: h.Status, CreatedAt: h.CreatedAt, ClaimedAt: h.ClaimedAt,
+		ClaimedByPrincipal: h.ClaimedByPrincipal, ClaimedByClient: h.ClaimedByClient,
 		Summary: body.Summary, CompletedWork: body.CompletedWork, NextActions: body.NextActions,
 		ReferencedArtifacts: body.ReferencedArtifacts, ReferencedTasks: body.ReferencedTasks,
 	}
@@ -258,10 +289,14 @@ func (s *Service) fillArtifacts(
 	ctx context.Context, principalID, projectID uuid.UUID,
 	opts Options, referenced []uuid.UUID, pack *Pack, b *budget,
 ) {
-	paths, err := s.selectArtifactPaths(ctx, principalID, projectID, opts, referenced)
+	paths, overflow, err := s.selectArtifactPaths(ctx, principalID, projectID, opts, referenced)
 	if err != nil {
 		b.note("artifact", "selection", 0, reasonFor(err, "could not list artifacts"))
 		return
+	}
+	if overflow {
+		b.note("artifact", ConventionalArtifactPrefix, 0,
+			"omitted: more than "+strconv.Itoa(MaxConventionalArtifacts)+" artifacts under this prefix — list them with artifact.list and pass artifact_paths explicitly")
 	}
 
 	for _, path := range paths {
@@ -292,34 +327,50 @@ func (s *Service) fillArtifacts(
 // signal than a naming convention.
 func (s *Service) selectArtifactPaths(
 	ctx context.Context, principalID, projectID uuid.UUID, opts Options, referenced []uuid.UUID,
-) ([]string, error) {
+) (selected []string, overflow bool, err error) {
 	if len(opts.ArtifactPaths) > 0 {
-		return dedupe(opts.ArtifactPaths), nil
+		return dedupe(opts.ArtifactPaths), false, nil
 	}
 
 	var paths []string
 	if len(referenced) > 0 {
 		resolved, err := s.resolveArtifactPaths(ctx, principalID, projectID, referenced)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		paths = append(paths, resolved...)
 	}
 
-	// The convention half. One page is deliberate: if a project has more
-	// than paging.DefaultLimit artifacts under context/, it has outgrown
-	// "everything here is must-read" and needs the Phase 2 manifest, not a
-	// bigger pack.
-	page, err := s.artifacts.List(ctx, principalID, projectID, paging.Options{})
+	// The convention half. The prefix is filtered in the query
+	// (ListByPathPrefix), not applied to a page of a general listing: the
+	// general listing orders by updated_at across every artifact in the
+	// project, so filtering its first page would return only the must-read
+	// files that happen to be among the most recently updated overall. A
+	// project with one old context/instructions.md and a hundred newer
+	// unrelated writes would have silently produced a pack with no
+	// instructions in it and nothing in budget.truncated to say so — found
+	// in review, and the reason this no longer goes through List at all.
+	//
+	// One page, bounded by MaxConventionalArtifacts: a project with more
+	// must-read files than that has genuinely outgrown "everything under
+	// this prefix is required reading" and wants the Phase 2 manifest. That
+	// limit now counts only files under the prefix, which is what makes the
+	// statement true.
+	page, err := s.artifacts.ListByPathPrefix(ctx, principalID, projectID, ConventionalArtifactPrefix,
+		paging.Options{Limit: MaxConventionalArtifacts})
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	for _, a := range page.Items {
-		if strings.HasPrefix(a.LogicalPath, ConventionalArtifactPrefix) {
-			paths = append(paths, a.LogicalPath)
-		}
+		paths = append(paths, a.LogicalPath)
 	}
-	return dedupe(paths), nil
+	if page.NextCursor != "" {
+		// Reported rather than dropped: "there are more must-read files
+		// than a pack carries" is exactly the kind of thing an agent must
+		// not have to infer from a suspiciously round number of artifacts.
+		overflow = true
+	}
+	return dedupe(paths), overflow, nil
 }
 
 // resolveArtifactPaths maps artifact IDs to logical paths. The handoff
@@ -350,8 +401,13 @@ func (s *Service) resolveArtifactPaths(ctx context.Context, principalID, project
 	return paths, err
 }
 
+// hookAfterContentRead is called once every content section has been read.
+// Always nil outside this package's own tests — see the call site in
+// Bootstrap for why the seam exists and why it is at that point.
+var hookAfterContentRead func()
+
 // fillEvents reports the tail of the event stream and the cursor to
-// continue from.
+// continue from. Called before any content is read; see Bootstrap.
 //
 // The stream is oldest-first with a seq cursor (internal/events), so "the
 // most recent N" is not a page of it — it is the last page. Rather than

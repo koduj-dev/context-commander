@@ -3,6 +3,7 @@ package contextpack_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -20,6 +21,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/handoffs"
 	"github.com/koduj-dev/context-commander/internal/installation"
 	"github.com/koduj-dev/context-commander/internal/organizations"
+	"github.com/koduj-dev/context-commander/internal/paging"
 	"github.com/koduj-dev/context-commander/internal/projects"
 	"github.com/koduj-dev/context-commander/internal/skills"
 	"github.com/koduj-dev/context-commander/internal/storage/filesystem"
@@ -427,4 +429,109 @@ func keys(m map[string]string) []string {
 		out = append(out, k)
 	}
 	return out
+}
+
+// TestConventionSelectionSurvivesNewerUnrelatedWrites is the regression
+// test for the review finding that convention-selected artifacts could
+// vanish behind unrelated activity.
+//
+// The selection used to take one page of a listing ordered by updated_at
+// across *every* artifact in the project and filter the prefix afterwards.
+// A must-read file nobody had touched lately therefore fell off the end of
+// that page — silently, with nothing in budget.truncated to say so. Here
+// the must-read file is written first and then buried under more unrelated
+// writes than a page holds.
+func TestConventionSelectionSurvivesNewerUnrelatedWrites(t *testing.T) {
+	f := newFixture(t)
+
+	f.writeArtifact(contextpack.ConventionalArtifactPrefix+"instructions.md", "read this first")
+
+	// One more than the default page size of the general listing, so the
+	// must-read file cannot be on its first page under any ordering by time.
+	for i := range paging.DefaultLimit + 1 {
+		f.writeArtifact(fmt.Sprintf("scratch/note-%03d.md", i), "unrelated")
+	}
+
+	pack, err := f.pack.Bootstrap(f.ctx, f.principalID, f.projectID, contextpack.Options{})
+	if err != nil {
+		t.Fatalf("Bootstrap: %v", err)
+	}
+
+	var found bool
+	for _, a := range pack.Artifacts {
+		if a.LogicalPath == contextpack.ConventionalArtifactPrefix+"instructions.md" {
+			found = true
+			if a.Content != "read this first" {
+				t.Fatalf("instructions content = %q", a.Content)
+			}
+		}
+		if strings.HasPrefix(a.LogicalPath, "scratch/") {
+			t.Fatalf("pack selected %q, which is outside the convention prefix", a.LogicalPath)
+		}
+	}
+	if !found {
+		t.Fatalf("the must-read artifact was dropped behind %d newer unrelated writes; pack carried %d artifacts",
+			paging.DefaultLimit+1, len(pack.Artifacts))
+	}
+}
+
+// TestConventionSelectionReportsOverflow: the cap now counts only artifacts
+// under the prefix, and reaching it has to be stated rather than absorbed —
+// a pack that quietly stops at a round number is indistinguishable from a
+// complete one.
+func TestConventionSelectionReportsOverflow(t *testing.T) {
+	f := newFixture(t)
+
+	for i := range contextpack.MaxConventionalArtifacts + 1 {
+		f.writeArtifact(fmt.Sprintf("%sdoc-%03d.md", contextpack.ConventionalArtifactPrefix, i), "x")
+	}
+
+	pack, err := f.pack.Bootstrap(f.ctx, f.principalID, f.projectID, contextpack.Options{})
+	if err != nil {
+		t.Fatalf("Bootstrap: %v", err)
+	}
+	if len(pack.Artifacts) != contextpack.MaxConventionalArtifacts {
+		t.Fatalf("artifacts = %d, want the cap of %d", len(pack.Artifacts), contextpack.MaxConventionalArtifacts)
+	}
+
+	var noted bool
+	for _, n := range pack.Budget.Truncated {
+		if n.Kind == "artifact" && n.Ref == contextpack.ConventionalArtifactPrefix {
+			noted = true
+		}
+	}
+	if !noted {
+		t.Fatalf("hitting the convention cap was not reported; notes = %v", pack.Budget.Truncated)
+	}
+}
+
+// TestPackCarriesClaimAttribution is the regression test for the review
+// finding that the pack reported a handoff as claimed without saying by
+// whom — leaving a client whose own claim response was lost unable to
+// recognize its own work.
+func TestPackCarriesClaimAttribution(t *testing.T) {
+	f := newFixture(t)
+	second := f.addPrincipal(projects.RoleContributor)
+
+	h, err := f.handoffs.Create(f.ctx, f.principalID, nil, f.projectID, nil, handoffs.Body{Summary: "work"})
+	if err != nil {
+		t.Fatalf("create handoff: %v", err)
+	}
+	if _, err := f.handoffs.Claim(f.ctx, second, nil, f.projectID, h.ID); err != nil {
+		t.Fatalf("claim: %v", err)
+	}
+
+	pack, err := f.pack.Bootstrap(f.ctx, f.principalID, f.projectID, contextpack.Options{})
+	if err != nil {
+		t.Fatalf("Bootstrap: %v", err)
+	}
+	if pack.Handoff == nil {
+		t.Fatal("no handoff in pack")
+	}
+	if pack.Handoff.ClaimedByPrincipal == nil {
+		t.Fatal("pack reports the handoff as claimed but not by whom")
+	}
+	if *pack.Handoff.ClaimedByPrincipal != second {
+		t.Fatalf("claimed_by_principal = %s, want %s", pack.Handoff.ClaimedByPrincipal, second)
+	}
 }

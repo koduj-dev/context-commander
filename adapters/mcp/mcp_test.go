@@ -595,3 +595,113 @@ func TestConnectWithoutTokenFails(t *testing.T) {
 		t.Fatal("connecting without a bearer token should fail, got a session")
 	}
 }
+
+// TestHandoffReportsWhoHoldsIt is the regression test for the review
+// finding that MCP reported a handoff as claimed without saying by whom.
+//
+// The scenario it protects is the lost response: a claim that succeeds on
+// the server but whose reply never arrives. The client retries, gets
+// "already claimed", and follows the tool's own advice to re-read the
+// handoff — at which point it must be able to tell its own successful claim
+// from a competitor's. Status alone cannot say, and a principal id cannot
+// either, since two clients may authenticate as the same principal.
+func TestHandoffReportsWhoHoldsIt(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+
+	tokenA := f.newUserWithToken("holder-a@example.test")
+	sessionA, err := f.connect(ctx, tokenA)
+	if err != nil {
+		t.Fatalf("connect A: %v", err)
+	}
+	defer func() { _ = sessionA.Close() }()
+
+	const project = "holder-a/work"
+	callTool[projectResult](t, ctx, sessionA, "project.create", map[string]any{
+		"project": project, "name": "Work",
+	})
+
+	created := callTool[handoffToolResult](t, ctx, sessionA, "handoff.create", map[string]any{
+		"project": project, "summary": "half done", "completed_work": "part one", "next_actions": "part two",
+	})
+	claimed := callTool[handoffToolResult](t, ctx, sessionA, "handoff.claim", map[string]any{
+		"project": project, "id": created.ID,
+	})
+	if !claimed.ClaimedByYou {
+		t.Fatal("the claimer's own claim result does not say claimed_by_you")
+	}
+	if claimed.ClaimedByClient == "" {
+		t.Fatal("claim result carries no claimed_by_client")
+	}
+
+	// The lost-response path: re-reading must still identify the holder.
+	reread := callTool[handoffDetailToolResult](t, ctx, sessionA, "handoff.current", map[string]any{"project": project})
+	if !reread.ClaimedByYou {
+		t.Fatal("after re-reading, the client that actually claimed the handoff cannot recognize its own claim — " +
+			"which is exactly what makes a lost claim response unrecoverable")
+	}
+
+	// A second client, same project, different credential: same handoff,
+	// opposite answer.
+	tokenB := f.newUserWithToken("holder-b@example.test")
+	principalB := f.principalIDOf(ctx, tokenB)
+	callTool[addMemberToolResult](t, ctx, sessionA, "project.add_member", map[string]any{
+		"project": project, "principal_id": principalB, "role": "CONTRIBUTOR",
+	})
+
+	sessionB, err := f.connect(ctx, tokenB)
+	if err != nil {
+		t.Fatalf("connect B: %v", err)
+	}
+	defer func() { _ = sessionB.Close() }()
+
+	fromB := callTool[handoffDetailToolResult](t, ctx, sessionB, "handoff.current", map[string]any{"project": project})
+	if fromB.ClaimedByYou {
+		t.Fatal("a client that did not claim the handoff is told it did")
+	}
+	if fromB.ClaimedByClient != claimed.ClaimedByClient {
+		t.Fatalf("B sees claimed_by_client=%q, A reported %q — both must name the same holder",
+			fromB.ClaimedByClient, claimed.ClaimedByClient)
+	}
+
+	// And the pack an arriving agent actually starts from carries it too.
+	pack := callTool[struct {
+		Handoff struct {
+			Status       string `json:"status"`
+			ClaimedByYou bool   `json:"claimed_by_you"`
+		} `json:"handoff"`
+	}](t, ctx, sessionB, "context.bootstrap", map[string]any{"project": project})
+	if pack.Handoff.Status != "claimed" || pack.Handoff.ClaimedByYou {
+		t.Fatalf("bootstrap handoff = %+v, want status claimed and claimed_by_you=false for B", pack.Handoff)
+	}
+}
+
+type addMemberToolResult struct {
+	Added bool `json:"added"`
+}
+
+type handoffToolResult struct {
+	ID              string `json:"id"`
+	Status          string `json:"status"`
+	ClaimedByClient string `json:"claimed_by_client"`
+	ClaimedByYou    bool   `json:"claimed_by_you"`
+}
+
+type handoffDetailToolResult struct {
+	handoffToolResult
+	Summary     string `json:"summary"`
+	NextActions string `json:"next_actions"`
+}
+
+// principalIDOf resolves the principal behind a token straight through the
+// owner pool. There is no MCP tool that reports "who am I" — the session
+// already acts as one principal and never needs to name it — and this is a
+// fixture detail, not the behavior under test.
+func (f *fixture) principalIDOf(ctx context.Context, token string) string {
+	f.t.Helper()
+	cred, err := identity.Authenticate(ctx, f.ownerPool, token)
+	if err != nil {
+		f.t.Fatalf("principalIDOf: %v", err)
+	}
+	return cred.PrincipalID.String()
+}
