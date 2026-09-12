@@ -164,7 +164,7 @@ func (f *fixture) writeArtifact(path, content string) uuid.UUID {
 
 func (f *fixture) publishAndInstallSkill(name, content string) {
 	f.t.Helper()
-	v, err := f.skills.Publish(f.ctx, f.principalID, f.projectID, nil, name, "acme", "local", []byte(content), nil)
+	v, err := f.skills.Publish(f.ctx, f.principalID, f.userIDOf(f.principalID), skills.ScopeProject, &f.projectID, nil, name, "acme", "local", []byte(content), nil)
 	if err != nil {
 		f.t.Fatalf("publish skill %q: %v", name, err)
 	}

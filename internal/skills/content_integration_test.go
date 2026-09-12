@@ -22,12 +22,12 @@ func TestGetVersionReturnsPublishedContent(t *testing.T) {
 	f := newFixture(t)
 	content := []byte("# Code review\n\nCheck the error paths first.\n")
 
-	v, err := f.svc.Publish(f.ctx, f.principalID, f.projectID, nil, "code-review", "acme", "local", content, []string{"filesystem"})
+	v, err := f.svc.Publish(f.ctx, f.principalID, f.userID, skills.ScopeProject, &f.projectID, nil, "code-review", "acme", "local", content, []string{"filesystem"})
 	if err != nil {
 		t.Fatalf("Publish: %v", err)
 	}
 
-	got, err := f.svc.GetVersion(f.ctx, f.principalID, f.projectID, v.ID)
+	got, err := f.svc.GetVersion(f.ctx, f.principalID, v.ID)
 	if err != nil {
 		t.Fatalf("GetVersion: %v", err)
 	}
@@ -54,11 +54,11 @@ func TestGetVersionReturnsPublishedContent(t *testing.T) {
 func TestGetVersionResolvesEachVersionSeparately(t *testing.T) {
 	f := newFixture(t)
 
-	v1, err := f.svc.Publish(f.ctx, f.principalID, f.projectID, nil, "policy", "acme", "local", []byte("first"), nil)
+	v1, err := f.svc.Publish(f.ctx, f.principalID, f.userID, skills.ScopeProject, &f.projectID, nil, "policy", "acme", "local", []byte("first"), nil)
 	if err != nil {
 		t.Fatalf("Publish v1: %v", err)
 	}
-	v2, err := f.svc.Publish(f.ctx, f.principalID, f.projectID, &v1.SkillID, "policy", "acme", "local", []byte("second"), nil)
+	v2, err := f.svc.Publish(f.ctx, f.principalID, f.userID, skills.ScopeProject, &f.projectID, &v1.SkillID, "policy", "acme", "local", []byte("second"), nil)
 	if err != nil {
 		t.Fatalf("Publish v2: %v", err)
 	}
@@ -67,7 +67,7 @@ func TestGetVersionResolvesEachVersionSeparately(t *testing.T) {
 		id   uuid.UUID
 		want string
 	}{{v1.ID, "first"}, {v2.ID, "second"}} {
-		got, err := f.svc.GetVersion(f.ctx, f.principalID, f.projectID, tc.id)
+		got, err := f.svc.GetVersion(f.ctx, f.principalID, tc.id)
 		if err != nil {
 			t.Fatalf("GetVersion(%s): %v", tc.id, err)
 		}
@@ -79,7 +79,7 @@ func TestGetVersionResolvesEachVersionSeparately(t *testing.T) {
 
 func TestGetVersionUnknownIDIsNotFound(t *testing.T) {
 	f := newFixture(t)
-	if _, err := f.svc.GetVersion(f.ctx, f.principalID, f.projectID, uuid.New()); !errors.Is(err, skills.ErrNotFound) {
+	if _, err := f.svc.GetVersion(f.ctx, f.principalID, uuid.New()); !errors.Is(err, skills.ErrNotFound) {
 		t.Fatalf("GetVersion(unknown) = %v, want ErrNotFound", err)
 	}
 }
@@ -92,7 +92,7 @@ func TestGetVersionUnknownIDIsNotFound(t *testing.T) {
 func TestGetVersionDetectsTamperedContent(t *testing.T) {
 	f := newFixture(t)
 
-	v, err := f.svc.Publish(f.ctx, f.principalID, f.projectID, nil, "security-review", "acme", "local", []byte("original"), nil)
+	v, err := f.svc.Publish(f.ctx, f.principalID, f.userID, skills.ScopeProject, &f.projectID, nil, "security-review", "acme", "local", []byte("original"), nil)
 	if err != nil {
 		t.Fatalf("Publish: %v", err)
 	}
@@ -111,7 +111,7 @@ func TestGetVersionDetectsTamperedContent(t *testing.T) {
 		t.Fatalf("overwrite stored object: %v", err)
 	}
 
-	_, err = f.svc.GetVersion(f.ctx, f.principalID, f.projectID, v.ID)
+	_, err = f.svc.GetVersion(f.ctx, f.principalID, v.ID)
 	if !errors.Is(err, skills.ErrChecksumMismatch) {
 		t.Fatalf("GetVersion on tampered content = %v, want ErrChecksumMismatch", err)
 	}
@@ -121,7 +121,7 @@ func TestPublishRejectsOversizedContent(t *testing.T) {
 	f := newFixture(t)
 	oversized := make([]byte, skills.MaxContentSize+1)
 
-	_, err := f.svc.Publish(f.ctx, f.principalID, f.projectID, nil, "huge", "acme", "local", oversized, nil)
+	_, err := f.svc.Publish(f.ctx, f.principalID, f.userID, skills.ScopeProject, &f.projectID, nil, "huge", "acme", "local", oversized, nil)
 	if !errors.Is(err, skills.ErrTooLarge) {
 		t.Fatalf("Publish oversized = %v, want ErrTooLarge", err)
 	}
@@ -170,17 +170,17 @@ func seedOutsider(t *testing.T, f *fixture) (principalID, projectID uuid.UUID) {
 func TestGetVersionDeniesUnrelatedProject(t *testing.T) {
 	f := newFixture(t)
 
-	v, err := f.svc.Publish(f.ctx, f.principalID, f.projectID, nil, "internal-runbook", "acme", "local",
+	v, err := f.svc.Publish(f.ctx, f.principalID, f.userID, skills.ScopeProject, &f.projectID, nil, "internal-runbook", "acme", "local",
 		[]byte("PROD DB is at db.internal, break glass procedure"), nil)
 	if err != nil {
 		t.Fatalf("Publish: %v", err)
 	}
 
-	outsider, outsiderProject := seedOutsider(t, f)
-	// The outsider is an OWNER of their own project, so the capability
-	// check passes — which is exactly why it could never have been the
-	// thing protecting this.
-	if _, err := f.svc.GetVersion(f.ctx, outsider, outsiderProject, v.ID); !errors.Is(err, skills.ErrNotFound) {
+	// The outsider is an OWNER of their own project — a perfectly
+	// legitimate principal. Nothing about the caller's own standing can
+	// protect another scope's package; only the package's scope can.
+	outsider, _ := seedOutsider(t, f)
+	if _, err := f.svc.GetVersion(f.ctx, outsider, v.ID); !errors.Is(err, skills.ErrNotFound) {
 		t.Fatalf("cross-project GetVersion = %v, want ErrNotFound", err)
 	}
 }
@@ -191,11 +191,11 @@ func TestGetVersionDeniesUnrelatedProject(t *testing.T) {
 func TestGetVersionAllowsPublisherBeforeAnyInstall(t *testing.T) {
 	f := newFixture(t)
 
-	v, err := f.svc.Publish(f.ctx, f.principalID, f.projectID, nil, "mine", "acme", "local", []byte("my content"), nil)
+	v, err := f.svc.Publish(f.ctx, f.principalID, f.userID, skills.ScopeProject, &f.projectID, nil, "mine", "acme", "local", []byte("my content"), nil)
 	if err != nil {
 		t.Fatalf("Publish: %v", err)
 	}
-	got, err := f.svc.GetVersion(f.ctx, f.principalID, f.projectID, v.ID)
+	got, err := f.svc.GetVersion(f.ctx, f.principalID, v.ID)
 	if err != nil {
 		t.Fatalf("publisher GetVersion: %v", err)
 	}
@@ -222,21 +222,21 @@ func TestGetVersionAllowsAnyoneOncePromotedToTheShelf(t *testing.T) {
 	f := newFixture(t)
 	f.grantInstallationAdmin()
 
-	v, err := f.svc.Publish(f.ctx, f.principalID, f.projectID, nil, "org-policy", "acme", "local", []byte("policy text"), nil)
+	v, err := f.svc.Publish(f.ctx, f.principalID, f.userID, skills.ScopeProject, &f.projectID, nil, "org-policy", "acme", "local", []byte("policy text"), nil)
 	if err != nil {
 		t.Fatalf("Publish: %v", err)
 	}
 
-	outsider, outsiderProject := seedOutsider(t, f)
-	if _, err := f.svc.GetVersion(f.ctx, outsider, outsiderProject, v.ID); !errors.Is(err, skills.ErrNotFound) {
+	outsider, _ := seedOutsider(t, f)
+	if _, err := f.svc.GetVersion(f.ctx, outsider, v.ID); !errors.Is(err, skills.ErrNotFound) {
 		t.Fatalf("a project-scoped skill was readable by an outsider: %v", err)
 	}
 
-	if _, err := f.svc.Promote(f.ctx, f.principalID, f.userID, f.projectID, v.SkillID, skills.ScopeInstallation, nil); err != nil {
+	if _, err := f.svc.Promote(f.ctx, f.principalID, f.userID, v.SkillID, skills.ScopeInstallation, nil); err != nil {
 		t.Fatalf("Promote: %v", err)
 	}
 
-	got, err := f.svc.GetVersion(f.ctx, outsider, outsiderProject, v.ID)
+	got, err := f.svc.GetVersion(f.ctx, outsider, v.ID)
 	if err != nil {
 		t.Fatalf("after promotion to the installation shelf, the outsider still cannot read it: %v", err)
 	}
@@ -252,20 +252,20 @@ func TestSearchOnlyReturnsWhatTheCallerCanSee(t *testing.T) {
 	f := newFixture(t)
 	f.grantInstallationAdmin()
 
-	mine, err := f.svc.Publish(f.ctx, f.principalID, f.projectID, nil, "code-review", "acme", "local", []byte("review instructions"), nil)
+	mine, err := f.svc.Publish(f.ctx, f.principalID, f.userID, skills.ScopeProject, &f.projectID, nil, "code-review", "acme", "local", []byte("review instructions"), nil)
 	if err != nil {
 		t.Fatalf("Publish mine: %v", err)
 	}
-	shelved, err := f.svc.Publish(f.ctx, f.principalID, f.projectID, nil, "security-review", "acme", "local", []byte("security instructions"), nil)
+	shelved, err := f.svc.Publish(f.ctx, f.principalID, f.userID, skills.ScopeProject, &f.projectID, nil, "security-review", "acme", "local", []byte("security instructions"), nil)
 	if err != nil {
 		t.Fatalf("Publish shelved: %v", err)
 	}
-	if _, err := f.svc.Promote(f.ctx, f.principalID, f.userID, f.projectID, shelved.SkillID, skills.ScopeInstallation, nil); err != nil {
+	if _, err := f.svc.Promote(f.ctx, f.principalID, f.userID, shelved.SkillID, skills.ScopeInstallation, nil); err != nil {
 		t.Fatalf("Promote: %v", err)
 	}
 
 	// The publisher sees both: one in their own project, one on the shelf.
-	page, err := f.svc.Search(f.ctx, f.principalID, f.projectID, "", paging.Options{})
+	page, err := f.svc.Search(f.ctx, f.principalID, "", paging.Options{})
 	if err != nil {
 		t.Fatalf("Search as publisher: %v", err)
 	}
@@ -274,8 +274,8 @@ func TestSearchOnlyReturnsWhatTheCallerCanSee(t *testing.T) {
 	}
 
 	// An outsider sees only the shelf.
-	outsider, outsiderProject := seedOutsider(t, f)
-	page, err = f.svc.Search(f.ctx, outsider, outsiderProject, "", paging.Options{})
+	outsider, _ := seedOutsider(t, f)
+	page, err = f.svc.Search(f.ctx, outsider, "", paging.Options{})
 	if err != nil {
 		t.Fatalf("Search as outsider: %v", err)
 	}
@@ -296,14 +296,14 @@ func TestSearchOnlyReturnsWhatTheCallerCanSee(t *testing.T) {
 
 func TestSearchMatchesNameCaseInsensitively(t *testing.T) {
 	f := newFixture(t)
-	if _, err := f.svc.Publish(f.ctx, f.principalID, f.projectID, nil, "Code-Review", "acme", "local", []byte("x"), nil); err != nil {
+	if _, err := f.svc.Publish(f.ctx, f.principalID, f.userID, skills.ScopeProject, &f.projectID, nil, "Code-Review", "acme", "local", []byte("x"), nil); err != nil {
 		t.Fatalf("Publish: %v", err)
 	}
-	if _, err := f.svc.Publish(f.ctx, f.principalID, f.projectID, nil, "deploy", "acme", "local", []byte("y"), nil); err != nil {
+	if _, err := f.svc.Publish(f.ctx, f.principalID, f.userID, skills.ScopeProject, &f.projectID, nil, "deploy", "acme", "local", []byte("y"), nil); err != nil {
 		t.Fatalf("Publish: %v", err)
 	}
 
-	page, err := f.svc.Search(f.ctx, f.principalID, f.projectID, "REVIEW", paging.Options{})
+	page, err := f.svc.Search(f.ctx, f.principalID, "REVIEW", paging.Options{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
@@ -317,16 +317,16 @@ func TestSearchMatchesNameCaseInsensitively(t *testing.T) {
 func TestSearchReportsTheNewestVersion(t *testing.T) {
 	f := newFixture(t)
 
-	v1, err := f.svc.Publish(f.ctx, f.principalID, f.projectID, nil, "evolving", "acme", "local", []byte("first"), nil)
+	v1, err := f.svc.Publish(f.ctx, f.principalID, f.userID, skills.ScopeProject, &f.projectID, nil, "evolving", "acme", "local", []byte("first"), nil)
 	if err != nil {
 		t.Fatalf("Publish v1: %v", err)
 	}
-	v2, err := f.svc.Publish(f.ctx, f.principalID, f.projectID, &v1.SkillID, "evolving", "acme", "local", []byte("second"), nil)
+	v2, err := f.svc.Publish(f.ctx, f.principalID, f.userID, skills.ScopeProject, &f.projectID, &v1.SkillID, "evolving", "acme", "local", []byte("second"), nil)
 	if err != nil {
 		t.Fatalf("Publish v2: %v", err)
 	}
 
-	page, err := f.svc.Search(f.ctx, f.principalID, f.projectID, "evolving", paging.Options{})
+	page, err := f.svc.Search(f.ctx, f.principalID, "evolving", paging.Options{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
@@ -337,7 +337,7 @@ func TestSearchReportsTheNewestVersion(t *testing.T) {
 		t.Fatalf("entry reports v%d/%s, want v2/%s", page.Items[0].LatestVersion, page.Items[0].LatestChecksum, v2.Checksum)
 	}
 
-	versions, err := f.svc.ListVersions(f.ctx, f.principalID, f.projectID, v1.SkillID, paging.Options{})
+	versions, err := f.svc.ListVersions(f.ctx, f.principalID, v1.SkillID, paging.Options{})
 	if err != nil {
 		t.Fatalf("ListVersions: %v", err)
 	}
@@ -348,25 +348,79 @@ func TestSearchReportsTheNewestVersion(t *testing.T) {
 
 func TestPromoteRequiresRightsAtTheTargetScope(t *testing.T) {
 	f := newFixture(t)
-	v, err := f.svc.Publish(f.ctx, f.principalID, f.projectID, nil, "mine", "acme", "local", []byte("x"), nil)
+	v, err := f.svc.Publish(f.ctx, f.principalID, f.userID, skills.ScopeProject, &f.projectID, nil, "mine", "acme", "local", []byte("x"), nil)
 	if err != nil {
 		t.Fatalf("Publish: %v", err)
 	}
 
 	// Not an installation admin: may publish into their own project, may
 	// not put anything on the installation shelf (docs/adr/0017).
-	if _, err := f.svc.Promote(f.ctx, f.principalID, f.userID, f.projectID, v.SkillID, skills.ScopeInstallation, nil); !errors.Is(err, skills.ErrForbidden) {
+	if _, err := f.svc.Promote(f.ctx, f.principalID, f.userID, v.SkillID, skills.ScopeInstallation, nil); !errors.Is(err, skills.ErrForbidden) {
 		t.Fatalf("Promote to installation without admin = %v, want ErrForbidden", err)
 	}
 
 	f.grantInstallationAdmin()
-	if _, err := f.svc.Promote(f.ctx, f.principalID, f.userID, f.projectID, v.SkillID, skills.ScopeInstallation, nil); err != nil {
+	if _, err := f.svc.Promote(f.ctx, f.principalID, f.userID, v.SkillID, skills.ScopeInstallation, nil); err != nil {
 		t.Fatalf("Promote as admin: %v", err)
 	}
 
 	// And promotion only ever widens: taking it back down would break
 	// bindings made while it was visible.
-	if _, err := f.svc.Promote(f.ctx, f.principalID, f.userID, f.projectID, v.SkillID, skills.ScopeProject, &f.projectID); !errors.Is(err, skills.ErrNotPromotable) {
+	if _, err := f.svc.Promote(f.ctx, f.principalID, f.userID, v.SkillID, skills.ScopeProject, &f.projectID); !errors.Is(err, skills.ErrNotPromotable) {
 		t.Fatalf("narrowing scope = %v, want ErrNotPromotable", err)
+	}
+}
+
+// TestPublishStraightToTheInstallationShelf is the case that has nothing to
+// do with any project: a company self-hosting this wants an instance-wide
+// rule available to everyone, published by an installation admin who need
+// not be a member of anything.
+//
+// Nothing about the publish names a project, and the resulting skill records
+// no publishing project either — inventing one would make the provenance
+// column a lie.
+func TestPublishStraightToTheInstallationShelf(t *testing.T) {
+	f := newFixture(t)
+	f.grantInstallationAdmin()
+
+	v, err := f.svc.Publish(f.ctx, f.principalID, f.userID, skills.ScopeInstallation, nil, nil,
+		"house-rules", "acme", "local", []byte("always run the tests"), nil)
+	if err != nil {
+		t.Fatalf("Publish to installation scope: %v", err)
+	}
+	if v.PublishedInProject != nil {
+		t.Fatalf("published_in_project = %v, want nil for an installation-scope publish", v.PublishedInProject)
+	}
+
+	// Visible and readable to someone with no relationship to the publisher.
+	outsider, _ := seedOutsider(t, f)
+	got, err := f.svc.GetVersion(f.ctx, outsider, v.ID)
+	if err != nil {
+		t.Fatalf("outsider cannot read an installation-shelf skill: %v", err)
+	}
+	if string(got.Content) != "always run the tests" {
+		t.Fatalf("content = %q", got.Content)
+	}
+
+	page, err := f.svc.Search(f.ctx, outsider, "house", paging.Options{})
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+	if len(page.Items) != 1 || page.Items[0].Scope != skills.ScopeInstallation {
+		t.Fatalf("search results = %+v, want the installation-scope skill", page.Items)
+	}
+}
+
+// TestPublishToInstallationRequiresAdmin: the shelf is open to read, not to
+// write. Anyone may publish into their own project; putting something in
+// front of the whole installation takes installation-admin rights
+// (docs/adr/0017).
+func TestPublishToInstallationRequiresAdmin(t *testing.T) {
+	f := newFixture(t)
+
+	_, err := f.svc.Publish(f.ctx, f.principalID, f.userID, skills.ScopeInstallation, nil, nil,
+		"house-rules", "acme", "local", []byte("x"), nil)
+	if !errors.Is(err, skills.ErrForbidden) {
+		t.Fatalf("Publish to installation without admin = %v, want ErrForbidden", err)
 	}
 }

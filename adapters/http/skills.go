@@ -44,8 +44,15 @@ func toSkillBindingResponse(b skills.SkillBinding) skillBindingResponse {
 	}
 }
 
+// publishSkill puts a package into a scope. It is a top-level registry
+// operation, not a project one: an installation admin publishing an
+// instance-wide rule may belong to no project at all (docs/adr/0017,
+// docs/adr/0018), so demanding a project in the path would have excluded
+// exactly the caller a self-hosted instance most wants publishing.
 func (d Deps) publishSkill(w http.ResponseWriter, r *http.Request) {
 	var body struct {
+		Scope                string     `json:"scope"`
+		ScopeRef             *uuid.UUID `json:"scope_ref"`
 		SkillID              *uuid.UUID `json:"skill_id"`
 		Name                 string     `json:"name"`
 		Author               string     `json:"author"`
@@ -57,11 +64,19 @@ func (d Deps) publishSkill(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid_request", "could not decode request body")
 		return
 	}
+	if body.Scope == "" {
+		body.Scope = string(skills.ScopeProject)
+	}
 
-	project := projectFrom(r.Context())
 	principalID := principalIDFrom(r.Context())
+	userID, err := resolveUserID(r.Context(), d.Pool, principalID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal", "internal error")
+		return
+	}
 
-	v, err := d.Skills.Publish(r.Context(), principalID, project.ID, body.SkillID, body.Name, body.Author, body.Origin, []byte(body.Content), body.DeclaredCapabilities)
+	v, err := d.Skills.Publish(r.Context(), principalID, userID, skills.Scope(body.Scope), body.ScopeRef,
+		body.SkillID, body.Name, body.Author, body.Origin, []byte(body.Content), body.DeclaredCapabilities)
 	if err != nil {
 		writeDomainError(w, err)
 		return
@@ -196,10 +211,9 @@ func (d Deps) getSkillVersion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	project := projectFrom(r.Context())
 	principalID := principalIDFrom(r.Context())
 
-	v, err := d.Skills.GetVersion(r.Context(), principalID, project.ID, skillVersionID)
+	v, err := d.Skills.GetVersion(r.Context(), principalID, skillVersionID)
 	if err != nil {
 		writeDomainError(w, err)
 		return
@@ -231,14 +245,13 @@ type catalogEntryResponse struct {
 // what comes back is what the caller may see (docs/adr/0018), which is not
 // limited to the project in the path — that only proves membership.
 func (d Deps) searchSkills(w http.ResponseWriter, r *http.Request) {
-	project := projectFrom(r.Context())
 	principalID := principalIDFrom(r.Context())
 
 	opts, ok := pagingFrom(w, r)
 	if !ok {
 		return
 	}
-	page, err := d.Skills.Search(r.Context(), principalID, project.ID, r.URL.Query().Get("q"), opts)
+	page, err := d.Skills.Search(r.Context(), principalID, r.URL.Query().Get("q"), opts)
 	if err != nil {
 		writeDomainError(w, err)
 		return
@@ -262,14 +275,13 @@ func (d Deps) listSkillVersions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	project := projectFrom(r.Context())
 	principalID := principalIDFrom(r.Context())
 
 	opts, ok := pagingFrom(w, r)
 	if !ok {
 		return
 	}
-	page, err := d.Skills.ListVersions(r.Context(), principalID, project.ID, skillID, opts)
+	page, err := d.Skills.ListVersions(r.Context(), principalID, skillID, opts)
 	if err != nil {
 		writeDomainError(w, err)
 		return
@@ -295,7 +307,6 @@ func (d Deps) promoteSkill(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	project := projectFrom(r.Context())
 	principalID := principalIDFrom(r.Context())
 	userID, err := resolveUserID(r.Context(), d.Pool, principalID)
 	if err != nil {
@@ -303,7 +314,7 @@ func (d Deps) promoteSkill(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sk, err := d.Skills.Promote(r.Context(), principalID, userID, project.ID, body.SkillID, skills.Scope(body.Scope), body.ScopeRef)
+	sk, err := d.Skills.Promote(r.Context(), principalID, userID, body.SkillID, skills.Scope(body.Scope), body.ScopeRef)
 	if err != nil {
 		writeDomainError(w, err)
 		return

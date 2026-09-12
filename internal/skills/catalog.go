@@ -10,7 +10,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/koduj-dev/context-commander/internal/auth"
 	"github.com/koduj-dev/context-commander/internal/db"
 	"github.com/koduj-dev/context-commander/internal/paging"
 )
@@ -43,20 +42,17 @@ type CatalogEntry struct {
 //
 // What comes back is exactly what the caller can see: skills living in
 // their projects, in their organizations, and on the installation-wide
-// shelf (docs/adr/0018). The anchor projectID is the usual CapSkillRead
-// floor, not a filter — a caller does not only see the anchor project's
-// skills.
+// shelf (docs/adr/0018). No project is named or needed — scope decides
+// visibility, and RLS applies it (see GetVersion for why the decision sits
+// in the database here).
 //
 // Skills with no published version are omitted. A Skill row exists from the
 // moment Publish starts, before its first SkillVersion is committed
 // (Service.Publish phase 1), and offering an agent a catalog entry it
 // cannot download would be worse than not listing it yet.
 func (s *Service) Search(
-	ctx context.Context, principalID, projectID uuid.UUID, query string, opts paging.Options,
+	ctx context.Context, principalID uuid.UUID, query string, opts paging.Options,
 ) (paging.Page[CatalogEntry], error) {
-	if err := s.checkCapability(ctx, principalID, projectID, auth.CapSkillRead); err != nil {
-		return paging.Page[CatalogEntry]{}, err
-	}
 	cursorName, cursorID, hasCursor, err := decodeCatalogCursor(opts)
 	if err != nil {
 		return paging.Page[CatalogEntry]{}, err
@@ -123,11 +119,8 @@ func (s *Service) Search(
 // ListVersions returns a skill's versions, newest first — what a client
 // consults to pin an older version deliberately, or to see what it missed.
 func (s *Service) ListVersions(
-	ctx context.Context, principalID, projectID, skillID uuid.UUID, opts paging.Options,
+	ctx context.Context, principalID, skillID uuid.UUID, opts paging.Options,
 ) (paging.Page[SkillVersion], error) {
-	if err := s.checkCapability(ctx, principalID, projectID, auth.CapSkillRead); err != nil {
-		return paging.Page[SkillVersion]{}, err
-	}
 	afterVersion, hasCursor, err := opts.DecodeSeq()
 	if err != nil {
 		return paging.Page[SkillVersion]{}, err
@@ -184,22 +177,19 @@ func (s *Service) ListVersions(
 // to the marketplace" means here, and it is a separate, authorized act
 // rather than a side effect of publishing (docs/adr/0018).
 //
-// Authorization is checkScopeTarget, the same check Install uses to decide
-// whether a caller may bind INTO a scope: promoting to an organization
-// needs CapOrgManageMembers there, and to the installation needs
-// installation-admin rights (docs/adr/0017). The two questions are the same
-// question — "may you put something in front of everyone at this scope?"
+// Authorization is checkPublishTarget — the same check Publish uses, asked
+// about the TARGET scope: promoting to an organization needs
+// CapOrgManageMembers there, and to the installation needs
+// installation-admin rights (docs/adr/0017). Where the skill currently
+// lives does not grant the right to move it somewhere wider; only the
+// destination does.
 func (s *Service) Promote(
-	ctx context.Context, principalID, userID, projectID uuid.UUID,
+	ctx context.Context, principalID, userID uuid.UUID,
 	skillID uuid.UUID, targetScope Scope, targetScopeRef *uuid.UUID,
 ) (Skill, error) {
-	if err := s.checkCapability(ctx, principalID, projectID, auth.CapSkillPublish); err != nil {
-		return Skill{}, err
-	}
-
 	var skill Skill
 	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
-		if err := s.checkScopeTarget(ctx, tx, principalID, userID, targetScope, targetScopeRef); err != nil {
+		if err := s.checkPublishTarget(ctx, tx, principalID, userID, targetScope, targetScopeRef); err != nil {
 			return err
 		}
 

@@ -533,10 +533,13 @@ func TestSkillPublishInstallListEffective(t *testing.T) {
 		t.Fatalf("get project: response had no id: %+v", proj)
 	}
 
+	// The registry is top-level and the publish names its own scope
+	// (docs/adr/0018); only the binding below is project-scoped.
 	publishBody, _ := json.Marshal(map[string]any{
+		"scope": "project", "scope_ref": projectID,
 		"name": "code-review", "author": "filip", "content": "review checklist",
 	})
-	resp = f.do(http.MethodPost, "/v1/projects/skills/proj/skills", token, publishBody)
+	resp = f.do(http.MethodPost, "/v1/skills", token, publishBody)
 	if resp.StatusCode != http.StatusOK {
 		b, _ := io.ReadAll(resp.Body)
 		t.Fatalf("publish skill: status=%d body=%s", resp.StatusCode, b)

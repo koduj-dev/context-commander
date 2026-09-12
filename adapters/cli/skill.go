@@ -146,7 +146,27 @@ func newSkillPublishCmd() *cobra.Command {
 				return fmt.Errorf("read content: %w", err)
 			}
 
-			v, err := sc.svc.Publish(cmd.Context(), sc.principalID, sc.project.ID, skillID, name, author, origin, content, nil)
+			scope, _ := cmd.Flags().GetString("scope")
+			if scope == "" {
+				scope = string(skills.ScopeProject)
+			}
+			// For project scope the --project flag IS the destination, so
+			// the operator never names the same project twice.
+			var scopeRef *uuid.UUID
+			switch skills.Scope(scope) {
+			case skills.ScopeProject:
+				scopeRef = &sc.project.ID
+			case skills.ScopeOrganization:
+				raw, _ := cmd.Flags().GetString("scope-ref")
+				id, err := uuid.Parse(raw)
+				if err != nil {
+					return fmt.Errorf("--scope-ref (organization UUID): %w", err)
+				}
+				scopeRef = &id
+			}
+
+			v, err := sc.svc.Publish(cmd.Context(), sc.principalID, sc.userID, skills.Scope(scope), scopeRef,
+				skillID, name, author, origin, content, nil)
 			if err != nil {
 				return err
 			}
@@ -159,6 +179,8 @@ func newSkillPublishCmd() *cobra.Command {
 	cmd.Flags().String("author", "", "skill author")
 	cmd.Flags().String("origin", "", "skill origin")
 	cmd.Flags().String("file", "", "file to read content from (default: stdin)")
+	cmd.Flags().String("scope", "project", `where the skill should live: "project" (uses --project), "organization" or "installation"`)
+	cmd.Flags().String("scope-ref", "", "organization UUID when --scope=organization")
 	skillFlags(cmd)
 	return cmd
 }
@@ -342,7 +364,7 @@ func newSkillGetCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("invalid skill version id: %w", err)
 			}
-			v, err := sc.svc.GetVersion(cmd.Context(), sc.principalID, sc.project.ID, skillVersionID)
+			v, err := sc.svc.GetVersion(cmd.Context(), sc.principalID, skillVersionID)
 			if err != nil {
 				return err
 			}
@@ -378,7 +400,7 @@ func newSkillSearchCmd() *cobra.Command {
 			if len(args) == 1 {
 				query = args[0]
 			}
-			page, err := sc.svc.Search(cmd.Context(), sc.principalID, sc.project.ID, query, pagingOptionsFrom(cmd))
+			page, err := sc.svc.Search(cmd.Context(), sc.principalID, query, pagingOptionsFrom(cmd))
 			if err != nil {
 				return err
 			}
@@ -415,7 +437,7 @@ func newSkillVersionsCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("invalid skill id: %w", err)
 			}
-			page, err := sc.svc.ListVersions(cmd.Context(), sc.principalID, sc.project.ID, skillID, pagingOptionsFrom(cmd))
+			page, err := sc.svc.ListVersions(cmd.Context(), sc.principalID, skillID, pagingOptionsFrom(cmd))
 			if err != nil {
 				return err
 			}
@@ -461,7 +483,7 @@ func newSkillPromoteCmd() *cobra.Command {
 				scopeRef = &id
 			}
 
-			sk, err := sc.svc.Promote(cmd.Context(), sc.principalID, sc.userID, sc.project.ID, skillID, skills.Scope(scope), scopeRef)
+			sk, err := sc.svc.Promote(cmd.Context(), sc.principalID, sc.userID, skillID, skills.Scope(scope), scopeRef)
 			if err != nil {
 				return err
 			}

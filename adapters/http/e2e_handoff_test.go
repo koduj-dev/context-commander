@@ -44,7 +44,11 @@ func TestE2ECrossClientHandoff(t *testing.T) {
 	f.mustDo(http.MethodPut, base+"/artifacts/content?path=notes/decisions.md&content_type=text/markdown&expected_version=0",
 		tokenA, []byte("Chose the reindex-in-place approach."), http.StatusOK, "A writes its decisions")
 
+	// Publishing is a registry operation, not a project one: it names the
+	// scope the package should live at (docs/adr/0018). Project scope here,
+	// so only this project's members can see it until someone promotes it.
 	publish, _ := json.Marshal(map[string]any{
+		"scope": "project", "scope_ref": f.projectIDOf(tokenA, project),
 		"name": "es-review", "author": "agent-a", "origin": "local",
 		"content": "# ES review\nAlways verify mapping compatibility before reindexing.",
 	})
@@ -52,7 +56,7 @@ func TestE2ECrossClientHandoff(t *testing.T) {
 		ID      string `json:"id"`
 		SkillID string `json:"skill_id"`
 	}
-	f.mustDecode(http.MethodPost, base+"/skills", tokenA, publish, http.StatusOK, "A publishes a skill", &published)
+	f.mustDecode(http.MethodPost, "/v1/skills", tokenA, publish, http.StatusOK, "A publishes a skill", &published)
 
 	install, _ := json.Marshal(map[string]any{
 		"scope": "project", "scope_ref": f.projectIDOf(tokenA, project),
@@ -204,21 +208,23 @@ func TestE2ESkillGetReturnsInstalledContent(t *testing.T) {
 	token := f.newUserWithToken("skills@example.test")
 	const project = "skills/proj"
 	f.createProject(token, project, "Skills Proj")
-	base := "/v1/projects/" + project
 
 	const content = "# Deploy checklist\n1. run migrations\n2. flip the alias\n"
-	publish, _ := json.Marshal(map[string]any{"name": "deploy", "author": "ops", "content": content})
+	publish, _ := json.Marshal(map[string]any{
+		"scope": "project", "scope_ref": f.projectIDOf(token, project),
+		"name": "deploy", "author": "ops", "content": content,
+	})
 	var published struct {
 		ID string `json:"id"`
 	}
-	f.mustDecode(http.MethodPost, base+"/skills", token, publish, http.StatusOK, "publish", &published)
+	f.mustDecode(http.MethodPost, "/v1/skills", token, publish, http.StatusOK, "publish", &published)
 
 	var got struct {
 		SkillName string `json:"skill_name"`
 		Content   string `json:"content"`
 		Checksum  string `json:"checksum"`
 	}
-	f.mustDecode(http.MethodGet, base+"/skills/versions/"+published.ID, token, nil, http.StatusOK, "skill.get", &got)
+	f.mustDecode(http.MethodGet, "/v1/skills/versions/"+published.ID, token, nil, http.StatusOK, "skill.get", &got)
 	if got.Content != content {
 		t.Fatalf("skill content = %q, want %q", got.Content, content)
 	}

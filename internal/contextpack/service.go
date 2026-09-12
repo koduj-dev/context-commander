@@ -263,7 +263,7 @@ func (s *Service) fillSkills(ctx context.Context, principalID, projectID uuid.UU
 	}
 
 	for _, binding := range bindings {
-		v, err := s.skills.GetVersion(ctx, principalID, projectID, binding.SkillVersionID)
+		v, err := s.skills.GetVersion(ctx, principalID, binding.SkillVersionID)
 		if err != nil {
 			b.note("skill", binding.SkillVersionID.String(), 0, reasonFor(err, "could not read the skill's content"))
 			continue

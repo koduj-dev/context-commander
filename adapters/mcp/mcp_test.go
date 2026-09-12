@@ -474,7 +474,7 @@ func TestSkillPublishInstallListEffectiveMCP(t *testing.T) {
 		SkillID string `json:"skill_id"`
 	}
 	v := callTool[skillVersionResult](t, ctx, session, "skill.publish", map[string]any{
-		"project": "mcp-skills/proj", "name": "code-review", "content": "checklist",
+		"scope": "project", "scope_ref": "mcp-skills/proj", "name": "code-review", "content": "checklist",
 	})
 	if v.ID == "" || v.SkillID == "" {
 		t.Fatalf("skill.publish: missing ids in %+v", v)

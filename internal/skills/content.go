@@ -11,7 +11,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/koduj-dev/context-commander/internal/auth"
 	"github.com/koduj-dev/context-commander/internal/db"
 	"github.com/koduj-dev/context-commander/internal/storage"
 )
@@ -57,37 +56,33 @@ type VersionWithContent struct {
 // until now nothing in any adapter could turn one into the bytes it names —
 // an agent could install a skill it was then unable to load.
 //
-// Authorization has two halves, enforced in two places on purpose.
+// Reading needs no project, and takes no capability check of its own.
 //
-// The capability half is here: the caller must hold CapSkillRead on an
-// anchor project it names, the same shape every other skill operation uses
-// (docs/adr/0014). That is a floor — "you are a member of something in this
-// installation" — not a filter on which skills exist.
+// Visibility IS the authorization here, and it is Row-Level Security on
+// `skills` / `skill_versions` (migrations/000021): a package is visible at
+// its own scope — its project, its organization, or the installation-wide
+// shelf (docs/adr/0018). A version outside every scope the caller can see is
+// not refused, it is simply not there, and this returns ErrNotFound.
 //
-// The visibility half is Row-Level Security on `skills` and `skill_versions`
-// (migrations/000021): a skill is visible at its own scope — its project,
-// its organization, or the installation-wide shelf (docs/adr/0018). An
-// out-of-scope version is not refused, it is simply not there, and this
-// method returns ErrNotFound.
+// An earlier version of this method demanded CapSkillRead on an "anchor"
+// project the caller named. That was theatre: every project role holds
+// CapSkillRead, so it only ever proved the caller belonged to some project —
+// which is not a fact the registry cares about, and which excluded exactly
+// the people a self-hosted instance most wants reading its shelf (an
+// installation admin who is in no project at all).
 //
-// That split is a deliberate exception to the usual "authorize in the domain
-// service" rule (CONTRIBUTING rule 7). Restating the scope predicate in Go
-// would mean resolving organization membership, which is keyed by user
-// (docs/adr/0006) and not by the principal this read path carries — so the
-// Go version would either need a userID every caller would have to thread
-// through, or it would quietly get organization-scoped skills wrong. The
-// policy is identical to the one skill_bindings has always used, and
-// internal/skills' tests exercise it with RLS both on and off.
+// That RLS carries the decision is a deliberate exception to "authorize in
+// the domain service" (CONTRIBUTING rule 7). Restating the scope predicate
+// in Go would mean resolving organization membership, which is keyed by user
+// (docs/adr/0006) and not by the principal a read path carries. The policy
+// is identical to the one skill_bindings has always used, and this package's
+// tests exercise it with RLS both on and off.
 //
-// The consequence worth stating wherever a caller can act on it: a skill
-// promoted to the installation shelf is readable by everyone in the
-// installation. Project-private material belongs in internal/secrets or an
-// artifact, never in a skill package.
-func (s *Service) GetVersion(ctx context.Context, principalID, projectID, skillVersionID uuid.UUID) (VersionWithContent, error) {
-	if err := s.checkCapability(ctx, principalID, projectID, auth.CapSkillRead); err != nil {
-		return VersionWithContent{}, err
-	}
-
+// The consequence worth stating wherever a caller can act on it: a skill on
+// the installation shelf is readable by everyone in the installation, and
+// skill content is stored unencrypted either way. Confidential material
+// belongs in internal/secrets, never in a package.
+func (s *Service) GetVersion(ctx context.Context, principalID, skillVersionID uuid.UUID) (VersionWithContent, error) {
 	var out VersionWithContent
 	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
 		// author/origin are nullable in migrations/000007 but plain strings

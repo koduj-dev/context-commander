@@ -100,6 +100,20 @@ func NewHandler(deps Deps) http.Handler {
 
 		r.Post("/projects", deps.createProject)
 
+		// The skill registry is a top-level resource, not a project one:
+		// packages live at a scope of their own (docs/adr/0018) and an
+		// installation-wide one belongs to no project. Only the *bindings*
+		// below — which project uses which skill — are project-scoped.
+		r.Route("/skills", func(r chi.Router) {
+			r.Post("/", deps.publishSkill)
+			r.Get("/", deps.searchSkills)
+			r.Post("/promote", deps.promoteSkill)
+			// Registered before "/{skillID}/...": chi prefers static
+			// segments, so "versions" is not read as a skill id.
+			r.Get("/versions/{skillVersionID}", deps.getSkillVersion)
+			r.Get("/{skillID}/versions", deps.listSkillVersions)
+		})
+
 		r.Post("/organizations", deps.createOrganization)
 		r.Post("/organizations/{id}/members", deps.addOrganizationMember)
 
@@ -157,18 +171,11 @@ func NewHandler(deps Deps) http.Handler {
 				})
 			})
 
-			r.Post("/skills", deps.publishSkill)
 			r.Post("/skills/install", deps.installSkill)
 			r.Post("/skills/override", deps.overrideSkill)
 			r.Post("/skills/pin", deps.pinSkillBinding)
 			r.Post("/skills/unpin", deps.unpinSkillBinding)
 			r.Get("/skills/effective", deps.listEffectiveSkills)
-			r.Get("/skills/versions/{skillVersionID}", deps.getSkillVersion)
-			// The registry itself: browse by name, enumerate a skill's
-			// versions, and move a skill to a wider shelf.
-			r.Get("/skills/catalog", deps.searchSkills)
-			r.Get("/skills/{skillID}/versions", deps.listSkillVersions)
-			r.Post("/skills/promote", deps.promoteSkill)
 
 			r.Get("/gates/bindings", deps.listGateBindings)
 			r.Post("/gates/bindings", deps.bindGate)

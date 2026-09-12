@@ -32,9 +32,16 @@ scope the way a binding does.
 
 - `Skill` carries `scope` (installation / organization / project) and `scope_ref`
   (migration 000021), the same shape and the same CHECK constraints as `skill_bindings`.
-- A skill is **born in the project it was published from**. Publishing is therefore never
-  accidentally a public act — the narrowest scope is the default, and no flag can widen it during
-  publish.
+- **Publishing names its target scope**, and project scope is only the default. A team running
+  this self-hosted can put an instance-wide rule on the shelf directly, without inventing a
+  project to hang it on; an installation admin who belongs to no project at all is exactly the
+  caller that case has (docs/adr/0017). Authorization is the destination, never the caller's
+  standing somewhere else: `checkPublishTarget` asks for CapSkillPublish on the target project,
+  organization-admin rights on the target organization, or installation-admin rights for the
+  shelf.
+- A skill published at project scope records that project as its provenance
+  (`published_in_project`, migration 000020); one published straight to an organization or the
+  installation records none, because it has none.
 - **`skill.promote` widens** the scope: project → organization → installation. It only ever
   widens; narrowing is refused, because anyone who could already see the skill may have installed
   it and pulling the shelf out from under them would break bindings that were legitimate when
@@ -47,10 +54,13 @@ scope the way a binding does.
 - `SkillBinding`'s scope keeps its existing meaning, untouched: it says where a skill is
   *applied*, never who may *see* it. The two were only ever conflated because the package had no
   model of its own.
-- **The catalog is browsable**: `skill.search` lists and searches by name, `skill.versions`
-  enumerates a skill's versions. Both return exactly what the caller can see. Browsing requires
-  `CapSkillRead` on an anchor project — a floor ("you are a member of something here"), not a
-  filter: the catalog returned spans every scope the caller can see, not just the anchor.
+- **The catalog is browsable, and reading it needs no project.** `skill.search` lists and searches
+  by name, `skill.versions` enumerates a skill's versions, `skill.get` returns content. All three
+  return exactly what the caller can see, and none of them names a project: scope decides
+  visibility, so an anchor project would have been a hoop rather than a check. (An earlier draft
+  demanded `CapSkillRead` on an anchor project. Every project role holds that capability, so it
+  only proved the caller belonged to some project — not a fact the registry cares about, and one
+  that excluded the installation admin who belongs to none.)
 - **Change detection is the checksum**, which `SkillVersion` already carries and which is computed
   over the plaintext package at publish time. A catalog entry reports its newest version's
   checksum, so a client remembers what it loaded and compares — never trusting a version number or
@@ -71,6 +81,10 @@ scope the way a binding does.
 - A *cross-instance* public marketplace is still out of scope and stays behind trust, signing and
   distribution (NEXT.md's "deliberately not doing"). This ADR is about one installation's own
   registry, not about federating between installations.
+- The REST surface splits along the same line the concepts do: the registry is top-level
+  (`/v1/skills` — publish, search, promote, versions, content), while *bindings* stay project-scoped
+  (`/v1/projects/{ns}/{slug}/skills/install|override|pin|effective`). A package that can live
+  above any project has no business behind a project path.
 - Signed packages and an approval workflow (Phase 3) get more valuable, not less: once a catalog
   is browsable, "which of these do I trust" is a question an agent will actually ask.
   `trust_status` exists on `SkillVersion` for exactly that and is still always `unverified`.

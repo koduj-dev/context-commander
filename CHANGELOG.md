@@ -19,21 +19,38 @@ link definition at the bottom of the file.
   reachable only through a UUID that came from somewhere else, so an agent
   could not look for a skill it did not already know about.
   - `Skill` carries `scope`/`scope_ref` with the same shape and constraints
-    as `skill_bindings`. A skill is **born in the project it was published
-    from**, so publishing is never accidentally a public act, and
-    `skill.promote` widens it: project → organization → installation. The
+    as `skill_bindings`, and `skill.promote` widens it: project →
+    organization → installation. Project scope is the default for a publish
+    that does not say otherwise, so publishing is never accidentally a
+    public act. The
     installation scope is the marketplace shelf, and putting something on it
     is an authorized act (installation admin) rather than a side effect of
     publishing. Promotion only ever widens — narrowing would break bindings
     made while the skill was visible. Authorized by the same
     `checkScopeTarget` that decides whether a caller may bind *into* a
     scope, because it is the same question.
+  - **Publishing names its target scope and needs no project.** A team
+    self-hosting this can put an instance-wide rule on the shelf directly
+    rather than inventing a project to hang it on — an installation admin
+    who belongs to no project is exactly the caller that case has
+    (docs/adr/0017). Authorization is always the destination, never the
+    caller's standing somewhere else. Reading the registry names no project
+    either: an earlier draft demanded `CapSkillRead` on an "anchor" project,
+    which every project role holds, so it only proved the caller belonged to
+    *some* project — not a fact the registry cares about, and one that
+    excluded the very admin a self-hosted instance wants curating its shelf.
+  - The REST surface now splits where the concepts do: the registry is
+    top-level (`/v1/skills` — publish, search, promote, versions, content)
+    and *bindings* stay project-scoped
+    (`/v1/projects/{ns}/{slug}/skills/install|override|pin|effective`). A
+    package that can live above any project has no business behind a project
+    path.
   - **Discovery:** `skill.search` browses and searches by name
     (case-insensitive, LIKE metacharacters escaped), `skill.versions`
     enumerates a skill's versions. Both return exactly what the caller can
     see, across every scope — the anchor project is a membership floor, not
-    a filter. Also `GET .../skills/catalog`, `GET .../skills/{id}/versions`,
-    `POST .../skills/promote`, and `ccd skill search|versions|promote`.
+    a filter. Also `GET /v1/skills?q=`, `GET /v1/skills/{id}/versions`,
+    `POST /v1/skills/promote`, and `ccd skill search|versions|promote`.
   - **Change detection is the checksum**, already carried by every
     `SkillVersion` and computed over the plaintext package. A catalog entry
     reports its newest version's checksum, so a client remembers what it

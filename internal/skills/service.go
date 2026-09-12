@@ -148,18 +148,66 @@ func (s *Service) checkScopeTarget(ctx context.Context, tx pgx.Tx, principalID, 
 	}
 }
 
+// checkPublishTarget authorizes publishing a package INTO a scope. It
+// mirrors checkScopeTarget exactly, except that project scope asks for
+// CapSkillPublish rather than CapSkillInstall: putting a package somewhere
+// and binding one there are different acts, and a role could reasonably
+// hold one without the other.
+//
+// Nothing here needs an anchor project. An installation admin publishing an
+// instance-wide rule may belong to no project at all (docs/adr/0017), and
+// requiring one would have been an artificial hoop — the scope the caller
+// is publishing into is the only thing that decides whether they may.
+func (s *Service) checkPublishTarget(ctx context.Context, tx pgx.Tx, principalID, userID uuid.UUID, scope Scope, scopeRef *uuid.UUID) error {
+	switch scope {
+	case ScopeInstallation:
+		isAdmin, err := s.installationAdmins.IsAdmin(ctx, tx, userID)
+		if err != nil {
+			return fmt.Errorf("skills: check installation admin: %w", err)
+		}
+		if !isAdmin {
+			return ErrForbidden
+		}
+		return nil
+	case ScopeOrganization:
+		if scopeRef == nil {
+			return ErrScopeRefRequired
+		}
+		m, err := s.orgs.GetMembership(ctx, tx, *scopeRef, userID)
+		if err != nil {
+			return ErrForbidden
+		}
+		if !organizations.RoleCan(m.Role, organizations.CapOrgManageMembers) {
+			return ErrForbidden
+		}
+		return nil
+	case ScopeProject:
+		if scopeRef == nil {
+			return ErrScopeRefRequired
+		}
+		m, err := s.projects.GetMembership(ctx, tx, *scopeRef, principalID)
+		if err != nil {
+			return ErrForbidden
+		}
+		if !auth.RoleCan(m.Role, auth.CapSkillPublish) {
+			return ErrForbidden
+		}
+		return nil
+	default:
+		return fmt.Errorf("skills: unknown scope %q", scope)
+	}
+}
+
 // Publish inserts a new Skill (if skillID is nil) or a new SkillVersion
 // under an existing one — always a pure INSERT, never an UPDATE to any
 // existing SkillVersion row (docs/adr/0012). content is uploaded to
 // ObjectStore unencrypted — see docs/gotchas.md.
 func (s *Service) Publish(
-	ctx context.Context, principalID, projectID uuid.UUID,
+	ctx context.Context, principalID, userID uuid.UUID,
+	scope Scope, scopeRef *uuid.UUID,
 	skillID *uuid.UUID, name, author, origin string,
 	content []byte, declaredCapabilities []string,
 ) (SkillVersion, error) {
-	if err := s.checkCapability(ctx, principalID, projectID, auth.CapSkillPublish); err != nil {
-		return SkillVersion{}, err
-	}
 	// Checked here rather than only in the adapters: the CLI publishes
 	// straight from a file with no HTTP body limit in the way, so the cap
 	// belongs at the domain chokepoint that every adapter shares. See
@@ -183,14 +231,18 @@ func (s *Service) Publish(
 	var skill Skill
 	var nextVersion int
 	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+		if err := s.checkPublishTarget(ctx, tx, principalID, userID, scope, scopeRef); err != nil {
+			return err
+		}
 		if skillID == nil {
-			// Born in the project it was published from — the narrowest
-			// scope, so publishing is never accidentally a public act
-			// (docs/adr/0018). Widening it is Promote's job and a separate
-			// decision.
+			// Published straight into the scope the caller named and was
+			// authorized for. A team self-hosting this can put an
+			// instance-wide rule on the shelf directly; a project that
+			// wants a local skill publishes at project scope. Neither has
+			// to pretend to be the other (docs/adr/0018).
 			skill = Skill{
 				ID: uuid.New(), Name: name, Author: author, Origin: origin,
-				Scope: ScopeProject, ScopeRef: &projectID,
+				Scope: scope, ScopeRef: scopeRef,
 			}
 			if _, err := tx.Exec(ctx,
 				`INSERT INTO skills (id, name, author, origin, scope, scope_ref) VALUES ($1, $2, $3, $4, $5, $6)`,
@@ -236,7 +288,7 @@ func (s *Service) Publish(
 			`INSERT INTO skill_versions (id, skill_id, version, checksum, storage_key, files, declared_capabilities, trust_status,
 			                             published_in_project, published_by)
 			 VALUES ($1, $2, $3, $4, $5, $6, $7, 'unverified', $8, $9)`,
-			versionID, skill.ID, nextVersion, checksum, storageKey, []byte("[]"), declared, projectID, principalID,
+			versionID, skill.ID, nextVersion, checksum, storageKey, []byte("[]"), declared, publishedInProject(scope, scopeRef), principalID,
 		)
 		return err
 	})
@@ -457,4 +509,15 @@ func (s *Service) ListEffective(ctx context.Context, principalID, projectID uuid
 		effective = append(effective, b)
 	}
 	return effective, nil
+}
+
+// publishedInProject records the originating project only when there is
+// one. A skill published straight to the organization or the installation
+// has no owning project, and inventing one would make the provenance column
+// a lie (migrations/000020).
+func publishedInProject(scope Scope, scopeRef *uuid.UUID) *uuid.UUID {
+	if scope == ScopeProject {
+		return scopeRef
+	}
+	return nil
 }

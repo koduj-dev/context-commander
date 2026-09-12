@@ -138,7 +138,7 @@ func newFixture(t *testing.T) *fixture {
 func TestPublishNeverMutatesExistingVersion(t *testing.T) {
 	f := newFixture(t)
 
-	v1, err := f.svc.Publish(f.ctx, f.principalID, f.projectID, nil, "code-review", "acme", "local", []byte("v1 content"), nil)
+	v1, err := f.svc.Publish(f.ctx, f.principalID, f.userID, skills.ScopeProject, &f.projectID, nil, "code-review", "acme", "local", []byte("v1 content"), nil)
 	if err != nil {
 		t.Fatalf("Publish v1: %v", err)
 	}
@@ -146,7 +146,7 @@ func TestPublishNeverMutatesExistingVersion(t *testing.T) {
 		t.Fatalf("first Publish should produce version 1, got %d", v1.Version)
 	}
 
-	v2, err := f.svc.Publish(f.ctx, f.principalID, f.projectID, &v1.SkillID, "code-review", "acme", "local", []byte("v2 content"), nil)
+	v2, err := f.svc.Publish(f.ctx, f.principalID, f.userID, skills.ScopeProject, &f.projectID, &v1.SkillID, "code-review", "acme", "local", []byte("v2 content"), nil)
 	if err != nil {
 		t.Fatalf("Publish v2: %v", err)
 	}
@@ -176,7 +176,7 @@ func TestPublishNeverMutatesExistingVersion(t *testing.T) {
 func TestOverrideRejectedWhenNotOverridable(t *testing.T) {
 	f := newFixture(t)
 
-	v1, err := f.svc.Publish(f.ctx, f.principalID, f.projectID, nil, "security-review", "acme", "local", []byte("content"), nil)
+	v1, err := f.svc.Publish(f.ctx, f.principalID, f.userID, skills.ScopeProject, &f.projectID, nil, "security-review", "acme", "local", []byte("content"), nil)
 	if err != nil {
 		t.Fatalf("Publish: %v", err)
 	}
@@ -238,7 +238,7 @@ func TestOverrideDeniedForNonOverridableOrgBindingWithoutOrgMembership(t *testin
 		t.Fatalf("seed org project: %v", err)
 	}
 
-	v1, err := f.svc.Publish(f.ctx, f.principalID, orgProjectID, nil, "security-review", "acme", "local", []byte("content"), nil)
+	v1, err := f.svc.Publish(f.ctx, f.principalID, f.userID, skills.ScopeProject, &orgProjectID, nil, "security-review", "acme", "local", []byte("content"), nil)
 	if err != nil {
 		t.Fatalf("Publish: %v", err)
 	}
@@ -271,7 +271,7 @@ func TestOverrideDeniedForNonOverridableOrgBindingWithoutOrgMembership(t *testin
 func TestListEffectiveComposesScopesAndProjectWins(t *testing.T) {
 	f := newFixture(t)
 
-	installV, err := f.svc.Publish(f.ctx, f.principalID, f.projectID, nil, "coding-conventions", "acme", "local", []byte("install content"), nil)
+	installV, err := f.svc.Publish(f.ctx, f.principalID, f.userID, skills.ScopeProject, &f.projectID, nil, "coding-conventions", "acme", "local", []byte("install content"), nil)
 	if err != nil {
 		t.Fatalf("Publish installation skill: %v", err)
 	}
@@ -286,7 +286,7 @@ func TestListEffectiveComposesScopesAndProjectWins(t *testing.T) {
 	}
 
 	// A different skill, only bound at project scope.
-	projectV, err := f.svc.Publish(f.ctx, f.principalID, f.projectID, nil, "xyz-api", "acme", "local", []byte("project content"), nil)
+	projectV, err := f.svc.Publish(f.ctx, f.principalID, f.userID, skills.ScopeProject, &f.projectID, nil, "xyz-api", "acme", "local", []byte("project content"), nil)
 	if err != nil {
 		t.Fatalf("Publish project skill: %v", err)
 	}
@@ -295,7 +295,7 @@ func TestListEffectiveComposesScopesAndProjectWins(t *testing.T) {
 	}
 
 	// Override the installation skill at project scope with a newer version.
-	overrideV, err := f.svc.Publish(f.ctx, f.principalID, f.projectID, &installV.SkillID, "coding-conventions", "acme", "local", []byte("overridden content"), nil)
+	overrideV, err := f.svc.Publish(f.ctx, f.principalID, f.userID, skills.ScopeProject, &f.projectID, &installV.SkillID, "coding-conventions", "acme", "local", []byte("overridden content"), nil)
 	if err != nil {
 		t.Fatalf("Publish override version: %v", err)
 	}
@@ -330,7 +330,10 @@ func TestPublishDeniedWithoutCapability(t *testing.T) {
 	f := newFixture(t)
 	outsider := uuid.New()
 
-	_, err := f.svc.Publish(f.ctx, outsider, f.projectID, nil, "x", "a", "o", []byte("c"), nil)
+	// A principal with no membership of the target project: the publish
+	// target is what authorizes, so naming someone else's project is
+	// refused regardless of what the caller holds elsewhere.
+	_, err := f.svc.Publish(f.ctx, outsider, uuid.New(), skills.ScopeProject, &f.projectID, nil, "x", "a", "o", []byte("c"), nil)
 	if !errors.Is(err, skills.ErrForbidden) {
 		t.Fatalf("Publish by non-member: got err=%v, want ErrForbidden", err)
 	}
@@ -369,7 +372,7 @@ func TestInstallDeniedForNonMemberOfScopeRefProject(t *testing.T) {
 		t.Fatalf("seed other project: %v", err)
 	}
 
-	v, err := f.svc.Publish(f.ctx, f.principalID, f.projectID, nil, "cross-project-skill", "acme", "local", []byte("content"), nil)
+	v, err := f.svc.Publish(f.ctx, f.principalID, f.userID, skills.ScopeProject, &f.projectID, nil, "cross-project-skill", "acme", "local", []byte("content"), nil)
 	if err != nil {
 		t.Fatalf("Publish: %v", err)
 	}
@@ -383,7 +386,7 @@ func TestInstallDeniedForNonMemberOfScopeRefProject(t *testing.T) {
 func TestInstallInstallationScopeRequiresAdmin(t *testing.T) {
 	f := newFixture(t)
 
-	v, err := f.svc.Publish(f.ctx, f.principalID, f.projectID, nil, "git-workflow", "acme", "local", []byte("content"), nil)
+	v, err := f.svc.Publish(f.ctx, f.principalID, f.userID, skills.ScopeProject, &f.projectID, nil, "git-workflow", "acme", "local", []byte("content"), nil)
 	if err != nil {
 		t.Fatalf("Publish: %v", err)
 	}
@@ -403,7 +406,7 @@ func TestInstallInstallationScopeAllowedForAdmin(t *testing.T) {
 	f := newFixture(t)
 	f.grantInstallationAdmin()
 
-	v, err := f.svc.Publish(f.ctx, f.principalID, f.projectID, nil, "git-workflow", "acme", "local", []byte("content"), nil)
+	v, err := f.svc.Publish(f.ctx, f.principalID, f.userID, skills.ScopeProject, &f.projectID, nil, "git-workflow", "acme", "local", []byte("content"), nil)
 	if err != nil {
 		t.Fatalf("Publish: %v", err)
 	}
@@ -428,11 +431,11 @@ func TestInstallInstallationScopeAllowedForAdmin(t *testing.T) {
 func TestInstallRejectsMismatchedSkillVersion(t *testing.T) {
 	f := newFixture(t)
 
-	a, err := f.svc.Publish(f.ctx, f.principalID, f.projectID, nil, "skill-a", "acme", "local", []byte("a content"), nil)
+	a, err := f.svc.Publish(f.ctx, f.principalID, f.userID, skills.ScopeProject, &f.projectID, nil, "skill-a", "acme", "local", []byte("a content"), nil)
 	if err != nil {
 		t.Fatalf("Publish skill-a: %v", err)
 	}
-	b, err := f.svc.Publish(f.ctx, f.principalID, f.projectID, nil, "skill-b", "acme", "local", []byte("b content"), nil)
+	b, err := f.svc.Publish(f.ctx, f.principalID, f.userID, skills.ScopeProject, &f.projectID, nil, "skill-b", "acme", "local", []byte("b content"), nil)
 	if err != nil {
 		t.Fatalf("Publish skill-b: %v", err)
 	}
@@ -446,11 +449,11 @@ func TestInstallRejectsMismatchedSkillVersion(t *testing.T) {
 func TestOverrideRejectsMismatchedSkillVersion(t *testing.T) {
 	f := newFixture(t)
 
-	a, err := f.svc.Publish(f.ctx, f.principalID, f.projectID, nil, "skill-a", "acme", "local", []byte("a content"), nil)
+	a, err := f.svc.Publish(f.ctx, f.principalID, f.userID, skills.ScopeProject, &f.projectID, nil, "skill-a", "acme", "local", []byte("a content"), nil)
 	if err != nil {
 		t.Fatalf("Publish skill-a: %v", err)
 	}
-	b, err := f.svc.Publish(f.ctx, f.principalID, f.projectID, nil, "skill-b", "acme", "local", []byte("b content"), nil)
+	b, err := f.svc.Publish(f.ctx, f.principalID, f.userID, skills.ScopeProject, &f.projectID, nil, "skill-b", "acme", "local", []byte("b content"), nil)
 	if err != nil {
 		t.Fatalf("Publish skill-b: %v", err)
 	}
@@ -471,7 +474,7 @@ func TestPublishUploadFailureLeavesNoInstallableVersion(t *testing.T) {
 	svc := skills.NewService(f.appPool, auth.NewAuthzService(f.appPool, projects.NewStore()), organizations.NewStore(), projects.NewStore(), failingStore{}, installation.NewStore())
 
 	const name = "broken-upload"
-	_, err := svc.Publish(f.ctx, f.principalID, f.projectID, nil, name, "acme", "local", []byte("content"), nil)
+	_, err := svc.Publish(f.ctx, f.principalID, f.userID, skills.ScopeProject, &f.projectID, nil, name, "acme", "local", []byte("content"), nil)
 	if err == nil {
 		t.Fatal("Publish: want an error when ObjectStore.Put fails")
 	}

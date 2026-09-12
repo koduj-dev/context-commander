@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"errors"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -57,6 +58,44 @@ func toSkillBindingResult(b skills.SkillBinding) skillBindingResult {
 	return r
 }
 
+// resolveScopeTarget turns the (scope, scope_ref) pair a caller names into
+// the domain's form. scope_ref is accepted as a project PATH for project
+// scope, because that is how every other tool in this package names a
+// project and an agent should not have to look up a UUID to publish.
+func resolveScopeTarget(
+	ctx context.Context,
+	resolve func(context.Context, string) (uuid.UUID, error),
+	scope, scopeRef string,
+) (skills.Scope, *uuid.UUID, error) {
+	if scope == "" {
+		scope = string(skills.ScopeProject)
+	}
+	switch skills.Scope(scope) {
+	case skills.ScopeInstallation:
+		return skills.ScopeInstallation, nil, nil
+	case skills.ScopeProject:
+		if scopeRef == "" {
+			return "", nil, errors.New(`scope "project" needs scope_ref: the project path "namespace/slug"`)
+		}
+		projectID, err := resolve(ctx, scopeRef)
+		if err != nil {
+			return "", nil, err
+		}
+		return skills.ScopeProject, &projectID, nil
+	case skills.ScopeOrganization:
+		if scopeRef == "" {
+			return "", nil, errors.New(`scope "organization" needs scope_ref: the organization UUID`)
+		}
+		orgID, err := uuid.Parse(scopeRef)
+		if err != nil {
+			return "", nil, err
+		}
+		return skills.ScopeOrganization, &orgID, nil
+	default:
+		return "", nil, errors.New(`scope must be "project", "organization" or "installation"`)
+	}
+}
+
 // registerSkillTools mirrors registerArtifactTools/registerProjectTools:
 // every tool resolves a "project" path argument via deps.Projects.Resolve,
 // then calls straight into deps.Skills — no business logic here.
@@ -95,7 +134,8 @@ func registerSkillTools(server *sdkmcp.Server, deps Deps, principalID, clientID 
 	}
 
 	type publishArgs struct {
-		Project              string   `json:"project" jsonschema:"project path \"namespace/slug\", used to authorize the publish"`
+		Scope                string   `json:"scope,omitempty" jsonschema:"where the skill should live: \"project\" (default), \"organization\" or \"installation\". Installation puts it on the shelf every project here can search."`
+		ScopeRef             string   `json:"scope_ref,omitempty" jsonschema:"project path \"namespace/slug\" or organization UUID for the chosen scope; omit for installation scope"`
 		SkillID              string   `json:"skill_id,omitempty" jsonschema:"existing skill UUID to publish a new version under (omit to create a brand-new skill)"`
 		Name                 string   `json:"name,omitempty" jsonschema:"skill name (required when skill_id is omitted)"`
 		Author               string   `json:"author,omitempty"`
@@ -111,7 +151,11 @@ func registerSkillTools(server *sdkmcp.Server, deps Deps, principalID, clientID 
 			"installation-wide by default. Even so, do not put secrets in skill content — use the secret tools " +
 			"for anything that must stay confidential.",
 	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, args publishArgs) (*sdkmcp.CallToolResult, skillVersionResult, error) {
-		projectID, err := resolve(ctx, args.Project)
+		scope, scopeRef, err := resolveScopeTarget(ctx, resolve, args.Scope, args.ScopeRef)
+		if err != nil {
+			return nil, skillVersionResult{}, err
+		}
+		userID, err := resolveUserID(ctx)
 		if err != nil {
 			return nil, skillVersionResult{}, err
 		}
@@ -123,7 +167,7 @@ func registerSkillTools(server *sdkmcp.Server, deps Deps, principalID, clientID 
 			}
 			skillID = &id
 		}
-		v, err := deps.Skills.Publish(ctx, principalID, projectID, skillID, args.Name, args.Author, args.Origin, []byte(args.Content), args.DeclaredCapabilities)
+		v, err := deps.Skills.Publish(ctx, principalID, userID, scope, scopeRef, skillID, args.Name, args.Author, args.Origin, []byte(args.Content), args.DeclaredCapabilities)
 		if err != nil {
 			return nil, skillVersionResult{}, err
 		}
@@ -240,8 +284,7 @@ func registerSkillTools(server *sdkmcp.Server, deps Deps, principalID, clientID 
 	registerPinTool("skill.unpin", false)
 
 	type getArgs struct {
-		Project        string `json:"project" jsonschema:"project path \"namespace/slug\", used to authorize the read"`
-		SkillVersionID string `json:"skill_version_id" jsonschema:"skill version UUID — the skill_version_id from skill.install or skill.list_effective"`
+		SkillVersionID string `json:"skill_version_id" jsonschema:"skill version UUID — from skill.search (latest_version_id), skill.versions, or skill.list_effective"`
 	}
 	type skillContentResult struct {
 		skillVersionResult
@@ -257,15 +300,11 @@ func registerSkillTools(server *sdkmcp.Server, deps Deps, principalID, clientID 
 			"something you can load and follow. Content is verified against the checksum recorded when the " +
 			"version was published.",
 	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, args getArgs) (*sdkmcp.CallToolResult, skillContentResult, error) {
-		projectID, err := resolve(ctx, args.Project)
-		if err != nil {
-			return nil, skillContentResult{}, err
-		}
 		skillVersionID, err := uuid.Parse(args.SkillVersionID)
 		if err != nil {
 			return nil, skillContentResult{}, err
 		}
-		v, err := deps.Skills.GetVersion(ctx, principalID, projectID, skillVersionID)
+		v, err := deps.Skills.GetVersion(ctx, principalID, skillVersionID)
 		if err != nil {
 			return nil, skillContentResult{}, err
 		}
@@ -279,10 +318,9 @@ func registerSkillTools(server *sdkmcp.Server, deps Deps, principalID, clientID 
 	})
 
 	type searchArgs struct {
-		Project string `json:"project" jsonschema:"project path \"namespace/slug\" — proves membership; the catalog returned is not limited to this project"`
-		Query   string `json:"query,omitempty" jsonschema:"match skill names containing this text, case-insensitive; omit to list everything visible"`
-		Limit   int    `json:"limit,omitempty" jsonschema:"max entries to return (default 100, max 500)"`
-		Cursor  string `json:"cursor,omitempty" jsonschema:"next_cursor from a previous call to continue"`
+		Query  string `json:"query,omitempty" jsonschema:"match skill names containing this text, case-insensitive; omit to list everything visible"`
+		Limit  int    `json:"limit,omitempty" jsonschema:"max entries to return (default 100, max 500)"`
+		Cursor string `json:"cursor,omitempty" jsonschema:"next_cursor from a previous call to continue"`
 	}
 	type catalogEntryResult struct {
 		SkillID  string `json:"skill_id"`
@@ -306,11 +344,7 @@ func registerSkillTools(server *sdkmcp.Server, deps Deps, principalID, clientID 
 			"alongside whatever you loaded, and compare on a later search to tell whether the skill changed and " +
 			"needs re-downloading, without fetching the content again.",
 	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, args searchArgs) (*sdkmcp.CallToolResult, pagedResult[catalogEntryResult], error) {
-		projectID, err := resolve(ctx, args.Project)
-		if err != nil {
-			return nil, pagedResult[catalogEntryResult]{}, err
-		}
-		page, err := deps.Skills.Search(ctx, principalID, projectID, args.Query, pagingOptions(args.Limit, args.Cursor))
+		page, err := deps.Skills.Search(ctx, principalID, args.Query, pagingOptions(args.Limit, args.Cursor))
 		if err != nil {
 			return nil, pagedResult[catalogEntryResult]{}, err
 		}
@@ -330,7 +364,6 @@ func registerSkillTools(server *sdkmcp.Server, deps Deps, principalID, clientID 
 	})
 
 	type versionsArgs struct {
-		Project string `json:"project" jsonschema:"project path \"namespace/slug\""`
 		SkillID string `json:"skill_id" jsonschema:"skill UUID from skill.search"`
 		Limit   int    `json:"limit,omitempty"`
 		Cursor  string `json:"cursor,omitempty"`
@@ -340,15 +373,11 @@ func registerSkillTools(server *sdkmcp.Server, deps Deps, principalID, clientID 
 		Description: "List a skill's published versions, newest first, with each one's checksum. Use it to pin " +
 			"an older version deliberately, or to see what changed since the version you are running.",
 	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, args versionsArgs) (*sdkmcp.CallToolResult, pagedResult[skillVersionResult], error) {
-		projectID, err := resolve(ctx, args.Project)
-		if err != nil {
-			return nil, pagedResult[skillVersionResult]{}, err
-		}
 		skillID, err := uuid.Parse(args.SkillID)
 		if err != nil {
 			return nil, pagedResult[skillVersionResult]{}, err
 		}
-		page, err := deps.Skills.ListVersions(ctx, principalID, projectID, skillID, pagingOptions(args.Limit, args.Cursor))
+		page, err := deps.Skills.ListVersions(ctx, principalID, skillID, pagingOptions(args.Limit, args.Cursor))
 		if err != nil {
 			return nil, pagedResult[skillVersionResult]{}, err
 		}
@@ -360,7 +389,6 @@ func registerSkillTools(server *sdkmcp.Server, deps Deps, principalID, clientID 
 	})
 
 	type promoteArgs struct {
-		Project  string `json:"project" jsonschema:"project path \"namespace/slug\" that authorizes the promotion"`
 		SkillID  string `json:"skill_id"`
 		Scope    string `json:"scope" jsonschema:"target scope: \"organization\" or \"installation\""`
 		ScopeRef string `json:"scope_ref,omitempty" jsonschema:"organization UUID (omit for installation scope)"`
@@ -377,10 +405,6 @@ func registerSkillTools(server *sdkmcp.Server, deps Deps, principalID, clientID 
 			"ever widens, never narrows — anyone who could already see it may have installed it. Requires the " +
 			"rights at the TARGET scope (organization admin, or installation admin).",
 	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, args promoteArgs) (*sdkmcp.CallToolResult, promoteResult, error) {
-		projectID, err := resolve(ctx, args.Project)
-		if err != nil {
-			return nil, promoteResult{}, err
-		}
 		userID, err := resolveUserID(ctx)
 		if err != nil {
 			return nil, promoteResult{}, err
@@ -397,7 +421,7 @@ func registerSkillTools(server *sdkmcp.Server, deps Deps, principalID, clientID 
 			}
 			scopeRef = &id
 		}
-		sk, err := deps.Skills.Promote(ctx, principalID, userID, projectID, skillID, skills.Scope(args.Scope), scopeRef)
+		sk, err := deps.Skills.Promote(ctx, principalID, userID, skillID, skills.Scope(args.Scope), scopeRef)
 		if err != nil {
 			return nil, promoteResult{}, err
 		}
