@@ -254,6 +254,32 @@ link definition at the bottom of the file.
 
 ### Changed
 
+- **The integration suite runs in ~20 seconds instead of minutes.**
+  `internal/dbtest.New` started a whole Postgres container per test —
+  ~2.4 s of image boot plus a full 18-migration run, 209 times across the
+  repo, which was roughly eight minutes of the suite spent watching
+  Postgres start while the tests themselves took ~0.5 s each. It now starts
+  one container per test binary, migrates a template database once, and
+  clones it per test (`CREATE DATABASE ... TEMPLATE`, dropped on cleanup),
+  which costs ~150 ms. The isolation these tests need is isolation of
+  *data*, and that never required a container each. `New`'s signature and
+  contract are unchanged, so no test was touched.
+  - Verified rather than assumed, since a clone that quietly lost a
+    database-level property would make every RLS test in the repo pass for
+    the wrong reason: `internal/dbtest` now has its own tests pinning that
+    each test gets a separate database, that `cc_owner` still owns the
+    tables, that `cc_app` is neither owner nor `BYPASSRLS`, that RLS is
+    enabled, and that the clone is fully migrated. End-to-end, breaking
+    `project_members`' RLS policy still fails
+    `internal/db`'s `TestSetLocalDoesNotLeakAcrossPooledConnections`,
+    confirming policies are genuinely enforced on a cloned database.
+  - Noted while doing this, not fixed: `internal/handoffs`'
+    `TestRLSIsolationBetweenProjects` passes with that table's RLS policy
+    replaced by `USING (true)`. It asserts through `Service`, whose
+    capability check and `WHERE project_id = $1` already produce the
+    expected result, so it does not actually exercise RLS despite its name.
+    Pre-existing, unrelated to this change.
+
 - **Unified keyset pagination across every growing list** — the last Phase 0
   release blocker. `artifacts`, `handoffs` and `secrets` had no pagination at
   all (a project with more rows than a screen had no way to reach the rest);

@@ -18,17 +18,36 @@ Both tiers run together: `make test` is `go test ./... -race -count=1`, and CI
 split to skip the integration tier in CI the way some sibling projects do.
 Locally, integration tests need Docker running (`make dev-up` starts the same
 Postgres/MinIO compose stack, but the integration tests spin up their **own**
-disposable container per run via `testcontainers-go` — they don't reuse
-`dev-up`'s instance).
+disposable container via `testcontainers-go` — they don't reuse `dev-up`'s
+instance). The whole suite runs in well under a minute; if it takes minutes,
+something has regressed in `internal/dbtest` — see below.
 
 `make lint` (`golangci-lint`, config in `.golangci.yml`) and a `gitleaks` secret
 scan run as separate CI jobs alongside `test`.
 
 ## Why integration tests use a real Postgres, not mocks
 
-`internal/dbtest.New` starts a disposable `postgres:16-alpine` container, applies
-`deploy/postgres/init/01-roles.sql` (the same `cc_owner`/`cc_app` role split as
-production) and every embedded migration, then hands the test two DSNs:
+`internal/dbtest.New` hands each test its own freshly migrated database and two
+DSNs for it.
+
+**One container per test binary, one database per test.** The container starts on
+the first `New` in a package, applies `deploy/postgres/init/01-roles.sql` (the
+same `cc_owner`/`cc_app` role split as production) and every embedded migration
+into a template database; each `New` after that clones the template
+(`CREATE DATABASE ... TEMPLATE`) and drops it when the test ends. The isolation
+these tests need is isolation of *data*, and a clone gives exactly that for
+~150 ms instead of ~2.4 s of image boot plus a full migration run. It used to be
+a container per test — 209 of them across the repo, about eight minutes of the
+suite spent watching Postgres start.
+
+What that makes shared, and therefore what a test must not mutate: the cluster's
+roles and the template database. Everything a test writes lives in its own
+database. `internal/dbtest`'s own tests pin the properties a clone has to
+preserve — cc_owner owns the tables, cc_app is neither owner nor `BYPASSRLS`,
+RLS is enabled, and the schema is fully migrated — because a clone that silently
+lost one of those would make every RLS test below pass for the wrong reason.
+
+The two DSNs:
 
 - **`Owner`** — RLS-exempt, table-owning role. Fixture setup (inserting rows to
   test against) uses this.
