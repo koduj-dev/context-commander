@@ -208,6 +208,16 @@ on the planned move to a public repo:
 
 ## 📦 Backlog
 
+- **`ccd sync-skills` — the client-side half of the registry.**
+  `docs/adr/0012` decided it ("the server never writes to a client's
+  filesystem ... a client-side adapter does the actual `.claude/skills/`-
+  shaped write") and `cmd/ccd/main.go` still carries a comment promising it,
+  but nothing was ever built. Now that the registry is browsable and
+  `skill.get` returns bytes, this is the obvious missing step: resolve a
+  project's effective skills, write them into the client's skill directory,
+  and re-sync only what changed — the checksum in each catalog entry is
+  exactly the comparison it needs. An MCP client gets skill content through
+  the tools; a plain CLI user has no way to land it on disk at all.
 - **[security] Per-IP rate limiting needs a trusted-proxy configuration.**
   `internal/ratelimit` limits per credential and bounds authentications in
   flight, which is everything that can be done correctly today. Per-IP
