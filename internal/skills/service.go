@@ -226,9 +226,10 @@ func (s *Service) Publish(
 	}
 	err = db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
 		_, err := tx.Exec(ctx,
-			`INSERT INTO skill_versions (id, skill_id, version, checksum, storage_key, files, declared_capabilities, trust_status)
-			 VALUES ($1, $2, $3, $4, $5, $6, $7, 'unverified')`,
-			versionID, skill.ID, nextVersion, checksum, storageKey, []byte("[]"), declared,
+			`INSERT INTO skill_versions (id, skill_id, version, checksum, storage_key, files, declared_capabilities, trust_status,
+			                             published_in_project, published_by)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, 'unverified', $8, $9)`,
+			versionID, skill.ID, nextVersion, checksum, storageKey, []byte("[]"), declared, projectID, principalID,
 		)
 		return err
 	})

@@ -84,6 +84,15 @@ type SkillVersion struct {
 	TrustStatus          string
 	Signature            []byte
 	CreatedAt            time.Time
+
+	// Provenance (migrations/000020). PublishedInProject is what
+	// Service.GetVersion authorizes reads against; nil means a row
+	// predating that migration, read as installation-wide. PublishedBy is
+	// trust metadata — ADR 0012 frames this as a distribution/trust
+	// platform, and "who published this" belongs with the checksum and the
+	// signature.
+	PublishedInProject *uuid.UUID
+	PublishedBy        *uuid.UUID
 }
 
 // SkillBinding is what "project X uses skill Y" (or organization/

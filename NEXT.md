@@ -208,19 +208,17 @@ on the planned move to a public repo:
 
 ## 📦 Backlog
 
-- **[security] Skill content is readable installation-wide.**
-  `skills`/`skill_versions` have no RLS and `skills.Service.GetVersion`
-  authorizes against an anchor project the caller already belongs to, so
-  anyone who knows a version UUID can read content published inside a
-  project they are not a member of. Verified with a probe, not theoretical.
-  migrations/000007 decided the *catalog* is installation-wide; it never
-  decided content was, and before `skill.get` shipped in Phase 1 the
-  content was simply unreachable, so the question went unanswered. Fix:
-  allow a read only when the caller can see a binding for that skill *or*
-  published the version themselves — the second half needs a `published_by`
-  column on `skill_versions`, which docs/adr/0012's supply-chain story
-  arguably wants anyway. Needs a decision on the skill trust model, hence
-  here rather than done. See docs/gotchas.md.
+- **What is the skill registry, actually?** `docs/adr/0012` gives the
+  *binding* a scope (installation/organization/project) but the *package*
+  none, so "where does a published skill live" has no answer in the model —
+  which is how `skill.get` shipped able to read across projects (closed by
+  migration 000020, which records the publishing project `Publish` already
+  knew). Three possible answers: one catalog per instance; scoped to the
+  publishing organization; or born in a project and explicitly promoted.
+  The third gives the package the same scope vocabulary the binding already
+  has and keeps a marketplace reachable later without declaring one now.
+  Not urgent — reads are safe either way — but it decides `skill.publish`'s
+  shape, so pick it before building a catalog browse endpoint.
 - **[security] Per-IP rate limiting needs a trusted-proxy configuration.**
   `internal/ratelimit` limits per credential and bounds authentications in
   flight, which is everything that can be done correctly today. Per-IP

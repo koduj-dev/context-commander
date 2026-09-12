@@ -65,27 +65,33 @@ call sites can serialize against each other — or deadlock — by accident.
 codebase in a single const block for that reason. Add new ones there, and
 check the nesting order documented on `AdvisoryXactLock` before taking two.
 
-## Skill content is readable installation-wide, not per-project
+## Who can read a skill's content
 
-`skills` and `skill_versions` have no RLS (migrations/000007), and
-`skills.Service.GetVersion` authorizes against an *anchor* project the caller
-holds `CapSkillRead` on — which every project role has — rather than against
-the skill being read. A principal who knows a skill version's UUID can
-therefore read its content even if it was published inside a project they are
-not a member of. Verified, not theoretical.
+Reading a skill version's bytes (`skills.Service.GetVersion`, `skill.get`)
+needs two things: `CapSkillRead` on an anchor project, and the version itself
+being readable by you. The second rule is:
 
-migrations/000007 decided that the *catalog* is installation-wide ("every
-authenticated principal in this installation can see what skills exist"). It
-did not decide that content is, and until `skill.get` shipped in Phase 1 the
-content was unreachable through every adapter, so nobody had to answer the
-question. The read path answered it in the widest direction by default.
+> You may read a skill's content if you can see a binding for it, or if you
+> are a member of the project it was published from.
 
-**Until this is narrowed, do not put project secrets in skill content.** Use
-`internal/secrets` for anything that must stay inside one project — it is
-project-key-encrypted and RLS-scoped, which skill content is neither (see also
-the encryption note above: skill content is stored unencrypted because the key
-hierarchy has no installation-level key to anchor it to).
+`skills` and `skill_versions` carry no RLS (migrations/000007), so the anchor
+project alone protects nothing — the caller picks it. When `skill.get` first
+shipped there was no second check, and any principal holding `CapSkillRead`
+anywhere (every role does) could read any version whose UUID it knew,
+including one published inside a project it was not a member of. Confirmed by
+probe, then closed by migration 000020, which records the publishing project
+the `Publish` call already knew and was discarding.
 
-Closing it means allowing a read only when the caller can see a binding for
-the skill or published the version themselves, which needs a `published_by`
-column on `skill_versions` — tracked in NEXT.md.
+Consequences worth knowing:
+
+- An **installation-scope binding is visible to every principal**, so a skill
+  installed installation-wide is readable installation-wide. That is the
+  intended registry behaviour, not a leak.
+- A version published **before** migration 000020 has no recorded provenance
+  and is read as installation-wide. Only rows predating that migration can be
+  in this state.
+- This does **not** decide what the skill registry *is*. `docs/adr/0012`
+  scopes the *binding* (where a skill applies), not the package (where it
+  lives). Whether packages are instance-wide, organization-scoped or
+  explicitly promoted is still open — migration 000020 records the provenance
+  any of those answers would need.

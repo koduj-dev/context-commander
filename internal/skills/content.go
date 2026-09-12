@@ -13,6 +13,7 @@ import (
 
 	"github.com/koduj-dev/context-commander/internal/auth"
 	"github.com/koduj-dev/context-commander/internal/db"
+	"github.com/koduj-dev/context-commander/internal/projects"
 	"github.com/koduj-dev/context-commander/internal/storage"
 )
 
@@ -57,33 +58,27 @@ type VersionWithContent struct {
 // until now nothing in any adapter could turn one into the bytes it names —
 // an agent could install a skill it was then unable to load.
 //
-// SECURITY — KNOWN EXPOSURE, NOT YET DECIDED. Authorization mirrors Publish
-// (docs/adr/0014): projectID is an anchor the caller must hold CapSkillRead
-// on, and is NOT a filter on which skills may be read. `skills` and
-// `skill_versions` carry no RLS (migrations/000007), so any principal
-// holding CapSkillRead on any project — every role does — can read the
-// content of ANY skill version whose UUID it knows, including one published
-// inside a project it is not a member of.
+// Authorization has two steps, because the anchor project cannot carry
+// both. projectID is an anchor the caller must hold CapSkillRead on — the
+// same shape Publish uses (docs/adr/0014) — but the caller picks it, so on
+// its own it proves nothing about the skill being read. `skills` and
+// `skill_versions` carry no RLS (migrations/000007), so without a second
+// check any principal holding CapSkillRead on any project could read the
+// content of ANY version whose UUID it knew, including one published inside
+// a project it was not a member of. That was true when this method first
+// shipped; canReadVersion is what closes it.
 //
-// migrations/000007 decided that the *catalog* is installation-wide: "every
-// authenticated principal in this installation can see what skills exist
-// (the trust decision is per-binding)". That justifies seeing that a skill
-// exists. It does not decide that its CONTENT is installation-wide, and
-// before this method existed the content was unreachable through every
-// adapter, so the question never had to be answered. Adding the read path
-// answered it by accident, in the widest possible direction.
+// The rule: you may read a skill's content if you can see a binding for it,
+// or if you are a member of the project it was published from.
 //
-// Mitigating, but not a defense to rely on: version IDs are v4 UUIDs, so
-// there is nothing to enumerate — a caller needs an ID that reached it some
-// other way.
-//
-// Narrowing this to "a skill you can see a binding for, or one you
-// published yourself" would close it while keeping every flow that works
-// today, but it needs a published_by column on skill_versions (which
-// docs/adr/0012's supply-chain story arguably wants regardless) and is a
-// change to the skill trust model, so it is the maintainer's call rather
-// than something to slip in. Until then: do not put project secrets in
-// skill content.
+// That deliberately does not decide what the skill registry IS — whether
+// packages are instance-wide, organization-scoped, or explicitly promoted
+// is a product question (docs/adr/0012 scopes the *binding*, not the
+// package). It keeps every flow that works today: an installation-scope
+// binding is visible to everyone, so an installation-wide skill stays
+// installation-wide; a project's effective skills resolve through bindings
+// it can see; and publishing then reading your own package back works
+// because you are a member of the project you published from.
 func (s *Service) GetVersion(ctx context.Context, principalID, projectID, skillVersionID uuid.UUID) (VersionWithContent, error) {
 	if err := s.checkCapability(ctx, principalID, projectID, auth.CapSkillRead); err != nil {
 		return VersionWithContent{}, err
@@ -97,7 +92,7 @@ func (s *Service) GetVersion(ctx context.Context, principalID, projectID, skillV
 		// distinction this domain makes anywhere else either.
 		err := tx.QueryRow(ctx,
 			`SELECT v.id, v.skill_id, v.version, v.checksum, v.storage_key, v.files, v.declared_capabilities,
-			        v.trust_status, v.signature, v.created_at,
+			        v.trust_status, v.signature, v.created_at, v.published_in_project, v.published_by,
 			        s.id, s.name, COALESCE(s.author, ''), COALESCE(s.origin, ''), s.created_at
 			 FROM skill_versions v JOIN skills s ON s.id = v.skill_id
 			 WHERE v.id = $1`,
@@ -105,6 +100,7 @@ func (s *Service) GetVersion(ctx context.Context, principalID, projectID, skillV
 		).Scan(
 			&out.Version.ID, &out.Version.SkillID, &out.Version.Version, &out.Version.Checksum, &out.Version.StorageKey,
 			&out.Version.Files, &out.Version.DeclaredCapabilities, &out.Version.TrustStatus, &out.Version.Signature, &out.Version.CreatedAt,
+			&out.Version.PublishedInProject, &out.Version.PublishedBy,
 			&out.Skill.ID, &out.Skill.Name, &out.Skill.Author, &out.Skill.Origin, &out.Skill.CreatedAt,
 		)
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -113,7 +109,7 @@ func (s *Service) GetVersion(ctx context.Context, principalID, projectID, skillV
 		if err != nil {
 			return fmt.Errorf("skills: get version: %w", err)
 		}
-		return nil
+		return s.canReadVersion(ctx, tx, principalID, out.Version)
 	})
 	if err != nil {
 		return VersionWithContent{}, err
@@ -166,4 +162,47 @@ func (s *Service) readContent(ctx context.Context, storageKey string) ([]byte, e
 		return nil, ErrTooLarge
 	}
 	return content, nil
+}
+
+// canReadVersion decides whether principalID may read this version's bytes.
+//
+// Returns ErrNotFound rather than ErrForbidden for an unreadable version,
+// following the same reasoning projects.Resolve uses for a non-member:
+// telling a stranger that a skill exists but is not theirs hands out more
+// than "you can't have this".
+func (s *Service) canReadVersion(ctx context.Context, tx pgx.Tx, principalID uuid.UUID, v SkillVersion) error {
+	// A version published before migration 000020 has no recorded
+	// provenance, and there is nothing to infer it from. Those are read as
+	// installation-wide — the terms they were published under — rather than
+	// made permanently unreadable.
+	if v.PublishedInProject == nil {
+		return nil
+	}
+
+	// Visible through a binding. The subquery is not filtered by scope here
+	// because RLS already is: migrations/000007's skill_bindings policy
+	// shows installation-scope bindings to everyone, organization-scope to
+	// that organization's members, and project-scope to that project's
+	// members. Asking "does a binding for this skill exist" under the
+	// caller's own principal therefore asks exactly "can this caller see
+	// one".
+	var boundVisibly bool
+	if err := tx.QueryRow(ctx,
+		`SELECT EXISTS (SELECT 1 FROM skill_bindings WHERE skill_id = $1)`, v.SkillID,
+	).Scan(&boundVisibly); err != nil {
+		return fmt.Errorf("skills: check visible bindings: %w", err)
+	}
+	if boundVisibly {
+		return nil
+	}
+
+	// Or a member of the project it was published from — which is what lets
+	// a publisher read back a package nobody has installed yet.
+	if _, err := s.projects.GetMembership(ctx, tx, *v.PublishedInProject, principalID); err != nil {
+		if errors.Is(err, projects.ErrNotFound) {
+			return ErrNotFound
+		}
+		return fmt.Errorf("skills: check publishing project membership: %w", err)
+	}
+	return nil
 }

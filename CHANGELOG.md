@@ -373,6 +373,31 @@ link definition at the bottom of the file.
 
 ### Fixed
 
+- **Skill content could be read across project boundaries.** `skill.get`
+  (added in Phase 1) authorized reads against an *anchor* project the caller
+  picks, and `skills`/`skill_versions` carry no RLS — so any principal
+  holding `CapSkillRead` anywhere, which every project role does, could read
+  the content of any version whose UUID it knew, including one published
+  inside a project it was not a member of. Confirmed by probe before fixing:
+  a READER in an unrelated project read back a runbook published in someone
+  else's project.
+  - Migration 000020 records `published_in_project` and `published_by` on
+    `skill_versions` — provenance `Publish` already had (it takes a
+    projectID and checks `CapSkillPublish` on it) and was discarding. The
+    rule is now: **you may read a skill's content if you can see a binding
+    for it, or if you are a member of the project it was published from.**
+    An unreadable version returns not-found rather than forbidden, the same
+    reasoning `projects.Resolve` uses for a non-member.
+  - Everything that worked still works: an installation-scope binding is
+    visible to every principal, so installation-wide skills stay
+    installation-wide; effective skills resolve through bindings the project
+    can see; and a publisher reads its own package back before anyone has
+    installed it. Each of those is pinned by a test, alongside the
+    cross-project denial.
+  - Deliberately *not* a decision about what the registry is — ADR 0012
+    scopes the binding, not the package, and whether packages are
+    instance-wide, organization-scoped or explicitly promoted is still open
+    (NEXT.md). This records the provenance every one of those answers needs.
 - **Four "RLS isolation" tests did not test RLS.** `internal/handoffs`,
   `internal/history` and `internal/secrets` each had a
   `TestRLSIsolationBetweenProjects` that passed unchanged with the table's

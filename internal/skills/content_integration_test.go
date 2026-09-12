@@ -125,3 +125,118 @@ func TestPublishRejectsOversizedContent(t *testing.T) {
 		t.Fatalf("Publish oversized = %v, want ErrTooLarge", err)
 	}
 }
+
+// seedOutsider creates a principal that owns its own project and has no
+// relationship whatsoever to the fixture's project.
+func seedOutsider(t *testing.T, f *fixture) (principalID, projectID uuid.UUID) {
+	t.Helper()
+	principalID, projectID = uuid.New(), uuid.New()
+	err := db.WithoutPrincipal(f.ctx, f.ownerPool, func(tx pgx.Tx) error {
+		userID := uuid.New()
+		if _, err := tx.Exec(f.ctx, `INSERT INTO users (id, email, display_name) VALUES ($1, $2, $3)`,
+			userID, userID.String()+"@example.test", "Outsider"); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(f.ctx, `INSERT INTO principals (id, kind, user_id) VALUES ($1, 'user', $2)`, principalID, userID); err != nil {
+			return err
+		}
+		nsID := uuid.New()
+		if _, err := tx.Exec(f.ctx, `INSERT INTO namespaces (id, kind, slug, owner_user_id) VALUES ($1, 'personal', $2, $3)`,
+			nsID, "out-"+nsID.String()[:8], userID); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(f.ctx, `INSERT INTO projects (id, namespace_id, slug, name) VALUES ($1, $2, 'other', 'Other')`,
+			projectID, nsID); err != nil {
+			return err
+		}
+		_, err := tx.Exec(f.ctx, `INSERT INTO project_members (project_id, principal_id, role) VALUES ($1, $2, 'OWNER')`,
+			projectID, principalID)
+		return err
+	})
+	if err != nil {
+		t.Fatalf("seed outsider: %v", err)
+	}
+	return principalID, projectID
+}
+
+// TestGetVersionDeniesUnrelatedProject is the regression test for a real
+// exposure this method shipped with: because `skills`/`skill_versions` have
+// no RLS and the authorization anchor is a project the CALLER picks, any
+// principal holding CapSkillRead anywhere — every role does — could read
+// the content of any version whose UUID it knew. Confirmed by probe before
+// the fix: an outsider read back a runbook published in someone else's
+// private project.
+func TestGetVersionDeniesUnrelatedProject(t *testing.T) {
+	f := newFixture(t)
+
+	v, err := f.svc.Publish(f.ctx, f.principalID, f.projectID, nil, "internal-runbook", "acme", "local",
+		[]byte("PROD DB is at db.internal, break glass procedure"), nil)
+	if err != nil {
+		t.Fatalf("Publish: %v", err)
+	}
+
+	outsider, outsiderProject := seedOutsider(t, f)
+	// The outsider is an OWNER of their own project, so the capability
+	// check passes — which is exactly why it could never have been the
+	// thing protecting this.
+	if _, err := f.svc.GetVersion(f.ctx, outsider, outsiderProject, v.ID); !errors.Is(err, skills.ErrNotFound) {
+		t.Fatalf("cross-project GetVersion = %v, want ErrNotFound", err)
+	}
+}
+
+// TestGetVersionAllowsPublisherBeforeAnyInstall: the flow that must keep
+// working. Publishing and reading your own package back needs no binding —
+// you just wrote the bytes.
+func TestGetVersionAllowsPublisherBeforeAnyInstall(t *testing.T) {
+	f := newFixture(t)
+
+	v, err := f.svc.Publish(f.ctx, f.principalID, f.projectID, nil, "mine", "acme", "local", []byte("my content"), nil)
+	if err != nil {
+		t.Fatalf("Publish: %v", err)
+	}
+	got, err := f.svc.GetVersion(f.ctx, f.principalID, f.projectID, v.ID)
+	if err != nil {
+		t.Fatalf("publisher GetVersion: %v", err)
+	}
+	if string(got.Content) != "my content" {
+		t.Fatalf("content = %q", got.Content)
+	}
+	if got.Version.PublishedInProject == nil || *got.Version.PublishedInProject != f.projectID {
+		t.Fatalf("published_in_project = %v, want %s", got.Version.PublishedInProject, f.projectID)
+	}
+	if got.Version.PublishedBy == nil || *got.Version.PublishedBy != f.principalID {
+		t.Fatalf("published_by = %v, want %s", got.Version.PublishedBy, f.principalID)
+	}
+}
+
+// TestGetVersionAllowsAnyoneOnceBoundInstallationWide: an installation-scope
+// binding is visible to every principal (migrations/000007), so a skill
+// published installation-wide stays readable installation-wide. Closing the
+// cross-project hole must not have closed this too.
+func TestGetVersionAllowsAnyoneOnceBoundInstallationWide(t *testing.T) {
+	f := newFixture(t)
+	f.grantInstallationAdmin()
+
+	v, err := f.svc.Publish(f.ctx, f.principalID, f.projectID, nil, "org-policy", "acme", "local", []byte("policy text"), nil)
+	if err != nil {
+		t.Fatalf("Publish: %v", err)
+	}
+
+	outsider, outsiderProject := seedOutsider(t, f)
+	if _, err := f.svc.GetVersion(f.ctx, outsider, outsiderProject, v.ID); !errors.Is(err, skills.ErrNotFound) {
+		t.Fatalf("before the binding, the outsider could already read it: %v", err)
+	}
+
+	if _, err := f.svc.Install(f.ctx, f.principalID, f.userID, f.projectID,
+		skills.ScopeInstallation, nil, v.SkillID, v.ID, false, true); err != nil {
+		t.Fatalf("Install installation-scope: %v", err)
+	}
+
+	got, err := f.svc.GetVersion(f.ctx, outsider, outsiderProject, v.ID)
+	if err != nil {
+		t.Fatalf("after an installation-wide binding, the outsider still cannot read it: %v", err)
+	}
+	if string(got.Content) != "policy text" {
+		t.Fatalf("content = %q", got.Content)
+	}
+}
