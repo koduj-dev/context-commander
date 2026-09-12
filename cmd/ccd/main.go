@@ -30,8 +30,6 @@ func newRootCmd() *cobra.Command {
 
 	cmd.AddCommand(newVersionCmd())
 	cmd.AddCommand(cli.NewCommand()...)
-	// `serve` (the actual server) and `sync-skills` land with adapters/http
-	// and internal/skills respectively (later phases).
 
 	return cmd
 }

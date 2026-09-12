@@ -12,6 +12,26 @@ link definition at the bottom of the file.
 
 ### Added
 
+- **`ccd sync-skills`** — the client-side half docs/adr/0012 reserved and
+  `cmd/ccd/main.go` had a comment promising: it resolves a project's
+  effective skills and writes each one as `<dir>/<skill>/SKILL.md` (default
+  `.claude/skills`). An MCP client gets skill content through the tools; a
+  plain CLI user had no way to land it on disk at all.
+  - **Incremental by construction.** A `SkillVersion` is immutable, so the
+    version id a binding points at completely answers "do I already have
+    this". A manifest written into the skill directory records it, and a
+    sync downloads only the skills whose version actually moved — a second
+    run over unchanged skills fetches nothing. `--dry-run` prints the plan;
+    `--prune` (opt-in, because it deletes) removes skills this command
+    wrote that the project no longer binds, and only those.
+  - Skill names come from a registry other people publish into and this
+    command writes to the caller's filesystem, so the directory name is a
+    security boundary: anything outside a conservative allowlist collapses
+    to `-`, a name that sanitizes to empty/`.`/`..` becomes the skill id,
+    and a sanitized name carries an id suffix so two skills cannot collide
+    on one directory. The prune path independently refuses any manifest
+    entry that is not a plain child of the target directory. Unit-tested
+    against `../../.ssh/authorized_keys` and friends.
 - **The skill registry is browsable, and a package now lives at a scope**
   (`docs/adr/0018`, migration 000021). ADR 0012 gave the *binding* a scope
   and the package none, which left two holes at once: nothing said who may
@@ -430,6 +450,24 @@ link definition at the bottom of the file.
 
 ### Fixed
 
+- **A project could never adopt a newer version of a skill.**
+  `skill_bindings` had no uniqueness on `(scope, scope_ref, skill_id)`, so
+  installing a skill a scope already bound added a *second* row; and
+  `ListEffective` composes by scope rank only, so two bindings of equal rank
+  left the winner undefined — in practice the older one kept winning.
+  Since docs/adr/0012 forbids `skill.publish` from touching a pinned binding
+  and no upgrade operation exists, installing again was the only move
+  available, and it silently did nothing. Migration 000022 deduplicates
+  (keeping the most recently installed row per group) and adds
+  `UNIQUE NULLS NOT DISTINCT (scope, scope_ref, skill_id)` — `NULLS NOT
+  DISTINCT` because `scope_ref` is NULL for installation scope, which the
+  default SQL rule would have exempted from the constraint entirely.
+  `Install` and `Override` now upsert, so installing again *moves* the
+  binding, which is what the word means to anyone typing it.
+  - Found by running `ccd sync-skills` against a live server rather than
+    only in tests: it reported "unchanged" for a skill whose new version had
+    just been installed, which was correct — the binding really had not
+    moved.
 - **Skill content could be read across project boundaries.** `skill.get`
   (added in Phase 1) authorized reads against an *anchor* project the caller
   picks, and `skills`/`skill_versions` carry no RLS — so any principal

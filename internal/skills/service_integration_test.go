@@ -495,3 +495,90 @@ func TestPublishUploadFailureLeavesNoInstallableVersion(t *testing.T) {
 		t.Fatalf("verify no skill_versions row: %v", err)
 	}
 }
+
+// TestInstallingAgainMovesTheBindingToTheNewVersion is the regression test
+// for a gap that made the whole skill-update story impossible: a project had
+// no way to adopt a newer version at all.
+//
+// skill.publish must not touch a pinned binding (docs/adr/0012) and no
+// "upgrade" operation exists, so installing again is the only move anyone
+// can make — and it used to add a SECOND binding for the same skill at the
+// same scope. ListEffective compares scope rank only, so two bindings of
+// equal rank left the winner undefined, and a project could silently keep
+// running the old version forever. Found while testing `ccd sync-skills`,
+// which correctly reported "unchanged" after an install that should have
+// upgraded.
+func TestInstallingAgainMovesTheBindingToTheNewVersion(t *testing.T) {
+	f := newFixture(t)
+
+	v1, err := f.svc.Publish(f.ctx, f.principalID, f.userID, skills.ScopeProject, &f.projectID, nil,
+		"house-rules", "acme", "local", []byte("v1"), nil)
+	if err != nil {
+		t.Fatalf("Publish v1: %v", err)
+	}
+	v2, err := f.svc.Publish(f.ctx, f.principalID, f.userID, skills.ScopeProject, &f.projectID, &v1.SkillID,
+		"house-rules", "acme", "local", []byte("v2"), nil)
+	if err != nil {
+		t.Fatalf("Publish v2: %v", err)
+	}
+
+	first, err := f.svc.Install(f.ctx, f.principalID, f.userID, f.projectID,
+		skills.ScopeProject, &f.projectID, v1.SkillID, v1.ID, false, true)
+	if err != nil {
+		t.Fatalf("Install v1: %v", err)
+	}
+	second, err := f.svc.Install(f.ctx, f.principalID, f.userID, f.projectID,
+		skills.ScopeProject, &f.projectID, v1.SkillID, v2.ID, false, true)
+	if err != nil {
+		t.Fatalf("Install v2: %v", err)
+	}
+
+	// Same binding, moved — not a second one alongside the first.
+	if second.ID != first.ID {
+		t.Fatalf("installing again created a new binding %s instead of moving %s", second.ID, first.ID)
+	}
+	if second.SkillVersionID != v2.ID {
+		t.Fatalf("binding points at %s, want the newly installed %s", second.SkillVersionID, v2.ID)
+	}
+
+	effective, err := f.svc.ListEffective(f.ctx, f.principalID, f.projectID)
+	if err != nil {
+		t.Fatalf("ListEffective: %v", err)
+	}
+	if len(effective) != 1 {
+		t.Fatalf("effective bindings = %d, want exactly 1 — a duplicate makes the winner arbitrary: %+v", len(effective), effective)
+	}
+	if effective[0].SkillVersionID != v2.ID {
+		t.Fatalf("effective version = %s, want v2 %s", effective[0].SkillVersionID, v2.ID)
+	}
+}
+
+// TestInstallingTheSameSkillAtDifferentScopesStillComposes: the uniqueness
+// is per scope, not per skill. An installation-wide binding and a project
+// binding of the same skill must still coexist — that is what override is.
+func TestInstallingTheSameSkillAtDifferentScopesStillComposes(t *testing.T) {
+	f := newFixture(t)
+	f.grantInstallationAdmin()
+
+	v, err := f.svc.Publish(f.ctx, f.principalID, f.userID, skills.ScopeProject, &f.projectID, nil,
+		"conventions", "acme", "local", []byte("v1"), nil)
+	if err != nil {
+		t.Fatalf("Publish: %v", err)
+	}
+	if _, err := f.svc.Install(f.ctx, f.principalID, f.userID, f.projectID,
+		skills.ScopeInstallation, nil, v.SkillID, v.ID, false, true); err != nil {
+		t.Fatalf("Install installation-scope: %v", err)
+	}
+	if _, err := f.svc.Install(f.ctx, f.principalID, f.userID, f.projectID,
+		skills.ScopeProject, &f.projectID, v.SkillID, v.ID, false, true); err != nil {
+		t.Fatalf("Install project-scope: %v", err)
+	}
+
+	effective, err := f.svc.ListEffective(f.ctx, f.principalID, f.projectID)
+	if err != nil {
+		t.Fatalf("ListEffective: %v", err)
+	}
+	if len(effective) != 1 || effective[0].Scope != skills.ScopeProject {
+		t.Fatalf("effective = %+v, want the project binding to win over the installation one", effective)
+	}
+}

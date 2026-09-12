@@ -328,12 +328,29 @@ func (s *Service) Install(
 		if err := s.checkSkillVersionBelongsTo(ctx, tx, skillID, skillVersionID); err != nil {
 			return err
 		}
-		_, err := tx.Exec(ctx,
+		// Installing a skill that this scope already binds MOVES the
+		// binding to the named version rather than adding a second one.
+		// That is what the word means to anyone typing it, and it is the
+		// only upgrade path there is: docs/adr/0012 forbids skill.publish
+		// from touching a pinned binding, so without this a project could
+		// never adopt a newer version (migrations/000022).
+		//
+		// RETURNING id/installed_at because on conflict the surviving row
+		// is the existing one, and the caller must be told about the
+		// binding that actually exists, not the one it proposed.
+		return tx.QueryRow(ctx,
 			`INSERT INTO skill_bindings (id, scope, scope_ref, skill_id, skill_version_id, pinned, managed, overridable, installed_by)
-			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+			 ON CONFLICT (scope, scope_ref, skill_id) DO UPDATE
+			 SET skill_version_id = EXCLUDED.skill_version_id,
+			     pinned           = EXCLUDED.pinned,
+			     managed          = EXCLUDED.managed,
+			     overridable      = EXCLUDED.overridable,
+			     installed_by     = EXCLUDED.installed_by,
+			     installed_at     = now()
+			 RETURNING id, installed_at`,
 			b.ID, b.Scope, b.ScopeRef, b.SkillID, b.SkillVersionID, b.Pinned, b.Managed, b.Overridable, b.InstalledBy,
-		)
-		return err
+		).Scan(&b.ID, &b.InstalledAt)
 	})
 	if err != nil {
 		return SkillBinding{}, fmt.Errorf("skills: install: %w", err)
@@ -398,12 +415,22 @@ func (s *Service) Override(
 			return err
 		}
 
-		_, err = tx.Exec(ctx,
+		// Same upsert as Install, for the same reason: overriding again
+		// with a newer version moves the project's own binding instead of
+		// creating a rival to it.
+		return tx.QueryRow(ctx,
 			`INSERT INTO skill_bindings (id, scope, scope_ref, skill_id, skill_version_id, pinned, managed, overridable, installed_by)
-			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+			 ON CONFLICT (scope, scope_ref, skill_id) DO UPDATE
+			 SET skill_version_id = EXCLUDED.skill_version_id,
+			     pinned           = EXCLUDED.pinned,
+			     managed          = EXCLUDED.managed,
+			     overridable      = EXCLUDED.overridable,
+			     installed_by     = EXCLUDED.installed_by,
+			     installed_at     = now()
+			 RETURNING id, installed_at`,
 			b.ID, b.Scope, b.ScopeRef, b.SkillID, b.SkillVersionID, b.Pinned, b.Managed, b.Overridable, b.InstalledBy,
-		)
-		return err
+		).Scan(&b.ID, &b.InstalledAt)
 	})
 	if err != nil {
 		return SkillBinding{}, fmt.Errorf("skills: override: %w", err)

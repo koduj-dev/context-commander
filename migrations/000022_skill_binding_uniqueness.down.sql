@@ -1,0 +1,1 @@
+ALTER TABLE skill_bindings DROP CONSTRAINT skill_bindings_one_per_scope;

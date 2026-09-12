@@ -40,6 +40,7 @@ func NewCommand() []*cobra.Command {
 		newHandoffCmd(),
 		newHistoryCmd(),
 		newSkillCmd(),
+		newSyncSkillsCmd(),
 		newGateCmd(),
 		newSecretCmd(),
 		newInstallationCmd(),
