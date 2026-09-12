@@ -23,7 +23,7 @@ func newSkillCmd() *cobra.Command {
 		Use:   "skill",
 		Short: "Publish, install, and list skills (docs/adr/0012-skill-registry-supply-chain.md)",
 	}
-	skillCmd.AddCommand(newSkillPublishCmd(), newSkillInstallCmd(), newSkillOverrideCmd(), newSkillPinCmd(true), newSkillPinCmd(false), newSkillListEffectiveCmd())
+	skillCmd.AddCommand(newSkillPublishCmd(), newSkillGetCmd(), newSkillInstallCmd(), newSkillOverrideCmd(), newSkillPinCmd(true), newSkillPinCmd(false), newSkillListEffectiveCmd())
 	return skillCmd
 }
 
@@ -321,4 +321,41 @@ func newSkillListEffectiveCmd() *cobra.Command {
 func mustFlag(cmd *cobra.Command, name string) string {
 	v, _ := cmd.Flags().GetString(name)
 	return v
+}
+
+// newSkillGetCmd is the read half `ccd skill install` never had: until now
+// the CLI could publish and install a skill and had no way to print one
+// back out.
+func newSkillGetCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "get <skill-version-id>",
+		Short: "Print a skill version's content (verified against its published checksum)",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			sc, err := setupSkillContext(cmd)
+			if err != nil {
+				return err
+			}
+			defer sc.pool.Close()
+
+			skillVersionID, err := uuid.Parse(args[0])
+			if err != nil {
+				return fmt.Errorf("invalid skill version id: %w", err)
+			}
+			v, err := sc.svc.GetVersion(cmd.Context(), sc.principalID, sc.project.ID, skillVersionID)
+			if err != nil {
+				return err
+			}
+
+			// Metadata to stderr, content to stdout — so `ccd skill get ID >
+			// skill.md` writes the package and nothing else, while a human
+			// running it in a terminal still sees what they just fetched.
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "skill: %s (version %d, %s, trust=%s)\n",
+				v.Skill.Name, v.Version.Version, v.Version.ID, v.Version.TrustStatus)
+			_, _ = cmd.OutOrStdout().Write(v.Content)
+			return nil
+		},
+	}
+	skillFlags(cmd)
+	return cmd
 }

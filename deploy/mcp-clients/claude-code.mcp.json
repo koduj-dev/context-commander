@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "context-commander": {
+      "type": "http",
+      "url": "${CC_MCP_URL:-http://127.0.0.1:8490/mcp}",
+      "headers": {
+        "Authorization": "Bearer ${CC_TOKEN}"
+      }
+    }
+  }
+}

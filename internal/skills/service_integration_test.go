@@ -36,11 +36,15 @@ func (failingStore) Delete(context.Context, string) error                       
 func (failingStore) List(context.Context, string) ([]storage.ObjectInfo, error) { return nil, nil }
 
 type fixture struct {
-	t                  *testing.T
-	ctx                context.Context
-	ownerPool          *db.Pool
-	appPool            *db.Pool
-	svc                *skills.Service
+	t         *testing.T
+	ctx       context.Context
+	ownerPool *db.Pool
+	appPool   *db.Pool
+	svc       *skills.Service
+	// store is the same ObjectStore svc writes through — content tests
+	// reach for it directly to simulate what a compromised or buggy
+	// storage backend would do underneath an immutable row.
+	store              storage.ObjectStore
 	orgs               *organizations.Store
 	orgSvc             *organizations.Service
 	installationAdmins *installation.Store
@@ -121,6 +125,7 @@ func newFixture(t *testing.T) *fixture {
 	return &fixture{
 		t: t, ctx: ctx, ownerPool: ownerPool, appPool: appPool,
 		svc:                skills.NewService(appPool, authz, orgStore, projStore, store, installationStore),
+		store:              store,
 		orgs:               orgStore,
 		orgSvc:             organizations.NewService(appPool, orgStore),
 		installationAdmins: installationStore,

@@ -557,6 +557,19 @@ Possible backends:
 - another S3-compatible service,
 - local filesystem adapter for development/single-node use.
 
+> **What is actually wired, as of 2026-09-11.** The running server only ever
+> constructs the filesystem backend: `adapters/cli/serve.go` calls
+> `filesystem.New(storageDir)` and has no code path that builds
+> `internal/storage/s3`. That package is implemented and unit-tested against
+> its own fake, but nothing in `ccd serve` can reach it and no integration
+> test exercises it against a real S3/MinIO endpoint — so **S3 is
+> experimental and unsupported**, not a configuration option a deployment
+> can choose today. The filesystem backend is the supported one
+> (`--storage-dir` / `$CC_STORAGE_DIR`), and the supported quickstart
+> (`docs/quickstart.md`) ships no object-storage container at all. This
+> paragraph goes away the day `serve` can construct either backend and an
+> integration test proves the S3 one works.
+
 ### Why S3-compatible storage
 
 It already gives useful primitives:
@@ -1937,7 +1950,8 @@ Important distinction:
 - [ ] Metadata database.
 - [ ] Storage interface.
 - [ ] Local filesystem backend for development.
-- [ ] S3-compatible backend.
+- [ ] S3-compatible backend — implemented in `internal/storage/s3` but not
+      reachable from `ccd serve`; experimental, see §8.1.
 - [ ] Artifact version conflict detection.
 
 ## Security

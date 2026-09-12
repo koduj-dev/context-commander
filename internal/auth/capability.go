@@ -1,6 +1,10 @@
 package auth
 
-import "github.com/koduj-dev/context-commander/internal/projects"
+import (
+	"slices"
+
+	"github.com/koduj-dev/context-commander/internal/projects"
+)
 
 // Capability is a fine-grained internal permission. Roles map to a set of
 // capabilities so future policy can get more granular without renaming the
@@ -139,4 +143,24 @@ func setOf(caps ...Capability) map[Capability]bool {
 // (if any) a principal holds on a project before calling this.
 func RoleCan(role projects.Role, cap Capability) bool {
 	return roleCapabilities[role][cap]
+}
+
+// CapabilitiesFor returns everything role may do, sorted so the output is
+// stable across calls and processes (map iteration order is not).
+//
+// RoleCan answers "may this role do X?" one question at a time, which is
+// the right shape for an authorization check. This answers "what may this
+// role do?", which is the right shape for telling a client what it is
+// allowed to attempt — an agent that knows it holds READER proposes a
+// handoff instead of attempting a write and reporting the refusal as a bug.
+// It is a description of an existing grant, never a decision: nothing may
+// authorize anything by consulting this instead of Can/RoleCan.
+func CapabilitiesFor(role projects.Role) []Capability {
+	caps := roleCapabilities[role]
+	out := make([]Capability, 0, len(caps))
+	for c := range caps {
+		out = append(out, c)
+	}
+	slices.Sort(out)
+	return out
 }

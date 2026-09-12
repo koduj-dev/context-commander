@@ -19,6 +19,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/artifacts"
 	"github.com/koduj-dev/context-commander/internal/audit"
 	"github.com/koduj-dev/context-commander/internal/auth"
+	"github.com/koduj-dev/context-commander/internal/contextpack"
 	"github.com/koduj-dev/context-commander/internal/crypto"
 	"github.com/koduj-dev/context-commander/internal/db"
 	"github.com/koduj-dev/context-commander/internal/events"
@@ -153,6 +154,9 @@ func newServeCmd() *cobra.Command {
 			installationSvc := installation.NewService(pool, installationStore, identity.NewStore())
 			secretsBackend := secrets.NewLocalEncryptedBackend(pool, cryptoProvider)
 			secretsSvc := secrets.NewService(pool, authz, secretsBackend)
+			// Constructed last: it composes the services above and owns no
+			// storage of its own (internal/contextpack).
+			contextSvc := contextpack.NewService(pool, projStore, authz, artifactsSvc, skillsSvc, handoffsSvc, eventsSvc)
 
 			dev, _ := cmd.Flags().GetBool("dev")
 			var webFS fs.FS
@@ -173,15 +177,15 @@ func newServeCmd() *cobra.Command {
 				Events: eventsSvc, Organizations: orgSvc, Audit: auditSvc,
 				Handoffs: handoffsSvc, History: historySvc,
 				Skills: skillsSvc, Gates: gatesAdmin, Secrets: secretsSvc,
-				Installation: installationSvc,
+				Installation: installationSvc, ContextPack: contextSvc,
 			}))
 			mux.Handle("/", cchttp.NewHandler(cchttp.Deps{
 				Pool: pool, Projects: projStore, Members: membersSvc, Authz: authz, Artifacts: artifactsSvc,
 				Events: eventsSvc, Organizations: orgSvc, Audit: auditSvc,
 				Handoffs: handoffsSvc, History: historySvc,
 				Skills: skillsSvc, Gates: gatesAdmin, Secrets: secretsSvc,
-				Installation: installationSvc,
-				WebFS:        webFS,
+				Installation: installationSvc, ContextPack: contextSvc,
+				WebFS: webFS,
 			}))
 
 			server := &http.Server{

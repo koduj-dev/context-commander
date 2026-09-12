@@ -11,6 +11,14 @@ ARG VERSION=docker
 RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" \
     -o /out/ccd ./cmd/ccd
 
+# An empty directory to seed the storage volume from. Docker initializes a
+# fresh named volume from whatever the image has at the mount point, so
+# shipping this one owned by the runtime user is what makes the volume
+# writable — without it Docker creates the mount point as root:root and
+# every artifact and skill write fails with permission denied against a
+# distroless image that has no shell to chown it afterwards.
+RUN mkdir -p /out/data
+
 # 2. Minimal runtime: distroless static ships CA certificates (TLS to
 #    Postgres/S3) and has no shell or package manager.
 FROM gcr.io/distroless/static-debian12:nonroot
@@ -19,7 +27,10 @@ LABEL org.opencontainers.image.source="https://github.com/koduj-dev/context-comm
       org.opencontainers.image.licenses="AGPL-3.0"
 COPY --from=build /out/ccd /usr/local/bin/ccd
 # Artifact storage (filesystem backend) lives on this volume, not in the
-# image — see deploy/docker-compose.yml.
+# image — see deploy/docker-compose.yml. Numeric ownership, not "nonroot":
+# distroless's nonroot user is uid/gid 65532, and a numeric --chown cannot
+# silently resolve to the wrong account.
+COPY --from=build --chown=65532:65532 /out/data /data
 ENV CC_STORAGE_DIR=/data
 EXPOSE 8490
 VOLUME ["/data"]

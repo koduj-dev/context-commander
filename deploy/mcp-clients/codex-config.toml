@@ -1,0 +1,16 @@
+# Codex CLI — merge this into ~/.codex/config.toml (or a project-local
+# .codex/config.toml).
+#
+# Codex picks the transport from the shape of the entry: a `url` key means
+# Streamable HTTP, so there is no transport field to set. The token is read
+# from the environment at connect time and sent as
+# "Authorization: Bearer ..." — never paste the token itself here, since a
+# project-local config.toml is exactly the file that ends up committed.
+#
+#   export CC_TOKEN="cc_..."   # from `ccd bootstrap`
+#
+[mcp_servers.context_commander]
+url = "http://127.0.0.1:8490/mcp"
+bearer_token_env_var = "CC_TOKEN"
+startup_timeout_sec = 20
+tool_timeout_sec = 120
