@@ -29,7 +29,9 @@ import (
 	"github.com/koduj-dev/context-commander/internal/members"
 	"github.com/koduj-dev/context-commander/internal/organizations"
 	"github.com/koduj-dev/context-commander/internal/projects"
+	"github.com/koduj-dev/context-commander/internal/ratelimit"
 	"github.com/koduj-dev/context-commander/internal/secrets"
+	"github.com/koduj-dev/context-commander/internal/security"
 	"github.com/koduj-dev/context-commander/internal/skills"
 )
 
@@ -51,6 +53,13 @@ type Deps struct {
 	Secrets       *secrets.Service
 	Installation  *installation.Service
 	ContextPack   *contextpack.Service
+	// Security records refusals and Limiter bounds them. Both are safe to
+	// leave nil — a nil *security.Recorder records nothing and a nil
+	// *ratelimit.Limiter allows everything, which is what the CLI and the
+	// tests that don't exercise either one get.
+	Security       *security.Recorder
+	Limiter        *ratelimit.Limiter
+	SecurityEvents *security.Service
 	// WebFS is the embedded web UI build (web.DistFS()), served as the
 	// SPA fallback for any request under "/" that isn't "/v1/*" or
 	// "/healthz". Left nil in dev mode (`serve --dev`), where the UI is
@@ -101,6 +110,7 @@ func NewHandler(deps Deps) http.Handler {
 			r.Post("/principals/{id}/tokens", deps.issueCredentialFor)
 			r.Get("/principals/{id}/tokens", deps.listCredentialsFor)
 			r.Delete("/tokens/{id}", deps.revokeCredentialFor)
+			r.Get("/security-events", deps.listSecurityEvents)
 		})
 
 		r.Route("/projects/{namespace}/{slug}", func(r chi.Router) {

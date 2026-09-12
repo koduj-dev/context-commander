@@ -29,7 +29,9 @@ import (
 	"github.com/koduj-dev/context-commander/internal/members"
 	"github.com/koduj-dev/context-commander/internal/organizations"
 	"github.com/koduj-dev/context-commander/internal/projects"
+	"github.com/koduj-dev/context-commander/internal/ratelimit"
 	"github.com/koduj-dev/context-commander/internal/secrets"
+	"github.com/koduj-dev/context-commander/internal/security"
 	"github.com/koduj-dev/context-commander/internal/skills"
 	"github.com/koduj-dev/context-commander/internal/storage/filesystem"
 )
@@ -41,6 +43,29 @@ type fixture struct {
 }
 
 func newFixture(t *testing.T) *fixture {
+	t.Helper()
+	return newFixtureWith(t, nil, ratelimit.Limits{})
+}
+
+// newSecurityFixture builds a fixture whose handler actually records
+// security events; the default fixture leaves the recorder nil, which is
+// the documented "records nothing" mode and keeps every other test's
+// database free of refusal rows.
+func newSecurityFixture(t *testing.T) *fixture {
+	t.Helper()
+	return newFixtureWith(t, boolPtr(true), ratelimit.Limits{})
+}
+
+// newSecurityFixtureWithLimits additionally configures the per-credential
+// limiter, so a test can exhaust a burst without making thousands of calls.
+func newSecurityFixtureWithLimits(t *testing.T, perCredential float64, burst int) *fixture {
+	t.Helper()
+	return newFixtureWith(t, boolPtr(true), ratelimit.Limits{PerCredential: perCredential, Burst: burst})
+}
+
+func boolPtr(b bool) *bool { return &b }
+
+func newFixtureWith(t *testing.T, recordSecurity *bool, limits ratelimit.Limits) *fixture {
 	t.Helper()
 	dsns := dbtest.New(t)
 	ctx := context.Background()
@@ -87,12 +112,20 @@ func newFixture(t *testing.T) *fixture {
 	secretsSvc := secrets.NewService(appPool, authz, secrets.NewLocalEncryptedBackend(appPool, cryptoProvider))
 	contextSvc := contextpack.NewService(appPool, projStore, authz, artifactsSvc, skillsSvc, handoffsSvc, eventsSvc)
 
+	var securityRec *security.Recorder
+	if recordSecurity != nil {
+		securityRec = security.NewRecorder(appPool, *recordSecurity)
+		authz.SetDenyRecorder(security.NewDenyRecorder(securityRec))
+	}
+	securitySvc := security.NewService(appPool, installationStore)
+
 	handler := cchttp.NewHandler(cchttp.Deps{
 		Pool: appPool, Projects: projStore, Members: members.NewService(appPool, projStore, authz), Authz: authz, Artifacts: artifactsSvc,
 		Events: eventsSvc, Organizations: orgSvc, Audit: auditSvc,
 		Handoffs: handoffsSvc, History: historySvc,
 		Skills: skillsSvc, Gates: gatesAdmin, Secrets: secretsSvc,
 		Installation: installationSvc, ContextPack: contextSvc,
+		Security: securityRec, Limiter: ratelimit.New(limits), SecurityEvents: securitySvc,
 	})
 	server := httptest.NewServer(handler)
 	t.Cleanup(server.Close)
@@ -639,4 +672,27 @@ func TestNonMemberGetsNotFoundNotForbidden(t *testing.T) {
 	if resp.StatusCode != http.StatusNotFound {
 		t.Fatalf("outsider GET project: status=%d, want 404", resp.StatusCode)
 	}
+}
+
+// newInstallationAdminToken creates a user, grants it installation-admin
+// rights directly (the same thing `ccd installation grant-admin` does — the
+// chicken-and-egg path docs/adr/0017 keeps off the network), and returns
+// its token.
+func (f *fixture) newInstallationAdminToken(email string) string {
+	f.t.Helper()
+	token := f.newUserWithToken(email)
+	ctx := context.Background()
+
+	err := db.WithoutPrincipal(ctx, f.ownerPool, func(tx pgx.Tx) error {
+		var userID uuid.UUID
+		if err := tx.QueryRow(ctx, `SELECT id FROM users WHERE email = $1`, email).Scan(&userID); err != nil {
+			return err
+		}
+		_, err := installation.NewStore().Grant(ctx, tx, userID, nil)
+		return err
+	})
+	if err != nil {
+		f.t.Fatalf("grant installation admin: %v", err)
+	}
+	return token
 }

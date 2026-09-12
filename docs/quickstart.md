@@ -209,3 +209,44 @@ Store `CC_ROOT_KEY` somewhere other than alongside the backup.
 - [`deploy/mcp-clients/README.md`](../deploy/mcp-clients/README.md) — the two supported clients in detail
 - [`docs/architecture-cookbook.md`](architecture-cookbook.md) — why the system is shaped this way
 - [`docs/dev-environment.md`](dev-environment.md) — running from source instead
+
+## Security event recording
+
+The server records what it **refused** — failed authentications, denied
+capabilities, and rate-limit refusals — to the `security_events` table and to
+its structured log. Reads are installation-admin-only:
+
+```bash
+curl -fsS http://127.0.0.1:8490/v1/installation/security-events \
+  -H "Authorization: Bearer $CC_TOKEN" | jq
+```
+
+Each row carries the kind, the principal / credential / project that was
+refused, the capability where one applies, a fixed reason string, and the
+request id — never a token, a request body, or project content.
+
+**What is recorded**
+
+| Kind | When |
+|---|---|
+| `authentication_failed` | A bearer token did not resolve to an active credential (unknown, revoked, expired). The credential id from the token is recorded even when it names nothing — that is the row worth having. |
+| `authorization_denied` | An authenticated principal was refused a capability on a project, either for lack of membership or because its role does not hold that capability. The reason distinguishes the two. |
+| `rate_limited` | A credential exceeded its request rate. |
+
+A request with **no** `Authorization` header at all is not recorded: those are
+overwhelmingly health checks and stray browsers, and recording them would bury
+the rows that matter.
+
+**Opting out.** `ccd serve --security-log=false` disables recording entirely —
+nothing is written to the table and no security event is logged. The server
+warns at startup when it starts in that mode. Turning it off is what costs you
+the ability to notice an attack in progress or reconstruct an incident
+afterwards; the rest of the server behaves identically.
+
+**Rate limits.** Defaults are 100 requests/second sustained per credential with
+a burst of 200, and at most 64 authentications in flight at once. Tune with
+`--rate-limit-per-credential`, `--rate-limit-burst` and `--max-concurrent-auth`
+(`0` disables either mechanism). Limits are **per credential, not per IP**:
+`X-Forwarded-For` is not trusted, so behind a reverse proxy a per-IP bucket
+would put every caller in one shared bucket, where any one of them could lock
+out the rest.

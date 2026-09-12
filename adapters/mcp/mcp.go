@@ -27,7 +27,9 @@ import (
 	"github.com/koduj-dev/context-commander/internal/members"
 	"github.com/koduj-dev/context-commander/internal/organizations"
 	"github.com/koduj-dev/context-commander/internal/projects"
+	"github.com/koduj-dev/context-commander/internal/ratelimit"
 	"github.com/koduj-dev/context-commander/internal/secrets"
+	"github.com/koduj-dev/context-commander/internal/security"
 	"github.com/koduj-dev/context-commander/internal/skills"
 )
 
@@ -49,6 +51,10 @@ type Deps struct {
 	Secrets       *secrets.Service
 	Installation  *installation.Service
 	ContextPack   *contextpack.Service
+	// Both may be nil — a nil Recorder records nothing, a nil Limiter
+	// allows everything (see adapters/http.Deps).
+	Security *security.Recorder
+	Limiter  *ratelimit.Limiter
 }
 
 type credKey struct{}
@@ -80,11 +86,46 @@ func authenticateMiddleware(deps Deps, next http.Handler) http.Handler {
 			http.Error(w, "missing or malformed Authorization: Bearer <token> header", http.StatusUnauthorized)
 			return
 		}
+
+		// Same two bounds as the REST adapter (adapters/http/middleware.go):
+		// the credential lookup is work an unauthenticated caller can
+		// trigger, and an authenticated one is limited per credential. Both
+		// transports share one Limiter, so an agent cannot double its
+		// allowance by switching protocol.
+		release, ok := deps.Limiter.AcquireAuth()
+		if !ok {
+			w.Header().Set("Retry-After", "1")
+			http.Error(w, "too many authentication attempts in flight; retry shortly", http.StatusServiceUnavailable)
+			return
+		}
 		cred, err := identity.Authenticate(r.Context(), deps.Pool, token)
+		release()
 		if err != nil {
+			var credentialID *uuid.UUID
+			if id, _, parseErr := identity.ParseToken(token); parseErr == nil {
+				credentialID = &id
+			}
+			deps.Security.Record(r.Context(), security.Event{
+				Kind:         security.KindAuthenticationFailed,
+				CredentialID: credentialID,
+				Reason:       "presented token did not resolve to an active credential (mcp)",
+			})
 			http.Error(w, "invalid or expired token", http.StatusUnauthorized)
 			return
 		}
+
+		if !deps.Limiter.AllowCredential(cred.ID) {
+			deps.Security.Record(r.Context(), security.Event{
+				Kind:         security.KindRateLimited,
+				PrincipalID:  &cred.PrincipalID,
+				CredentialID: &cred.ID,
+				Reason:       "credential exceeded its request rate limit (mcp)",
+			})
+			w.Header().Set("Retry-After", "1")
+			http.Error(w, "this credential is making requests too quickly", http.StatusTooManyRequests)
+			return
+		}
+
 		ctx := context.WithValue(r.Context(), credKey{}, cred)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})

@@ -19,6 +19,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/paging"
 	"github.com/koduj-dev/context-commander/internal/projects"
 	"github.com/koduj-dev/context-commander/internal/secrets"
+	"github.com/koduj-dev/context-commander/internal/security"
 	"github.com/koduj-dev/context-commander/internal/skills"
 )
 
@@ -84,7 +85,7 @@ func writeDomainError(w http.ResponseWriter, err error) {
 		errors.Is(err, audit.ErrForbidden), errors.Is(err, handoffs.ErrForbidden), errors.Is(err, history.ErrForbidden),
 		errors.Is(err, skills.ErrForbidden), errors.Is(err, gates.ErrForbidden), errors.Is(err, secrets.ErrForbidden),
 		errors.Is(err, installation.ErrForbidden), errors.Is(err, members.ErrForbidden),
-		errors.Is(err, contextpack.ErrForbidden):
+		errors.Is(err, contextpack.ErrForbidden), errors.Is(err, security.ErrForbidden):
 		writeError(w, http.StatusForbidden, "forbidden", "forbidden")
 	case errors.Is(err, installation.ErrAlreadyAdmin):
 		writeError(w, http.StatusConflict, "conflict", "user is already an installation admin")

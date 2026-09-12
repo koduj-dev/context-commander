@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -31,7 +32,9 @@ import (
 	"github.com/koduj-dev/context-commander/internal/members"
 	"github.com/koduj-dev/context-commander/internal/organizations"
 	"github.com/koduj-dev/context-commander/internal/projects"
+	"github.com/koduj-dev/context-commander/internal/ratelimit"
 	"github.com/koduj-dev/context-commander/internal/secrets"
+	"github.com/koduj-dev/context-commander/internal/security"
 	"github.com/koduj-dev/context-commander/internal/skills"
 	"github.com/koduj-dev/context-commander/internal/storage/filesystem"
 	"github.com/koduj-dev/context-commander/web"
@@ -158,6 +161,42 @@ func newServeCmd() *cobra.Command {
 			// storage of its own (internal/contextpack).
 			contextSvc := contextpack.NewService(pool, projStore, authz, artifactsSvc, skillsSvc, handoffsSvc, eventsSvc)
 
+			// Structured logs to stderr. JSON by default: these lines are
+			// meant to be shipped and queried (CRA Annex I expects security
+			// information to be recordable and monitorable), and a human
+			// reading them live can pass --log-format=text.
+			logFormat, _ := cmd.Flags().GetString("log-format")
+			var handler slog.Handler
+			if logFormat == "text" {
+				handler = slog.NewTextHandler(os.Stderr, nil)
+			} else {
+				handler = slog.NewJSONHandler(os.Stderr, nil)
+			}
+			slog.SetDefault(slog.New(handler))
+
+			securityLog, _ := cmd.Flags().GetBool("security-log")
+			if !securityLog {
+				// Said out loud, once, at startup: an operator who turns
+				// this off should see the consequence stated rather than
+				// discover it during an incident.
+				slog.Warn("security event recording is DISABLED — failed authentications, denied capabilities " +
+					"and rate-limit refusals will not be recorded or queryable")
+			}
+			securityRec := security.NewRecorder(pool, securityLog)
+			// Every ALLOW/DENY decision for project content goes through
+			// authz (docs/adr/0006), so one hook covers every domain.
+			authz.SetDenyRecorder(security.NewDenyRecorder(securityRec))
+			securitySvc := security.NewService(pool, installationStore)
+
+			perCredential, _ := cmd.Flags().GetFloat64("rate-limit-per-credential")
+			burst, _ := cmd.Flags().GetInt("rate-limit-burst")
+			maxAuth, _ := cmd.Flags().GetInt("max-concurrent-auth")
+			limiter := ratelimit.New(ratelimit.Limits{
+				PerCredential:     perCredential,
+				Burst:             burst,
+				MaxConcurrentAuth: maxAuth,
+			})
+
 			dev, _ := cmd.Flags().GetBool("dev")
 			var webFS fs.FS
 			if !dev {
@@ -178,6 +217,7 @@ func newServeCmd() *cobra.Command {
 				Handoffs: handoffsSvc, History: historySvc,
 				Skills: skillsSvc, Gates: gatesAdmin, Secrets: secretsSvc,
 				Installation: installationSvc, ContextPack: contextSvc,
+				Security: securityRec, Limiter: limiter,
 			}))
 			mux.Handle("/", cchttp.NewHandler(cchttp.Deps{
 				Pool: pool, Projects: projStore, Members: membersSvc, Authz: authz, Artifacts: artifactsSvc,
@@ -185,6 +225,7 @@ func newServeCmd() *cobra.Command {
 				Handoffs: handoffsSvc, History: historySvc,
 				Skills: skillsSvc, Gates: gatesAdmin, Secrets: secretsSvc,
 				Installation: installationSvc, ContextPack: contextSvc,
+				Security: securityRec, Limiter: limiter, SecurityEvents: securitySvc,
 				WebFS: webFS,
 			}))
 
@@ -231,6 +272,17 @@ func newServeCmd() *cobra.Command {
 	cmd.Flags().Bool("insecure-allow-cleartext", false,
 		fmt.Sprintf("allow binding a non-loopback --addr without TLS — bearer tokens and content travel in plaintext (defaults to $%s=true)", insecureAllowCleartextEnv))
 	cmd.Flags().Bool("dev", false, "skip mounting the embedded web UI — run 'cd web && npm run dev' separately, proxying /v1 back here")
+	cmd.Flags().String("log-format", "json", `structured log format: "json" or "text"`)
+	cmd.Flags().Bool("security-log", true,
+		"record failed authentications, denied capabilities and rate-limit refusals to the security_events table "+
+			"(--security-log=false opts out; nothing is recorded and attacks become invisible)")
+	cmd.Flags().Float64("rate-limit-per-credential", 100,
+		"sustained requests per second allowed per credential (0 disables) — deliberately per credential, not per IP: "+
+			"X-Forwarded-For is not trusted, so behind a reverse proxy every caller would share one bucket")
+	cmd.Flags().Int("rate-limit-burst", 200, "how far above the sustained per-credential rate a short spike may go")
+	cmd.Flags().Int("max-concurrent-auth", 64,
+		"maximum authentication attempts in flight at once (0 disables) — bounds the database work an "+
+			"unauthenticated caller can trigger")
 	databaseURLFlag(cmd)
 	return cmd
 }

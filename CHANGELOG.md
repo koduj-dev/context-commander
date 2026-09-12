@@ -12,6 +12,60 @@ link definition at the bottom of the file.
 
 ### Added
 
+- **Refusals are now recorded, and callers are rate-limited.** Nothing in
+  the server recorded a denial before this: `audit.ResultDeny` was a
+  defined constant with **zero call sites**, and the server emitted no logs
+  at all, so a failed authentication or a denied capability left no trace
+  anywhere. Driven by two independent needs that want the same data —
+  reconstructing an incident afterwards, and CRA Annex I (2)(l)'s
+  requirement to record security-relevant internal activity with a user
+  opt-out.
+  - **`security_events` (migration 000019)** — append-only (no UPDATE/DELETE
+    grant), recording `authentication_failed`, `authorization_denied` and
+    `rate_limited`. Deliberately **not** `audit_log`: that table's RLS
+    policy has no separate `WITH CHECK`, so Postgres reuses `USING` as the
+    insert check — meaning a row saying "this principal has no access to
+    project X" cannot be inserted by that principal, which is exactly the
+    row worth keeping. An authentication failure has no principal or
+    project at all and no home in a per-project table. Also deliberately
+    **without foreign keys** on the recorded ids: a credential id that
+    names nothing is the most interesting row here, and an FK would reject
+    it.
+  - `internal/security.Recorder` writes best-effort in its own transaction
+    (a denial produced inside a transaction about to roll back must not
+    take its own record with it) and never changes the caller's outcome.
+    `internal/security.Service` reads, gated on installation-admin rights
+    (docs/adr/0017) — a refusal timeline spans projects the caller cannot
+    see, and one credential probing five projects is a pattern no
+    per-project view can show. Served at `GET
+    /v1/installation/security-events`.
+  - Denials are recorded from `auth.AuthzService.Can`, the single place that
+    decides ALLOW/DENY for project content (docs/adr/0006) — one hook
+    instead of nine `checkCapability` implementations to forget it in. Wired
+    through a new optional `auth.DenyRecorder` hook rather than a
+    constructor parameter, because `internal/audit` and `internal/security`
+    both import `internal/auth`, so the dependency had to be inverted; a nil
+    recorder keeps every existing caller and test unchanged.
+  - **Structured logging** (`log/slog`, JSON by default, `--log-format=text`
+    for a human). The server previously logged nothing whatsoever — the
+    `/data` permission bug earlier in this changelog surfaced as a bare 500
+    with no diagnostic anywhere.
+  - **CRA opt-out:** `--security-log=false` disables recording entirely,
+    with a startup warning stating what it costs. All-or-nothing on purpose:
+    a half-recorded security timeline reads as complete.
+  - **`internal/ratelimit`** — a token bucket per credential (default 100
+    rps, burst 200) plus a ceiling on authentications in flight (default
+    64). Per credential, **not per IP**: `serve` refuses to trust
+    `X-Forwarded-For` and the supported deployment is a loopback bind behind
+    a reverse proxy, so a per-IP bucket would put every caller in one shared
+    bucket where any one of them could lock out the rest. Per-IP limiting
+    needs a trusted-proxy configuration that does not exist yet, and is
+    logged in NEXT.md rather than faked. The concurrency ceiling is the part
+    that bounds unauthenticated work: `cc_<any valid uuid>_<anything>`
+    reaches the credential lookup — a database round trip — before being
+    rejected. Both transports share one limiter, so an agent cannot double
+    its allowance by switching between REST and MCP. Refusals are 429 with
+    `Retry-After` (per credential) and 503 (gate saturated).
 - **Phase 1 — the first usable cross-client handoff.** Two agents on two
   different clients can now complete a full handoff without copy-paste and
   without a shared credential. Everything below is one story; the pieces

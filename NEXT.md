@@ -126,6 +126,18 @@ insufficient. It is not a precondition for first value.
 
 Only on top of a core loop people actually use:
 
+- [ ] **CRA (Regulation (EU) 2024/2847) applicability and the rest of Annex
+      I.** Annex I (2)(l) — recording security-relevant internal activity
+      with a user opt-out — is now implemented (`internal/security`,
+      migration 000019, `--security-log`). Not yet looked at: whether the
+      CRA applies to this project at all (the free-and-open-source exemption
+      turns on monetization and on whether a legal entity acts as an
+      "open-source steward" — a question for the maintainer, not for the
+      code), a coordinated vulnerability disclosure policy beyond
+      SECURITY.md, an SBOM, and the Annex VII technical documentation
+      describing what is logged and how. Reporting obligations for actively
+      exploited vulnerabilities applied from 2026-09-11; full application is
+      2027-12-11.
 - [ ] Org-level credential management, policy, audit export.
 - [ ] SSO/OIDC and short-lived credentials.
 - [ ] Retention rules, legal hold, controlled purge workflow.
@@ -209,6 +221,17 @@ on the planned move to a public repo:
   column on `skill_versions`, which docs/adr/0012's supply-chain story
   arguably wants anyway. Needs a decision on the skill trust model, hence
   here rather than done. See docs/gotchas.md.
+- **[security] Per-IP rate limiting needs a trusted-proxy configuration.**
+  `internal/ratelimit` limits per credential and bounds authentications in
+  flight, which is everything that can be done correctly today. Per-IP
+  limiting cannot: `serve` deliberately does not trust `X-Forwarded-For`
+  (no trusted-proxy config exists, and the header is spoofable without
+  one), while the supported deployment is a loopback bind behind a reverse
+  proxy — so every request carries the proxy's address and a per-IP bucket
+  would be one shared bucket that any caller could exhaust to lock out the
+  rest. Needs `--trusted-proxies` (a CIDR allowlist) plus
+  `middleware.RealIP` gated on it, and only then a per-IP limit on
+  unauthenticated traffic.
 - **[security] RLS is barely tested.** With `cc_app` granted `BYPASSRLS`,
   only nine tests in the whole suite fail — everything else passes with
   Row-Level Security effectively switched off, because it asserts through
