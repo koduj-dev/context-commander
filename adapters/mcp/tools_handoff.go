@@ -17,6 +17,8 @@ type handoffResult struct {
 	SourceSessionID string `json:"source_session_id,omitempty"`
 	Status          string `json:"status"`
 	CreatedAt       string `json:"created_at"`
+	ClaimedAt       string `json:"claimed_at,omitempty"`
+	ClosedAt        string `json:"closed_at,omitempty"`
 }
 
 func toHandoffResult(h handoffs.Handoff) handoffResult {
@@ -24,7 +26,26 @@ func toHandoffResult(h handoffs.Handoff) handoffResult {
 	if h.SourceSessionID != nil {
 		r.SourceSessionID = h.SourceSessionID.String()
 	}
+	if h.ClaimedAt != nil {
+		r.ClaimedAt = h.ClaimedAt.Format(time.RFC3339)
+	}
+	if h.ClosedAt != nil {
+		r.ClosedAt = h.ClosedAt.Format(time.RFC3339)
+	}
 	return r
+}
+
+// handoffDetailResult is the full handoff — metadata plus decrypted body.
+// Declared at package scope rather than inside registerHandoffTools because
+// both handoff.get and handoff.current return it, and the MCP SDK derives
+// each tool's output schema by reflecting over this exact type.
+type handoffDetailResult struct {
+	handoffResult
+	Summary             string   `json:"summary"`
+	CompletedWork       string   `json:"completed_work"`
+	NextActions         string   `json:"next_actions"`
+	ReferencedArtifacts []string `json:"referenced_artifacts,omitempty"`
+	ReferencedTasks     []string `json:"referenced_tasks,omitempty"`
 }
 
 func registerHandoffTools(server *sdkmcp.Server, deps Deps, principalID, clientID uuid.UUID) {
@@ -92,14 +113,6 @@ func registerHandoffTools(server *sdkmcp.Server, deps Deps, principalID, clientI
 		Project string `json:"project" jsonschema:"project path \"namespace/slug\""`
 		ID      string `json:"id" jsonschema:"handoff ID"`
 	}
-	type handoffDetailResult struct {
-		handoffResult
-		Summary             string   `json:"summary"`
-		CompletedWork       string   `json:"completed_work"`
-		NextActions         string   `json:"next_actions"`
-		ReferencedArtifacts []string `json:"referenced_artifacts,omitempty"`
-		ReferencedTasks     []string `json:"referenced_tasks,omitempty"`
-	}
 	sdkmcp.AddTool(server, &sdkmcp.Tool{
 		Name:        "handoff.get",
 		Description: "Read one handoff's full body — summary, completed work, next actions, references.",
@@ -154,6 +167,98 @@ func registerHandoffTools(server *sdkmcp.Server, deps Deps, principalID, clientI
 		}
 		return nil, paged(out, page.NextCursor), nil
 	})
+
+	type currentArgs struct {
+		Project string `json:"project" jsonschema:"project path \"namespace/slug\""`
+	}
+	sdkmcp.AddTool(server, &sdkmcp.Tool{
+		Name: "handoff.current",
+		Description: "Get the handoff to continue from — the most recent one still open or claimed, with its " +
+			"full body. Use this instead of handoff.list when picking up work: a list of IDs does not say " +
+			"which one is current. Status \"open\" means nobody has taken it yet (claim it with handoff.claim); " +
+			"\"claimed\" means another client already did, so treat it as context rather than as an assignment. " +
+			"Returns an error when every handoff is closed — that means there is nothing to take over.",
+	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, args currentArgs) (*sdkmcp.CallToolResult, handoffDetailResult, error) {
+		projectID, err := resolve(ctx, args.Project)
+		if err != nil {
+			return nil, handoffDetailResult{}, err
+		}
+		h, err := deps.Handoffs.Current(ctx, principalID, projectID)
+		if err != nil {
+			return nil, handoffDetailResult{}, err
+		}
+		_, body, err := deps.Handoffs.Get(ctx, principalID, projectID, h.ID)
+		if err != nil {
+			return nil, handoffDetailResult{}, err
+		}
+		return nil, handoffDetailResult{
+			handoffResult:       toHandoffResult(h),
+			Summary:             body.Summary,
+			CompletedWork:       body.CompletedWork,
+			NextActions:         body.NextActions,
+			ReferencedArtifacts: formatUUIDs(body.ReferencedArtifacts),
+			ReferencedTasks:     formatUUIDs(body.ReferencedTasks),
+		}, nil
+	})
+
+	type transitionArgs struct {
+		Project string `json:"project" jsonschema:"project path \"namespace/slug\""`
+		ID      string `json:"id" jsonschema:"handoff ID"`
+	}
+	sdkmcp.AddTool(server, &sdkmcp.Tool{
+		Name: "handoff.claim",
+		Description: "Take responsibility for continuing a handoff's work: open -> claimed, recorded against " +
+			"this client. Do this before starting, so another agent picking up the same project can see the " +
+			"work is already being continued. Fails if another client claimed it first — that is the " +
+			"coordination answer, not an error in your request: re-read it with handoff.current and decide " +
+			"whether the work is still yours to do.",
+	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, args transitionArgs) (*sdkmcp.CallToolResult, handoffResult, error) {
+		projectID, handoffID, err := resolveHandoffTarget(ctx, resolve, args.Project, args.ID)
+		if err != nil {
+			return nil, handoffResult{}, err
+		}
+		h, err := deps.Handoffs.Claim(ctx, principalID, &clientID, projectID, handoffID)
+		if err != nil {
+			return nil, handoffResult{}, err
+		}
+		return nil, toHandoffResult(h), nil
+	})
+
+	sdkmcp.AddTool(server, &sdkmcp.Tool{
+		Name: "handoff.close",
+		Description: "Declare a handoff's work finished: open or claimed -> closed. Closing is what stops the " +
+			"next agent from picking work up again after it is done — handoff.current only ever returns " +
+			"handoffs that are still open or claimed. Create a new handoff first if you are stopping " +
+			"mid-task rather than finishing.",
+	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, args transitionArgs) (*sdkmcp.CallToolResult, handoffResult, error) {
+		projectID, handoffID, err := resolveHandoffTarget(ctx, resolve, args.Project, args.ID)
+		if err != nil {
+			return nil, handoffResult{}, err
+		}
+		h, err := deps.Handoffs.Close(ctx, principalID, &clientID, projectID, handoffID)
+		if err != nil {
+			return nil, handoffResult{}, err
+		}
+		return nil, toHandoffResult(h), nil
+	})
+}
+
+// resolveHandoffTarget resolves the project path and parses the handoff ID —
+// the identical four lines both transition tools would otherwise open with.
+func resolveHandoffTarget(
+	ctx context.Context,
+	resolve func(context.Context, string) (uuid.UUID, error),
+	projectPath, handoffID string,
+) (uuid.UUID, uuid.UUID, error) {
+	projectID, err := resolve(ctx, projectPath)
+	if err != nil {
+		return uuid.Nil, uuid.Nil, err
+	}
+	id, err := uuid.Parse(handoffID)
+	if err != nil {
+		return uuid.Nil, uuid.Nil, err
+	}
+	return projectID, id, nil
 }
 
 func parseUUIDs(ss []string) ([]uuid.UUID, error) {

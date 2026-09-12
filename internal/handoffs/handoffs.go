@@ -14,6 +14,33 @@ import (
 var (
 	ErrNotFound  = errors.New("handoffs: not found")
 	ErrForbidden = errors.New("handoffs: forbidden")
+
+	// ErrInvalidTransition is returned by Service.Claim/Close when the
+	// handoff is not in a status the requested transition starts from —
+	// claiming a closed handoff, or closing one twice. A client mistake
+	// about state, not a server fault, so adapters map it to 409 rather
+	// than the default 500: the caller's view of the lifecycle is stale
+	// and re-reading the handoff is the fix.
+	ErrInvalidTransition = errors.New("handoffs: invalid status transition")
+
+	// ErrAlreadyClaimed is the one transition failure worth distinguishing
+	// by name. Two agents racing to continue the same work is the expected
+	// collision in a cross-client handoff, and the loser needs to be told
+	// specifically that someone else took it — not the generic "wrong
+	// status", which reads as a bug in the caller rather than as the
+	// coordination outcome it is.
+	ErrAlreadyClaimed = errors.New("handoffs: already claimed by another client")
+)
+
+// The handoff lifecycle: created open, claimed by whichever client takes
+// responsibility for continuing the work, closed when that work is done.
+// StatusClaimed is deliberately not skippable — "someone is already on
+// this" and "this is finished" are different facts, and an agent deciding
+// whether to pick work up needs to tell them apart (migrations/000018).
+const (
+	StatusOpen    = "open"
+	StatusClaimed = "claimed"
+	StatusClosed  = "closed"
 )
 
 // Handoff is the plaintext-safe half of a handoff record — everything a
@@ -27,6 +54,17 @@ type Handoff struct {
 	SourceSessionID    *uuid.UUID
 	Status             string
 	CreatedAt          time.Time
+
+	// Lifecycle attribution — who moved this handoff out of 'open' and
+	// when. All nil while Status is StatusOpen; Claimed* is set from
+	// StatusClaimed onwards and deliberately survives the close, so a
+	// closed handoff still records which client actually did the work.
+	ClaimedAt          *time.Time
+	ClaimedByPrincipal *uuid.UUID
+	ClaimedByClient    *uuid.UUID
+	ClosedAt           *time.Time
+	ClosedByPrincipal  *uuid.UUID
+	ClosedByClient     *uuid.UUID
 }
 
 // Body is CONTENT PAYLOAD (docs/adr/0011) — marshaled to JSON and encrypted

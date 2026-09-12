@@ -236,6 +236,45 @@ func registerSkillTools(server *sdkmcp.Server, deps Deps, principalID, clientID 
 	registerPinTool("skill.pin", true)
 	registerPinTool("skill.unpin", false)
 
+	type getArgs struct {
+		Project        string `json:"project" jsonschema:"project path \"namespace/slug\", used to authorize the read"`
+		SkillVersionID string `json:"skill_version_id" jsonschema:"skill version UUID — the skill_version_id from skill.install or skill.list_effective"`
+	}
+	type skillContentResult struct {
+		skillVersionResult
+		SkillName   string `json:"skill_name"`
+		SkillAuthor string `json:"skill_author,omitempty"`
+		SkillOrigin string `json:"skill_origin,omitempty"`
+		Content     string `json:"content"`
+	}
+	sdkmcp.AddTool(server, &sdkmcp.Tool{
+		Name: "skill.get",
+		Description: "Read a skill version's actual content — the instructions themselves, not just the " +
+			"binding. skill.list_effective returns skill_version_id values; this is what turns one into " +
+			"something you can load and follow. Content is verified against the checksum recorded when the " +
+			"version was published.",
+	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, args getArgs) (*sdkmcp.CallToolResult, skillContentResult, error) {
+		projectID, err := resolve(ctx, args.Project)
+		if err != nil {
+			return nil, skillContentResult{}, err
+		}
+		skillVersionID, err := uuid.Parse(args.SkillVersionID)
+		if err != nil {
+			return nil, skillContentResult{}, err
+		}
+		v, err := deps.Skills.GetVersion(ctx, principalID, projectID, skillVersionID)
+		if err != nil {
+			return nil, skillContentResult{}, err
+		}
+		return nil, skillContentResult{
+			skillVersionResult: toSkillVersionResult(v.Version),
+			SkillName:          v.Skill.Name,
+			SkillAuthor:        v.Skill.Author,
+			SkillOrigin:        v.Skill.Origin,
+			Content:            string(v.Content),
+		}, nil
+	})
+
 	type listEffectiveArgs struct {
 		Project string `json:"project" jsonschema:"project path \"namespace/slug\""`
 	}

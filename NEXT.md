@@ -61,82 +61,51 @@ not create daily usage.
 
 ### The risk this roadmap exists to correct
 
-Domain breadth got ahead of user experience. The design (cookbook + 17 ADRs) is
-settled and every domain it describes is built, with HTTP/MCP/CLI adapters and
-a web management UI — but there is still **no single operation that assembles
-the right starting context for a new agent**, a skill can be installed but its
-content can't be read back, a handoff can be created but never claimed or
-closed, and several lists have no cursor. The most important product change is
-not another subsystem: it is assembling the existing parts into one short,
-safe, measurable story — **store state → hand off work → resume exactly**.
+Domain breadth got ahead of user experience. The design (cookbook + 17 ADRs)
+was settled and every domain it describes was built, with HTTP/MCP/CLI adapters
+and a web management UI — but there was no single operation that assembled the
+right starting context for a new agent, a skill could be installed but its
+content never read back, and a handoff could be created but never claimed or
+closed. The correction was not another subsystem: it was assembling the
+existing parts into one short, safe, measurable story — **store state → hand
+off work → resume exactly**.
+
+As of 2026-09-11 that story runs (Phase 1, below). The risk it was written
+against now inverts: the temptation is to keep adding to a loop nobody has
+measured. Hence the priority order at the bottom — **measure before Phase 2**.
 
 ---
 
 ## 🔭 Open work
 
-### Phase 0 — trustworthy foundation (release blocker)
+### Phases 0 and 1 — done
 
-**Done.** Every P1 finding from the 2026-09-01 review is fixed, each with a
-regression test — see CHANGELOG for what shipped. Kept as a heading only so
-the phase numbering below still reads in order; delete it once Phase 1 starts.
+Both shipped; see CHANGELOG for what landed and `docs/quickstart.md` for the
+result. Kept as a heading only so the phase numbering below still reads in
+order — delete it once Phase 2 starts.
 
-Already fixed, kept only so the next reader doesn't re-derive it: MCP sessions
-are bound to the authenticated principal per HTTP request
-(`adapters/mcp/mcp.go`, the server is constructed closed over `cred.PrincipalID`);
-organization-scope gate bindings are derived from the caller's org membership,
-not a client parameter (`internal/gates/admin.go`); PAT list/revoke shipped
-and `identity.ValidateExpiresAt` rejects a non-future expiry; granting OWNER
-now requires OWNER at both project and organization scope, checked in
-`internal/members.Service`/`internal/organizations.Service` rather than in each
-adapter (see CHANGELOG); the secret read-modify-write is serialized on
-`(project_id, name)`, and the same race in `internal/crypto.ensureProjectKey`
-— which affected every encrypting domain, not just secrets — is serialized per
-project (`internal/db/advisory.go`); every growing list endpoint takes a limit
-and an opaque cursor and reports whether more remain (`internal/paging`,
-cookbook §22.1).
+Phase 1's outcome in one line: **two clients complete a full cross-client
+handoff**, proven end to end in `adapters/http/e2e_handoff_test.go`.
+`context.bootstrap` (`internal/contextpack`) assembles the starting context
+in one call, `skill.get` returns a skill's actual bytes, handoffs move
+open → claimed → closed with a `current` query, `deploy/quickstart/` is a
+copy-paste install, and Claude Code + Codex CLI are guaranteed by fixtures
+under `deploy/mcp-clients/` that a smoke test parses and dials. S3 is now
+marked experimental everywhere rather than implied to work (cookbook §8.1,
+README, the package doc).
 
-### Phase 1 — the first genuinely usable vertical slice
+Two things Phase 1 deliberately did NOT do, so the next reader doesn't
+re-derive them:
 
-Goal: two clients complete a full cross-client handoff. **No web UI work is
-needed in this phase** — a good CLI, good MCP tools and a ten-minute quickstart
-carry more information than another page.
-
-- [ ] **Read a skill's content (`skill.get`).** `internal/skills.Service`
-  exposes `Publish`/`Install`/`Override`/`Pin`/`Unpin`/`ListEffective` and
-  nothing that returns the bytes. `SkillBinding` carries a `StorageKey`, so
-  the content is in `storage.ObjectStore` and simply unreachable through any
-  adapter. An agent can therefore install a skill it can never load — the
-  single most glaring hole in the current surface.
-- [ ] **Aggregated `context.bootstrap` / `context.pull`.** One well-described
-  MCP operation that assembles the starting context, with detail tools kept
-  alongside it, so an agent doesn't need to know the internal domain model
-  before its first useful step. Not a new source of truth — an aggregated
-  **read model** over existing domains: project identity and the caller's
-  role; the current/open handoff; selected artifacts by manifest or
-  convention; the *content* of effective skills, not just their UUIDs; recent
-  relevant events plus a cursor to continue from; and an explicit size budget
-  with a statement of what was truncated.
-- [ ] **Handoff lifecycle.** `internal/handoffs.Service` hardcodes
-  `'open'` on create and has no transition anywhere — there is no claim or
-  close endpoint, which is why the web UI's Handoffs tab only ever shows and
-  creates. Define open → claimed/acknowledged → closed, plus a "current
-  handoff" query.
-- [ ] **One supported Docker Compose quickstart** — server, PostgreSQL,
-  persistence; bootstrap and client connection must be copy-paste. The
-  `Dockerfile` + `profiles: ["app"]` service (see Packaging) is the raw
-  material; the quickstart itself isn't written.
-- [ ] **Pick and test two concrete MCP client implementations**, and keep
-  their configuration as an executable smoke test or at least a versioned
-  fixture. Guarantee two named clients rather than a vague "works with any
-  MCP".
-- [ ] **E2E scenario:** client A writes, client B reads/takes over with no
-  shared token, a revoked token fails.
-- [ ] **Align docs with the storage backend that is actually wired.**
-  `adapters/cli/serve.go` only ever constructs `filesystem.New(storageDir)` —
-  `internal/storage/s3` has no caller in `serve`, so the MinIO service in
-  `deploy/docker-compose.yml` isn't used by the running app at all. Either
-  wire S3 and integration-test it, or mark it experimental and say so in the
-  README and cookbook §8.1.
+- **No web UI work.** The Handoffs tab still only shows and creates — it
+  cannot claim or close, even though the endpoints now exist. That was the
+  stated trade ("no web UI before the CLI/MCP core loop is proven"); wiring
+  the tab to the new endpoints is now small and listed under UI below.
+- **No `context.pull`.** The roadmap named "`context.bootstrap` /
+  `context.pull`" but asked for *one* well-described operation. Continuation
+  is `event.list` with the cursor the pack already returns, so a second
+  half-specified operation would have been surface without a question to
+  answer.
 
 ### Phase 2 — relevance and daily use
 
@@ -170,6 +139,14 @@ what exists. Phases 1–3 of it shipped (design system, Handoffs/Conversations/
 Events tabs, Administration page — see `CHANGELOG.md`). Deliberately parked
 behind Phase 1 above, per "no web UI before the CLI/MCP core loop is proven":
 
+- [ ] **Wire the Handoffs tab to the lifecycle endpoints.** `POST
+  .../handoffs/{id}/claim` and `/close` and `GET .../handoffs/current` all
+  exist as of Phase 1; the tab predates them and still only lists and
+  creates. Claim/close buttons plus a "current handoff" callout — the
+  smallest piece of UI that makes the shipped core loop visible to someone
+  who never opens a terminal.
+- [ ] **Surface a skill's content in the Skills tab.** `GET
+  .../skills/versions/{id}` exists now; the tab still shows only UUIDs.
 - [ ] Organizations / Skill Registry top-level nav, and the remaining project
   tabs (Integrations, Settings) — not yet planned.
 - [ ] **`GET .../conversations` list endpoint** — surfaced while building the
@@ -234,18 +211,31 @@ on the planned move to a public repo:
 
 v0.1 is done when:
 
-- every P1 and scope-related P2 finding is fixed **and has a regression test**;
-- a new user completes the supported quickstart with no manual SQL;
-- two separate credentials and two clients complete the reference handoff
-  scenario;
-- the second client reads the actual content of artifacts *and* effective
-  skills;
-- every growing list endpoint has a limit and a cursor;
-- PATs can be listed and revoked, and revocation takes effect immediately;
-- a backup/restore procedure for database and storage is documented for at
-  least the reference deployment;
-- the docs don't describe an inactive storage backend or a future feature as
-  done.
+- [x] every P1 and scope-related P2 finding is fixed **and has a regression
+      test** (Phase 0);
+- [x] a new user completes the supported quickstart with no manual SQL
+      (`docs/quickstart.md`, `deploy/quickstart/` — walked end to end on
+      2026-09-11, which is how the `/data` ownership bug in the Docker image
+      was found);
+- [x] two separate credentials and two clients complete the reference handoff
+      scenario (`adapters/http/e2e_handoff_test.go`);
+- [x] the second client reads the actual content of artifacts *and* effective
+      skills (`context.bootstrap`, `skill.get`);
+- [x] every growing list endpoint has a limit and a cursor (Phase 0);
+- [x] PATs can be listed and revoked, and revocation takes effect immediately
+      (Phase 0; the E2E scenario asserts the revoked token stops working
+      while the other client's keeps working);
+- [x] a backup/restore procedure for database and storage is documented for
+      at least the reference deployment (`docs/quickstart.md`);
+- [x] the docs don't describe an inactive storage backend or a future feature
+      as done (S3 marked experimental in cookbook §8.1, README, and the
+      package doc).
+
+**Every box is ticked as of 2026-09-11.** What that does *not* mean: it was
+written as a checklist of capabilities, and capabilities are not adoption.
+Nothing here has been used by anyone but its author. Before calling v0.1
+released, take the measurements below against a real repository — the
+checklist says the loop exists, the metrics say whether it works.
 
 ## 📏 Metrics and validation
 
@@ -274,15 +264,19 @@ feature.
 
 ## ❓ Open questions
 
-- **First guaranteed client pair.** Pick after a short compatibility spike;
-  guarantee two concrete implementations instead of a generic "works with any
-  MCP". (Raised 2026-09-01.)
+- ~~**First guaranteed client pair.**~~ Decided 2026-09-11: **Claude Code and
+  Codex CLI**. Both reach the server over Streamable HTTP with a bearer PAT,
+  so one transport covers both, and both configure from a small committed
+  file a test can parse — see `deploy/mcp-clients/`.
 - **Handoff vs. context pack as the headline object.** Recommendation: sell the
   outcome ("handoff"), keep the context pack as the mechanism. (Raised
   2026-09-01.)
-- **Filesystem vs. S3 in v0.1.** Recommendation: one very well tested
-  filesystem quickstart; mark S3 experimental until it is genuinely wired into
-  `serve` and integration-tested. (Raised 2026-09-01 — see the Phase 1 item.)
+- ~~**Filesystem vs. S3 in v0.1.**~~ Decided 2026-09-11 as recommended: the
+  filesystem backend is the supported one and the quickstart ships no
+  object-storage container; S3 is marked experimental in cookbook §8.1, the
+  README, and `internal/storage/s3`'s package doc. Reopens the day someone
+  wires it into `serve` — with an integration test against a real endpoint,
+  which is the part that does not exist today.
 - **Name and positioning.** Keep "Context Commander", but narrow the subtitle
   to "shared project context for coding agents"; avoid sounding like an
   orchestrator. (Raised 2026-09-01.)
@@ -335,11 +329,18 @@ feature.
 1. ~~**Phase 0**~~ — done. ADMIN→OWNER escalation, the secret and project-key
    write races, and unified keyset pagination all shipped with regression
    tests (see CHANGELOG).
-2. **Phase 1** — `skill.get`, `context.bootstrap`, handoff lifecycle,
-   quickstart, two named MCP clients, E2E scenario, storage-backend honesty.
-3. **Phase 2 onward** — only after the core loop is measured with real design
-   partners.
+2. ~~**Phase 1**~~ — done 2026-09-11. `skill.get`, `context.bootstrap`,
+   handoff lifecycle, quickstart, two named MCP clients, E2E scenario,
+   storage-backend honesty.
+3. **Measure before building Phase 2.** The core loop now exists; nothing in
+   Phase 2 should be started before the metrics below have been taken against
+   a real repository with real design partners. Every missing datum is first
+   answered with a better context pack, not a new subsystem — and the pack is
+   now the thing to tune (what it selects, what it costs, what it truncates),
+   which is exactly what the Phase 2 list is mostly about.
+4. **Phase 3 onward** — only on top of a core loop people actually use.
 
 Independent of the above, cheap, and pickable any time: `docs/README.md` index,
-organization "list members", `GET .../conversations`. CI hardening unblocks
-itself the day the repo goes public.
+organization "list members", `GET .../conversations`, the two UI items above,
+and the member-audit backlog entry. CI hardening unblocks itself the day the
+repo goes public.

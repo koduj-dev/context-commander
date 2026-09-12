@@ -16,6 +16,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/artifacts"
 	"github.com/koduj-dev/context-commander/internal/audit"
 	"github.com/koduj-dev/context-commander/internal/auth"
+	"github.com/koduj-dev/context-commander/internal/contextpack"
 	"github.com/koduj-dev/context-commander/internal/crypto"
 	"github.com/koduj-dev/context-commander/internal/db"
 	"github.com/koduj-dev/context-commander/internal/dbtest"
@@ -84,13 +85,14 @@ func newFixture(t *testing.T) *fixture {
 	gatesAdmin := gates.NewAdminService(appPool, authz, orgStore, projStore, installationStore)
 	installationSvc := installation.NewService(appPool, installationStore, identity.NewStore())
 	secretsSvc := secrets.NewService(appPool, authz, secrets.NewLocalEncryptedBackend(appPool, cryptoProvider))
+	contextSvc := contextpack.NewService(appPool, projStore, authz, artifactsSvc, skillsSvc, handoffsSvc, eventsSvc)
 
 	handler := cchttp.NewHandler(cchttp.Deps{
 		Pool: appPool, Projects: projStore, Members: members.NewService(appPool, projStore, authz), Authz: authz, Artifacts: artifactsSvc,
 		Events: eventsSvc, Organizations: orgSvc, Audit: auditSvc,
 		Handoffs: handoffsSvc, History: historySvc,
 		Skills: skillsSvc, Gates: gatesAdmin, Secrets: secretsSvc,
-		Installation: installationSvc,
+		Installation: installationSvc, ContextPack: contextSvc,
 	})
 	server := httptest.NewServer(handler)
 	t.Cleanup(server.Close)

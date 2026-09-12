@@ -18,9 +18,10 @@ import (
 func newHandoffCmd() *cobra.Command {
 	handoffCmd := &cobra.Command{
 		Use:   "handoff",
-		Short: "Create, read, and list handoffs — structured hand-off state between agents",
+		Short: "Create, read, claim, and close handoffs — structured hand-off state between agents",
 	}
-	handoffCmd.AddCommand(newHandoffCreateCmd(), newHandoffGetCmd(), newHandoffListCmd())
+	handoffCmd.AddCommand(newHandoffCreateCmd(), newHandoffGetCmd(), newHandoffListCmd(),
+		newHandoffCurrentCmd(), newHandoffTransitionCmd("claim"), newHandoffTransitionCmd("close"))
 	return handoffCmd
 }
 
@@ -186,5 +187,94 @@ func newHandoffListCmd() *cobra.Command {
 	cmd.Flags().String("status", "", "filter by status: open or closed")
 	projectFlag(cmd)
 	pagingFlags(cmd)
+	return cmd
+}
+
+// newHandoffCurrentCmd prints the handoff to continue from — the question
+// `handoff list` cannot answer, since a list of IDs does not say which one
+// is current.
+func newHandoffCurrentCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "current",
+		Short: "Show the handoff to continue from (newest still open or claimed)",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			hc, err := setupHandoffContext(cmd)
+			if err != nil {
+				return err
+			}
+			defer hc.pool.Close()
+
+			h, err := hc.svc.Current(cmd.Context(), hc.principalID, hc.project.ID)
+			if err != nil {
+				return err
+			}
+			_, body, err := hc.svc.Get(cmd.Context(), hc.principalID, hc.project.ID, h.ID)
+			if err != nil {
+				return err
+			}
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(),
+				"id: %s\nstatus: %s\ncreated: %s\n%ssummary: %s\ncompleted_work: %s\nnext_actions: %s\n",
+				h.ID, h.Status, h.CreatedAt.Format(time.RFC3339), claimedLine(h),
+				body.Summary, body.CompletedWork, body.NextActions)
+			return nil
+		},
+	}
+	projectFlag(cmd)
+	return cmd
+}
+
+// claimedLine renders the claim attribution only once there is one, so an
+// unclaimed handoff doesn't print a line of empty fields the reader has to
+// interpret.
+func claimedLine(h handoffs.Handoff) string {
+	if h.ClaimedAt == nil {
+		return ""
+	}
+	claimedBy := "unknown"
+	if h.ClaimedByPrincipal != nil {
+		claimedBy = h.ClaimedByPrincipal.String()
+	}
+	return fmt.Sprintf("claimed: %s by principal %s\n", h.ClaimedAt.Format(time.RFC3339), claimedBy)
+}
+
+// newHandoffTransitionCmd builds `handoff claim` and `handoff close` from
+// one definition — they differ only in which service method they call and
+// what the resulting status means.
+func newHandoffTransitionCmd(action string) *cobra.Command {
+	short := map[string]string{
+		"claim": "Take responsibility for a handoff's work (open -> claimed)",
+		"close": "Declare a handoff's work finished (open or claimed -> closed)",
+	}[action]
+
+	cmd := &cobra.Command{
+		Use:   action + " <id>",
+		Short: short,
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			hc, err := setupHandoffContext(cmd)
+			if err != nil {
+				return err
+			}
+			defer hc.pool.Close()
+
+			id, err := uuid.Parse(args[0])
+			if err != nil {
+				return fmt.Errorf("invalid handoff id: %w", err)
+			}
+
+			var h handoffs.Handoff
+			if action == "claim" {
+				h, err = hc.svc.Claim(cmd.Context(), hc.principalID, &hc.clientID, hc.project.ID, id)
+			} else {
+				h, err = hc.svc.Close(cmd.Context(), hc.principalID, &hc.clientID, hc.project.ID, id)
+			}
+			if err != nil {
+				return err
+			}
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "handoff %s is now %s\n", h.ID, h.Status)
+			return nil
+		},
+	}
+	projectFlag(cmd)
 	return cmd
 }

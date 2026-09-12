@@ -1,6 +1,14 @@
 // Package s3 is an S3-API-compatible ObjectStore implementation — works
 // against AWS S3, MinIO, and Cloudflare R2 without code changes, only
 // config (docs/architecture-cookbook.md §8.1).
+//
+// EXPERIMENTAL, and not reachable from the running server.
+// adapters/cli/serve.go only ever constructs internal/storage/filesystem;
+// there is no flag, environment variable, or config path that selects this
+// backend, and its tests exercise it against a fake rather than a real
+// S3/MinIO endpoint. Treat it as unfinished work rather than a deployment
+// option: choosing it today is not possible, and the first thing anyone
+// wiring it up must add is an integration test against a real endpoint.
 package s3
 
 import (

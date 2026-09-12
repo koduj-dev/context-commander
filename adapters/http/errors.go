@@ -7,6 +7,7 @@ import (
 
 	"github.com/koduj-dev/context-commander/internal/artifacts"
 	"github.com/koduj-dev/context-commander/internal/audit"
+	"github.com/koduj-dev/context-commander/internal/contextpack"
 	"github.com/koduj-dev/context-commander/internal/events"
 	"github.com/koduj-dev/context-commander/internal/gates"
 	"github.com/koduj-dev/context-commander/internal/handoffs"
@@ -73,7 +74,8 @@ func writeDomainError(w http.ResponseWriter, err error) {
 	case errors.Is(err, artifacts.ErrNotFound), errors.Is(err, artifacts.ErrDeleted), errors.Is(err, projects.ErrNotFound),
 		errors.Is(err, organizations.ErrNotFound), errors.Is(err, handoffs.ErrNotFound), errors.Is(err, history.ErrNotFound),
 		errors.Is(err, skills.ErrNotFound), errors.Is(err, gates.ErrNotFound), errors.Is(err, secrets.ErrNotFound),
-		errors.Is(err, identity.ErrNotFound), errors.Is(err, installation.ErrNotFound):
+		errors.Is(err, identity.ErrNotFound), errors.Is(err, installation.ErrNotFound),
+		errors.Is(err, contextpack.ErrNotFound):
 		// A deleted artifact reads as "not found," not a distinct state —
 		// same reasoning as a non-member's Resolve: don't hand out more
 		// information than "you can't have this."
@@ -81,7 +83,8 @@ func writeDomainError(w http.ResponseWriter, err error) {
 	case errors.Is(err, artifacts.ErrForbidden), errors.Is(err, events.ErrForbidden), errors.Is(err, organizations.ErrForbidden),
 		errors.Is(err, audit.ErrForbidden), errors.Is(err, handoffs.ErrForbidden), errors.Is(err, history.ErrForbidden),
 		errors.Is(err, skills.ErrForbidden), errors.Is(err, gates.ErrForbidden), errors.Is(err, secrets.ErrForbidden),
-		errors.Is(err, installation.ErrForbidden), errors.Is(err, members.ErrForbidden):
+		errors.Is(err, installation.ErrForbidden), errors.Is(err, members.ErrForbidden),
+		errors.Is(err, contextpack.ErrForbidden):
 		writeError(w, http.StatusForbidden, "forbidden", "forbidden")
 	case errors.Is(err, installation.ErrAlreadyAdmin):
 		writeError(w, http.StatusConflict, "conflict", "user is already an installation admin")
@@ -90,6 +93,20 @@ func writeDomainError(w http.ResponseWriter, err error) {
 	case errors.Is(err, artifacts.ErrBlockedByGate):
 		writeError(w, http.StatusUnprocessableEntity, "blocked_by_gate", err.Error())
 	case errors.Is(err, artifacts.ErrTooLarge), errors.Is(err, history.ErrTooLarge):
+		writeError(w, http.StatusRequestEntityTooLarge, "too_large", err.Error())
+	case errors.Is(err, handoffs.ErrAlreadyClaimed):
+		writeError(w, http.StatusConflict, "already_claimed", "this handoff was already claimed by another client")
+	case errors.Is(err, handoffs.ErrInvalidTransition):
+		writeError(w, http.StatusConflict, "conflict", err.Error())
+	case errors.Is(err, skills.ErrChecksumMismatch):
+		// Not a 404 and not a plain 500: the row exists and the request was
+		// valid, but the stored bytes no longer match what was published.
+		// The caller must be able to tell "this skill is gone" from "this
+		// skill's content cannot be trusted" — the second is a
+		// supply-chain event (docs/adr/0012), not a missing resource.
+		writeError(w, http.StatusConflict, "checksum_mismatch",
+			"the stored skill content no longer matches its published checksum")
+	case errors.Is(err, skills.ErrTooLarge):
 		writeError(w, http.StatusRequestEntityTooLarge, "too_large", err.Error())
 	case errors.Is(err, skills.ErrNotOverridable):
 		writeError(w, http.StatusConflict, "conflict", "shadowed binding is not overridable")

@@ -19,6 +19,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/artifacts"
 	"github.com/koduj-dev/context-commander/internal/audit"
 	"github.com/koduj-dev/context-commander/internal/auth"
+	"github.com/koduj-dev/context-commander/internal/contextpack"
 	"github.com/koduj-dev/context-commander/internal/db"
 	"github.com/koduj-dev/context-commander/internal/events"
 	"github.com/koduj-dev/context-commander/internal/gates"
@@ -49,6 +50,7 @@ type Deps struct {
 	Gates         *gates.AdminService
 	Secrets       *secrets.Service
 	Installation  *installation.Service
+	ContextPack   *contextpack.Service
 	// WebFS is the embedded web UI build (web.DistFS()), served as the
 	// SPA fallback for any request under "/" that isn't "/v1/*" or
 	// "/healthz". Left nil in dev mode (`serve --dev`), where the UI is
@@ -118,10 +120,21 @@ func NewHandler(deps Deps) http.Handler {
 			r.Get("/events", deps.listEvents)
 			r.Get("/audit", deps.queryAudit)
 
+			// The aggregated bootstrap read model. Mounted on the project
+			// itself rather than under a domain, because it is the one
+			// operation that deliberately belongs to no single domain.
+			r.Get("/context", deps.getContextPack)
+
 			r.Route("/handoffs", func(r chi.Router) {
 				r.Post("/", deps.createHandoff)
 				r.Get("/", deps.listHandoffs)
+				// Registered before "/{handoffID}": chi matches static
+				// segments ahead of parameters, so "current" is not
+				// swallowed as a (malformed) handoff ID.
+				r.Get("/current", deps.getCurrentHandoff)
 				r.Get("/{handoffID}", deps.getHandoff)
+				r.Post("/{handoffID}/claim", deps.claimHandoff)
+				r.Post("/{handoffID}/close", deps.closeHandoff)
 			})
 
 			r.Route("/conversations", func(r chi.Router) {
@@ -140,6 +153,7 @@ func NewHandler(deps Deps) http.Handler {
 			r.Post("/skills/pin", deps.pinSkillBinding)
 			r.Post("/skills/unpin", deps.unpinSkillBinding)
 			r.Get("/skills/effective", deps.listEffectiveSkills)
+			r.Get("/skills/versions/{skillVersionID}", deps.getSkillVersion)
 
 			r.Get("/gates/bindings", deps.listGateBindings)
 			r.Post("/gates/bindings", deps.bindGate)

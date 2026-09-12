@@ -35,6 +35,31 @@ and [`docs/adr/`](docs/adr/) for individual architecture decisions.
 
 Design draft → implementation. See the ADRs in `docs/adr/` for what is decided and why.
 
+## Quickstart
+
+One command to a running server, then two agents on two different clients sharing project state:
+
+```bash
+git clone https://github.com/koduj-dev/context-commander.git
+cd context-commander/deploy/quickstart
+printf 'CC_ROOT_KEY=%s\n' "$(openssl rand -base64 32)" > .env
+docker compose up -d --build
+docker compose run --rm app bootstrap --email you@example.com --name "Your Name"
+```
+
+The full walkthrough — creating a project, connecting Claude Code and Codex CLI, and running the
+handoff loop end to end — is in [`docs/quickstart.md`](docs/quickstart.md). The two supported MCP
+client configurations are committed in [`deploy/mcp-clients/`](deploy/mcp-clients/) and covered by
+a smoke test, so they cannot drift from the server's actual surface.
+
+### Storage backends
+
+The supported backend is the local filesystem (`--storage-dir` / `$CC_STORAGE_DIR`).
+`internal/storage/s3` exists but no code path in `ccd serve` constructs it, so **S3/MinIO is
+experimental and not selectable** — see cookbook §8.1. The MinIO container in
+`deploy/docker-compose.yml` is part of the development environment, not something the running
+server talks to.
+
 ## Architecture
 
 Modular monolith written in Go. Domain logic lives under `internal/`; `adapters/` maps that domain
@@ -46,7 +71,7 @@ context-commander/
 ├── internal/           domain packages (identity, projects, crypto, artifacts, ...)
 ├── adapters/           mcp / http / cli — transport only, no business logic
 ├── migrations/         golang-migrate SQL migrations
-├── deploy/             docker-compose for local development
+├── deploy/             docker-compose (dev + quickstart), MCP client fixtures
 └── docs/               architecture cookbook + ADRs
 ```
 

@@ -16,6 +16,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/artifacts"
 	"github.com/koduj-dev/context-commander/internal/audit"
 	"github.com/koduj-dev/context-commander/internal/auth"
+	"github.com/koduj-dev/context-commander/internal/contextpack"
 	"github.com/koduj-dev/context-commander/internal/db"
 	"github.com/koduj-dev/context-commander/internal/events"
 	"github.com/koduj-dev/context-commander/internal/gates"
@@ -47,6 +48,7 @@ type Deps struct {
 	Gates         *gates.AdminService
 	Secrets       *secrets.Service
 	Installation  *installation.Service
+	ContextPack   *contextpack.Service
 }
 
 type credKey struct{}
@@ -93,11 +95,16 @@ func newServer(deps Deps, principalID, clientID uuid.UUID) *sdkmcp.Server {
 		Name:    "context-commander",
 		Version: "0.1.0",
 	}, &sdkmcp.ServerOptions{
-		Instructions: "Context Commander: shared project context for AI agents. Resolve or " +
-			"create a project first, then read/write artifacts within it. Every call acts on " +
-			"behalf of the authenticated principal for this session.",
+		Instructions: "Context Commander: shared project context for AI agents. Start with " +
+			"context.bootstrap on the project you were given — it returns your role, the handoff to " +
+			"continue from, the effective skills' content, the artifacts to read, and an event cursor, " +
+			"so you do not need to learn the domain model to take a first useful step. Then claim the " +
+			"handoff (handoff.claim) before working, and close it or create a new one when you stop. " +
+			"The per-domain tools (artifact.*, skill.*, handoff.*, event.list) cover everything past " +
+			"that. Every call acts on behalf of the authenticated principal for this session.",
 	})
 
+	registerContextTools(server, deps, principalID, clientID)
 	registerProjectTools(server, deps, principalID, clientID)
 	registerArtifactTools(server, deps, principalID, clientID)
 	registerEventTools(server, deps, principalID, clientID)

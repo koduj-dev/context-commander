@@ -160,6 +160,13 @@ func (s *Service) Publish(
 	if err := s.checkCapability(ctx, principalID, projectID, auth.CapSkillPublish); err != nil {
 		return SkillVersion{}, err
 	}
+	// Checked here rather than only in the adapters: the CLI publishes
+	// straight from a file with no HTTP body limit in the way, so the cap
+	// belongs at the domain chokepoint that every adapter shares. See
+	// MaxContentSize for why a cap exists at all.
+	if len(content) > MaxContentSize {
+		return SkillVersion{}, ErrTooLarge
+	}
 
 	sum := sha256.Sum256(content)
 	checksum := hex.EncodeToString(sum[:])

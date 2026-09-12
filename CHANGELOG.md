@@ -12,6 +12,91 @@ link definition at the bottom of the file.
 
 ### Added
 
+- **Phase 1 — the first usable cross-client handoff.** Two agents on two
+  different clients can now complete a full handoff without copy-paste and
+  without a shared credential. Everything below is one story; the pieces
+  were individually buildable before and individually useless.
+  - **`context.bootstrap` — one call to a usable starting state.** New
+    `internal/contextpack` assembles an aggregated read model over the
+    existing domains: project identity, the caller's role *and the
+    capabilities it implies*, the handoff to continue from (decrypted), the
+    **content** of the project's effective skills, selected artifacts, and
+    the tail of the event stream with a cursor to follow along from. It
+    owns no storage and no new source of truth — every field is fetched
+    through the same domain service (and therefore the same capability
+    check, docs/adr/0014) an adapter would call one at a time. Content is
+    bounded by an explicit byte budget (256 KiB default, 8 MiB max) and
+    whatever did not fit is reported in `budget.truncated` naming the tool
+    that fetches it: an agent that cannot distinguish "there is nothing
+    else" from "there was more and you didn't get it" acts confidently on a
+    partial picture. Items are omitted whole, never cut — half an artifact
+    reads exactly like a complete one. A section the caller isn't
+    authorized for degrades to a truncation note rather than failing the
+    pack. Artifact selection is the handoff's own referenced artifacts plus
+    the `context/` logical-path prefix (the "convention" half of the
+    manifest that arrives in Phase 2), or an explicit list from the caller.
+    Exposed as MCP `context.bootstrap` (which the server's MCP instructions
+    now name as the first call to make), `GET
+    /v1/projects/{ns}/{slug}/context`, and `ccd context`.
+  - **Handoff lifecycle: open → claimed → closed.** `internal/handoffs`
+    hardcoded `'open'` on create and had no transition anywhere, which is
+    why the web UI's Handoffs tab could only show and create. Migration
+    000018 widens the status vocabulary and adds claim/close attribution
+    (principal *and* client — the whole point of the domain is that agent A
+    and agent B are different clients). New `Service.Claim`/`Close`/
+    `Current`: the status precondition lives in the UPDATE's `WHERE`
+    clause, so two clients racing to continue the same work serialize on
+    the row lock and exactly one wins, the loser getting `ErrAlreadyClaimed`
+    (HTTP 409 `already_claimed`) — the race is the normal case in a
+    cross-client handoff, not the exotic one. `Current` answers "which
+    handoff am I supposed to read?", which a list of UUIDs cannot. Both
+    transitions write an audit row and an outbox event in the same
+    transaction as the mutation. New: MCP `handoff.current`/`claim`/
+    `close`, `GET .../handoffs/current`, `POST .../handoffs/{id}/claim`
+    and `/close`, `ccd handoff current|claim|close`.
+  - **`skill.get` — read a skill's content.** `internal/skills` exposed
+    publish/install/override/pin/list-effective and nothing that returned
+    the bytes, so an agent could install a skill it was then unable to
+    load. `Service.GetVersion` returns the version's metadata, the Skill
+    identity it belongs to, and the packaged content, verifying on every
+    read that the bytes still hash to the checksum recorded at publish
+    time: a SkillVersion row is immutable and its object write-once, but
+    the object store is the half Postgres cannot protect, and handing an
+    agent instructions that don't match what was reviewed and pinned is the
+    exact supply-chain failure docs/adr/0012 exists to prevent (HTTP 409
+    `checksum_mismatch`, distinct from "not found"). Content is now capped
+    at 10 MB on both publish and read — the CLI publishes straight from a
+    file with no HTTP body limit in the way, so the cap belongs at the
+    domain chokepoint. New: MCP `skill.get`, `GET
+    .../skills/versions/{id}`, `ccd skill get` (metadata to stderr, content
+    to stdout, so `> skill.md` writes the package and nothing else).
+  - **A supported Docker Compose quickstart** (`deploy/quickstart/`,
+    [`docs/quickstart.md`](docs/quickstart.md)): Postgres, migrations as
+    their own service (they run as `cc_owner`, which the server must never
+    hold — docs/adr/0002), and the server, so a plain `docker compose up -d`
+    yields a migrated database and a running server. Deliberately separate
+    from `deploy/docker-compose.yml`, which is the *development*
+    environment and stays unchanged. Covers bootstrap, the handoff loop,
+    per-agent credentials, and a backup/restore procedure for both stateful
+    halves.
+  - **Two named MCP clients, not "works with any MCP":** Claude Code and
+    Codex CLI, with their configurations committed in
+    `deploy/mcp-clients/` and an executable smoke test
+    (`adapters/mcp/clients_test.go`) that *parses the committed fixtures*,
+    derives the endpoint and Authorization header each client would send,
+    and runs the real handshake plus a `context.bootstrap` call with them.
+    A test with its own copy of the config would keep passing while the
+    file a user actually copies rots.
+  - **E2E reference scenario** (`adapters/http/e2e_handoff_test.go`):
+    client A writes artifacts, publishes and installs a skill and creates a
+    handoff; client B — a different principal with its own credential,
+    having seen none of A's conversation — bootstraps, receives the actual
+    *content* of A's artifacts and skills, claims the handoff, finishes and
+    closes it; a second claim is refused; A's token is revoked and stops
+    working immediately while B's keeps working.
+- **`auth.CapabilitiesFor`** enumerates a role's capabilities (sorted,
+  stable). A description of an existing grant, never a decision — nothing
+  authorizes anything by consulting it instead of `Can`/`RoleCan`.
 - **Administration page (web UI):** `GET /v1/me` gained
   `is_installation_admin` (a second, separate transaction from the rest of
   `getMe` — nesting it in the first would risk pool exhaustion, same
@@ -207,6 +292,16 @@ link definition at the bottom of the file.
     would change which binding wins) and the member lists (bounded sets).
 
 ### Fixed
+
+- **The Docker image could not write artifacts at all.** `/data` (the
+  filesystem ObjectStore root, `$CC_STORAGE_DIR`) did not exist in the
+  image, so Docker created the volume mount point as `root:root` while the
+  container runs as `nonroot` (uid 65532) — every artifact and skill write
+  failed with permission denied, surfacing as a bare HTTP 500, in a
+  distroless image with no shell to `chown` it afterwards. The image now
+  ships an empty `/data` owned by 65532:65532 for Docker to seed the volume
+  from. Found by actually running the new quickstart rather than reviewing
+  it.
 
 - **Concurrent writes to the same secret silently lost one.**
   `internal/secrets.LocalEncryptedBackend.Store` read the current version and

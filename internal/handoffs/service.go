@@ -97,7 +97,7 @@ func (s *Service) Create(
 
 		result = Handoff{
 			ID: id, ProjectID: projectID, CreatedByPrincipal: principalID, CreatedByClient: clientID,
-			SourceSessionID: sourceSessionID, Status: "open", CreatedAt: createdAt,
+			SourceSessionID: sourceSessionID, Status: StatusOpen, CreatedAt: createdAt,
 		}
 		return nil
 	})
@@ -119,10 +119,11 @@ func (s *Service) Get(ctx context.Context, principalID, projectID, handoffID uui
 		var ciphertext, nonce, wrappedDEK []byte
 		var projectKeyVersion int
 		err := tx.QueryRow(ctx,
-			`SELECT id, project_id, created_by_principal, created_by_client, source_session_id, status, created_at, ciphertext, nonce, wrapped_dek, project_key_version
+			`SELECT `+selectColumns+`, ciphertext, nonce, wrapped_dek, project_key_version
 			 FROM handoffs WHERE id = $1 AND project_id = $2`,
 			handoffID, projectID,
 		).Scan(&h.ID, &h.ProjectID, &h.CreatedByPrincipal, &h.CreatedByClient, &h.SourceSessionID, &h.Status, &h.CreatedAt,
+			&h.ClaimedAt, &h.ClaimedByPrincipal, &h.ClaimedByClient, &h.ClosedAt, &h.ClosedByPrincipal, &h.ClosedByClient,
 			&ciphertext, &nonce, &wrappedDEK, &projectKeyVersion)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrNotFound
@@ -165,7 +166,7 @@ func (s *Service) List(ctx context.Context, principalID, projectID uuid.UUID, st
 	out := make([]Handoff, 0, limit)
 	err = db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
 		rows, err := tx.Query(ctx,
-			`SELECT id, project_id, created_by_principal, created_by_client, source_session_id, status, created_at
+			`SELECT `+selectColumns+`
 			 FROM handoffs
 			 WHERE project_id = $1 AND ($2::text IS NULL OR status = $2)
 			   AND (NOT $3::bool OR (created_at, id) < ($4::timestamptz, $5::uuid))
@@ -178,7 +179,7 @@ func (s *Service) List(ctx context.Context, principalID, projectID uuid.UUID, st
 		defer rows.Close()
 		for rows.Next() {
 			var h Handoff
-			if err := rows.Scan(&h.ID, &h.ProjectID, &h.CreatedByPrincipal, &h.CreatedByClient, &h.SourceSessionID, &h.Status, &h.CreatedAt); err != nil {
+			if err := scanHandoff(rows, &h); err != nil {
 				return fmt.Errorf("handoffs: scan: %w", err)
 			}
 			out = append(out, h)

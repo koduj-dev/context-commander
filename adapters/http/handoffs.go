@@ -15,6 +15,14 @@ type handoffResponse struct {
 	SourceSessionID *uuid.UUID `json:"source_session_id,omitempty"`
 	Status          string     `json:"status"`
 	CreatedAt       string     `json:"created_at"`
+
+	// Lifecycle attribution, omitted while the handoff is still open —
+	// a field that is absent says "this hasn't happened" more clearly than
+	// one carrying a zero timestamp.
+	ClaimedAt          string     `json:"claimed_at,omitempty"`
+	ClaimedByPrincipal *uuid.UUID `json:"claimed_by_principal,omitempty"`
+	ClosedAt           string     `json:"closed_at,omitempty"`
+	ClosedByPrincipal  *uuid.UUID `json:"closed_by_principal,omitempty"`
 }
 
 type handoffDetailResponse struct {
@@ -27,10 +35,19 @@ type handoffDetailResponse struct {
 }
 
 func toHandoffResponse(h handoffs.Handoff) handoffResponse {
-	return handoffResponse{
+	r := handoffResponse{
 		ID: h.ID, SourceSessionID: h.SourceSessionID,
 		Status: h.Status, CreatedAt: h.CreatedAt.Format(time.RFC3339),
 	}
+	if h.ClaimedAt != nil {
+		r.ClaimedAt = h.ClaimedAt.Format(time.RFC3339)
+		r.ClaimedByPrincipal = h.ClaimedByPrincipal
+	}
+	if h.ClosedAt != nil {
+		r.ClosedAt = h.ClosedAt.Format(time.RFC3339)
+		r.ClosedByPrincipal = h.ClosedByPrincipal
+	}
+	return r
 }
 
 type createHandoffRequest struct {
@@ -115,4 +132,74 @@ func (d Deps) listHandoffs(w http.ResponseWriter, r *http.Request) {
 		out[i] = toHandoffResponse(h)
 	}
 	writeList(w, out, page.NextCursor)
+}
+
+// claimHandoff and closeHandoff are POSTs on a sub-resource rather than a
+// PATCH of a "status" field. The transitions are not interchangeable
+// assignments: each has its own precondition, its own audit action, and its
+// own failure that the caller must be able to tell apart (claiming
+// something another client already took is a 409, not a bad request). A
+// generic status write would collapse all of that into one handler that has
+// to re-derive which transition was meant.
+func (d Deps) claimHandoff(w http.ResponseWriter, r *http.Request) {
+	d.transitionHandoff(w, r, handoffs.StatusClaimed)
+}
+
+func (d Deps) closeHandoff(w http.ResponseWriter, r *http.Request) {
+	d.transitionHandoff(w, r, handoffs.StatusClosed)
+}
+
+func (d Deps) transitionHandoff(w http.ResponseWriter, r *http.Request, target string) {
+	handoffID, err := uuid.Parse(chi.URLParam(r, "handoffID"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", "handoffID must be a UUID")
+		return
+	}
+
+	project := projectFrom(r.Context())
+	principalID := principalIDFrom(r.Context())
+	clientID := clientIDFrom(r.Context())
+
+	var h handoffs.Handoff
+	if target == handoffs.StatusClaimed {
+		h, err = d.Handoffs.Claim(r.Context(), principalID, clientID, project.ID, handoffID)
+	} else {
+		h, err = d.Handoffs.Close(r.Context(), principalID, clientID, project.ID, handoffID)
+	}
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, toHandoffResponse(h))
+}
+
+// getCurrentHandoff answers "what am I supposed to continue?" — the
+// question an agent handed a project and a token cannot answer from a list
+// of UUIDs. 404 when everything is closed: "nothing to take over" is a real
+// answer, and the handoff history is still one List away.
+func (d Deps) getCurrentHandoff(w http.ResponseWriter, r *http.Request) {
+	project := projectFrom(r.Context())
+	principalID := principalIDFrom(r.Context())
+
+	h, err := d.Handoffs.Current(r.Context(), principalID, project.ID)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	// The body, not just the metadata: a caller asking for the current
+	// handoff wants to read it, and making that two round trips would be a
+	// pointless second call every single time.
+	_, body, err := d.Handoffs.Get(r.Context(), principalID, project.ID, h.ID)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, handoffDetailResponse{
+		handoffResponse:     toHandoffResponse(h),
+		Summary:             body.Summary,
+		CompletedWork:       body.CompletedWork,
+		NextActions:         body.NextActions,
+		ReferencedArtifacts: body.ReferencedArtifacts,
+		ReferencedTasks:     body.ReferencedTasks,
+	})
 }

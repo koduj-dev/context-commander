@@ -1,0 +1,84 @@
+# The supported Context Commander quickstart — see docs/quickstart.md.
+#
+# Deliberately NOT the same file as ../docker-compose.yml. That one is the
+# development environment: it starts Postgres and MinIO for `make test` and
+# everyday Go work, and leaves the app itself to run from source. This one
+# runs the product: server plus database plus persistence, migrations
+# applied automatically, nothing to build locally, one command.
+#
+# What it does not include, on purpose:
+#   - MinIO/S3. The running server only ever constructs the filesystem
+#     object store (adapters/cli/serve.go), so a MinIO container here would
+#     be a service the app never talks to. See docs/quickstart.md.
+#   - A published Postgres port. Nothing outside this compose network needs
+#     to reach the database, and not publishing it is what makes the
+#     built-in development role passwords below acceptable.
+name: context-commander-quickstart
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: postgres_quickstart_only
+      POSTGRES_DB: context_commander
+    volumes:
+      - cc_postgres_data:/var/lib/postgresql/data
+      # Creates cc_owner (owns the schema, runs migrations) and cc_app (what
+      # the server connects as — never owner, never BYPASSRLS, see
+      # docs/adr/0002). Shared with the dev compose file so the two
+      # environments cannot drift apart.
+      - ../postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d context_commander"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Migrations are their own service, not a step in the app's entrypoint:
+  # they run as cc_owner, and the server must never hold a connection with
+  # that privilege (docs/adr/0002). `app` waits for this to exit cleanly, so
+  # a plain `docker compose up -d` gives a migrated database and a running
+  # server with no second command.
+  migrate:
+    build:
+      context: ../..
+    restart: "no"
+    command: ["migrate"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      CC_DATABASE_URL: postgres://cc_owner:cc_owner_dev_password@postgres:5432/context_commander?sslmode=disable
+
+  app:
+    build:
+      context: ../..
+    restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      CC_DATABASE_URL: postgres://cc_app:cc_app_dev_password@postgres:5432/context_commander?sslmode=disable
+      # No default, by design: a deployment must never come up with a fixed,
+      # publicly known encryption root key (docs/adr/0005). Generate one
+      # with `openssl rand -base64 32` and put it in a .env file next to
+      # this compose file.
+      # Quoted because the ":?" default-error message contains a colon,
+      # which YAML would otherwise read as another mapping key.
+      CC_ROOT_KEY: "${CC_ROOT_KEY:?set CC_ROOT_KEY in a .env file next to this compose file — generate one with `openssl rand -base64 32`}"
+    ports:
+      # Loopback only. The server binds 0.0.0.0 inside the container (see
+      # the Dockerfile), but publishing it to 127.0.0.1 keeps bearer tokens
+      # and decrypted content off any shared network — reaching it from
+      # another host means putting TLS in front of it first.
+      - "127.0.0.1:8490:8490"
+    volumes:
+      - cc_app_storage:/data
+
+volumes:
+  # Artifact and skill content lives in cc_app_storage; everything else is in
+  # Postgres. Those two volumes together ARE the backup surface — see
+  # docs/quickstart.md.
+  cc_postgres_data:
+  cc_app_storage:

@@ -3,6 +3,7 @@ package http
 import (
 	"net/http"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
 	"github.com/koduj-dev/context-commander/internal/skills"
@@ -168,4 +169,46 @@ func (d Deps) listEffectiveSkills(w http.ResponseWriter, r *http.Request) {
 		out[i] = toSkillBindingResponse(b)
 	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+// skillContentResponse is skillVersionResponse plus what an agent actually
+// needs to load the thing: the skill's name and its packaged bytes.
+//
+// Content travels as a JSON string, not a binary download: a skill package
+// is instruction text, every other endpoint in this API is JSON, and a
+// client that has to branch on content type to read a skill is a client
+// that will get it wrong.
+type skillContentResponse struct {
+	skillVersionResponse
+	SkillName   string `json:"skill_name"`
+	SkillAuthor string `json:"skill_author,omitempty"`
+	SkillOrigin string `json:"skill_origin,omitempty"`
+	Content     string `json:"content"`
+}
+
+// getSkillVersion closes the gap NEXT.md calls the most glaring hole in the
+// surface: until now every adapter could install a skill and none could
+// read one back.
+func (d Deps) getSkillVersion(w http.ResponseWriter, r *http.Request) {
+	skillVersionID, err := uuid.Parse(chi.URLParam(r, "skillVersionID"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", "skillVersionID must be a UUID")
+		return
+	}
+
+	project := projectFrom(r.Context())
+	principalID := principalIDFrom(r.Context())
+
+	v, err := d.Skills.GetVersion(r.Context(), principalID, project.ID, skillVersionID)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, skillContentResponse{
+		skillVersionResponse: toSkillVersionResponse(v.Version),
+		SkillName:            v.Skill.Name,
+		SkillAuthor:          v.Skill.Author,
+		SkillOrigin:          v.Skill.Origin,
+		Content:              string(v.Content),
+	})
 }
