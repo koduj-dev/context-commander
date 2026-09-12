@@ -23,7 +23,7 @@ func newSkillCmd() *cobra.Command {
 		Use:   "skill",
 		Short: "Publish, install, and list skills (docs/adr/0012-skill-registry-supply-chain.md)",
 	}
-	skillCmd.AddCommand(newSkillPublishCmd(), newSkillGetCmd(), newSkillInstallCmd(), newSkillOverrideCmd(), newSkillPinCmd(true), newSkillPinCmd(false), newSkillListEffectiveCmd())
+	skillCmd.AddCommand(newSkillPublishCmd(), newSkillGetCmd(), newSkillSearchCmd(), newSkillVersionsCmd(), newSkillPromoteCmd(), newSkillInstallCmd(), newSkillOverrideCmd(), newSkillPinCmd(true), newSkillPinCmd(false), newSkillListEffectiveCmd())
 	return skillCmd
 }
 
@@ -356,6 +356,121 @@ func newSkillGetCmd() *cobra.Command {
 			return nil
 		},
 	}
+	skillFlags(cmd)
+	return cmd
+}
+
+// newSkillSearchCmd browses the registry — the operator-side view of the
+// same catalog an agent searches through MCP.
+func newSkillSearchCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "search [query]",
+		Short: "Search the skill registry by name (shows what you can see: your projects, organizations, and the installation shelf)",
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			sc, err := setupSkillContext(cmd)
+			if err != nil {
+				return err
+			}
+			defer sc.pool.Close()
+
+			var query string
+			if len(args) == 1 {
+				query = args[0]
+			}
+			page, err := sc.svc.Search(cmd.Context(), sc.principalID, sc.project.ID, query, pagingOptionsFrom(cmd))
+			if err != nil {
+				return err
+			}
+			if len(page.Items) == 0 {
+				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "(no matching skills)")
+				return nil
+			}
+			for _, e := range page.Items {
+				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%-30s v%-4d %-13s %s  %s\n",
+					e.Name, e.LatestVersion, e.Scope, e.LatestVersionID, e.LatestChecksum[:12])
+			}
+			printNextCursor(cmd, page.NextCursor)
+			return nil
+		},
+	}
+	skillFlags(cmd)
+	pagingFlags(cmd)
+	return cmd
+}
+
+func newSkillVersionsCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "versions <skill-id>",
+		Short: "List a skill's published versions, newest first",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			sc, err := setupSkillContext(cmd)
+			if err != nil {
+				return err
+			}
+			defer sc.pool.Close()
+
+			skillID, err := uuid.Parse(args[0])
+			if err != nil {
+				return fmt.Errorf("invalid skill id: %w", err)
+			}
+			page, err := sc.svc.ListVersions(cmd.Context(), sc.principalID, sc.project.ID, skillID, pagingOptionsFrom(cmd))
+			if err != nil {
+				return err
+			}
+			if len(page.Items) == 0 {
+				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "(no versions — unknown skill, or not visible to you)")
+				return nil
+			}
+			for _, v := range page.Items {
+				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "v%-4d %s  %s  %s\n", v.Version, v.ID, v.Checksum[:12], v.TrustStatus)
+			}
+			printNextCursor(cmd, page.NextCursor)
+			return nil
+		},
+	}
+	skillFlags(cmd)
+	pagingFlags(cmd)
+	return cmd
+}
+
+func newSkillPromoteCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "promote <skill-id>",
+		Short: "Widen where a skill lives so more people can find it (project -> organization -> installation)",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			sc, err := setupSkillContext(cmd)
+			if err != nil {
+				return err
+			}
+			defer sc.pool.Close()
+
+			skillID, err := uuid.Parse(args[0])
+			if err != nil {
+				return fmt.Errorf("invalid skill id: %w", err)
+			}
+			scope, _ := cmd.Flags().GetString("scope")
+			var scopeRef *uuid.UUID
+			if raw, _ := cmd.Flags().GetString("scope-ref"); raw != "" {
+				id, err := uuid.Parse(raw)
+				if err != nil {
+					return fmt.Errorf("--scope-ref: %w", err)
+				}
+				scopeRef = &id
+			}
+
+			sk, err := sc.svc.Promote(cmd.Context(), sc.principalID, sc.userID, sc.project.ID, skillID, skills.Scope(scope), scopeRef)
+			if err != nil {
+				return err
+			}
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "skill %s now lives at %s scope\n", sk.ID, sk.Scope)
+			return nil
+		},
+	}
+	cmd.Flags().String("scope", "installation", `target scope: "organization" or "installation"`)
+	cmd.Flags().String("scope-ref", "", "organization UUID (omit for installation scope)")
 	skillFlags(cmd)
 	return cmd
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/koduj-dev/context-commander/internal/db"
+	"github.com/koduj-dev/context-commander/internal/paging"
 	"github.com/koduj-dev/context-commander/internal/skills"
 )
 
@@ -209,11 +210,15 @@ func TestGetVersionAllowsPublisherBeforeAnyInstall(t *testing.T) {
 	}
 }
 
-// TestGetVersionAllowsAnyoneOnceBoundInstallationWide: an installation-scope
-// binding is visible to every principal (migrations/000007), so a skill
-// published installation-wide stays readable installation-wide. Closing the
-// cross-project hole must not have closed this too.
-func TestGetVersionAllowsAnyoneOnceBoundInstallationWide(t *testing.T) {
+// TestGetVersionAllowsAnyoneOncePromotedToTheShelf: promotion is what puts
+// a skill in front of the whole installation (docs/adr/0018). Before it, the
+// skill lives in the project it was published from and an outsider cannot
+// see it; after it, the skill is on the marketplace shelf and everyone can.
+//
+// Note what does NOT grant visibility any more: a binding. Installing a
+// skill says where it is applied, never who may see it — those were only
+// ever conflated because the package had no scope of its own.
+func TestGetVersionAllowsAnyoneOncePromotedToTheShelf(t *testing.T) {
 	f := newFixture(t)
 	f.grantInstallationAdmin()
 
@@ -224,19 +229,144 @@ func TestGetVersionAllowsAnyoneOnceBoundInstallationWide(t *testing.T) {
 
 	outsider, outsiderProject := seedOutsider(t, f)
 	if _, err := f.svc.GetVersion(f.ctx, outsider, outsiderProject, v.ID); !errors.Is(err, skills.ErrNotFound) {
-		t.Fatalf("before the binding, the outsider could already read it: %v", err)
+		t.Fatalf("a project-scoped skill was readable by an outsider: %v", err)
 	}
 
-	if _, err := f.svc.Install(f.ctx, f.principalID, f.userID, f.projectID,
-		skills.ScopeInstallation, nil, v.SkillID, v.ID, false, true); err != nil {
-		t.Fatalf("Install installation-scope: %v", err)
+	if _, err := f.svc.Promote(f.ctx, f.principalID, f.userID, f.projectID, v.SkillID, skills.ScopeInstallation, nil); err != nil {
+		t.Fatalf("Promote: %v", err)
 	}
 
 	got, err := f.svc.GetVersion(f.ctx, outsider, outsiderProject, v.ID)
 	if err != nil {
-		t.Fatalf("after an installation-wide binding, the outsider still cannot read it: %v", err)
+		t.Fatalf("after promotion to the installation shelf, the outsider still cannot read it: %v", err)
 	}
 	if string(got.Content) != "policy text" {
 		t.Fatalf("content = %q", got.Content)
+	}
+}
+
+// TestSearchOnlyReturnsWhatTheCallerCanSee is the browse half of the
+// registry: an agent looks for a skill by name and gets the entries it may
+// actually download, with the checksum it needs to notice a later change.
+func TestSearchOnlyReturnsWhatTheCallerCanSee(t *testing.T) {
+	f := newFixture(t)
+	f.grantInstallationAdmin()
+
+	mine, err := f.svc.Publish(f.ctx, f.principalID, f.projectID, nil, "code-review", "acme", "local", []byte("review instructions"), nil)
+	if err != nil {
+		t.Fatalf("Publish mine: %v", err)
+	}
+	shelved, err := f.svc.Publish(f.ctx, f.principalID, f.projectID, nil, "security-review", "acme", "local", []byte("security instructions"), nil)
+	if err != nil {
+		t.Fatalf("Publish shelved: %v", err)
+	}
+	if _, err := f.svc.Promote(f.ctx, f.principalID, f.userID, f.projectID, shelved.SkillID, skills.ScopeInstallation, nil); err != nil {
+		t.Fatalf("Promote: %v", err)
+	}
+
+	// The publisher sees both: one in their own project, one on the shelf.
+	page, err := f.svc.Search(f.ctx, f.principalID, f.projectID, "", paging.Options{})
+	if err != nil {
+		t.Fatalf("Search as publisher: %v", err)
+	}
+	if len(page.Items) != 2 {
+		t.Fatalf("publisher sees %d entries, want 2: %+v", len(page.Items), page.Items)
+	}
+
+	// An outsider sees only the shelf.
+	outsider, outsiderProject := seedOutsider(t, f)
+	page, err = f.svc.Search(f.ctx, outsider, outsiderProject, "", paging.Options{})
+	if err != nil {
+		t.Fatalf("Search as outsider: %v", err)
+	}
+	if len(page.Items) != 1 || page.Items[0].SkillID != shelved.SkillID {
+		t.Fatalf("outsider sees %+v, want only the promoted skill %s", page.Items, shelved.SkillID)
+	}
+
+	// The checksum travels with the entry, so a client can tell "changed"
+	// from "same" without downloading.
+	if page.Items[0].LatestChecksum != shelved.Checksum {
+		t.Fatalf("catalog checksum = %q, want %q", page.Items[0].LatestChecksum, shelved.Checksum)
+	}
+	if page.Items[0].LatestVersionID != shelved.ID {
+		t.Fatalf("catalog points at version %s, want the newest %s", page.Items[0].LatestVersionID, shelved.ID)
+	}
+	_ = mine
+}
+
+func TestSearchMatchesNameCaseInsensitively(t *testing.T) {
+	f := newFixture(t)
+	if _, err := f.svc.Publish(f.ctx, f.principalID, f.projectID, nil, "Code-Review", "acme", "local", []byte("x"), nil); err != nil {
+		t.Fatalf("Publish: %v", err)
+	}
+	if _, err := f.svc.Publish(f.ctx, f.principalID, f.projectID, nil, "deploy", "acme", "local", []byte("y"), nil); err != nil {
+		t.Fatalf("Publish: %v", err)
+	}
+
+	page, err := f.svc.Search(f.ctx, f.principalID, f.projectID, "REVIEW", paging.Options{})
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+	if len(page.Items) != 1 || page.Items[0].Name != "Code-Review" {
+		t.Fatalf("search for REVIEW returned %+v", page.Items)
+	}
+}
+
+// TestSearchReportsTheNewestVersion: the entry must describe what a client
+// would get if it downloaded now, or "has this changed" is unanswerable.
+func TestSearchReportsTheNewestVersion(t *testing.T) {
+	f := newFixture(t)
+
+	v1, err := f.svc.Publish(f.ctx, f.principalID, f.projectID, nil, "evolving", "acme", "local", []byte("first"), nil)
+	if err != nil {
+		t.Fatalf("Publish v1: %v", err)
+	}
+	v2, err := f.svc.Publish(f.ctx, f.principalID, f.projectID, &v1.SkillID, "evolving", "acme", "local", []byte("second"), nil)
+	if err != nil {
+		t.Fatalf("Publish v2: %v", err)
+	}
+
+	page, err := f.svc.Search(f.ctx, f.principalID, f.projectID, "evolving", paging.Options{})
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+	if len(page.Items) != 1 {
+		t.Fatalf("entries = %d, want 1 (one skill, two versions)", len(page.Items))
+	}
+	if page.Items[0].LatestVersion != 2 || page.Items[0].LatestChecksum != v2.Checksum {
+		t.Fatalf("entry reports v%d/%s, want v2/%s", page.Items[0].LatestVersion, page.Items[0].LatestChecksum, v2.Checksum)
+	}
+
+	versions, err := f.svc.ListVersions(f.ctx, f.principalID, f.projectID, v1.SkillID, paging.Options{})
+	if err != nil {
+		t.Fatalf("ListVersions: %v", err)
+	}
+	if len(versions.Items) != 2 || versions.Items[0].Version != 2 {
+		t.Fatalf("ListVersions = %+v, want two versions newest first", versions.Items)
+	}
+}
+
+func TestPromoteRequiresRightsAtTheTargetScope(t *testing.T) {
+	f := newFixture(t)
+	v, err := f.svc.Publish(f.ctx, f.principalID, f.projectID, nil, "mine", "acme", "local", []byte("x"), nil)
+	if err != nil {
+		t.Fatalf("Publish: %v", err)
+	}
+
+	// Not an installation admin: may publish into their own project, may
+	// not put anything on the installation shelf (docs/adr/0017).
+	if _, err := f.svc.Promote(f.ctx, f.principalID, f.userID, f.projectID, v.SkillID, skills.ScopeInstallation, nil); !errors.Is(err, skills.ErrForbidden) {
+		t.Fatalf("Promote to installation without admin = %v, want ErrForbidden", err)
+	}
+
+	f.grantInstallationAdmin()
+	if _, err := f.svc.Promote(f.ctx, f.principalID, f.userID, f.projectID, v.SkillID, skills.ScopeInstallation, nil); err != nil {
+		t.Fatalf("Promote as admin: %v", err)
+	}
+
+	// And promotion only ever widens: taking it back down would break
+	// bindings made while it was visible.
+	if _, err := f.svc.Promote(f.ctx, f.principalID, f.userID, f.projectID, v.SkillID, skills.ScopeProject, &f.projectID); !errors.Is(err, skills.ErrNotPromotable) {
+		t.Fatalf("narrowing scope = %v, want ErrNotPromotable", err)
 	}
 }

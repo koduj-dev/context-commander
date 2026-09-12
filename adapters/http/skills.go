@@ -212,3 +212,103 @@ func (d Deps) getSkillVersion(w http.ResponseWriter, r *http.Request) {
 		Content:              string(v.Content),
 	})
 }
+
+type catalogEntryResponse struct {
+	SkillID  string     `json:"skill_id"`
+	Name     string     `json:"name"`
+	Author   string     `json:"author,omitempty"`
+	Origin   string     `json:"origin,omitempty"`
+	Scope    string     `json:"scope"`
+	ScopeRef *uuid.UUID `json:"scope_ref,omitempty"`
+
+	LatestVersionID string `json:"latest_version_id"`
+	LatestVersion   int    `json:"latest_version"`
+	LatestChecksum  string `json:"latest_checksum"`
+	TrustStatus     string `json:"trust_status"`
+}
+
+// searchSkills browses the registry. ?q= matches names case-insensitively;
+// what comes back is what the caller may see (docs/adr/0018), which is not
+// limited to the project in the path — that only proves membership.
+func (d Deps) searchSkills(w http.ResponseWriter, r *http.Request) {
+	project := projectFrom(r.Context())
+	principalID := principalIDFrom(r.Context())
+
+	opts, ok := pagingFrom(w, r)
+	if !ok {
+		return
+	}
+	page, err := d.Skills.Search(r.Context(), principalID, project.ID, r.URL.Query().Get("q"), opts)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	out := make([]catalogEntryResponse, len(page.Items))
+	for i, e := range page.Items {
+		out[i] = catalogEntryResponse{
+			SkillID: e.SkillID.String(), Name: e.Name, Author: e.Author, Origin: e.Origin,
+			Scope: string(e.Scope), ScopeRef: e.ScopeRef,
+			LatestVersionID: e.LatestVersionID.String(), LatestVersion: e.LatestVersion,
+			LatestChecksum: e.LatestChecksum, TrustStatus: e.TrustStatus,
+		}
+	}
+	writeList(w, out, page.NextCursor)
+}
+
+func (d Deps) listSkillVersions(w http.ResponseWriter, r *http.Request) {
+	skillID, err := uuid.Parse(chi.URLParam(r, "skillID"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", "skillID must be a UUID")
+		return
+	}
+
+	project := projectFrom(r.Context())
+	principalID := principalIDFrom(r.Context())
+
+	opts, ok := pagingFrom(w, r)
+	if !ok {
+		return
+	}
+	page, err := d.Skills.ListVersions(r.Context(), principalID, project.ID, skillID, opts)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	out := make([]skillVersionResponse, len(page.Items))
+	for i, v := range page.Items {
+		out[i] = toSkillVersionResponse(v)
+	}
+	writeList(w, out, page.NextCursor)
+}
+
+// promoteSkill widens where a skill lives. A POST on the skill rather than a
+// PATCH of a "scope" field: it is a one-way, authorized move, not an
+// assignable attribute (see internal/skills.Service.Promote).
+func (d Deps) promoteSkill(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		SkillID  uuid.UUID  `json:"skill_id"`
+		Scope    string     `json:"scope"`
+		ScopeRef *uuid.UUID `json:"scope_ref"`
+	}
+	if err := decodeJSONBody(w, r, &body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", "could not decode request body")
+		return
+	}
+
+	project := projectFrom(r.Context())
+	principalID := principalIDFrom(r.Context())
+	userID, err := resolveUserID(r.Context(), d.Pool, principalID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal", "internal error")
+		return
+	}
+
+	sk, err := d.Skills.Promote(r.Context(), principalID, userID, project.ID, body.SkillID, skills.Scope(body.Scope), body.ScopeRef)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"skill_id": sk.ID.String(), "scope": string(sk.Scope), "scope_ref": sk.ScopeRef,
+	})
+}

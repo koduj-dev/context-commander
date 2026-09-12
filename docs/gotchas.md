@@ -65,33 +65,25 @@ call sites can serialize against each other — or deadlock — by accident.
 codebase in a single const block for that reason. Add new ones there, and
 check the nesting order documented on `AdvisoryXactLock` before taking two.
 
-## Who can read a skill's content
+## Who can see a skill
 
-Reading a skill version's bytes (`skills.Service.GetVersion`, `skill.get`)
-needs two things: `CapSkillRead` on an anchor project, and the version itself
-being readable by you. The second rule is:
+A skill **lives at a scope** — the project it was published from, an
+organization, or the installation-wide shelf (`docs/adr/0018`, migration
+000021). Visibility follows that scope, and is enforced by Row-Level Security
+on `skills`, with `skill_versions` inheriting through its parent, using the
+same policy `skill_bindings` has always had.
 
-> You may read a skill's content if you can see a binding for it, or if you
-> are a member of the project it was published from.
+Two traps worth knowing:
 
-`skills` and `skill_versions` carry no RLS (migrations/000007), so the anchor
-project alone protects nothing — the caller picks it. When `skill.get` first
-shipped there was no second check, and any principal holding `CapSkillRead`
-anywhere (every role does) could read any version whose UUID it knew,
-including one published inside a project it was not a member of. Confirmed by
-probe, then closed by migration 000020, which records the publishing project
-the `Publish` call already knew and was discarding.
+- **A binding does not grant visibility.** `SkillBinding.Scope` says where a
+  skill is *applied*; `Skill.Scope` says who can *see* it. They use the same
+  vocabulary and mean different things. Installing a skill at installation
+  scope does not put it on the marketplace shelf — `skill.promote` does.
+- **Promotion is one-way.** A skill only ever widens its scope. Narrowing is
+  refused: anyone who could already see it may have installed it.
 
-Consequences worth knowing:
-
-- An **installation-scope binding is visible to every principal**, so a skill
-  installed installation-wide is readable installation-wide. That is the
-  intended registry behaviour, not a leak.
-- A version published **before** migration 000020 has no recorded provenance
-  and is read as installation-wide. Only rows predating that migration can be
-  in this state.
-- This does **not** decide what the skill registry *is*. `docs/adr/0012`
-  scopes the *binding* (where a skill applies), not the package (where it
-  lives). Whether packages are instance-wide, organization-scoped or
-  explicitly promoted is still open — migration 000020 records the provenance
-  any of those answers would need.
+Skill content is stored **unencrypted** (see the encryption note above: the
+key hierarchy has no installation-level key to anchor it to). A project-scoped
+skill is therefore only as private as the database itself. Anything that must
+be confidential belongs in `internal/secrets`, which is project-key encrypted
+and RLS-scoped — never in a skill package.

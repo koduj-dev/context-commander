@@ -106,7 +106,10 @@ func registerSkillTools(server *sdkmcp.Server, deps Deps, principalID, clientID 
 	sdkmcp.AddTool(server, &sdkmcp.Tool{
 		Name: "skill.publish",
 		Description: "Publish a new Skill or SkillVersion. Always a pure insert — never mutates an existing " +
-			"published version's content (docs/adr/0012).",
+			"published version's content. A new skill is created inside the project you publish from and is " +
+			"visible only to that project's members until someone promotes it (skill.promote); it is NOT " +
+			"installation-wide by default. Even so, do not put secrets in skill content — use the secret tools " +
+			"for anything that must stay confidential.",
 	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, args publishArgs) (*sdkmcp.CallToolResult, skillVersionResult, error) {
 		projectID, err := resolve(ctx, args.Project)
 		if err != nil {
@@ -273,6 +276,136 @@ func registerSkillTools(server *sdkmcp.Server, deps Deps, principalID, clientID 
 			SkillOrigin:        v.Skill.Origin,
 			Content:            string(v.Content),
 		}, nil
+	})
+
+	type searchArgs struct {
+		Project string `json:"project" jsonschema:"project path \"namespace/slug\" — proves membership; the catalog returned is not limited to this project"`
+		Query   string `json:"query,omitempty" jsonschema:"match skill names containing this text, case-insensitive; omit to list everything visible"`
+		Limit   int    `json:"limit,omitempty" jsonschema:"max entries to return (default 100, max 500)"`
+		Cursor  string `json:"cursor,omitempty" jsonschema:"next_cursor from a previous call to continue"`
+	}
+	type catalogEntryResult struct {
+		SkillID  string `json:"skill_id"`
+		Name     string `json:"name"`
+		Author   string `json:"author,omitempty"`
+		Origin   string `json:"origin,omitempty"`
+		Scope    string `json:"scope" jsonschema:"where the skill lives: installation (visible to everyone here), organization, or project"`
+		ScopeRef string `json:"scope_ref,omitempty"`
+
+		LatestVersionID string `json:"latest_version_id" jsonschema:"pass this to skill.get to download the newest content"`
+		LatestVersion   int    `json:"latest_version"`
+		LatestChecksum  string `json:"latest_checksum" jsonschema:"sha256 of the newest package; remember it and compare later to tell whether the skill changed"`
+		TrustStatus     string `json:"trust_status"`
+	}
+	sdkmcp.AddTool(server, &sdkmcp.Tool{
+		Name: "skill.search",
+		Description: "Browse the skill registry by name. This is how you FIND a skill you do not already " +
+			"have an id for: search by name, then call skill.get with the latest_version_id to download its " +
+			"content. Returns what you are allowed to see — skills in your projects, in your organizations, and " +
+			"those promoted to the installation-wide shelf. Each entry carries latest_checksum: remember it " +
+			"alongside whatever you loaded, and compare on a later search to tell whether the skill changed and " +
+			"needs re-downloading, without fetching the content again.",
+	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, args searchArgs) (*sdkmcp.CallToolResult, pagedResult[catalogEntryResult], error) {
+		projectID, err := resolve(ctx, args.Project)
+		if err != nil {
+			return nil, pagedResult[catalogEntryResult]{}, err
+		}
+		page, err := deps.Skills.Search(ctx, principalID, projectID, args.Query, pagingOptions(args.Limit, args.Cursor))
+		if err != nil {
+			return nil, pagedResult[catalogEntryResult]{}, err
+		}
+		out := make([]catalogEntryResult, len(page.Items))
+		for i, e := range page.Items {
+			out[i] = catalogEntryResult{
+				SkillID: e.SkillID.String(), Name: e.Name, Author: e.Author, Origin: e.Origin,
+				Scope:           string(e.Scope),
+				LatestVersionID: e.LatestVersionID.String(), LatestVersion: e.LatestVersion,
+				LatestChecksum: e.LatestChecksum, TrustStatus: e.TrustStatus,
+			}
+			if e.ScopeRef != nil {
+				out[i].ScopeRef = e.ScopeRef.String()
+			}
+		}
+		return nil, paged(out, page.NextCursor), nil
+	})
+
+	type versionsArgs struct {
+		Project string `json:"project" jsonschema:"project path \"namespace/slug\""`
+		SkillID string `json:"skill_id" jsonschema:"skill UUID from skill.search"`
+		Limit   int    `json:"limit,omitempty"`
+		Cursor  string `json:"cursor,omitempty"`
+	}
+	sdkmcp.AddTool(server, &sdkmcp.Tool{
+		Name: "skill.versions",
+		Description: "List a skill's published versions, newest first, with each one's checksum. Use it to pin " +
+			"an older version deliberately, or to see what changed since the version you are running.",
+	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, args versionsArgs) (*sdkmcp.CallToolResult, pagedResult[skillVersionResult], error) {
+		projectID, err := resolve(ctx, args.Project)
+		if err != nil {
+			return nil, pagedResult[skillVersionResult]{}, err
+		}
+		skillID, err := uuid.Parse(args.SkillID)
+		if err != nil {
+			return nil, pagedResult[skillVersionResult]{}, err
+		}
+		page, err := deps.Skills.ListVersions(ctx, principalID, projectID, skillID, pagingOptions(args.Limit, args.Cursor))
+		if err != nil {
+			return nil, pagedResult[skillVersionResult]{}, err
+		}
+		out := make([]skillVersionResult, len(page.Items))
+		for i, v := range page.Items {
+			out[i] = toSkillVersionResult(v)
+		}
+		return nil, paged(out, page.NextCursor), nil
+	})
+
+	type promoteArgs struct {
+		Project  string `json:"project" jsonschema:"project path \"namespace/slug\" that authorizes the promotion"`
+		SkillID  string `json:"skill_id"`
+		Scope    string `json:"scope" jsonschema:"target scope: \"organization\" or \"installation\""`
+		ScopeRef string `json:"scope_ref,omitempty" jsonschema:"organization UUID (omit for installation scope)"`
+	}
+	type promoteResult struct {
+		SkillID  string `json:"skill_id"`
+		Scope    string `json:"scope"`
+		ScopeRef string `json:"scope_ref,omitempty"`
+	}
+	sdkmcp.AddTool(server, &sdkmcp.Tool{
+		Name: "skill.promote",
+		Description: "Widen where a skill lives, so more people can find it: project -> organization -> " +
+			"installation. Promoting to installation puts it on the shelf every project here can search. Only " +
+			"ever widens, never narrows — anyone who could already see it may have installed it. Requires the " +
+			"rights at the TARGET scope (organization admin, or installation admin).",
+	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, args promoteArgs) (*sdkmcp.CallToolResult, promoteResult, error) {
+		projectID, err := resolve(ctx, args.Project)
+		if err != nil {
+			return nil, promoteResult{}, err
+		}
+		userID, err := resolveUserID(ctx)
+		if err != nil {
+			return nil, promoteResult{}, err
+		}
+		skillID, err := uuid.Parse(args.SkillID)
+		if err != nil {
+			return nil, promoteResult{}, err
+		}
+		var scopeRef *uuid.UUID
+		if args.ScopeRef != "" {
+			id, err := uuid.Parse(args.ScopeRef)
+			if err != nil {
+				return nil, promoteResult{}, err
+			}
+			scopeRef = &id
+		}
+		sk, err := deps.Skills.Promote(ctx, principalID, userID, projectID, skillID, skills.Scope(args.Scope), scopeRef)
+		if err != nil {
+			return nil, promoteResult{}, err
+		}
+		r := promoteResult{SkillID: sk.ID.String(), Scope: string(sk.Scope)}
+		if sk.ScopeRef != nil {
+			r.ScopeRef = sk.ScopeRef.String()
+		}
+		return nil, r, nil
 	})
 
 	type listEffectiveArgs struct {

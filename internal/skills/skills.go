@@ -37,6 +37,14 @@ var (
 	// the default 500 an unwrapped fmt.Errorf would fall through to.
 	ErrScopeRefRequired = errors.New("skills: organization/project scope requires scope_ref")
 
+	// ErrNotPromotable is returned by Service.Promote for a move that is
+	// not upward — installation is the widest scope, and a skill already
+	// there has nowhere to go. Narrowing is refused outright rather than
+	// supported: anyone who could already see the skill may have installed
+	// it, and pulling the shelf out from under them would break bindings
+	// that were legitimate when they were made.
+	ErrNotPromotable = errors.New("skills: scope can only be widened")
+
 	// ErrSkillVersionMismatch is returned by Service.Install/Override when
 	// skillVersionID does not belong to skillID — a client input mistake
 	// (or a supply-chain-relevant one), not a server fault, so it must map
@@ -53,10 +61,20 @@ var (
 // SkillVersion's skill_id actually points at — without it, "one skill, many
 // versions" has nowhere to hang the name.
 type Skill struct {
-	ID        uuid.UUID
-	Name      string
-	Author    string
-	Origin    string
+	ID     uuid.UUID
+	Name   string
+	Author string
+	Origin string
+
+	// Scope is where the package LIVES — who can see it in the catalog —
+	// as opposed to SkillBinding.Scope, which is where a skill is applied
+	// (docs/adr/0018). A skill is born in the project it was published
+	// from and moves up only through Service.Promote; ScopeInstallation is
+	// the instance-wide marketplace shelf. ScopeRef is nil exactly when
+	// Scope is ScopeInstallation, the same shape SkillBinding uses.
+	Scope    Scope
+	ScopeRef *uuid.UUID
+
 	CreatedAt time.Time
 }
 

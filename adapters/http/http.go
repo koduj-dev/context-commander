@@ -164,6 +164,11 @@ func NewHandler(deps Deps) http.Handler {
 			r.Post("/skills/unpin", deps.unpinSkillBinding)
 			r.Get("/skills/effective", deps.listEffectiveSkills)
 			r.Get("/skills/versions/{skillVersionID}", deps.getSkillVersion)
+			// The registry itself: browse by name, enumerate a skill's
+			// versions, and move a skill to a wider shelf.
+			r.Get("/skills/catalog", deps.searchSkills)
+			r.Get("/skills/{skillID}/versions", deps.listSkillVersions)
+			r.Post("/skills/promote", deps.promoteSkill)
 
 			r.Get("/gates/bindings", deps.listGateBindings)
 			r.Post("/gates/bindings", deps.bindGate)

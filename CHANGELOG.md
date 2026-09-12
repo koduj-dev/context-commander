@@ -12,6 +12,46 @@ link definition at the bottom of the file.
 
 ### Added
 
+- **The skill registry is browsable, and a package now lives at a scope**
+  (`docs/adr/0018`, migration 000021). ADR 0012 gave the *binding* a scope
+  and the package none, which left two holes at once: nothing said who may
+  see a published skill, and there was no way to *find* one — a package was
+  reachable only through a UUID that came from somewhere else, so an agent
+  could not look for a skill it did not already know about.
+  - `Skill` carries `scope`/`scope_ref` with the same shape and constraints
+    as `skill_bindings`. A skill is **born in the project it was published
+    from**, so publishing is never accidentally a public act, and
+    `skill.promote` widens it: project → organization → installation. The
+    installation scope is the marketplace shelf, and putting something on it
+    is an authorized act (installation admin) rather than a side effect of
+    publishing. Promotion only ever widens — narrowing would break bindings
+    made while the skill was visible. Authorized by the same
+    `checkScopeTarget` that decides whether a caller may bind *into* a
+    scope, because it is the same question.
+  - **Discovery:** `skill.search` browses and searches by name
+    (case-insensitive, LIKE metacharacters escaped), `skill.versions`
+    enumerates a skill's versions. Both return exactly what the caller can
+    see, across every scope — the anchor project is a membership floor, not
+    a filter. Also `GET .../skills/catalog`, `GET .../skills/{id}/versions`,
+    `POST .../skills/promote`, and `ccd skill search|versions|promote`.
+  - **Change detection is the checksum**, already carried by every
+    `SkillVersion` and computed over the plaintext package. A catalog entry
+    reports its newest version's checksum, so a client remembers what it
+    loaded and compares, instead of trusting a version number or a timestamp
+    to decide whether to re-download. The `skill.search` tool description
+    tells an agent to do exactly that.
+  - Visibility is enforced by RLS on `skills`, with `skill_versions`
+    inheriting through its parent — the identical policy `skill_bindings`
+    has had since migration 000007. A deliberate exception to "authorize in
+    the domain service" (CONTRIBUTING rule 7), because restating the
+    predicate in Go would need to resolve organization membership, which is
+    keyed by user and not by the principal a read path carries. Verified
+    load-bearing: granting `cc_app` `BYPASSRLS` fails both the
+    cross-project read test and the search-visibility test.
+  - This replaces the narrowing shipped as a stopgap alongside migration
+    000020 ("a binding you can see, or the project you published from"),
+    which deferred the product question. The provenance that migration
+    recorded stays, as trust metadata.
 - **Refusals are now recorded, and callers are rate-limited.** Nothing in
   the server recorded a denial before this: `audit.ResultDeny` was a
   defined constant with **zero call sites**, and the server emitted no logs

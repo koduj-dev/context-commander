@@ -184,10 +184,17 @@ func (s *Service) Publish(
 	var nextVersion int
 	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
 		if skillID == nil {
-			skill = Skill{ID: uuid.New(), Name: name, Author: author, Origin: origin}
+			// Born in the project it was published from — the narrowest
+			// scope, so publishing is never accidentally a public act
+			// (docs/adr/0018). Widening it is Promote's job and a separate
+			// decision.
+			skill = Skill{
+				ID: uuid.New(), Name: name, Author: author, Origin: origin,
+				Scope: ScopeProject, ScopeRef: &projectID,
+			}
 			if _, err := tx.Exec(ctx,
-				`INSERT INTO skills (id, name, author, origin) VALUES ($1, $2, $3, $4)`,
-				skill.ID, skill.Name, skill.Author, skill.Origin,
+				`INSERT INTO skills (id, name, author, origin, scope, scope_ref) VALUES ($1, $2, $3, $4, $5, $6)`,
+				skill.ID, skill.Name, skill.Author, skill.Origin, skill.Scope, skill.ScopeRef,
 			); err != nil {
 				return fmt.Errorf("insert skill: %w", err)
 			}

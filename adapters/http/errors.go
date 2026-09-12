@@ -109,6 +109,8 @@ func writeDomainError(w http.ResponseWriter, err error) {
 			"the stored skill content no longer matches its published checksum")
 	case errors.Is(err, skills.ErrTooLarge):
 		writeError(w, http.StatusRequestEntityTooLarge, "too_large", err.Error())
+	case errors.Is(err, skills.ErrNotPromotable):
+		writeError(w, http.StatusConflict, "conflict", err.Error())
 	case errors.Is(err, skills.ErrNotOverridable):
 		writeError(w, http.StatusConflict, "conflict", "shadowed binding is not overridable")
 	case errors.Is(err, skills.ErrScopeRefRequired), errors.Is(err, gates.ErrScopeRefRequired):
