@@ -64,7 +64,12 @@ a:hover { text-decoration: underline; }
   padding: 18px 16px 14px;
   border-bottom: 1px solid var(--cc-border);
 }
-.brand img { display: block; height: 26px; width: auto; }
+/* The lockup fills the rail's width rather than being pinned to an
+ * arbitrary height. The horizontal SVG is 1024×360, so at the rail's inner
+ * width it lands at its natural proportions with the padding below acting
+ * as the clear space the brand manual asks for — a fixed 26px height was me
+ * guessing, and guessing smaller than the mark wants. */
+.brand img { display: block; width: 100%; height: auto; }
 
 .nav { padding: 12px 8px; overflow-y: auto; flex: 1; }
 .nav-label {
@@ -423,6 +428,7 @@ table.dt td.r, table.dt th.r { text-align: right; }
     border-bottom: 1px solid var(--cc-border);
   }
   .brand { padding: 12px 14px; border-bottom: 0; }
+  .brand img { width: auto; height: 26px; }
   .nav {
     display: flex;
     gap: 2px;
