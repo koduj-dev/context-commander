@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -17,6 +18,23 @@ type organizationResult struct {
 	ID        string `json:"id"`
 	Name      string `json:"name"`
 	CreatedAt string `json:"created_at"`
+}
+
+type myOrganizationResult struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Role string `json:"role"`
+}
+
+// organizationMemberResult carries the person, not just their id: a list of
+// UUIDs answers "who is in this organization" with "I am not going to tell
+// you", and a model reading it has no way to look them up.
+type organizationMemberResult struct {
+	UserID      string `json:"user_id"`
+	Role        string `json:"role"`
+	Email       string `json:"email,omitempty"`
+	DisplayName string `json:"display_name,omitempty"`
+	CreatedAt   string `json:"created_at"`
 }
 
 type membershipResult struct {
@@ -89,5 +107,65 @@ func registerOrganizationTools(server *sdkmcp.Server, deps Deps, principalID, _ 
 			return nil, membershipResult{}, err
 		}
 		return nil, membershipResult{OrganizationID: m.OrganizationID.String(), UserID: m.UserID.String(), Role: string(m.Role)}, nil
+	})
+
+	// The two reads this surface was missing. Without them an agent could
+	// create an organization and add people to it but never find out which
+	// organizations it belongs to or who is already in one — writes without
+	// the matching reads.
+	sdkmcp.AddTool(server, &sdkmcp.Tool{
+		Name:        "organization.list",
+		Description: "List every organization you belong to, with your role. A service principal belongs to none — that is the correct answer for one, not a refusal.",
+	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, _ struct{}) (*sdkmcp.CallToolResult, []myOrganizationResult, error) {
+		callerID, err := callerUserID(ctx)
+		if errors.Is(err, organizations.ErrForbidden) {
+			// A service principal: no organizations, which is a fact rather
+			// than a refusal.
+			return nil, []myOrganizationResult{}, nil
+		}
+		if err != nil {
+			return nil, nil, err
+		}
+		memberships, err := deps.Organizations.ListMine(ctx, principalID, callerID)
+		if err != nil {
+			return nil, nil, err
+		}
+		out := make([]myOrganizationResult, len(memberships))
+		for i, m := range memberships {
+			out[i] = myOrganizationResult{
+				ID: m.Organization.ID.String(), Name: m.Organization.Name, Role: string(m.Role),
+			}
+		}
+		return nil, out, nil
+	})
+
+	type listMembersArgs struct {
+		OrganizationID string `json:"organization_id" jsonschema:"organization UUID"`
+	}
+	sdkmcp.AddTool(server, &sdkmcp.Tool{
+		Name:        "organization.list_members",
+		Description: "List an organization's members. Any member may read this; who added them is in the audit trail, which is not.",
+	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, args listMembersArgs) (*sdkmcp.CallToolResult, []organizationMemberResult, error) {
+		orgID, err := uuid.Parse(args.OrganizationID)
+		if err != nil {
+			return nil, nil, err
+		}
+		callerID, err := callerUserID(ctx)
+		if err != nil {
+			return nil, nil, err
+		}
+		members, err := deps.Organizations.ListMembers(ctx, principalID, callerID, orgID)
+		if err != nil {
+			return nil, nil, err
+		}
+		out := make([]organizationMemberResult, len(members))
+		for i, m := range members {
+			out[i] = organizationMemberResult{
+				UserID: m.UserID.String(), Role: string(m.Role),
+				Email: m.Email, DisplayName: m.DisplayName,
+				CreatedAt: m.CreatedAt.Format(time.RFC3339),
+			}
+		}
+		return nil, out, nil
 	})
 }

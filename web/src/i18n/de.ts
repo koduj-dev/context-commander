@@ -224,7 +224,7 @@ export const de: Partial<Record<MessageKey, string>> = {
     "Der Server sendet nie eine formatierte Zeichenkette. Er sendet den Wert; die Oberfläche liest ihn.",
 
   "members.addHelp":
-    "Über die Principal-UUID. Kein Endpunkt listet die Principals einer Installation auf, es gibt also nichts zur Auswahl — kopieren Sie die UUID aus dem Konto der betreffenden Person.",
+    "Eine Projektrolle gehört einem Principal — einem Menschen oder einem Agenten. Beide stehen hier zur Auswahl, wenn Sie diese Installation administrieren; sonst nimmt das Feld die Principal-ID, die nicht dasselbe ist wie eine Benutzer-ID.",
   "members.principalPlaceholder": "Principal-UUID",
   "members.noRemoval":
     "Mitglieder zu entfernen und Rollen zu ändern ist nicht gebaut: die API hat dafür keinen Schreibpfad, also bietet dieser Bildschirm auch keinen an.",
@@ -269,7 +269,7 @@ export const de: Partial<Record<MessageKey, string>> = {
   "admin.description": "Beschreibung",
   "admin.security": "Sicherheitsprotokoll",
   "admin.identitiesLead":
-    "Hier entstehen die Identitäten, an denen alles andere hängt. Kein Endpunkt der API listet Benutzerkonten oder Dienst-Principals auf, diese Seite legt sie also an und zeigt, was gerade angelegt wurde — ein Verzeichnis kann sie nicht zeigen.",
+    "Die Identitäten, an denen alles andere hängt: die Personen, die ein Token halten können, und die Agenten, die eigenständig handeln. Jeder von ihnen kann hier ein Token bekommen und wieder entzogen bekommen.",
   "admin.securityLead":
     "Was der Server abgelehnt hat: ein Token, das sich nicht auflösen ließ, eine verweigerte Berechtigung, eine gedrosselte Anfrage. Bewusst getrennt vom Projekt-Audit — eine Ablehnung betrifft oft ein Projekt, das die anfragende Seite gar nicht sehen kann, und das eigentlich interessante Muster, ein Zugangsmerkmal, das mehrere Projekte abklopft, ist aus jedem einzelnen Projekt heraus unsichtbar.",
   "admin.securityNote":
@@ -516,7 +516,7 @@ export const de: Partial<Record<MessageKey, string>> = {
   "orgs.name": "Name",
   "orgs.addMember": "Mitglied hinzufügen",
   "orgs.addMemberLead":
-    "Über die Benutzer-ID, nicht die des Principals: eine Organisationsrolle betrifft einen Menschen. Kein Endpunkt der API listet Benutzerkonten auf, es gibt also nichts zur Auswahl.",
+    "Eine Organisationsrolle betrifft einen Menschen, hier wird also ein Benutzerkonto benannt und kein Principal — ein Agent handelt stattdessen innerhalb eines Projekts und kann so eine Rolle nicht halten.",
   "orgs.userId": "Benutzer-ID",
 
   "settings.title": "Einstellungen",
@@ -589,4 +589,12 @@ export const de: Partial<Record<MessageKey, string>> = {
   "admin.issueFor": "Token ausstellen",
   "admin.issueForLead":
     "Ein Token für diese Identität, nicht für Sie. Es wird einmal angezeigt und nie wieder, und wer es hat, handelt als diese Identität.",
+
+  "picker.agent": "Agent",
+  "admin.tokens": "Token",
+  "admin.tokensLead":
+    "Alle Zugangsmerkmale dieser Identität. Ein Widerruf wirkt ab der nächsten Anfrage und ändert keine Mitgliedschaft.",
+  "admin.noTokens": "Keine Token ausgestellt",
+  "admin.confirmRevokeFor":
+    "Dieses Zugangsmerkmal widerrufen? Was immer es verwendet, hört sofort auf zu funktionieren — bei einem laufenden Agenten mitten in der Arbeit.",
 };

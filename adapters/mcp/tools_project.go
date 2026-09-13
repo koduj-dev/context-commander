@@ -23,6 +23,17 @@ type projectResult struct {
 	Visibility string `json:"visibility"`
 }
 
+// myProjectResult names the project the way a caller will use it — one
+// "namespace/slug" string, since that is what every other tool takes as its
+// `project` argument. Handing back the two halves separately would make the
+// obvious next call a string concatenation the caller has to get right.
+type myProjectResult struct {
+	Project    string `json:"project"`
+	Name       string `json:"name"`
+	Visibility string `json:"visibility"`
+	Role       string `json:"role"`
+}
+
 func toProjectResult(p projects.Project, namespaceSlug string) projectResult {
 	return projectResult{ID: p.ID.String(), Namespace: namespaceSlug, Slug: p.Slug, Name: p.Name, Visibility: string(p.Visibility)}
 }
@@ -48,6 +59,38 @@ func registerProjectTools(server *sdkmcp.Server, deps Deps, principalID, clientI
 			return nil, projectResult{}, err
 		}
 		return nil, toProjectResult(p, namespaceSlug), nil
+	})
+
+	// project.list closes the gap that mattered most on this surface: an
+	// agent holding a token had no way to find out which projects it could
+	// act in. Every other project tool takes a "namespace/slug" the agent
+	// had to be told out of band — which is exactly the kind of thing a
+	// shared context layer exists to stop happening.
+	sdkmcp.AddTool(server, &sdkmcp.Tool{
+		Name:        "project.list",
+		Description: "List every project you are a member of, with your role in each. Start here when you do not already know a project's \"namespace/slug\".",
+	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, _ struct{}) (*sdkmcp.CallToolResult, []myProjectResult, error) {
+		var out []myProjectResult
+		err := db.WithPrincipal(ctx, deps.Pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+			memberships, err := deps.Projects.ListForPrincipal(ctx, tx, principalID)
+			if err != nil {
+				return err
+			}
+			out = make([]myProjectResult, len(memberships))
+			for i, m := range memberships {
+				out[i] = myProjectResult{
+					Project:    m.NamespaceSlug + "/" + m.Project.Slug,
+					Name:       m.Project.Name,
+					Visibility: string(m.Project.Visibility),
+					Role:       string(m.Role),
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			return nil, nil, err
+		}
+		return nil, out, nil
 	})
 
 	type createArgs struct {

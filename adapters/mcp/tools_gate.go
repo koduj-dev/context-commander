@@ -160,7 +160,7 @@ func registerGateTools(server *sdkmcp.Server, deps Deps, principalID, clientID u
 	}
 	sdkmcp.AddTool(server, &sdkmcp.Tool{
 		Name:        "gate.unbind",
-		Description: "Delete a gate binding.",
+		Description: "Remove a gate binding by its id, so the gate stops running on that hook for that scope. Operations it was refusing start going through immediately.",
 	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, args unbindArgs) (*sdkmcp.CallToolResult, unbindResult, error) {
 		projectID, err := resolve(ctx, args.Project)
 		if err != nil {

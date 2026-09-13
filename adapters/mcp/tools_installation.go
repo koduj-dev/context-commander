@@ -237,4 +237,82 @@ func registerInstallationTools(server *sdkmcp.Server, deps Deps, principalID, _ 
 		}
 		return nil, out, nil
 	})
+
+	registerDirectoryTools(server, deps, principalID, callerUserID)
+}
+
+// registerDirectoryTools adds the reads that let an agent name a person or
+// another agent instead of demanding a UUID it has no way to obtain.
+//
+// Both are installation-admin only, exactly like their HTTP counterparts:
+// the directory says who exists on this installation, which is not something
+// every credential should be able to enumerate.
+func registerDirectoryTools(server *sdkmcp.Server, deps Deps, principalID uuid.UUID, callerUserID func(context.Context) (uuid.UUID, error)) {
+	type listArgs struct {
+		Limit  int    `json:"limit,omitempty" jsonschema:"maximum rows to return"`
+		Cursor string `json:"cursor,omitempty" jsonschema:"continue from a previous next_cursor; ordered oldest first"`
+	}
+
+	sdkmcp.AddTool(server, &sdkmcp.Tool{
+		Name:        "installation.list_users",
+		Description: "List the people on this installation. Each carries both ids: `id` names them in an organization, `principal_id` names them in a project. Requires installation-admin rights.",
+	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, args listArgs) (*sdkmcp.CallToolResult, pagedResult[directoryUserResult], error) {
+		userID, err := callerUserID(ctx)
+		if err != nil {
+			return nil, pagedResult[directoryUserResult]{}, err
+		}
+		page, err := deps.Installation.ListUsers(ctx, principalID, userID, pagingOptions(args.Limit, args.Cursor))
+		if err != nil {
+			return nil, pagedResult[directoryUserResult]{}, err
+		}
+		out := make([]directoryUserResult, len(page.Items))
+		for i, u := range page.Items {
+			out[i] = directoryUserResult{
+				ID: u.ID.String(), PrincipalID: u.PrincipalID.String(),
+				Email: u.Email, DisplayName: u.DisplayName,
+				CreatedAt: u.CreatedAt.Format(time.RFC3339),
+			}
+		}
+		return nil, paged(out, page.NextCursor), nil
+	})
+
+	sdkmcp.AddTool(server, &sdkmcp.Tool{
+		Name:        "installation.list_service_principals",
+		Description: "List the agents registered on this installation. `principal_id` is what a token is issued for and what a project membership names. Requires installation-admin rights.",
+	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, args listArgs) (*sdkmcp.CallToolResult, pagedResult[directoryAgentResult], error) {
+		userID, err := callerUserID(ctx)
+		if err != nil {
+			return nil, pagedResult[directoryAgentResult]{}, err
+		}
+		page, err := deps.Installation.ListServicePrincipals(ctx, principalID, userID, pagingOptions(args.Limit, args.Cursor))
+		if err != nil {
+			return nil, pagedResult[directoryAgentResult]{}, err
+		}
+		out := make([]directoryAgentResult, len(page.Items))
+		for i, a := range page.Items {
+			out[i] = directoryAgentResult{
+				ID: a.ID.String(), PrincipalID: a.PrincipalID.String(),
+				Name: a.Name, Description: a.Description,
+				CreatedAt: a.CreatedAt.Format(time.RFC3339),
+			}
+		}
+		return nil, paged(out, page.NextCursor), nil
+	})
+}
+
+// The two ids are not interchangeable — see identity.DirectoryUser.
+type directoryUserResult struct {
+	ID          string `json:"id"`
+	PrincipalID string `json:"principal_id"`
+	Email       string `json:"email"`
+	DisplayName string `json:"display_name"`
+	CreatedAt   string `json:"created_at"`
+}
+
+type directoryAgentResult struct {
+	ID          string `json:"id"`
+	PrincipalID string `json:"principal_id"`
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	CreatedAt   string `json:"created_at"`
 }

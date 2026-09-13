@@ -138,10 +138,11 @@ export const en = {
   "members.add": "Add principal",
   "members.count": "{count, plural, one {# member} other {# members}}",
   "members.addHelp":
-    "By principal UUID. Nothing in the API lists the principals of an installation, so there is nothing to pick from — copy the UUID from the person's own account screen.",
+    "A project role belongs to a principal — a person or an agent. Both are offered here if you administer this installation; otherwise it takes the principal id, which is not the same as a user id.",
   "members.principalPlaceholder": "Principal UUID",
   "picker.choose": "Choose someone…",
   "picker.userId": "User id",
+  "picker.agent": "agent",
   "picker.noDirectory":
     "Only an installation admin can list the people on this installation, so this asks for an id rather than offering a choice. Ask an admin for it, or paste it from the person's own account screen.",
   "members.noRemoval":
@@ -253,11 +254,17 @@ export const en = {
   "admin.noServicePrincipalsBody":
     "Register one, then issue it a token — that token is what a CI job or a scheduled agent presents when it calls this server.",
   "admin.issueFor": "Issue a token",
+  "admin.tokens": "Tokens",
+  "admin.tokensLead":
+    "Every credential issued to this identity. Revoking one takes effect on the next request it makes and changes no membership.",
+  "admin.noTokens": "No tokens issued",
+  "admin.confirmRevokeFor":
+    "Revoke this credential? Whatever is using it stops working immediately, and if that is a running agent it will start failing mid-task.",
   "admin.issueForLead":
     "A token for this identity, not for you. It is shown once and never again, and whatever holds it acts as this identity.",
   "admin.security": "Security log",
   "admin.identitiesLead":
-    "Creating the identities everything else hangs off. Nothing in the API lists users or service principals, so this page creates them and shows what it just created — it has no directory to show you.",
+    "The identities everything else hangs off: the people who can hold a token, and the agents that act on their own. Each one can be given a token here, and have one taken away.",
   "admin.securityLead":
     "What the server refused: a token that did not resolve, a capability denied, a caller throttled. Kept apart from project audit on purpose — a refusal is often about a project the caller cannot even see, and the pattern worth catching, one credential probing several projects, is invisible from inside any one of them.",
   "admin.securityNote":
@@ -451,7 +458,7 @@ export const en = {
   "orgs.name": "Name",
   "orgs.addMember": "Add member",
   "orgs.addMemberLead":
-    "By user id, not principal: an organization role is about a person. Nothing in the API lists users, so there is nothing to pick from.",
+    "An organization role is about a person, so this names a user and not a principal — an agent acts inside a project instead, and cannot hold one of these.",
   "orgs.userId": "User id",
 
   "settings.title": "Settings",

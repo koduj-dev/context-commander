@@ -6,60 +6,85 @@ import { useResource } from "../lib/resource";
 import { Note, SelectField, TextField } from "./index";
 
 /**
- * Choosing a person, or failing that, naming one.
+ * Choosing a person or an agent, or failing that, naming one by id.
  *
- * The directory (`/installation/users`) is installation-admin only, and most
- * people using these screens are not installation admins. So this offers a
- * real choice when it can and an id field when it cannot — rather than
- * showing a picker that would be empty, or an id field to everyone because
- * someone might not have access.
+ * `kind` decides which id the chosen value is. They are different ids for
+ * the same identity: an organization membership is keyed by the user, a
+ * project membership by the principal (docs/adr/0006). Getting that wrong
+ * produces a foreign-key error nobody can read, which is why this component
+ * exists at all rather than each screen rendering its own field.
  *
- * `kind` decides what the value means: an organization membership is keyed by
- * user (docs/adr/0006), a project membership by principal. They are different
- * ids and picking the wrong one produces a foreign-key error nobody can read.
+ * The directory is installation-admin only, and most people using these
+ * screens are not admins. So this offers a real choice when it can and an id
+ * field when it cannot, rather than showing an empty picker or giving
+ * everyone the id field because someone might lack access.
  */
 export function PrincipalPicker({
   kind,
   value,
   onChange,
   label,
+  includeAgents,
 }: {
   kind: "user" | "principal";
   value: string;
   onChange: (v: string) => void;
   label: string;
+  /** Agents can hold a project role; they cannot hold an organization one. */
+  includeAgents?: boolean;
 }) {
   const t = useT();
   const { me } = useAuth();
   const [denied, setDenied] = useState(false);
 
-  const directory = useResource(
+  const admin = Boolean(me?.is_installation_admin);
+  const refused = (err: unknown) => {
+    // An admin flag that is true and a read that is refused must not blank
+    // the form: fall back to the id field.
+    if (err instanceof ApiError) setDenied(true);
+    return { items: [] };
+  };
+
+  const users = useResource(
+    () => (admin ? api.users(undefined, 200).catch(refused) : Promise.resolve({ items: [] })),
+    [admin],
+  );
+  const agents = useResource(
     () =>
-      me?.is_installation_admin
-        ? api.users(undefined, 200).catch((err: unknown) => {
-            // An admin flag that is true and a read that is refused should
-            // not blank the form: fall back to the id field.
-            if (err instanceof ApiError) setDenied(true);
-            return { items: [] };
-          })
+      admin && includeAgents
+        ? api.servicePrincipals(undefined, 200).catch(refused)
         : Promise.resolve({ items: [] }),
-    [me?.is_installation_admin],
+    [admin, includeAgents],
   );
 
-  const people = useMemo(() => directory.data?.items ?? [], [directory.data]);
-  const canPick = kind === "user" && people.length > 0 && !denied;
+  const options = useMemo(() => {
+    const people = (users.data?.items ?? []).flatMap((u) => {
+      const id = kind === "user" ? u.id : u.principal_id;
+      if (!id) return [];
+      return [{ value: id, label: u.display_name ? `${u.display_name} · ${u.email}` : u.email }];
+    });
+    const bots = (agents.data?.items ?? []).flatMap((a) =>
+      a.principal_id
+        ? [
+            {
+              value: a.principal_id,
+              label: `${a.name} · ${t("picker.agent")}`,
+            },
+          ]
+        : [],
+    );
+    return [...people, ...bots];
+  }, [users.data, agents.data, kind, t]);
 
-  if (!canPick) {
+  if (denied || options.length === 0) {
     return (
-      <>
-        <TextField
-          label={label}
-          value={value}
-          onChange={onChange}
-          placeholder={kind === "user" ? t("picker.userId") : t("members.principalPlaceholder")}
-          grow
-        />
-      </>
+      <TextField
+        label={label}
+        value={value}
+        onChange={onChange}
+        placeholder={kind === "user" ? t("picker.userId") : t("members.principalPlaceholder")}
+        grow
+      />
     );
   }
 
@@ -68,18 +93,12 @@ export function PrincipalPicker({
       label={label}
       value={value}
       onChange={onChange}
-      options={[
-        { value: "", label: t("picker.choose") },
-        ...people.map((u) => ({
-          value: u.id,
-          label: u.display_name ? `${u.display_name} · ${u.email}` : u.email,
-        })),
-      ]}
+      options={[{ value: "", label: t("picker.choose") }, ...options]}
     />
   );
 }
 
-/** Says why a picker is a plain field, where that is worth saying. */
+/** Says why a picker is a plain id field, where that is worth saying. */
 export function PickerNote() {
   const t = useT();
   const { me } = useAuth();

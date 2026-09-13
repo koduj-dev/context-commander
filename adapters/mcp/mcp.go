@@ -156,6 +156,7 @@ func newServer(deps Deps, principalID, clientID uuid.UUID) *sdkmcp.Server {
 	registerSkillTools(server, deps, principalID, clientID)
 	registerGateTools(server, deps, principalID, clientID)
 	registerSecretTools(server, deps, principalID, clientID)
+	registerMeTools(server, deps, principalID)
 	registerInstallationTools(server, deps, principalID, clientID)
 
 	return server

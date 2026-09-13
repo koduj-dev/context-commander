@@ -348,6 +348,24 @@ func (s *Store) RevokeCredentialByID(ctx context.Context, tx pgx.Tx, id uuid.UUI
 	return nil
 }
 
+// DirectoryUser is a user together with the Principal that acts as them.
+//
+// The two ids are not interchangeable and confusing them is the classic
+// mistake here: an organization membership is keyed by user, a project
+// membership by principal (docs/adr/0006). An interface that offers a person
+// to pick therefore needs both, and principals_user_unique guarantees there
+// is exactly one principal to carry.
+type DirectoryUser struct {
+	User
+	PrincipalID uuid.UUID
+}
+
+// DirectoryAgent is the same pairing for a ServicePrincipal.
+type DirectoryAgent struct {
+	ServicePrincipal
+	PrincipalID uuid.UUID
+}
+
 // ListUsers returns one page of users, oldest first.
 //
 // It exists because nothing else did: every screen that needs to name a
@@ -355,35 +373,39 @@ func (s *Store) RevokeCredentialByID(ctx context.Context, tx pgx.Tx, id uuid.UUI
 // clumsiest thing in the product and a reliable source of mistakes. Reading
 // the directory is an installation-admin operation — see
 // installation.Service.ListUsers, which is the only caller.
-func (s *Store) ListUsers(ctx context.Context, tx pgx.Tx, opts paging.Options) (paging.Page[User], error) {
+func (s *Store) ListUsers(ctx context.Context, tx pgx.Tx, opts paging.Options) (paging.Page[DirectoryUser], error) {
 	cursorTime, cursorID, hasCursor, err := opts.DecodeTimeUUID()
 	if err != nil {
-		return paging.Page[User]{}, err
+		return paging.Page[DirectoryUser]{}, err
 	}
 	limit := opts.ClampedLimit()
 
+	// JOIN, not LEFT JOIN: every user gets a principal at creation and
+	// principals_user_unique keeps it to one, so a user without one is a
+	// broken row rather than a case to render around.
 	rows, err := tx.Query(ctx,
-		`SELECT id, email, display_name, created_at
-		 FROM users
-		 WHERE (NOT $1::bool OR (created_at, id) > ($2::timestamptz, $3::uuid))
-		 ORDER BY created_at ASC, id ASC LIMIT $4`,
+		`SELECT u.id, u.email, u.display_name, u.created_at, p.id
+		 FROM users u
+		 JOIN principals p ON p.user_id = u.id
+		 WHERE (NOT $1::bool OR (u.created_at, u.id) > ($2::timestamptz, $3::uuid))
+		 ORDER BY u.created_at ASC, u.id ASC LIMIT $4`,
 		hasCursor, cursorTime, cursorID, limit+1,
 	)
 	if err != nil {
-		return paging.Page[User]{}, fmt.Errorf("identity: list users: %w", err)
+		return paging.Page[DirectoryUser]{}, fmt.Errorf("identity: list users: %w", err)
 	}
 	defer rows.Close()
 
-	out := make([]User, 0, limit)
+	out := make([]DirectoryUser, 0, limit)
 	for rows.Next() {
-		var u User
-		if err := rows.Scan(&u.ID, &u.Email, &u.DisplayName, &u.CreatedAt); err != nil {
-			return paging.Page[User]{}, fmt.Errorf("identity: scan user: %w", err)
+		var u DirectoryUser
+		if err := rows.Scan(&u.ID, &u.Email, &u.DisplayName, &u.CreatedAt, &u.PrincipalID); err != nil {
+			return paging.Page[DirectoryUser]{}, fmt.Errorf("identity: scan user: %w", err)
 		}
 		out = append(out, u)
 	}
 	if err := rows.Err(); err != nil {
-		return paging.Page[User]{}, fmt.Errorf("identity: list users: %w", err)
+		return paging.Page[DirectoryUser]{}, fmt.Errorf("identity: list users: %w", err)
 	}
 
 	page, hasMore := paging.More(out, limit)
@@ -392,41 +414,42 @@ func (s *Store) ListUsers(ctx context.Context, tx pgx.Tx, opts paging.Options) (
 		last := page[len(page)-1]
 		next = paging.EncodeTimeUUID(last.CreatedAt, last.ID)
 	}
-	return paging.Page[User]{Items: page, NextCursor: next}, nil
+	return paging.Page[DirectoryUser]{Items: page, NextCursor: next}, nil
 }
 
 // ListServicePrincipals is ListUsers' counterpart for agents. Same ordering,
 // same reasoning: an agent is named by a UUID everywhere until something can
 // list them.
-func (s *Store) ListServicePrincipals(ctx context.Context, tx pgx.Tx, opts paging.Options) (paging.Page[ServicePrincipal], error) {
+func (s *Store) ListServicePrincipals(ctx context.Context, tx pgx.Tx, opts paging.Options) (paging.Page[DirectoryAgent], error) {
 	cursorTime, cursorID, hasCursor, err := opts.DecodeTimeUUID()
 	if err != nil {
-		return paging.Page[ServicePrincipal]{}, err
+		return paging.Page[DirectoryAgent]{}, err
 	}
 	limit := opts.ClampedLimit()
 
 	rows, err := tx.Query(ctx,
-		`SELECT id, name, COALESCE(description, ''), created_at
-		 FROM service_principals
-		 WHERE (NOT $1::bool OR (created_at, id) > ($2::timestamptz, $3::uuid))
-		 ORDER BY created_at ASC, id ASC LIMIT $4`,
+		`SELECT sp.id, sp.name, COALESCE(sp.description, ''), sp.created_at, p.id
+		 FROM service_principals sp
+		 JOIN principals p ON p.service_principal_id = sp.id
+		 WHERE (NOT $1::bool OR (sp.created_at, sp.id) > ($2::timestamptz, $3::uuid))
+		 ORDER BY sp.created_at ASC, sp.id ASC LIMIT $4`,
 		hasCursor, cursorTime, cursorID, limit+1,
 	)
 	if err != nil {
-		return paging.Page[ServicePrincipal]{}, fmt.Errorf("identity: list service principals: %w", err)
+		return paging.Page[DirectoryAgent]{}, fmt.Errorf("identity: list service principals: %w", err)
 	}
 	defer rows.Close()
 
-	out := make([]ServicePrincipal, 0, limit)
+	out := make([]DirectoryAgent, 0, limit)
 	for rows.Next() {
-		var sp ServicePrincipal
-		if err := rows.Scan(&sp.ID, &sp.Name, &sp.Description, &sp.CreatedAt); err != nil {
-			return paging.Page[ServicePrincipal]{}, fmt.Errorf("identity: scan service principal: %w", err)
+		var a DirectoryAgent
+		if err := rows.Scan(&a.ID, &a.Name, &a.Description, &a.CreatedAt, &a.PrincipalID); err != nil {
+			return paging.Page[DirectoryAgent]{}, fmt.Errorf("identity: scan service principal: %w", err)
 		}
-		out = append(out, sp)
+		out = append(out, a)
 	}
 	if err := rows.Err(); err != nil {
-		return paging.Page[ServicePrincipal]{}, fmt.Errorf("identity: list service principals: %w", err)
+		return paging.Page[DirectoryAgent]{}, fmt.Errorf("identity: list service principals: %w", err)
 	}
 
 	page, hasMore := paging.More(out, limit)
@@ -435,5 +458,5 @@ func (s *Store) ListServicePrincipals(ctx context.Context, tx pgx.Tx, opts pagin
 		last := page[len(page)-1]
 		next = paging.EncodeTimeUUID(last.CreatedAt, last.ID)
 	}
-	return paging.Page[ServicePrincipal]{Items: page, NextCursor: next}, nil
+	return paging.Page[DirectoryAgent]{Items: page, NextCursor: next}, nil
 }

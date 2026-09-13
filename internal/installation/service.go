@@ -215,35 +215,35 @@ func (s *Service) RevokeCredentialFor(ctx context.Context, principalID, callerUs
 // governs. It exists so that naming a person in an interface does not
 // require knowing their UUID — every screen that adds a member, looks up a
 // credential or grants a role had no way to offer a choice before this.
-func (s *Service) ListUsers(ctx context.Context, principalID, callerUserID uuid.UUID, opts paging.Options) (paging.Page[identity.User], error) {
+func (s *Service) ListUsers(ctx context.Context, principalID, callerUserID uuid.UUID, opts paging.Options) (paging.Page[identity.DirectoryUser], error) {
 	if err := s.checkCapability(ctx, principalID, callerUserID, CapAdminRead); err != nil {
-		return paging.Page[identity.User]{}, err
+		return paging.Page[identity.DirectoryUser]{}, err
 	}
-	var page paging.Page[identity.User]
+	var page paging.Page[identity.DirectoryUser]
 	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
 		var err error
 		page, err = s.identity.ListUsers(ctx, tx, opts)
 		return err
 	})
 	if err != nil {
-		return paging.Page[identity.User]{}, fmt.Errorf("installation: list users: %w", err)
+		return paging.Page[identity.DirectoryUser]{}, fmt.Errorf("installation: list users: %w", err)
 	}
 	return page, nil
 }
 
 // ListServicePrincipals is ListUsers' counterpart for agents.
-func (s *Service) ListServicePrincipals(ctx context.Context, principalID, callerUserID uuid.UUID, opts paging.Options) (paging.Page[identity.ServicePrincipal], error) {
+func (s *Service) ListServicePrincipals(ctx context.Context, principalID, callerUserID uuid.UUID, opts paging.Options) (paging.Page[identity.DirectoryAgent], error) {
 	if err := s.checkCapability(ctx, principalID, callerUserID, CapAdminRead); err != nil {
-		return paging.Page[identity.ServicePrincipal]{}, err
+		return paging.Page[identity.DirectoryAgent]{}, err
 	}
-	var page paging.Page[identity.ServicePrincipal]
+	var page paging.Page[identity.DirectoryAgent]
 	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
 		var err error
 		page, err = s.identity.ListServicePrincipals(ctx, tx, opts)
 		return err
 	})
 	if err != nil {
-		return paging.Page[identity.ServicePrincipal]{}, fmt.Errorf("installation: list service principals: %w", err)
+		return paging.Page[identity.DirectoryAgent]{}, fmt.Errorf("installation: list service principals: %w", err)
 	}
 	return page, nil
 }

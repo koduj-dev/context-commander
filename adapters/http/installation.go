@@ -25,6 +25,12 @@ type userResponse struct {
 	Email       string `json:"email"`
 	DisplayName string `json:"display_name"`
 	CreatedAt   string `json:"created_at"`
+	// PrincipalID is who this user ACTS AS, and it is a different id from
+	// ID. An organization membership is keyed by the user, a project
+	// membership by the principal (docs/adr/0006) — a client that has only
+	// one of them can fill in exactly one of those two forms. Absent on
+	// create, where the caller has just been handed the user itself.
+	PrincipalID string `json:"principal_id,omitempty"`
 }
 
 func (d Deps) createInstallationUser(w http.ResponseWriter, r *http.Request) {
@@ -64,6 +70,9 @@ type servicePrincipalResponse struct {
 	Name        string `json:"name"`
 	Description string `json:"description,omitempty"`
 	CreatedAt   string `json:"created_at"`
+	// The principal this agent acts as — see userResponse.PrincipalID. It is
+	// what a token is issued for and what a project membership names.
+	PrincipalID string `json:"principal_id,omitempty"`
 }
 
 func (d Deps) createServicePrincipal(w http.ResponseWriter, r *http.Request) {
@@ -249,7 +258,7 @@ func (d Deps) listInstallationUsers(w http.ResponseWriter, r *http.Request) {
 	for i, u := range page.Items {
 		out[i] = userResponse{
 			ID: u.ID.String(), Email: u.Email, DisplayName: u.DisplayName,
-			CreatedAt: u.CreatedAt.Format(time.RFC3339),
+			CreatedAt: u.CreatedAt.Format(time.RFC3339), PrincipalID: u.PrincipalID.String(),
 		}
 	}
 	writeList(w, out, page.NextCursor)
@@ -273,10 +282,10 @@ func (d Deps) listServicePrincipals(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out := make([]servicePrincipalResponse, len(page.Items))
-	for i, sp := range page.Items {
+	for i, a := range page.Items {
 		out[i] = servicePrincipalResponse{
-			ID: sp.ID.String(), Name: sp.Name, Description: sp.Description,
-			CreatedAt: sp.CreatedAt.Format(time.RFC3339),
+			ID: a.ID.String(), Name: a.Name, Description: a.Description,
+			CreatedAt: a.CreatedAt.Format(time.RFC3339), PrincipalID: a.PrincipalID.String(),
 		}
 	}
 	writeList(w, out, page.NextCursor)

@@ -252,25 +252,121 @@ export function AdminIdentities() {
 }
 
 function UserRow({ user }: { user: InstallationUser }) {
+  const t = useT();
   const f = useFormat();
+  const [open, setOpen] = useState(false);
+
   return (
-    <tr>
-      <td>
-        <Cell
-          primary={user.display_name || user.email}
-          secondary={
-            user.display_name ? (
-              <span className="dim">{user.email}</span>
-            ) : (
-              <Copyable value={user.id} />
-            )
-          }
-        />
-      </td>
-      <td className="r">
-        <span className="dim">{f.date(user.created_at)}</span>
-      </td>
-    </tr>
+    <>
+      <tr>
+        <td>
+          <Cell
+            primary={user.display_name || user.email}
+            secondary={
+              user.display_name ? (
+                <span className="dim">{user.email}</span>
+              ) : (
+                <Copyable value={user.id} />
+              )
+            }
+          />
+        </td>
+        <td className="r nowrap">
+          <span className="dim">{f.date(user.created_at)}</span>{" "}
+          {user.principal_id && (
+            <Btn small onClick={() => setOpen((v) => !v)}>
+              {t("admin.tokens")}
+            </Btn>
+          )}
+        </td>
+      </tr>
+      {open && user.principal_id && (
+        <tr>
+          <td colSpan={2}>
+            <Credentials principalID={user.principal_id} />
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
+/**
+ * The tokens one identity holds.
+ *
+ * Revoking lives here and not only on a person's own account screen because
+ * the credential that matters in an incident is usually not yours — it is
+ * the agent's, and whoever is dealing with it is an admin, not the agent.
+ */
+function Credentials({ principalID }: { principalID: string }) {
+  const t = useT();
+  const f = useFormat();
+  const { data, error, loading, reload } = useResource(
+    () => api.credentialsFor(principalID),
+    [principalID],
+  );
+  const [failure, setFailure] = useState<unknown>();
+
+  async function revoke(id: string) {
+    if (!window.confirm(t("admin.confirmRevokeFor"))) return;
+    setFailure(undefined);
+    try {
+      await api.revokeCredentialFor(id);
+      reload();
+    } catch (err) {
+      setFailure(err);
+    }
+  }
+
+  const credentials = data ?? [];
+
+  if (loading) return <Loading />;
+  if (error) return <ErrorState error={error} onRetry={reload} />;
+  if (credentials.length === 0) return <EmptyState title={t("admin.noTokens")} />;
+
+  return (
+    <>
+      <DataTable
+        columns={[
+          { key: "type", label: t("tokens.column.type") },
+          { key: "used", label: t("tokens.column.lastUsed"), align: "r" },
+          { key: "act", align: "r" },
+        ]}
+      >
+        {credentials.map((c) => (
+          <tr key={c.id}>
+            <td>
+              <Cell
+                primary={<Mono>{c.client_type}</Mono>}
+                secondary={
+                  c.revoked_at ? (
+                    <Badge tone="danger">{t("tokens.revoked")}</Badge>
+                  ) : (
+                    <Copyable value={c.id} />
+                  )
+                }
+              />
+            </td>
+            <td className="r">
+              <span className="dim">
+                {c.last_used_at ? f.relative(c.last_used_at) : t("common.never")}
+              </span>
+            </td>
+            <td className="r">
+              {!c.revoked_at && (
+                <Btn kind="danger" small onClick={() => void revoke(c.id)}>
+                  {t("tokens.revoke")}
+                </Btn>
+              )}
+            </td>
+          </tr>
+        ))}
+      </DataTable>
+      <div className="mt-sm">
+        <span className="dim">{t("admin.tokensLead")}</span>
+      </div>
+      {failure !== undefined && <ErrorState error={failure} />}
+    </>
   );
 }
 
@@ -285,15 +381,19 @@ function AgentRow({ agent }: { agent: ServicePrincipal }) {
   const t = useT();
   const f = useFormat();
   const [issued, setIssued] = useState<IssuedToken>();
+  const [showTokens, setShowTokens] = useState(false);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<unknown>();
 
   async function issue() {
-    if (busy) return;
+    // The token is issued for the principal the agent acts as, not for the
+    // service_principals row — they are different ids and the endpoint takes
+    // the first.
+    if (busy || !agent.principal_id) return;
     setBusy(true);
     setFailure(undefined);
     try {
-      setIssued(await api.issueTokenFor(agent.id, agent.name, 365 * 86400));
+      setIssued(await api.issueTokenFor(agent.principal_id, agent.name, 365 * 86400));
     } catch (err) {
       setFailure(err);
     } finally {
@@ -316,13 +416,25 @@ function AgentRow({ agent }: { agent: ServicePrincipal }) {
             }
           />
         </td>
-        <td className="r">
+        <td className="r nowrap">
           <span className="dim">{f.date(agent.created_at)}</span>{" "}
+          {agent.principal_id && (
+            <Btn small onClick={() => setShowTokens((v) => !v)}>
+              {t("admin.tokens")}
+            </Btn>
+          )}{" "}
           <Btn small onClick={() => void issue()} disabled={busy}>
             {busy ? t("common.loading") : t("admin.issueFor")}
           </Btn>
         </td>
       </tr>
+      {showTokens && agent.principal_id && (
+        <tr>
+          <td colSpan={2}>
+            <Credentials principalID={agent.principal_id} />
+          </td>
+        </tr>
+      )}
       {(issued || failure !== undefined) && (
         <tr>
           <td colSpan={2}>

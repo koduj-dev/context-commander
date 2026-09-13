@@ -148,6 +148,7 @@ function AddMember({ onAdded }: { onAdded: () => void }) {
       <Row gap="sm">
         <PrincipalPicker
           kind="principal"
+          includeAgents
           label={t("members.column.principal")}
           value={principal}
           onChange={setPrincipal}

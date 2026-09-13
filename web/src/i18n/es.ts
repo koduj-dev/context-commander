@@ -218,7 +218,7 @@ export const es: Partial<Record<MessageKey, string>> = {
     "El servidor nunca envía una cadena con formato. Envía el valor; la interfaz lo lee.",
 
   "members.addHelp":
-    "Por UUID del principal. Ningún punto de la API enumera los principals de una instalación, así que no hay nada entre lo que elegir — copie el UUID de la pantalla de cuenta de esa persona.",
+    "Un rol de proyecto pertenece a un principal — una persona o un agente. Aquí se ofrecen ambos si usted administra esta instalación; si no, el campo toma el id del principal, que no es lo mismo que el id de una cuenta.",
   "members.principalPlaceholder": "UUID del principal",
   "members.noRemoval":
     "Quitar a un miembro y cambiar un rol no están construidos: la API no tiene escritura para ninguno de los dos, así que esta pantalla tampoco la ofrece.",
@@ -262,7 +262,7 @@ export const es: Partial<Record<MessageKey, string>> = {
   "admin.description": "Descripción",
   "admin.security": "Registro de seguridad",
   "admin.identitiesLead":
-    "Aquí se crean las identidades de las que cuelga todo lo demás. Nada en la API enumera cuentas ni principals de servicio, así que esta página los crea y muestra lo que acaba de crear — no tiene ningún directorio que enseñarle.",
+    "Las identidades de las que cuelga todo lo demás: las personas que pueden tener un token y los agentes que actúan por su cuenta. A cada una se le puede dar aquí un token, y quitárselo.",
   "admin.securityLead":
     "Lo que el servidor rechazó: un token que no se resolvió, una capacidad denegada, una llamada limitada. Separado a propósito de la auditoría de proyecto — una denegación trata a menudo de un proyecto que quien la provoca ni siquiera puede ver, y el patrón que de verdad importa, una credencial tanteando varios proyectos, es invisible desde dentro de cualquiera de ellos.",
   "admin.securityNote":
@@ -503,7 +503,7 @@ export const es: Partial<Record<MessageKey, string>> = {
   "orgs.name": "Nombre",
   "orgs.addMember": "Añadir miembro",
   "orgs.addMemberLead":
-    "Por id de cuenta, no de principal: un rol de organización habla de una persona. Nada en la API enumera cuentas, así que no hay nada entre lo que elegir.",
+    "Un rol de organización habla de una persona, así que aquí se nombra una cuenta y no un principal — un agente actúa dentro de un proyecto y no puede tener uno de estos.",
   "orgs.userId": "Id de cuenta",
 
   "settings.title": "Ajustes",
@@ -575,4 +575,12 @@ export const es: Partial<Record<MessageKey, string>> = {
   "admin.issueFor": "Emitir un token",
   "admin.issueForLead":
     "Un token para esta identidad, no para usted. Se muestra una vez y nunca más, y quien lo tenga actúa como esta identidad.",
+
+  "picker.agent": "agente",
+  "admin.tokens": "Tokens",
+  "admin.tokensLead":
+    "Todas las credenciales emitidas a esta identidad. Revocar una surte efecto en su siguiente petición y no cambia ninguna pertenencia.",
+  "admin.noTokens": "No se ha emitido ningún token",
+  "admin.confirmRevokeFor":
+    "¿Revocar esta credencial? Lo que la esté usando dejará de funcionar de inmediato, y si es un agente en marcha fallará a mitad de su tarea.",
 };

@@ -209,18 +209,24 @@ removing a project member or changing a role, renaming or deleting a project,
 changing visibility, revoking installation admin. Each of those says so on
 the screen rather than showing a control that would fail.
 
-- [ ] **No user or service-principal directory.** `POST /installation/users`
-  and `/service-principals` exist; nothing lists them. Every screen that
-  needs to name a principal therefore asks for a UUID — adding a member,
-  looking up credentials, adding someone to an organization. This is the
-  single biggest usability gap in the interface and it is a server gap, not
-  a UI one.
+- [x] ~~No user or service-principal directory.~~ Closed 2026-09-14:
+  `GET /installation/users` and `/installation/service-principals` list them,
+  admin-gated and paginated, each row carrying both ids — the user id an
+  organization membership names and the principal id a project membership
+  names. Organization member lists join the user row, so they return a person
+  rather than a UUID. MCP has the same two reads plus `me`, `project.list`,
+  `organization.list` and `organization.list_members`.
 - [ ] **No `GET /skills/{id}`.** The skill detail screen finds its own name
   and scope by reading a version, because there is no read of the skill
   itself.
 - [ ] **No cross-project reads.** The dashboard answers "waiting on you" with
   one request per project. Bounded by membership and acceptable at this size,
   but it is the shape that will not hold at a hundred projects.
+- [ ] **Service principal names are not unique** while user emails are
+  (`migrations/000001`). Two agents may share a name, which makes a name a
+  poor thing to identify one by. Recorded in
+  `internal/identity/duplicate_integration_test.go`; adding the constraint
+  needs a migration and a decision about existing rows.
 - [ ] Project templates — agreed in the mockups (`templates.html`), no
   schema and no endpoint.
 

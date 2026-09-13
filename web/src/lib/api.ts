@@ -483,6 +483,15 @@ export type InstallationUser = {
   email: string;
   display_name: string;
   created_at: string;
+  /**
+   * Who this user ACTS AS, which is a different id from `id`.
+   *
+   * An organization membership is keyed by the user; a project membership by
+   * the principal. Sending one where the other is expected produces a
+   * foreign-key error nobody can read, so both travel together. Absent on
+   * the response to creating a user.
+   */
+  principal_id?: string;
 };
 
 export type ServicePrincipal = {
@@ -490,6 +499,8 @@ export type ServicePrincipal = {
   name: string;
   description?: string;
   created_at: string;
+  /** The principal this agent acts as — see InstallationUser.principal_id. */
+  principal_id?: string;
 };
 
 export type InstallationAdmin = {
@@ -732,6 +743,10 @@ export const api = {
     request<Page<SecurityEvent>>(withQuery("/installation/security-events", { cursor, limit })),
   credentialsFor: (principalID: string) =>
     request<Credential[]>(`/installation/principals/${principalID}/tokens`),
+  // Revoking someone else's credential. Mounted on the credential rather
+  // than on the principal because a credential id is unique on its own.
+  revokeCredentialFor: (credentialID: string) =>
+    request<void>(`/installation/tokens/${credentialID}`, { method: "DELETE" }),
   createUser: (email: string, displayName: string) =>
     request<InstallationUser>("/installation/users", {
       method: "POST",
