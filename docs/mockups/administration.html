@@ -17,7 +17,7 @@
   <a href="index.html">All screens</a>
   <span class="dim">·</span>
   <span>Administration</span>
-  <span class="grow"></span>
+  <span style="flex:1"></span>
   <span class="seg">
     <button type="button" aria-pressed="true" onclick="setTheme('dark',this)">Dark</button>
     <button type="button" aria-pressed="false" onclick="setTheme('light',this)">Light</button>
@@ -48,111 +48,27 @@
   </aside>
   <div class="main">
     <div class="topbar">
-      <div class="crumbs"><b>Administration</b></div>
+      <div class="crumbs"><span>Administration</span><span class="sep">/</span><b>Overview</b></div>
       <div class="spacer"></div>
       <div class="search"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="5"/><path d="m12 12 3 3"/></svg><span>Search</span><kbd>⌘K</kbd></div>
     </div>
     <div class="page ">
-      
+      <nav class="tabs"><a href="administration.html" class="active">Overview</a><a href="admin-users.html">Users</a><a href="admin-principals.html">Service principals</a><a href="admin-credentials.html">Credentials</a><a href="security-log.html">Security log</a><a href="admin-settings.html">Settings</a></nav>
       
 <div class="page-head">
-  <div>
-    <h1>Administration</h1>
-    <p>Installation-wide identity and credentials. Everything here is admin-only and audited.</p>
-  </div>
+  <div><h1>Administration</h1><p>The installation at a glance. Each section below has its own tab — this page answers “is anything wrong, and what changed lately”, not “show me every row”.</p></div>
   <div class="actions"><a class="btn" href="security-log.html">Security log</a><button class="btn btn-primary">Create user</button></div>
 </div>
 
-<div class="grid g-2-1">
-  <div class="grid">
-    <section class="panel">
-      <header><h2>Users</h2><span class="sub">3</span></header>
-      <div class="body tight">
-        <table class="dt">
-          <thead><tr><th>User</th><th>Email</th><th>Installation admin</th><th>Created</th><th class="r"></th></tr></thead>
-          <tbody>
-            <tr><td>Filip Majerík</td><td class="mono sec">filip@majerik.cz</td><td><span class="badge b-active"><span class="dot"></span>yes</span></td><td class="dim">11 Sep 2026</td><td class="r"><button class="btn btn-sm">Tokens</button></td></tr>
-            <tr><td>Petr Novák</td><td class="mono sec">petr@example.com</td><td class="dim">—</td><td class="dim">12 Sep 2026</td><td class="r"><button class="btn btn-sm">Tokens</button></td></tr>
-            <tr><td>Jana Dvořáková</td><td class="mono sec">jana@example.com</td><td class="dim">—</td><td class="dim">12 Sep 2026</td><td class="r"><button class="btn btn-sm">Tokens</button></td></tr>
-          </tbody>
-        </table>
-      </div>
-      <footer><span class="dim">Granting installation admin is CLI-only (<span class="mono">ccd installation grant-admin</span>). No admin can mint another over the network.</span></footer>
-    </section>
+<div class="grid g4"><section class="panel"><div class="body"><div class="kpi"><span class="v">3</span><span class="k">users</span></div></div></section><section class="panel"><div class="body"><div class="kpi"><span class="v">2</span><span class="k">service principals</span></div></div></section><section class="panel"><div class="body"><div class="kpi"><span class="v">4</span><span class="k">active credentials</span></div></div></section><section class="panel"><div class="body"><div class="kpi"><span class="v" style="color:var(--cc-warning)">12</span><span class="k">refusals / 24h</span></div></div></section></div>
 
-    <section class="panel">
-      <header><h2>Service principals</h2><span class="sub">Agents, not people</span>
-        <div class="right"><button class="btn btn-sm">Register</button></div></header>
-      <div class="body tight">
-        <table class="dt">
-          <thead><tr><th>Name</th><th>Projects</th><th>Credentials</th><th class="r">Last seen</th></tr></thead>
-          <tbody>
-            <tr><td class="mono">nightly-review-agent</td><td class="num">2</td><td class="num">1</td><td class="r dim">6h ago</td></tr>
-            <tr><td class="mono">ci-agent</td><td class="num">4</td><td class="num">2</td><td class="r dim">21m ago</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <footer><span class="dim">A service principal can never hold installation-admin rights — the table is keyed by user.</span></footer>
-    </section>
-
-    <section class="panel">
-      <header><h2>Credentials</h2><span class="sub">Personal access tokens, all principals</span></header>
-      <div class="body tight">
-        <table class="dt">
-          <thead><tr><th>Label</th><th>Acting as</th><th>Created</th><th>Last used</th><th>State</th><th class="r"></th></tr></thead>
-          <tbody>
-            <tr><td>Claude Code</td><td>Filip Majerík</td><td class="dim">11 Sep</td><td class="dim">2m ago</td><td><span class="badge b-ok"><span class="dot"></span>active</span></td><td class="r"><button class="btn btn-sm btn-danger">Revoke</button></td></tr>
-            <tr><td>Codex CLI</td><td>Filip Majerík</td><td class="dim">11 Sep</td><td class="dim">14m ago</td><td><span class="badge b-ok"><span class="dot"></span>active</span></td><td class="r"><button class="btn btn-sm btn-danger">Revoke</button></td></tr>
-            <tr><td>ci-agent</td><td><span class="mono">ci-agent</span></td><td class="dim">12 Sep</td><td class="dim">21m ago</td><td><span class="badge b-ok"><span class="dot"></span>active</span></td><td class="r"><button class="btn btn-sm btn-danger">Revoke</button></td></tr>
-            <tr><td>laptop (old)</td><td>Filip Majerík</td><td class="dim">28 Aug</td><td class="dim">4d ago</td><td><span class="badge b-danger"><span class="dot"></span>revoked</span></td><td class="r"></td></tr>
-          </tbody>
-        </table>
-      </div>
-      <footer><span class="dim">Revocation takes effect on the next request. It does not change project membership.</span></footer>
-    </section>
-  </div>
-
-  <div class="grid">
-    <section class="panel">
-      <header><h2>Sign-in</h2></header>
-      <div class="body">
-        <dl class="defs">
-          <dt>Method</dt><dd>Personal access token</dd>
-          <dt>SSO / OIDC</dt><dd><span class="badge b-warn"><span class="dot"></span>not available</span></dd>
-          <dt>LDAP</dt><dd><span class="badge b-warn"><span class="dot"></span>not available</span></dd>
-        </dl>
-        <div class="note warn mt-sm">These are on the roadmap, not in the build. They are shown as unavailable rather than as a settings page that does nothing.</div>
-      </div>
-    </section>
-
-    <section class="panel">
-      <header><h2>Storage</h2></header>
-      <div class="body">
-        <div class="kpi mb-sm"><span class="v">2.4<span class="unit"> GB</span></span><span class="k">across 7 projects</span></div>
-        <table class="dt">
-          <tbody>
-            <tr><td class="mono">acme/platform</td><td class="r num">1.1 GB</td></tr>
-            <tr><td class="mono">acme/data-platform</td><td class="r num">742 MB</td></tr>
-            <tr><td class="mono">filip/es-migration</td><td class="r num">184 MB</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <footer><span class="dim">Quotas are not enforced yet.</span></footer>
-    </section>
-
-    <section class="panel">
-      <header><h2>Backend</h2></header>
-      <div class="body">
-        <dl class="defs">
-          <dt>Object store</dt><dd>filesystem <span class="dim">/data</span></dd>
-          <dt>S3</dt><dd><span class="badge b-warn"><span class="dot"></span>experimental</span></dd>
-          <dt>Database</dt><dd>PostgreSQL 16</dd>
-          <dt>Secrets</dt><dd>local encrypted</dd>
-        </dl>
-      </div>
-    </section>
-  </div>
-</div>
+<div class="mt"><div class="grid g-2-1"><div class="stack"><section class="panel"><header><h2>Component status</h2><span class="sub">Every moving part, and the fact that matters about it</span></header><div class="body tight"><div class="status-row"><span class="name">Database</span><span class="badge b-ok"><span class="dot"></span>healthy</span><span class="detail">PostgreSQL 16 · 9 connections of 25 · migrations at 000023</span></div><div class="status-row"><span class="name">Object store</span><span class="badge b-ok"><span class="dot"></span>healthy</span><span class="detail">filesystem /data · 2.4 GB · last write 2m ago</span></div><div class="status-row"><span class="name">Outbox</span><span class="badge b-ok"><span class="dot"></span>draining</span><span class="detail">0 events pending · newest seq 4,182</span></div><div class="status-row"><span class="name">Gates</span><span class="badge b-ok"><span class="dot"></span>enforcing</span><span class="detail">2 registered · 1 denial in 7 days</span></div><div class="status-row"><span class="name">Security log</span><span class="badge b-ok"><span class="dot"></span>recording</span><span class="detail">enabled · 12 events in 24h</span></div><div class="status-row"><span class="name">Rate limiter</span><span class="badge b-ok"><span class="dot"></span>active</span><span class="detail">100 rps per credential · 1 client throttled today</span></div><div class="status-row"><span class="name">S3 backend</span><span class="badge b-warn"><span class="dot"></span>experimental</span><span class="detail">implemented but not reachable from the running server</span></div><div class="status-row"><span class="name">SSO / LDAP</span><span class="badge b-warn"><span class="dot"></span>not available</span><span class="detail">personal access tokens only</span></div></div></section><section class="panel"><header><h2>Recently active</h2><span class="sub">Who is actually using this</span></header><div class="body tight"><table class="dt"><thead><tr><th>Principal</th><th>Via</th><th class="r">Projects</th><th class="r">Last seen</th></tr></thead><tbody><tr><td>Filip Majerík</td><td><span class="sec">Claude Code</span></td><td class="r"><span class="num">7</span></td><td class="r"><span class="dim">2m ago</span></td></tr><tr><td>Filip Majerík</td><td><span class="sec">Codex CLI</span></td><td class="r"><span class="num">7</span></td><td class="r"><span class="dim">14m ago</span></td></tr><tr><td><span class="mono">ci-agent</span></td><td><span class="sec">ci-agent</span></td><td class="r"><span class="num">4</span></td><td class="r"><span class="dim">21m ago</span></td></tr><tr><td><span class="mono">nightly-review-agent</span></td><td><span class="sec">ci-agent</span></td><td class="r"><span class="num">2</span></td><td class="r"><span class="dim">6h ago</span></td></tr><tr><td>Petr Novák</td><td><span class="sec">Claude Code</span></td><td class="r"><span class="num">3</span></td><td class="r"><span class="dim">yesterday</span></td></tr></tbody></table></div><footer><a class="btn btn-sm" href="admin-credentials.html">All credentials</a></footer></section></div><div class="stack stack-start"><section class="panel"><header><h2>New users</h2></header><div class="body tight"><table class="dt"><thead><tr><th>User</th><th class="r">Added</th></tr></thead><tbody><tr><td>Jana Dvořáková</td><td class="r"><span class="dim">12 Sep</span></td></tr><tr><td>Petr Novák</td><td class="r"><span class="dim">12 Sep</span></td></tr><tr><td>Filip Majerík</td><td class="r"><span class="dim">11 Sep</span></td></tr></tbody></table></div><footer><a class="btn btn-sm" href="admin-users.html">All users</a></footer></section><section class="panel"><header><h2>Storage</h2></header><div class="body"><div class="kpi"><span class="v">2.4<span class="unit"> GB</span></span><span class="k">across 7 projects</span></div>
+      <div class="mt-sm"><div class="meter"><i style="width:24%"></i></div></div>
+      <div class="mt"><table class="dt"><thead><tr><th>Project</th><th class="r"></th></tr></thead><tbody><tr><td><span class="mono">acme/platform</span></td><td class="r"><span class="num">1.1 GB</span></td></tr><tr><td><span class="mono">acme/data-platform</span></td><td class="r"><span class="num">742 MB</span></td></tr><tr><td><span class="mono">filip/es-migration</span></td><td class="r"><span class="num">184 MB</span></td></tr></tbody></table></div></div><footer><span class="dim">Quotas are not enforced yet.</span></footer></section><section class="panel"><header><h2>Needs attention</h2></header><div class="body">
+      <div class="stack-sm">
+        <div class="note warn"><b>3 unknown credentials</b> presented in the last 24h, all from one address.</div>
+        <div class="note info"><b>acme/data-platform</b> is pinned to <span class='mono'>security-review v3</span>; v4 has shipped.</div>
+      </div></div></section></div></div></div>
 
     </div>
   </div>

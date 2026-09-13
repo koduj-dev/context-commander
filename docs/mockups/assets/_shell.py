@@ -8,6 +8,15 @@ NAV_GLOBAL = [
     ("administration.html", "Administration", "M9 2.5 3.5 5v4.2c0 3 2.3 5.2 5.5 6.3 3.2-1.1 5.5-3.3 5.5-6.3V5z M6.8 9l1.6 1.6L11.6 7", None),
 ]
 
+ADMIN_TABS = [
+    ("administration.html", "Overview"),
+    ("admin-users.html", "Users"),
+    ("admin-principals.html", "Service principals"),
+    ("admin-credentials.html", "Credentials"),
+    ("security-log.html", "Security log"),
+    ("admin-settings.html", "Settings"),
+]
+
 PROJECT_TABS = [
     ("project-overview.html", "Overview"),
     ("project-members.html", "Members"),
@@ -33,12 +42,17 @@ def nav(active):
         out.append('<a href="%s"%s>%s<span>%s</span>%s</a>' % (href, cls, icon(d), label, c))
     return "\n        ".join(out)
 
-def shell(fname, title, active, crumbs, body, tabs_active=None, page_class=""):
+def shell(fname, title, active, crumbs, body, tabs_active=None, page_class="", tabset=None):
+    """tabs_active names the current tab; tabset picks which set of tabs to
+    render (defaults to the project ones). A section with more than a couple
+    of screens' worth of rows gets tabs — one long page of everything is how
+    a table of three credentials becomes unusable at three hundred."""
     tabs = ""
     if tabs_active:
+        items = tabset if tabset is not None else PROJECT_TABS
         links = "".join(
             '<a href="%s"%s>%s</a>' % (h, ' class="active"' if h == tabs_active else '', l)
-            for h, l in PROJECT_TABS)
+            for h, l in items)
         tabs = '<nav class="tabs">%s</nav>' % links
     doc = f"""<!doctype html>
 <html lang="en" data-theme="dark">

@@ -42,7 +42,13 @@ a:hover { text-decoration: underline; }
 
 /* ---------- shell ---------- */
 
-.app { display: grid; grid-template-columns: 232px 1fr; min-height: 100vh; }
+:root { --mockbar-h: 30px; --topbar-h: 48px; }
+
+.app {
+  display: grid;
+  grid-template-columns: 232px 1fr;
+  min-height: calc(100vh - var(--mockbar-h));
+}
 
 .sidebar {
   background: var(--cc-surface-1);
@@ -50,8 +56,8 @@ a:hover { text-decoration: underline; }
   display: flex;
   flex-direction: column;
   position: sticky;
-  top: 0;
-  height: 100vh;
+  top: var(--mockbar-h);
+  height: calc(100vh - var(--mockbar-h));
 }
 
 .brand {
@@ -88,7 +94,11 @@ a:hover { text-decoration: underline; }
   color: var(--cc-text);
   box-shadow: inset 2px 0 0 var(--cc-accent-primary-visual);
 }
-.nav a .ico { width: 15px; height: 15px; flex: none; opacity: .75; }
+/* Sized globally, not only inside the nav: an inline SVG with no width
+ * fills whatever box it lands in, which is how the topbar's search icon
+ * ended up the size of a building. */
+.ico { width: 15px; height: 15px; flex: none; }
+.nav a .ico { opacity: .75; }
 .nav a.active .ico { opacity: 1; }
 .nav .count { margin-left: auto; font-size: 11px; color: var(--cc-text-muted); }
 
@@ -122,6 +132,7 @@ a:hover { text-decoration: underline; }
   border-bottom: 1px solid var(--cc-border);
   background: var(--cc-bg);
   position: sticky; top: 0; z-index: 5;
+  min-height: var(--topbar-h);
 }
 .crumbs { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--cc-text-muted); }
 .crumbs .sep { opacity: .5; }
@@ -202,6 +213,7 @@ a:hover { text-decoration: underline; }
 .grid { display: grid; gap: 14px; }
 .g2 { grid-template-columns: 1fr 1fr; }
 .g3 { grid-template-columns: repeat(3, 1fr); }
+.g4 { grid-template-columns: repeat(4, 1fr); }
 .g-2-1 { grid-template-columns: 2fr 1fr; }
 
 .panel {
@@ -234,23 +246,36 @@ a:hover { text-decoration: underline; }
 
 /* ---------- tables ---------- */
 
-table.dt { width: 100%; border-collapse: collapse; }
+/* border-collapse: separate, not collapse. A collapsed table drops the
+ * border of a sticky header cell — the header then floats with nothing
+ * under it and the first body row appears to slide beneath it. With
+ * separate borders the header owns its own rule, drawn as an inset shadow
+ * so it travels with the cell while it is stuck. */
+table.dt { width: 100%; border-collapse: separate; border-spacing: 0; }
 table.dt th {
   text-align: left;
   font-size: 10.5px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase;
   color: var(--cc-text-muted);
   padding: 8px 14px;
-  border-bottom: 1px solid var(--cc-border);
   white-space: nowrap;
+  /* Opaque, or scrolled rows show through it. */
   background: var(--cc-surface-1);
-  position: sticky; top: 48px;
+  box-shadow: inset 0 -1px 0 var(--cc-border);
+  position: sticky;
+  top: var(--topbar-h);
+  z-index: 2;
 }
 table.dt td {
   padding: 9px 14px;
   border-bottom: 1px solid var(--cc-border);
   vertical-align: middle;
+  background: var(--cc-surface-1);
 }
 table.dt tbody tr:hover td { background: var(--cc-surface-2); }
+/* A panel body that scrolls sideways becomes the sticky container, which
+ * would silently stop the header sticking. Keep the page as the scroll
+ * parent and let the container scroll only when it must. */
+.panel .body.tight { overflow-x: auto; overflow-y: visible; }
 table.dt tbody tr:last-child td { border-bottom: 0; }
 table.dt td.r, table.dt th.r { text-align: right; }
 .dim { color: var(--cc-text-muted); }
@@ -352,27 +377,96 @@ table.dt td.r, table.dt th.r { text-align: right; }
   padding: 0 5px; font-size: 10.5px; letter-spacing: .05em; text-transform: uppercase;
 }
 
-@media (max-width: 1100px) {
+/* ---------- responsive ----------
+ * Desktop-first, because this is an operator's console — but "desktop-first"
+ * is not a licence for the layout to fall apart below 1100px, which is what
+ * the single stacking breakpoint here used to do.
+ *
+ * A table is the one thing that must never be squeezed: a security log with
+ * wrapped, re-flowed columns is harder to read than one you scroll. Tables
+ * live in `.body.tight`, so that container scrolls horizontally and the rest
+ * of the page stays put. */
+
+.panel .body.tight { overflow-x: auto; }
+.tabs { overflow-x: auto; scrollbar-width: thin; }
+
+@media (max-width: 1180px) {
+  .app { grid-template-columns: 200px 1fr; }
+  .g3, .g4 { grid-template-columns: 1fr 1fr; }
+  .g-2-1 { grid-template-columns: 1fr; }
+  .search { width: 180px; }
+}
+
+@media (max-width: 900px) {
+  /* The sidebar stops being a column and becomes a strip: still the same
+   * items in the same order, still the same active marker, just laid out
+   * along the top. Collapsing it into a hamburger would hide the one thing
+   * that must stay obvious — which scope you are in. */
   .app { grid-template-columns: 1fr; }
-  .sidebar { position: static; height: auto; }
+  .sidebar {
+    position: static;
+    height: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--cc-border);
+  }
+  .brand { padding: 12px 14px; border-bottom: 0; }
+  .nav {
+    display: flex;
+    gap: 2px;
+    padding: 0 10px 8px;
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+  .nav-label { display: none; }
+  .nav a { white-space: nowrap; }
+  .nav a.active { box-shadow: inset 0 -2px 0 var(--cc-accent-primary-visual); border-radius: 5px 5px 0 0; }
+  .nav .count { margin-left: 4px; }
+  .sidebar-foot { border-top: 1px solid var(--cc-border); }
+
   .g2, .g3, .g-2-1 { grid-template-columns: 1fr; }
+  .g4 { grid-template-columns: 1fr 1fr; }
+  .page { padding: 16px; }
+  .search { display: none; }
+  table.dt th { position: static; }
+}
+
+@media (max-width: 640px) {
+  .page { padding: 12px; }
+  .page-head { flex-wrap: wrap; }
+  .page-head .actions { margin-left: 0; width: 100%; }
+  .panel > header { flex-wrap: wrap; }
+  .panel > header .right { margin-left: 0; width: 100%; }
+  .defs { grid-template-columns: 1fr; gap: 2px 0; }
+  .defs dd { margin-bottom: 7px; }
+  .mockbar { flex-wrap: wrap; row-gap: 4px; }
+  .seg button { padding: 4px 8px; }
+  .kpi .v { font-size: 19px; }
 }
 
 /* ---------- layout utilities ----------
- * These exist so a page never needs an inline style. Every inline style is
- * a small private decision, and a hundred of them is what turns a kit back
- * into a pile of one-off pages. If a layout need recurs, it gets a name
+ * These exist so a page never needs an inline style. Every inline style is a
+ * small private decision, and a hundred of them is what turns a kit back
+ * into a pile of one-off pages. If a layout need recurs, it earns a name
  * here rather than a style attribute there. */
 
 .stack { display: grid; gap: 14px; }
 .stack-sm { display: grid; gap: 9px; }
 .stack-start { align-content: start; }
 .row { display: flex; align-items: center; gap: 10px; }
-.row-sm { display: flex; align-items: center; gap: 7px; }
+.row-sm { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
 .grow { flex: 1; min-width: 0; }
+.wrap { flex-wrap: wrap; }
 .mt { margin-top: 14px; }
 .mb { margin-bottom: 14px; }
+.mt-sm { margin-top: 10px; }
+.mb-sm { margin-bottom: 10px; }
+.lead-out { margin: 0 0 10px; }
+.tail { margin: 10px 0 0; }
+.inline-badge { margin-left: 4px; }
 .nowrap { white-space: nowrap; }
+.strong { font-weight: 600; }
+.v-warn { color: var(--cc-warning); }
+.unit { font-size: 13px; font-weight: 500; }
 
 /* The small uppercase caption above a value inside a panel body. */
 .label-caps {
@@ -394,18 +488,19 @@ table.dt td.r, table.dt th.r { text-align: right; }
 .meter.warn > i { background: var(--cc-warning); }
 .meter.danger > i { background: var(--cc-danger); }
 
-.unit { font-size: 13px; font-weight: 500; }
-
 /* A document preview: rendered markdown, a skill body, a handoff note. */
-.doc {
-  border: 1px solid var(--cc-border);
-  border-radius: 6px;
-  padding: 16px;
-  background: var(--cc-bg);
-}
+.doc { border: 1px solid var(--cc-border); border-radius: 6px; padding: 16px; background: var(--cc-bg); }
 .doc h3 { margin: 0 0 8px; font-size: 15px; }
 .doc p { margin: 0 0 10px; color: var(--cc-text-secondary); }
 .doc ol, .doc ul { margin: 0; padding-left: 18px; color: var(--cc-text-secondary); line-height: 1.7; }
+
+/* Theme-swapped logo. The toggle flips `hidden` on these two, so the lockup
+ * always matches the ground it sits on — the brand ships both and neither is
+ * a recolour of the other. The [hidden] rule is explicit because a bare
+ * `display:block` silently beats the browser's own [hidden] handling, which
+ * is how both lockups once rendered at the same time. */
+.logo-dark, .logo-light { display: block; }
+.logo-dark[hidden], .logo-light[hidden] { display: none; }
 
 /* ---------- foundations page only ---------- */
 .swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 10px; }
@@ -418,18 +513,11 @@ table.dt td.r, table.dt th.r { text-align: right; }
 .specimen + .specimen { margin-top: 10px; }
 .spec-note { font-size: 12px; color: var(--cc-text-secondary); margin: 8px 0 0; }
 
-/* Utilities that replaced the last of the inline styles. Anything used more
- * than twice across the screens earns a name here. */
-.lead-out { margin: 0 0 10px; }   /* paragraph that opens a panel body */
-.tail     { margin: 10px 0 0; }   /* explanatory line closing a panel body */
-.mt-sm    { margin-top: 10px; }
-.mb-sm    { margin-bottom: 10px; }
-.inline-badge { margin-left: 4px; }
-.wrap { flex-wrap: wrap; }
-.v-warn { color: var(--cc-warning); }
-.strong { font-weight: 600; }
-
-/* Theme-swapped logo. The toggle flips the `hidden` attribute on these two,
- * so the lockup is always the variant drawn for the background it sits on —
- * the brand ships both and neither is a recolour of the other. */
-.logo-dark, .logo-light { display: block; }
+/* ---------- component status ----------
+ * A row per moving part, with the fact that matters next to it. Not a
+ * dashboard of gauges: an operator wants "is the outbox draining" answered
+ * in words, not inferred from a needle. */
+.status-row { display: flex; align-items: center; gap: 10px; padding: 9px 14px; border-bottom: 1px solid var(--cc-border); }
+.status-row:last-child { border-bottom: 0; }
+.status-row .name { min-width: 140px; font-weight: 500; }
+.status-row .detail { color: var(--cc-text-muted); font-size: 12px; flex: 1; min-width: 0; }
