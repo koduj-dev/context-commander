@@ -110,6 +110,18 @@ to guard against is not proof of anything.
   to either — mutable state that legitimately changes (crypto wrapping, skill installation/pinning)
   lives in a separate table on purpose.
 
+## Before a structural change
+
+Read [`docs/CURRENT-ARCHITECTURE.md`](docs/CURRENT-ARCHITECTURE.md) first. It
+carries the precedence rules between the architecture documents, the ADRs and
+the code, the decisions that are settled and should not be re-opened, and the
+register of places where the architecture and the repository currently differ
+on purpose.
+
+The rule that matters most: **absence from an architecture document is not a
+reason to delete implemented behaviour.** When the documents and the code
+disagree, classify the drift before changing either.
+
 ## Pull requests
 
 1. Branch off `main`.

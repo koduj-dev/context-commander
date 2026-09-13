@@ -11,11 +11,13 @@ one of them is wrong.
 | [`../README.md`](../README.md) | What is Context Commander, and what is it deliberately not? |
 | [`../CHANGELOG.md`](../CHANGELOG.md) | What shipped, and when? |
 | [`../NEXT.md`](../NEXT.md) | What has *not* been done, and in what order should it be? |
+| [`CURRENT-ARCHITECTURE.md`](CURRENT-ARCHITECTURE.md) | Which document wins when they disagree, what is settled, and where the architecture and the code currently differ. |
 
 ## Design
 
 | Document | Answers |
 |---|---|
+| [`CURRENT-ARCHITECTURE.md`](CURRENT-ARCHITECTURE.md) | Precedence between documents, settled decisions that stay settled, the drift register, and the UI framing. **Read before any structural change.** |
 | [`architecture-cookbook.md`](architecture-cookbook.md) | Why is the system shaped this way? The long-form rationale, by domain. |
 | [`adr/`](adr/) | What exactly was decided, when, and what did it rule out? One decision per file. |
 | [`context-commander-ui-spec.md`](context-commander-ui-spec.md) | What is the web UI meant to become? |
