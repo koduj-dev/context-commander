@@ -44,10 +44,16 @@ link definition at the bottom of the file.
     projects had and organizations did not. Gated on `CapOrgRead`, which
     every organization role holds, mirroring how a project member may see
     the project's member list.
-  - **RLS coverage for `domain_events`** — a count through `cc_app` with no
-    project filter, verified to fail when the policy is disabled. Still
-    uncovered and logged in NEXT.md: `audit_log`, `skill_bindings`,
-    `gate_bindings`, `project_keys`.
+  - **RLS coverage for every table that has a policy.** `domain_events`,
+    `audit_log`, `skill_bindings`, `gate_bindings` and `project_keys` all
+    gained a test that counts the table through `cc_app` with a principal
+    who should see nothing and no filter of its own — the only shape that can
+    observe a policy. Each was verified to fail with `cc_app` granted
+    `BYPASSRLS`, which is the standing way to check: before this work that
+    switch left all but nine tests in the whole suite passing.
+    `project_keys` went to `internal/auth` rather than `internal/crypto`,
+    following the latter's own note that its tests are about crypto
+    correctness and access is covered there.
   - **[`docs/README.md`](docs/README.md)** — an index of what each document
     is for, and a table of every ADR and what it decided.
 - **`ccd sync-skills`** — the client-side half docs/adr/0012 reserved and

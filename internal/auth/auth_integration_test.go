@@ -303,3 +303,51 @@ func TestNamespaceScopedSlugsDoNotCollide(t *testing.T) {
 		return nil
 	})
 }
+
+// TestRLSIsolationOfProjectKeys pins the database half for project_keys —
+// the table that holds every project's wrapped encryption key, and therefore
+// the one where a policy regression matters most. A leaked wrapped key is
+// not immediately useful (unwrapping needs the root key, docs/adr/0005), but
+// "not immediately" is the whole margin, and this table has no other
+// protection: internal/crypto's own tests run entirely as the RLS-exempt
+// owner role, deliberately, because they are about crypto correctness rather
+// than access — with a comment pointing here for the access half.
+func TestRLSIsolationOfProjectKeys(t *testing.T) {
+	f := newFixture(t)
+
+	owner := f.newUserPrincipal("keys-owner@example.test")
+	outsider := f.newUserPrincipal("keys-outsider@example.test")
+	project := f.newPersonalProject(*owner.UserID, "keys-ns", "proj")
+	f.addMember(project.ID, owner.ID, projects.RoleOwner)
+
+	// A project key, inserted the way crypto.ensureProjectKey does.
+	f.asOwner(func(tx pgx.Tx) error {
+		// wrapped_key packs the GCM nonce prefix with the ciphertext; this
+		// table has no separate nonce column (migrations/000002).
+		_, err := tx.Exec(f.ctx,
+			`INSERT INTO project_keys (project_id, key_version, wrapped_key, root_key_ref)
+			 VALUES ($1, 1, $2, 'test')`,
+			project.ID, []byte("wrapped-key-bytes"))
+		return err
+	})
+
+	countThrough := func(principalID uuid.UUID) int {
+		t.Helper()
+		var n int
+		if err := db.WithPrincipal(f.ctx, f.appPool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+			// No project filter: whatever comes back was let through by the
+			// policy itself.
+			return tx.QueryRow(f.ctx, `SELECT count(*) FROM project_keys`).Scan(&n)
+		}); err != nil {
+			t.Fatalf("count project_keys through cc_app: %v", err)
+		}
+		return n
+	}
+
+	if n := countThrough(outsider.ID); n != 0 {
+		t.Fatalf("project_keys: a non-member's session sees %d wrapped key(s) — RLS is not isolating this table", n)
+	}
+	if n := countThrough(owner.ID); n != 1 {
+		t.Fatalf("the project's own member sees %d keys, want 1", n)
+	}
+}

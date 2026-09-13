@@ -434,3 +434,55 @@ func TestAdminUnbind(t *testing.T) {
 		t.Fatalf("second Unbind: got %v, want ErrNotFound", err)
 	}
 }
+
+// TestRLSIsolationOfGateBindings pins the database half for gate_bindings.
+// A gate binding says which policy checks run against a project's writes, so
+// leaking the list tells an outsider what a project screens for — and
+// migration 000012 exists precisely because this table's visibility was got
+// wrong once already.
+func TestRLSIsolationOfGateBindings(t *testing.T) {
+	f := newEngineFixture(t)
+	f.bindGate("artifact.before_write", "project", "secret-scanner", &f.projectID)
+
+	outsider := uuid.New()
+	err := db.WithoutPrincipal(f.ctx, f.ownerPool, func(tx pgx.Tx) error {
+		userID := uuid.New()
+		if _, err := tx.Exec(f.ctx, `INSERT INTO users (id, email, display_name) VALUES ($1, $2, $3)`,
+			userID, userID.String()+"@example.test", "Outsider"); err != nil {
+			return err
+		}
+		_, err := tx.Exec(f.ctx, `INSERT INTO principals (id, kind, user_id) VALUES ($1, 'user', $2)`, outsider, userID)
+		return err
+	})
+	if err != nil {
+		t.Fatalf("seed outsider: %v", err)
+	}
+
+	err = db.WithPrincipal(f.ctx, f.appPool, db.Principal{ID: outsider}, func(tx pgx.Tx) error {
+		var n int
+		if err := tx.QueryRow(f.ctx, `SELECT count(*) FROM gate_bindings`).Scan(&n); err != nil {
+			return err
+		}
+		if n != 0 {
+			t.Fatalf("gate_bindings: a non-member's session sees %d row(s) — RLS is not isolating which gates a project runs", n)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("count gate_bindings through cc_app: %v", err)
+	}
+
+	err = db.WithPrincipal(f.ctx, f.appPool, db.Principal{ID: f.principalID}, func(tx pgx.Tx) error {
+		var n int
+		if err := tx.QueryRow(f.ctx, `SELECT count(*) FROM gate_bindings`).Scan(&n); err != nil {
+			return err
+		}
+		if n != 1 {
+			t.Fatalf("the project's own member sees %d gate bindings, want 1", n)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("count as member: %v", err)
+	}
+}

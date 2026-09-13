@@ -364,3 +364,77 @@ func TestServiceQueryAllowedForOwner(t *testing.T) {
 		t.Fatalf("Query returned %d rows, want 1", len(rows.Items))
 	}
 }
+
+// seedOutsiderPrincipal creates a principal that is a member of nothing.
+func (f *fixture) seedOutsiderPrincipal(t *testing.T) uuid.UUID {
+	t.Helper()
+	ctx := context.Background()
+	principalID := uuid.New()
+	err := db.WithoutPrincipal(ctx, f.ownerPool, func(tx pgx.Tx) error {
+		userID := uuid.New()
+		if _, err := tx.Exec(ctx, `INSERT INTO users (id, email, display_name) VALUES ($1, $2, $3)`,
+			userID, userID.String()+"@example.test", "Outsider"); err != nil {
+			return err
+		}
+		_, err := tx.Exec(ctx, `INSERT INTO principals (id, kind, user_id) VALUES ($1, 'user', $2)`, principalID, userID)
+		return err
+	})
+	if err != nil {
+		t.Fatalf("seed outsider: %v", err)
+	}
+	return principalID
+}
+
+// TestRLSIsolationBetweenProjects pins the database half for audit_log, the
+// table whose whole purpose is to record who did what — and therefore the
+// one where a policy regression would be worst.
+//
+// Every other test in this package goes through Service.Query, which filters
+// by project in SQL and so gives the right answer with RLS switched off. This
+// one counts the table through cc_app with no filter of its own, which is
+// the only shape that can observe the policy (docs/adr/0002).
+func TestRLSIsolationBetweenProjects(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+
+	err := db.WithPrincipal(ctx, f.appPool, db.Principal{ID: f.ownerPrincipal}, func(tx pgx.Tx) error {
+		return audit.Write(ctx, tx, audit.Entry{
+			ProjectID: &f.projectID, PrincipalID: &f.ownerPrincipal,
+			Action: "test.action", ResourceType: "test", Result: audit.ResultAllow,
+		})
+	})
+	if err != nil {
+		t.Fatalf("write audit row: %v", err)
+	}
+
+	outsider := f.seedOutsiderPrincipal(t)
+	err = db.WithPrincipal(ctx, f.appPool, db.Principal{ID: outsider}, func(tx pgx.Tx) error {
+		var n int
+		if err := tx.QueryRow(ctx, `SELECT count(*) FROM audit_log`).Scan(&n); err != nil {
+			return err
+		}
+		if n != 0 {
+			t.Fatalf("audit_log: a non-member's session sees %d row(s) — RLS is not isolating the record of who did what", n)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("count audit_log through cc_app: %v", err)
+	}
+
+	// The project's own member still sees it, so the policy isolates rather
+	// than hiding everything from everyone.
+	err = db.WithPrincipal(ctx, f.appPool, db.Principal{ID: f.ownerPrincipal}, func(tx pgx.Tx) error {
+		var n int
+		if err := tx.QueryRow(ctx, `SELECT count(*) FROM audit_log`).Scan(&n); err != nil {
+			return err
+		}
+		if n == 0 {
+			t.Fatal("the project's own member sees no audit rows")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("count as member: %v", err)
+	}
+}

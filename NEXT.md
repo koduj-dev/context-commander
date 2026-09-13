@@ -151,14 +151,18 @@ what exists. Phases 1–3 of it shipped (design system, Handoffs/Conversations/
 Events tabs, Administration page — see `CHANGELOG.md`). Deliberately parked
 behind Phase 1 above, per "no web UI before the CLI/MCP core loop is proven":
 
-- [ ] **Wire the Handoffs tab to the lifecycle endpoints.** `POST
-  .../handoffs/{id}/claim` and `/close` and `GET .../handoffs/current` all
-  exist as of Phase 1; the tab predates them and still only lists and
-  creates. Claim/close buttons plus a "current handoff" callout — the
-  smallest piece of UI that makes the shipped core loop visible to someone
-  who never opens a terminal.
-- [ ] **Surface a skill's content in the Skills tab.** `GET
-  .../skills/versions/{id}` exists now; the tab still shows only UUIDs.
+> **The web UI is being reworked end to end** (maintainer, 2026-09-13), so
+> the items below are inputs to that rework rather than patches to apply to
+> what exists. Wiring two buttons into a UI that is about to be replaced is
+> work thrown away twice.
+>
+> What the rework inherits, all of it server-side and already shipped:
+> handoff claim/close and a "current handoff" query; `skill.get`, a
+> searchable registry (`skill.search`) and `skill.promote`; a conversations
+> list; organization members and an organization audit trail; the security
+> event timeline. The existing tabs predate every one of those and work
+> around several of them by asking the user to paste a UUID.
+
 - [ ] Organizations / Skill Registry top-level nav, and the remaining project
   tabs (Integrations, Settings) — not yet planned.
 
@@ -203,19 +207,18 @@ on the planned move to a public repo:
   rest. Needs `--trusted-proxies` (a CIDR allowlist) plus
   `middleware.RealIP` gated on it, and only then a per-IP limit on
   unauthenticated traffic.
-- **[security] RLS is barely tested.** With `cc_app` granted `BYPASSRLS`,
-  only nine tests in the whole suite fail — everything else passes with
-  Row-Level Security effectively switched off, because it asserts through
-  the service layer, whose capability checks and explicit
-  `WHERE project_id = $1` produce the right answer on their own. RLS is
-  described as load-bearing defense in depth (docs/adr/0002) but is close to
-  unverified. `artifacts`, `handoffs`, `history`, `secrets`, `domain_events` and
-  `skills`/`skill_versions` now have a genuine assertion (a count through
-  `cc_app` with no project filter, which fails when the policy is disabled).
-  Still uncovered: `audit_log`, `skill_bindings`, `gate_bindings`,
-  `project_keys`. The cheap
-  check is to run the suite with `cc_app` given `BYPASSRLS` and see what
-  still passes.
+- **[security] Keep RLS honest as tables are added.** Every table with a
+  policy now has a test that fails when the policy is removed — `artifacts`,
+  `artifact_versions`, `handoffs`, `conversations`, `secret_values`,
+  `domain_events`, `audit_log`, `skill_bindings`, `gate_bindings`,
+  `project_keys`, `skills`/`skill_versions`, plus `project_members`/
+  `projects`/`organizations` from before. The shape that works: count the
+  table through `cc_app` with a principal who should see nothing and NO
+  filter of your own — a query with `WHERE project_id = $1` in it passes
+  with RLS switched off and proves only the service layer.
+  The standing check, worth running whenever a policy is added or changed:
+  grant `cc_app` `BYPASSRLS` in `deploy/postgres/init/01-roles.sql`, run the
+  suite, and see what still passes. It used to be everything but nine tests.
 
 ---
 
