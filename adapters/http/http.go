@@ -116,6 +116,7 @@ func NewHandler(deps Deps) http.Handler {
 
 		r.Post("/organizations", deps.createOrganization)
 		r.Post("/organizations/{id}/members", deps.addOrganizationMember)
+		r.Get("/organizations/{id}/members", deps.listOrganizationMembers)
 
 		r.Route("/installation", func(r chi.Router) {
 			r.Get("/admins", deps.listInstallationAdmins)
@@ -163,6 +164,7 @@ func NewHandler(deps Deps) http.Handler {
 
 			r.Route("/conversations", func(r chi.Router) {
 				r.Post("/", deps.createConversation)
+				r.Get("/", deps.listConversations)
 				r.Route("/{conversationID}", func(r chi.Router) {
 					r.Post("/sessions", deps.createExternalSession)
 					r.Post("/objects", deps.appendHistoryObject)

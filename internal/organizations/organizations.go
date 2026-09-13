@@ -41,6 +41,35 @@ type Membership struct {
 
 var ErrNotFound = errors.New("organizations: not found")
 
+// ListMembers returns every member of organizationID, oldest first — the
+// counterpart of projects.Store.ListMembers, which existed while this did
+// not: organizations could be added to and never enumerated, so the only
+// way to answer "who is in this organization" was SQL.
+func (s *Store) ListMembers(ctx context.Context, tx pgx.Tx, organizationID uuid.UUID) ([]Membership, error) {
+	rows, err := tx.Query(ctx,
+		`SELECT organization_id, user_id, role, created_at FROM organization_members
+		 WHERE organization_id = $1 ORDER BY created_at ASC`,
+		organizationID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("organizations: list members: %w", err)
+	}
+	defer rows.Close()
+
+	var out []Membership
+	for rows.Next() {
+		var m Membership
+		if err := rows.Scan(&m.OrganizationID, &m.UserID, &m.Role, &m.CreatedAt); err != nil {
+			return nil, fmt.Errorf("organizations: list members: scan: %w", err)
+		}
+		out = append(out, m)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("organizations: list members: %w", err)
+	}
+	return out, nil
+}
+
 type Store struct{}
 
 func NewStore() *Store { return &Store{} }

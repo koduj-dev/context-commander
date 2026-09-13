@@ -207,3 +207,47 @@ func TestNonMemberCannotList(t *testing.T) {
 		t.Fatalf("outsider listing members: err = %v, want ErrForbidden", err)
 	}
 }
+
+// TestAddMemberWritesAnAuditRow closes the backlog gap: granting a role is
+// exactly the privilege change internal/audit exists to record, and
+// "trace the origin of a change without SQL" is a stated v0.1 metric — but
+// Add never wrote a row.
+func TestAddMemberWritesAnAuditRow(t *testing.T) {
+	f := newFixture(t)
+
+	owner := f.newUserPrincipal("owner-audit@example.test")
+	target := f.newUserPrincipal("target-audit@example.test")
+	project := f.newProject(*owner.UserID, "audit-ns", "proj")
+	f.seedMember(project.ID, owner.ID, projects.RoleOwner)
+
+	if err := f.svc.Add(f.ctx, owner.ID, project.ID, target.ID, projects.RoleContributor); err != nil {
+		t.Fatalf("Add: %v", err)
+	}
+
+	f.asOwner(func(tx pgx.Tx) error {
+		rows, err := tx.Query(f.ctx,
+			`SELECT resource_id FROM audit_log WHERE project_id = $1 AND action = 'member.add'`, project.ID)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		var named []uuid.UUID
+		for rows.Next() {
+			var id uuid.UUID
+			if err := rows.Scan(&id); err != nil {
+				return err
+			}
+			named = append(named, id)
+		}
+		if err := rows.Err(); err != nil {
+			return err
+		}
+		if len(named) != 1 {
+			t.Fatalf("audit rows for member.add = %d, want 1", len(named))
+		}
+		if named[0] != target.ID {
+			t.Fatalf("audit row names %s, want the added principal %s", named[0], target.ID)
+		}
+		return nil
+	})
+}

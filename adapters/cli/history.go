@@ -22,6 +22,7 @@ func newHistoryCmd() *cobra.Command {
 	}
 	historyCmd.AddCommand(
 		newHistoryCreateConversationCmd(),
+		newHistoryListConversationsCmd(),
 		newHistoryCreateSessionCmd(),
 		newHistoryAppendObjectCmd(),
 		newHistoryListObjectsCmd(),
@@ -271,5 +272,38 @@ func newHistoryLineageCmd() *cobra.Command {
 		},
 	}
 	projectFlag(cmd)
+	return cmd
+}
+
+// newHistoryListConversationsCmd is the discovery half: before it, the only
+// way to find a conversation was to already know its id.
+func newHistoryListConversationsCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "list-conversations",
+		Short: "List a project's conversations, most recent first",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			hc, err := setupHistoryContext(cmd)
+			if err != nil {
+				return err
+			}
+			defer hc.pool.Close()
+
+			page, err := hc.svc.ListConversations(cmd.Context(), hc.principalID, hc.project.ID, pagingOptionsFrom(cmd))
+			if err != nil {
+				return err
+			}
+			if len(page.Items) == 0 {
+				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "(no conversations)")
+				return nil
+			}
+			for _, c := range page.Items {
+				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s  created %s\n", c.ID, c.CreatedAt.Format(time.RFC3339))
+			}
+			printNextCursor(cmd, page.NextCursor)
+			return nil
+		},
+	}
+	projectFlag(cmd)
+	pagingFlags(cmd)
 	return cmd
 }

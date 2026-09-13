@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/koduj-dev/context-commander/internal/audit"
 	"github.com/koduj-dev/context-commander/internal/db"
 )
 
@@ -147,10 +148,43 @@ func (s *Service) AddMember(ctx context.Context, principalID, callerUserID, orga
 	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
 		var err error
 		m, err = s.store.AddMember(ctx, tx, organizationID, newUserID, role)
-		return err
+		if err != nil {
+			return err
+		}
+		// Organization-scoped (migrations/000023): this row has no project,
+		// and until that migration it could not be written at all — the RLS
+		// policy doubled as the insert check and no project meant no
+		// access. ResourceID is the user, not a principal: organization
+		// membership is keyed by user (docs/adr/0006).
+		return audit.Write(ctx, tx, audit.Entry{
+			OrganizationID: &organizationID, PrincipalID: &principalID,
+			Action: "organization.member.add", ResourceType: "organization_member", ResourceID: &newUserID,
+			Result: audit.ResultAllow,
+		})
 	})
 	if err != nil {
 		return Membership{}, fmt.Errorf("organizations: add member: %w", err)
 	}
 	return m, nil
+}
+
+// ListMembers returns every member of organizationID. Gated on CapOrgRead,
+// which every organization role holds — the same reasoning
+// internal/members.Service.List uses for projects: a member may see who
+// else is in the organization even if they cannot change the list.
+func (s *Service) ListMembers(ctx context.Context, principalID, callerUserID, organizationID uuid.UUID) ([]Membership, error) {
+	if err := s.checkCapability(ctx, principalID, callerUserID, organizationID, CapOrgRead); err != nil {
+		return nil, err
+	}
+
+	var out []Membership
+	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+		var err error
+		out, err = s.store.ListMembers(ctx, tx, organizationID)
+		return err
+	})
+	if err != nil {
+		return nil, fmt.Errorf("organizations: list members: %w", err)
+	}
+	return out, nil
 }

@@ -12,6 +12,36 @@ link definition at the bottom of the file.
 
 ### Added
 
+- **The cheap gaps from the backlog, cleared in one pass.**
+  - **Membership changes are audited.** Neither `members.Service.Add` nor
+    `organizations.Service.AddMember` wrote an audit row, though granting a
+    role is exactly the privilege change `internal/audit` exists to record
+    and "trace the origin of a change without SQL" is a stated v0.1 metric.
+    The project half was the one-liner the backlog promised. The
+    organization half was not: `audit_log` was project-scoped and its RLS
+    policy has no separate `WITH CHECK`, so Postgres reused `USING` as the
+    insert check and a row with no project could not be written at all.
+    Migration 000023 gives `audit_log` an `organization_id`, a CHECK that
+    exactly one scope is set, and a policy that grants access through
+    either — organizations are a peer scope to projects (docs/adr/0006),
+    not something nested below them.
+  - **`GET /v1/projects/{ns}/{slug}/conversations`**, plus MCP
+    `history.list_conversations` and `ccd history list-conversations`.
+    `internal/history` could create a conversation and operate on one whose
+    id you already had, and nothing could enumerate them — so the web UI's
+    Conversations tab told people to paste an id, and a project's existing
+    conversations were undiscoverable.
+  - **`GET /v1/organizations/{id}/members`** —
+    `organizations.Store.ListMembers`/`Service.ListMembers`, the counterpart
+    projects had and organizations did not. Gated on `CapOrgRead`, which
+    every organization role holds, mirroring how a project member may see
+    the project's member list.
+  - **RLS coverage for `domain_events`** — a count through `cc_app` with no
+    project filter, verified to fail when the policy is disabled. Still
+    uncovered and logged in NEXT.md: `audit_log`, `skill_bindings`,
+    `gate_bindings`, `project_keys`.
+  - **[`docs/README.md`](docs/README.md)** — an index of what each document
+    is for, and a table of every ADR and what it decided.
 - **`ccd sync-skills`** — the client-side half docs/adr/0012 reserved and
   `cmd/ccd/main.go` had a comment promising: it resolves a project's
   effective skills and writes each one as `<dir>/<skill>/SKILL.md` (default

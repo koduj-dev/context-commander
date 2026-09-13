@@ -161,16 +161,6 @@ behind Phase 1 above, per "no web UI before the CLI/MCP core loop is proven":
   .../skills/versions/{id}` exists now; the tab still shows only UUIDs.
 - [ ] Organizations / Skill Registry top-level nav, and the remaining project
   tabs (Integrations, Settings) — not yet planned.
-- [ ] **`GET .../conversations` list endpoint** — surfaced while building the
-  Conversations tab: `internal/history` only exposes create and
-  operate-on-a-known-id, and external sessions have no list endpoint either.
-  The tab works around it the way Skills' install form does ("no browse
-  endpoint" → paste an id), so a project with existing conversations has no
-  way to discover them from the UI.
-- [ ] **Organization "list members" endpoint** — the gap closed for projects
-  (`projects.Store.ListMembers`, `GET .../members`) doesn't exist for
-  `internal/organizations`; add exists, list doesn't. Small, same pattern to
-  mirror — candidate for whichever phase touches Organizations UI.
 
 ### CI/pipeline hardening (blocked on going public)
 
@@ -186,12 +176,6 @@ on the planned move to a public repo:
 - [ ] **Restrict `allowed_actions` from `all`** — any Action from any source
   can currently run here; narrow to verified creators once public.
 - [ ] `CODEOWNERS` — not critical with a single maintainer, but cheap.
-
-### Engineering docs parity with docker-commander
-
-- [ ] `docs/README.md` as a manual index — now that the cookbook, ADRs,
-  gotchas, dev-environment and brand docs all exist, an index is no longer
-  premature.
 
 ### Packaging and distribution
 
@@ -225,22 +209,14 @@ on the planned move to a public repo:
   the service layer, whose capability checks and explicit
   `WHERE project_id = $1` produce the right answer on their own. RLS is
   described as load-bearing defense in depth (docs/adr/0002) but is close to
-  unverified. `artifacts`, `handoffs`, `history` and `secrets` now have a
-  genuine assertion (a count through `cc_app` with no project filter, which
-  fails when the policy is disabled). Still uncovered: `domain_events`,
-  `audit_log`, `skill_bindings`, `gate_bindings`, `project_keys`. The cheap
+  unverified. `artifacts`, `handoffs`, `history`, `secrets`, `domain_events` and
+  `skills`/`skill_versions` now have a genuine assertion (a count through
+  `cc_app` with no project filter, which fails when the policy is disabled).
+  Still uncovered: `audit_log`, `skill_bindings`, `gate_bindings`,
+  `project_keys`. The cheap
   check is to run the suite with `cc_app` given `BYPASSRLS` and see what
   still passes.
 
-- **Adding or removing a project/organization member writes no audit row.**
-  Surfaced while closing the ADMIN→OWNER escalation: granting a role is
-  exactly the kind of privilege change `internal/audit` exists to record, and
-  "trace the origin of a change without SQL" is a stated v0.1 metric below —
-  but neither `internal/members.Service.Add` nor
-  `organizations.Service.AddMember` calls `audit.Write`. Cheap: one
-  `audit.Write` in the same transaction as the insert, the pattern
-  `internal/artifacts.Service.Write` already uses. Deliberately left out of
-  the escalation fix to keep that change to the security boundary.
 ---
 
 ## 🎯 Definition of Done for v0.1

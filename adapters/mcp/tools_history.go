@@ -50,6 +50,32 @@ func registerHistoryTools(server *sdkmcp.Server, deps Deps, principalID, clientI
 		return nil, conversationResult{ID: c.ID.String(), CreatedAt: c.CreatedAt.Format(time.RFC3339)}, nil
 	})
 
+	type listConversationsArgs struct {
+		Project string `json:"project" jsonschema:"project path \"namespace/slug\""`
+		Limit   int    `json:"limit,omitempty" jsonschema:"max conversations to return (default 100, max 500)"`
+		Cursor  string `json:"cursor,omitempty" jsonschema:"next_cursor from a previous call, to continue into older conversations"`
+	}
+	sdkmcp.AddTool(server, &sdkmcp.Tool{
+		Name: "history.list_conversations",
+		Description: "List a project's conversations, most recent first. Use it to find an existing thread of " +
+			"work to append to or trace, instead of starting a new conversation because you had no way to " +
+			"discover the old ones.",
+	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, args listConversationsArgs) (*sdkmcp.CallToolResult, pagedResult[conversationResult], error) {
+		projectID, err := resolve(ctx, args.Project)
+		if err != nil {
+			return nil, pagedResult[conversationResult]{}, err
+		}
+		page, err := deps.History.ListConversations(ctx, principalID, projectID, pagingOptions(args.Limit, args.Cursor))
+		if err != nil {
+			return nil, pagedResult[conversationResult]{}, err
+		}
+		out := make([]conversationResult, len(page.Items))
+		for i, c := range page.Items {
+			out[i] = conversationResult{ID: c.ID.String(), CreatedAt: c.CreatedAt.Format(time.RFC3339)}
+		}
+		return nil, paged(out, page.NextCursor), nil
+	})
+
 	type externalSessionResult struct {
 		ID                      string `json:"id"`
 		ConversationID          string `json:"conversation_id"`

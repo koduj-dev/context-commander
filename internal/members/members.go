@@ -18,6 +18,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/koduj-dev/context-commander/internal/audit"
 	"github.com/koduj-dev/context-commander/internal/auth"
 	"github.com/koduj-dev/context-commander/internal/db"
 	"github.com/koduj-dev/context-commander/internal/projects"
@@ -80,8 +81,19 @@ func (s *Service) Add(ctx context.Context, principalID, projectID, targetPrincip
 	}
 
 	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
-		_, err := s.projects.AddMember(ctx, tx, projectID, targetPrincipalID, role)
-		return err
+		if _, err := s.projects.AddMember(ctx, tx, projectID, targetPrincipalID, role); err != nil {
+			return err
+		}
+		// In the same transaction as the insert, the pattern
+		// internal/artifacts.Service.Write uses: granting a role is exactly
+		// the privilege change internal/audit exists to record, and an
+		// audit row that can be lost independently of the change it
+		// describes is worse than none.
+		return audit.Write(ctx, tx, audit.Entry{
+			ProjectID: &projectID, PrincipalID: &principalID,
+			Action: "member.add", ResourceType: "project_member", ResourceID: &targetPrincipalID,
+			Result: audit.ResultAllow,
+		})
 	})
 	if err != nil {
 		return fmt.Errorf("members: add: %w", err)

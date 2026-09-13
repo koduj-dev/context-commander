@@ -106,3 +106,42 @@ func (d Deps) addOrganizationMember(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, membershipResponse{OrganizationID: m.OrganizationID.String(), UserID: m.UserID.String(), Role: string(m.Role)})
 }
+
+type organizationMemberResponse struct {
+	UserID    string `json:"user_id"`
+	Role      string `json:"role"`
+	CreatedAt string `json:"created_at"`
+}
+
+// listOrganizationMembers is the counterpart projects had and organizations
+// did not: members could be added and never enumerated, so "who is in this
+// organization" was a question only SQL could answer.
+func (d Deps) listOrganizationMembers(w http.ResponseWriter, r *http.Request) {
+	orgID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", "invalid organization id")
+		return
+	}
+
+	principalID := principalIDFrom(r.Context())
+	callerUserID, err := resolveCallerUserID(r, d.Pool, principalID)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	members, err := d.Organizations.ListMembers(r.Context(), principalID, callerUserID, orgID)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	out := make([]organizationMemberResponse, len(members))
+	for i, m := range members {
+		out[i] = organizationMemberResponse{
+			UserID: m.UserID.String(), Role: string(m.Role), CreatedAt: m.CreatedAt.Format(time.RFC3339),
+		}
+	}
+	// A bounded set, like a project's member list: no cursor
+	// (docs/architecture-cookbook.md §22.1 covers growing lists).
+	writeJSON(w, http.StatusOK, out)
+}

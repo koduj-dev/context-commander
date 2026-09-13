@@ -26,15 +26,20 @@ const (
 )
 
 type Entry struct {
-	ProjectID    *uuid.UUID
-	PrincipalID  *uuid.UUID
-	ClientID     *uuid.UUID
-	Action       string
-	ResourceType string
-	ResourceID   *uuid.UUID
-	Result       Result
-	RequestID    *string
-	EventID      *uuid.UUID
+	// Exactly one of ProjectID / OrganizationID is set — the scope the
+	// audited change belongs to, and therefore who may read the row
+	// (migrations/000023). Organizations are a peer scope to projects
+	// (docs/adr/0006), not something nested below them.
+	ProjectID      *uuid.UUID
+	OrganizationID *uuid.UUID
+	PrincipalID    *uuid.UUID
+	ClientID       *uuid.UUID
+	Action         string
+	ResourceType   string
+	ResourceID     *uuid.UUID
+	Result         Result
+	RequestID      *string
+	EventID        *uuid.UUID
 }
 
 // Write inserts an audit_log row. Callers must pass tx from
@@ -44,9 +49,9 @@ type Entry struct {
 // record.
 func Write(ctx context.Context, tx pgx.Tx, e Entry) error {
 	_, err := tx.Exec(ctx,
-		`INSERT INTO audit_log (project_id, principal_id, client_id, action, resource_type, resource_id, result, request_id, event_id)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-		e.ProjectID, e.PrincipalID, e.ClientID, e.Action, e.ResourceType, e.ResourceID, e.Result, e.RequestID, e.EventID,
+		`INSERT INTO audit_log (project_id, organization_id, principal_id, client_id, action, resource_type, resource_id, result, request_id, event_id)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+		e.ProjectID, e.OrganizationID, e.PrincipalID, e.ClientID, e.Action, e.ResourceType, e.ResourceID, e.Result, e.RequestID, e.EventID,
 	)
 	if err != nil {
 		return fmt.Errorf("audit: write: %w", err)
@@ -164,9 +169,9 @@ func WriteWithPayload(ctx context.Context, tx pgx.Tx, e Entry, payload []byte, c
 
 	var auditLogID int64
 	err := tx.QueryRow(ctx,
-		`INSERT INTO audit_log (project_id, principal_id, client_id, action, resource_type, resource_id, result, request_id, event_id)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
-		e.ProjectID, e.PrincipalID, e.ClientID, e.Action, e.ResourceType, e.ResourceID, e.Result, e.RequestID, e.EventID,
+		`INSERT INTO audit_log (project_id, organization_id, principal_id, client_id, action, resource_type, resource_id, result, request_id, event_id)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
+		e.ProjectID, e.OrganizationID, e.PrincipalID, e.ClientID, e.Action, e.ResourceType, e.ResourceID, e.Result, e.RequestID, e.EventID,
 	).Scan(&auditLogID)
 	if err != nil {
 		return fmt.Errorf("audit: write with payload: insert audit_log: %w", err)

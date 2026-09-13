@@ -75,6 +75,65 @@ func (s *Service) CreateConversation(ctx context.Context, principalID, projectID
 	return c, nil
 }
 
+// ListConversations returns one page of a project's conversations, newest
+// first.
+//
+// It closes the gap the web UI's Conversations tab has been working around
+// since it was built: internal/history could create a conversation and
+// operate on one whose id you already had, and nothing could enumerate
+// them — so a project with existing conversations had no way to discover
+// them except by pasting an id someone remembered.
+//
+// Keyed on (created_at, id), the same shape handoffs.List uses: created_at
+// alone is not unique, so the row-value comparison carries the id as the
+// tiebreaker and matches the ORDER BY exactly.
+func (s *Service) ListConversations(
+	ctx context.Context, principalID, projectID uuid.UUID, opts paging.Options,
+) (paging.Page[Conversation], error) {
+	if err := s.checkCapability(ctx, principalID, projectID, auth.CapHistoryRead); err != nil {
+		return paging.Page[Conversation]{}, err
+	}
+	cursorTime, cursorID, hasCursor, err := opts.DecodeTimeUUID()
+	if err != nil {
+		return paging.Page[Conversation]{}, err
+	}
+	limit := opts.ClampedLimit()
+
+	out := make([]Conversation, 0, limit)
+	err = db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+		rows, err := tx.Query(ctx,
+			`SELECT id, project_id, created_by_principal, created_at
+			 FROM conversations
+			 WHERE project_id = $1
+			   AND (NOT $2::bool OR (created_at, id) < ($3::timestamptz, $4::uuid))
+			 ORDER BY created_at DESC, id DESC LIMIT $5`,
+			projectID, hasCursor, cursorTime, cursorID, limit+1)
+		if err != nil {
+			return fmt.Errorf("history: list conversations: %w", err)
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var c Conversation
+			if err := rows.Scan(&c.ID, &c.ProjectID, &c.CreatedByPrincipal, &c.CreatedAt); err != nil {
+				return fmt.Errorf("history: scan conversation: %w", err)
+			}
+			out = append(out, c)
+		}
+		return rows.Err()
+	})
+	if err != nil {
+		return paging.Page[Conversation]{}, err
+	}
+
+	items, hasMore := paging.More(out, limit)
+	page := paging.Page[Conversation]{Items: items}
+	if hasMore {
+		last := items[len(items)-1]
+		page.NextCursor = paging.EncodeTimeUUID(last.CreatedAt, last.ID)
+	}
+	return page, nil
+}
+
 func (s *Service) CreateExternalSession(
 	ctx context.Context,
 	principalID, projectID, conversationID uuid.UUID,

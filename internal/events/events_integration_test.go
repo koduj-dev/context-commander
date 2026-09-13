@@ -220,3 +220,60 @@ func TestServiceListAllowedForMember(t *testing.T) {
 		t.Fatalf("List returned %d events, want 2", len(got))
 	}
 }
+
+// TestRLSIsolationBetweenProjects pins the database half for domain_events.
+// Every other test here goes through the Service, whose capability check and
+// explicit project filter give the right answer with RLS switched off
+// entirely — so none of them actually exercises the policy (docs/adr/0002
+// calls it load-bearing defense in depth). This one queries through cc_app
+// with no project filter of its own, which is the only shape that can
+// observe it.
+func TestRLSIsolationBetweenProjects(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	f.publish(t, ctx, 1)
+
+	outsiderID := uuid.New()
+	err := db.WithoutPrincipal(ctx, f.ownerPool, func(tx pgx.Tx) error {
+		userID := uuid.New()
+		if _, err := tx.Exec(ctx, `INSERT INTO users (id, email, display_name) VALUES ($1, $2, $3)`,
+			userID, userID.String()+"@example.test", "Outsider"); err != nil {
+			return err
+		}
+		_, err := tx.Exec(ctx, `INSERT INTO principals (id, kind, user_id) VALUES ($1, 'user', $2)`, outsiderID, userID)
+		return err
+	})
+	if err != nil {
+		t.Fatalf("seed outsider: %v", err)
+	}
+
+	err = db.WithPrincipal(ctx, f.appPool, db.Principal{ID: outsiderID}, func(tx pgx.Tx) error {
+		var n int
+		if err := tx.QueryRow(ctx, `SELECT count(*) FROM domain_events`).Scan(&n); err != nil {
+			return err
+		}
+		if n != 0 {
+			t.Fatalf("domain_events: a non-member's session sees %d row(s) — RLS is not isolating this table", n)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("count domain_events through cc_app: %v", err)
+	}
+
+	// And the member still sees their own, so the policy isolates rather
+	// than hiding everything from everyone.
+	err = db.WithPrincipal(ctx, f.appPool, db.Principal{ID: f.principalID}, func(tx pgx.Tx) error {
+		var n int
+		if err := tx.QueryRow(ctx, `SELECT count(*) FROM domain_events`).Scan(&n); err != nil {
+			return err
+		}
+		if n == 0 {
+			t.Fatal("the project's own member sees no events")
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("count as member: %v", err)
+	}
+}

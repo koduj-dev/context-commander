@@ -182,3 +182,34 @@ func (d Deps) getLineage(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, out)
 }
+
+type conversationListResponse struct {
+	ID                 string `json:"id"`
+	CreatedByPrincipal string `json:"created_by_principal"`
+	CreatedAt          string `json:"created_at"`
+}
+
+// listConversations lets a client discover a project's conversations
+// instead of pasting an id it had to learn some other way.
+func (d Deps) listConversations(w http.ResponseWriter, r *http.Request) {
+	project := projectFrom(r.Context())
+	principalID := principalIDFrom(r.Context())
+
+	opts, ok := pagingFrom(w, r)
+	if !ok {
+		return
+	}
+	page, err := d.History.ListConversations(r.Context(), principalID, project.ID, opts)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	out := make([]conversationListResponse, len(page.Items))
+	for i, c := range page.Items {
+		out[i] = conversationListResponse{
+			ID: c.ID.String(), CreatedByPrincipal: c.CreatedByPrincipal.String(),
+			CreatedAt: c.CreatedAt.Format(time.RFC3339),
+		}
+	}
+	writeList(w, out, page.NextCursor)
+}

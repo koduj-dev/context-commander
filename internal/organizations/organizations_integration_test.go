@@ -260,3 +260,96 @@ func TestListMineOnlyReturnsCallerMemberships(t *testing.T) {
 		t.Fatalf("ListMine(outsider) = %+v, want empty", outsiderList)
 	}
 }
+
+// TestAddMemberWritesAnAuditRow: organization membership is a privilege
+// change like any other, and until migration 000023 the row could not even
+// be written — audit_log was project-scoped and its RLS policy doubled as
+// the insert check, so a row with no project was refused outright.
+func TestAddMemberWritesAnAuditRow(t *testing.T) {
+	f := newFixture(t)
+
+	owner := f.newUser("owner-audit@example.test")
+	newcomer := f.newUser("newcomer-audit@example.test")
+	org, err := f.svc.Create(f.ctx, owner.principalID, owner.userID, "Acme")
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if _, err := f.svc.AddMember(f.ctx, owner.principalID, owner.userID, org.ID, newcomer.userID, organizations.RoleMember); err != nil {
+		t.Fatalf("AddMember: %v", err)
+	}
+
+	err = db.WithoutPrincipal(f.ctx, f.ownerPool, func(tx pgx.Tx) error {
+		rows, err := tx.Query(f.ctx,
+			`SELECT resource_id, project_id FROM audit_log
+			 WHERE organization_id = $1 AND action = 'organization.member.add'`, org.ID)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		var named []uuid.UUID
+		for rows.Next() {
+			var resourceID uuid.UUID
+			var projectID *uuid.UUID
+			if err := rows.Scan(&resourceID, &projectID); err != nil {
+				return err
+			}
+			// Migration 000023's CHECK makes the two scopes exclusive; this
+			// asserts the service picked the right one.
+			if projectID != nil {
+				t.Fatalf("an organization audit row also carries project_id %s", projectID)
+			}
+			named = append(named, resourceID)
+		}
+		if err := rows.Err(); err != nil {
+			return err
+		}
+		if len(named) != 1 {
+			t.Fatalf("audit rows = %d, want 1", len(named))
+		}
+		// Keyed by user, not principal: organization membership is
+		// (docs/adr/0006).
+		if named[0] != newcomer.userID {
+			t.Fatalf("audit row names %s, want the added user %s", named[0], newcomer.userID)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("verify audit: %v", err)
+	}
+}
+
+// TestListMembersReturnsEveryMember is the enumeration organizations never
+// had: members could be added and never listed, so "who is in this
+// organization" was answerable only in SQL.
+func TestListMembersReturnsEveryMember(t *testing.T) {
+	f := newFixture(t)
+
+	owner := f.newUser("owner-list@example.test")
+	member := f.newUser("member-list@example.test")
+	outsider := f.newUser("outsider-list@example.test")
+	org, err := f.svc.Create(f.ctx, owner.principalID, owner.userID, "Acme")
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if _, err := f.svc.AddMember(f.ctx, owner.principalID, owner.userID, org.ID, member.userID, organizations.RoleMember); err != nil {
+		t.Fatalf("AddMember: %v", err)
+	}
+
+	members, err := f.svc.ListMembers(f.ctx, owner.principalID, owner.userID, org.ID)
+	if err != nil {
+		t.Fatalf("ListMembers: %v", err)
+	}
+	if len(members) != 2 {
+		t.Fatalf("members = %d, want the creator plus the one added: %+v", len(members), members)
+	}
+
+	// A plain MEMBER may read the list — CapOrgRead, which every role holds
+	// (the same reasoning projects use for CapMemberRead).
+	if _, err := f.svc.ListMembers(f.ctx, member.principalID, member.userID, org.ID); err != nil {
+		t.Fatalf("ListMembers as a plain member: %v", err)
+	}
+	// A non-member may not.
+	if _, err := f.svc.ListMembers(f.ctx, outsider.principalID, outsider.userID, org.ID); !errors.Is(err, organizations.ErrForbidden) {
+		t.Fatalf("ListMembers as a non-member = %v, want ErrForbidden", err)
+	}
+}
