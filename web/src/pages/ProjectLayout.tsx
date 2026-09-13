@@ -60,6 +60,7 @@ export function ProjectLayout() {
         {tab(`${base}/policies`, t("gates.title"))}
         {tab(`${base}/secrets`, t("secrets.title"))}
         {tab(`${base}/members`, t("project.tab.members"))}
+        {tab(`${base}/history`, t("history.title"))}
         {tab(`${base}/activity`, t("project.tab.activity"))}
       </Tabs>
 

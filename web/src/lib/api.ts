@@ -407,7 +407,7 @@ export type SecurityEvent = {
   request_id?: string;
 };
 
-export type Conversation = { id: string; created_at: string };
+export type Conversation = { id: string; created_by_principal: string; created_at: string };
 
 export type ExternalSession = {
   id: string;
@@ -426,9 +426,25 @@ export type HistoryObject = {
   type: string;
   derived_from?: string;
   content_hash: string;
+  /** Base64. History bodies are opaque bytes on the wire — see decodeHistory. */
   content: string;
   created_at: string;
 };
+
+/**
+ * History content travels base64-encoded, because a history object is
+ * whatever a client recorded and need not be text at all. Decoding can
+ * therefore fail on something that is not UTF-8, and that is a fact about
+ * the object rather than an error to throw at the reader.
+ */
+export function decodeHistory(base64: string): string | null {
+  try {
+    const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    return null;
+  }
+}
 
 export type LineageEdge = { from_id: string; to_id: string; kind: string };
 
@@ -569,8 +585,12 @@ export const api = {
       overridable?: boolean;
     },
   ) => request<SkillBinding>(`${project(ns, slug)}/skills/install`, { method: "POST", body }),
+  // 204, not the updated binding — re-read the effective set afterwards.
+  // Only a binding made at this project's own scope can be pinned; the
+  // server refuses an inherited one with a 404 rather than silently doing
+  // nothing (internal/skills.Service.setPinned).
   setSkillPinned: (ns: string, slug: string, bindingID: string, pinned: boolean) =>
-    request<SkillBinding>(`${project(ns, slug)}/skills/${pinned ? "pin" : "unpin"}`, {
+    request<void>(`${project(ns, slug)}/skills/${pinned ? "pin" : "unpin"}`, {
       method: "POST",
       body: { binding_id: bindingID },
     }),
@@ -586,8 +606,10 @@ export const api = {
     request<Page<HistoryObject>>(
       withQuery(`${project(ns, slug)}/conversations/${conversationID}/objects`, { cursor }),
     ),
+  // A bare array: lineage is bounded by the conversation, not by how much
+  // data the system holds.
   lineage: (ns: string, slug: string, conversationID: string) =>
-    request<Page<LineageEdge>>(`${project(ns, slug)}/conversations/${conversationID}/lineage`),
+    request<LineageEdge[]>(`${project(ns, slug)}/conversations/${conversationID}/lineage`),
 
   searchSkills: (query?: string, cursor?: string, limit?: number) =>
     request<Page<CatalogEntry>>(withQuery("/skills", { q: query, cursor, limit })),

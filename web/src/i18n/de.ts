@@ -477,4 +477,36 @@ export const de: Partial<Record<MessageKey, string>> = {
   "context.budgetLimit": "Größengrenze",
   "context.apply": "Neu zusammenstellen",
   "context.eventLimit": "Ereignisse",
+
+  "skill.pinLead":
+    "Eine festgesetzte Bindung ist eine, für die sich dieses Projekt entschieden hat und die nicht verschoben werden soll. Nur eine hier entstandene Bindung lässt sich festsetzen — eine geerbte gehört diesem Projekt nicht.",
+  "skill.inherited": "Geerbt",
+
+  "history.title": "Unterhaltungen",
+  "history.lead":
+    "Was Clients von ihren eigenen Sitzungen aufgezeichnet haben, damit eine Übergabe darauf zeigen kann, wo die Arbeit tatsächlich stattfand. Nichts davon schreibt diese Oberfläche — die Clients tragen es selbst ein.",
+  "history.column.conversation": "Unterhaltung",
+  "history.column.started": "Begonnen",
+  "history.column.by": "Begonnen von",
+  "history.column.type": "Typ",
+  "history.column.recorded": "Aufgezeichnet",
+  "history.objects": "Aufgezeichnete Objekte",
+  "history.lineage": "Abstammung",
+  "history.lineageLead":
+    "Wie ein Objekt aus einem anderen hervorging — eine Zusammenfassung aus einem Mitschnitt, eine Verdichtung aus einer Zusammenfassung. Genau das verhindert, dass ein abgeleitetes Objekt für ein Original gehalten wird.",
+  "history.column.from": "Abgeleitet aus",
+  "history.column.to": "Ergab",
+  "history.column.kind": "Beziehung",
+  "history.select": "Unterhaltung auswählen",
+  "history.selectBody": "Wählen Sie links eine aus, um zu sehen, was darin aufgezeichnet wurde.",
+  "history.empty": "Keine Unterhaltungen aufgezeichnet",
+  "history.emptyBody":
+    "Ein Client zeichnet diese während der Arbeit auf. In dieses Projekt hat noch nichts eine Historie eingetragen.",
+  "history.noObjects": "In dieser Unterhaltung wurde nichts aufgezeichnet",
+  "history.noLineage": "Keine Ableitungen",
+  "history.noLineageBody":
+    "Jedes Objekt hier wurde direkt aufgezeichnet, keines ging aus einem anderen hervor.",
+  "history.notText": "Kein Text",
+  "history.notTextBody":
+    "Ein Historienobjekt ist das, was der Client aufgezeichnet hat, und diese Bytes sind kein gültiges UTF-8. Prüfsumme und Typ oben sind das, was dieser Bildschirm darüber sagen kann.",
 };

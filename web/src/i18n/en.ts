@@ -407,6 +407,33 @@ export const en = {
   "gates.emptyBody": "Nothing is intercepting operations in this project.",
   "gates.config": "Configuration",
 
+  "history.title": "Conversations",
+  "history.lead":
+    "What clients recorded of their own sessions, so a handoff can point at where the work actually happened. Nothing here is written by this interface — it is ingested by the clients themselves.",
+  "history.column.conversation": "Conversation",
+  "history.column.started": "Started",
+  "history.column.by": "Started by",
+  "history.column.type": "Type",
+  "history.column.recorded": "Recorded",
+  "history.objects": "Recorded objects",
+  "history.lineage": "Lineage",
+  "history.lineageLead":
+    "How one object was derived from another — a summary from a transcript, a compaction from a summary. It is what keeps a derived object from being mistaken for an original.",
+  "history.column.from": "Derived from",
+  "history.column.to": "Produced",
+  "history.column.kind": "Relation",
+  "history.select": "Select a conversation",
+  "history.selectBody": "Pick one on the left to see what was recorded in it.",
+  "history.empty": "No conversations recorded",
+  "history.emptyBody":
+    "A client records these as it works. Nothing has ingested history into this project yet.",
+  "history.noObjects": "Nothing recorded in this conversation",
+  "history.noLineage": "No derivations",
+  "history.noLineageBody": "Every object here was recorded directly, none derived from another.",
+  "history.notText": "Not text",
+  "history.notTextBody":
+    "A history object is whatever the client recorded, and these bytes are not valid UTF-8. The hash and the type above are what this screen can tell you about it.",
+
   "events.title": "Events",
   "events.lead":
     "The outbox stream. An event is what other systems consume; the audit record next to it is what a person reads.",
@@ -463,6 +490,9 @@ export const en = {
   "skill.notFound": "No such skill",
   "skill.notFoundBody": "It may have been published somewhere you cannot see.",
   "skill.backToRegistry": "Back to the registry",
+  "skill.pinLead":
+    "A pinned binding is one this project decided on and does not want moved. Only a binding made here can be pinned — an inherited one is not this project's to hold.",
+  "skill.inherited": "Inherited",
   "skill.pin": "Pin",
   "skill.unpin": "Unpin",
   "skill.pinned": "Pinned",

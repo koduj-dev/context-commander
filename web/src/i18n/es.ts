@@ -465,4 +465,36 @@ export const es: Partial<Record<MessageKey, string>> = {
   "context.budgetLimit": "Límite de tamaño",
   "context.apply": "Volver a ensamblar",
   "context.eventLimit": "Eventos",
+
+  "skill.pinLead":
+    "Un vínculo fijado es uno por el que este proyecto se decidió y que no quiere que se mueva. Solo puede fijarse un vínculo creado aquí — uno heredado no le pertenece a este proyecto.",
+  "skill.inherited": "Heredado",
+
+  "history.title": "Conversaciones",
+  "history.lead":
+    "Lo que los clientes registraron de sus propias sesiones, para que un traspaso pueda señalar dónde ocurrió el trabajo de verdad. Esta interfaz no escribe nada de esto — lo aportan los propios clientes.",
+  "history.column.conversation": "Conversación",
+  "history.column.started": "Iniciada",
+  "history.column.by": "Iniciada por",
+  "history.column.type": "Tipo",
+  "history.column.recorded": "Registrado",
+  "history.objects": "Objetos registrados",
+  "history.lineage": "Linaje",
+  "history.lineageLead":
+    "Cómo un objeto salió de otro — un resumen a partir de una transcripción, una compactación a partir de un resumen. Es lo que impide confundir un objeto derivado con un original.",
+  "history.column.from": "Derivado de",
+  "history.column.to": "Produjo",
+  "history.column.kind": "Relación",
+  "history.select": "Seleccione una conversación",
+  "history.selectBody": "Elija una a la izquierda para ver qué se registró en ella.",
+  "history.empty": "No hay conversaciones registradas",
+  "history.emptyBody":
+    "Un cliente las registra mientras trabaja. Todavía nada ha aportado historial a este proyecto.",
+  "history.noObjects": "En esta conversación no se registró nada",
+  "history.noLineage": "Sin derivaciones",
+  "history.noLineageBody":
+    "Todos los objetos de aquí se registraron directamente, ninguno salió de otro.",
+  "history.notText": "No es texto",
+  "history.notTextBody":
+    "Un objeto de historial es lo que el cliente registró, y estos bytes no son UTF-8 válido. El hash y el tipo de arriba son lo que esta pantalla puede contarle sobre ello.",
 };

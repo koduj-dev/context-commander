@@ -32,8 +32,9 @@ import { useProject } from "./ProjectLayout";
  */
 export function ProjectSkills() {
   const t = useT();
-  const { namespace, slug } = useProject();
+  const { project, namespace, slug } = useProject();
   const [installing, setInstalling] = useState(false);
+  const [pinning, setPinning] = useState<string>();
   const { data, error, loading, reload } = useResource(
     () => api.effectiveSkills(namespace, slug),
     [namespace, slug],
@@ -41,6 +42,18 @@ export function ProjectSkills() {
 
   const bindings = data ?? [];
   const installed = new Set(bindings.map((b) => b.skill_id));
+
+  async function setPinned(bindingID: string, pinned: boolean) {
+    setPinning(bindingID);
+    try {
+      await api.setSkillPinned(namespace, slug, bindingID, pinned);
+    } finally {
+      // Re-read either way: the call answers 204, so the effective set is
+      // the only place the new state exists.
+      setPinning(undefined);
+      reload();
+    }
+  }
 
   return (
     <>
@@ -71,7 +84,11 @@ export function ProjectSkills() {
         </div>
       )}
 
-      <Panel title={t("skills.title")} tight>
+      <Panel
+        title={t("skills.title")}
+        tight
+        footer={<span className="dim">{t("skill.pinLead")}</span>}
+      >
         {loading ? (
           <Loading />
         ) : error ? (
@@ -85,12 +102,15 @@ export function ProjectSkills() {
               { key: "scope", label: t("skills.column.livesAt") },
               { key: "version", label: t("skills.column.version") },
               { key: "state", label: t("skills.column.state"), align: "r" },
+              { key: "pin", align: "r" },
             ]}
           >
             {bindings.map((b) => (
               <tr key={b.id}>
                 <td>
-                  <Mono truncate>{b.skill_id}</Mono>
+                  <Link to={`/registry/${b.skill_id}`}>
+                    <Mono truncate>{b.skill_id}</Mono>
+                  </Link>
                 </td>
                 <td>
                   <Scope kind={b.scope}>{scopeLabel(t, b.scope)}</Scope>
@@ -102,7 +122,27 @@ export function ProjectSkills() {
                 </td>
                 <td className="r">
                   {b.managed && <Badge tone="info">managed</Badge>}{" "}
-                  {b.overridable ? null : <Badge tone="warn">locked</Badge>}
+                  {b.overridable ? null : <Badge tone="warn">locked</Badge>}{" "}
+                  {b.pinned && <Badge tone="active">{t("skill.pinned")}</Badge>}
+                </td>
+                <td className="r">
+                  {/* Only a binding this project made is this project's to
+                      hold; the server refuses an inherited one. */}
+                  {b.scope === "project" && b.scope_ref === project.id ? (
+                    <Btn
+                      small
+                      disabled={pinning !== undefined}
+                      onClick={() => void setPinned(b.id, !b.pinned)}
+                    >
+                      {pinning === b.id
+                        ? t("common.loading")
+                        : b.pinned
+                          ? t("skill.unpin")
+                          : t("skill.pin")}
+                    </Btn>
+                  ) : (
+                    <span className="dim">{t("skill.inherited")}</span>
+                  )}
                 </td>
               </tr>
             ))}
