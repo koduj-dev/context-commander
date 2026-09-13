@@ -584,3 +584,22 @@ table.dt td.r, table.dt th.r { text-align: right; }
  * measured against English and every other language is longer. */
 .status-row .name { flex: 0 1 auto; min-width: 120px; font-weight: 500; }
 .status-row .detail { color: var(--cc-text-muted); font-size: 12px; flex: 1; min-width: 0; }
+
+/* ---------- preference rows ----------
+ * A setting, its control, and what it actually produces. The preview is not
+ * decoration: "DD-MM-YYYY" is an abstraction and "13-09-2026" is the thing
+ * the person will read every day. */
+.pref { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 240px) minmax(0, 200px); gap: 12px; align-items: center; padding: 11px 14px; border-bottom: 1px solid var(--cc-border); }
+.pref:last-child { border-bottom: 0; }
+.pref .what b { display: block; font-weight: 500; }
+.pref .what span { display: block; font-size: 11.5px; color: var(--cc-text-muted); }
+.pref .preview { text-align: right; color: var(--cc-text-secondary); }
+.pref .preview .was { display: block; font-size: 11px; color: var(--cc-text-muted); text-decoration: line-through; }
+@media (max-width: 900px) {
+  .pref { grid-template-columns: 1fr; gap: 7px; }
+  .pref .preview { text-align: left; }
+}
+/* The user block is the way into personal settings — the one place in this
+ * layout that is about the reader rather than the installation. */
+a.sidebar-foot { text-decoration: none; color: inherit; }
+a.sidebar-foot:hover { background: var(--cc-surface-2); text-decoration: none; }

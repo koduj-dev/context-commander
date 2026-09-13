@@ -17,7 +17,7 @@
   <a href="index.html">All screens</a>
   <span class="dim">·</span>
   <span>Policies</span>
-  <span class="grow"></span>
+  <span style="flex:1"></span>
   <span class="seg">
     <button type="button" aria-pressed="true" onclick="setTheme('dark',this)">Dark</button>
     <button type="button" aria-pressed="false" onclick="setTheme('light',this)">Light</button>
@@ -38,13 +38,13 @@
         <div class="nav-label">Installation</div>
         <a href="administration.html"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2.5 3.5 5v4.2c0 3 2.3 5.2 5.5 6.3 3.2-1.1 5.5-3.3 5.5-6.3V5z M6.8 9l1.6 1.6L11.6 7"/></svg><span>Administration</span></a>
     </nav>
-    <div class="sidebar-foot">
+    <a class="sidebar-foot" href="preferences.html">
       <div class="avatar">FM</div>
       <div class="who">
         <b>Filip Majerík</b>
         <span>Installation admin</span>
       </div>
-    </div>
+    </a>
   </aside>
   <div class="main">
     <div class="topbar">
@@ -70,7 +70,7 @@
       <thead><tr><th>Gate</th><th>Hook</th><th>Scope</th><th>State</th><th class="r">Last 7 days</th><th class="r"></th></tr></thead>
       <tbody>
         <tr>
-          <td><span class="mono">secret-scanner</span><div class="sub-line">Refuses writes that carry credentials</div></td>
+          <td><span class="mono">secret-scanner</span><div class="dim" style="font-size:11.5px">Refuses writes that carry credentials</div></td>
           <td class="mono">artifact.before_write</td>
           <td><span class="scope installation">installation</span></td>
           <td><span class="badge b-ok"><span class="dot"></span>enforcing</span></td>
@@ -78,7 +78,7 @@
           <td class="r"><button class="btn btn-sm" disabled title="Managed at installation scope">Configure</button></td>
         </tr>
         <tr>
-          <td><span class="mono">require-handoff</span><div class="sub-line">Warns when work starts with no handoff claimed</div></td>
+          <td><span class="mono">require-handoff</span><div class="dim" style="font-size:11.5px">Warns when work starts with no handoff claimed</div></td>
           <td class="mono">artifact.before_write</td>
           <td><span class="scope project">this project</span></td>
           <td><span class="badge b-info"><span class="dot"></span>guidance</span></td>
@@ -91,7 +91,7 @@
   <footer><span class="dim">Decisions aggregate deterministically: <span class="mono">DENY &gt; ALLOW_WITH_GUIDANCE &gt; ALLOW</span>.</span></footer>
 </section>
 
-<div class="grid g-2-1 mt">
+<div class="grid g-2-1" style="margin-top:14px">
   <section class="panel">
     <header><h2>Recent decisions</h2></header>
     <div class="body tight">
@@ -109,13 +109,13 @@
   <section class="panel">
     <header><h2>Available gates</h2></header>
     <div class="body">
-      <p class="sec lead-out">Gates are trusted Go code compiled into the server. This page configures which ones run where; it never uploads policy code.</p>
+      <p class="sec" style="margin:0 0 10px">Gates are trusted Go code compiled into the server. This page configures which ones run where; it never uploads policy code.</p>
       <dl class="defs">
         <dt class="mono">secret-scanner</dt><dd class="dim">bound</dd>
         <dt class="mono">require-handoff</dt><dd class="dim">bound</dd>
         <dt class="mono">protected-artifacts</dt><dd><button class="btn btn-sm">Bind</button></dd>
       </dl>
-      <div class="note warn mt-sm">A gate that errors in a <b>before_*</b> hook fails closed. A technical failure never becomes a silent allow.</div>
+      <div class="note warn" style="margin-top:12px">A gate that errors in a <b>before_*</b> hook fails closed. A technical failure never becomes a silent allow.</div>
     </div>
   </section>
 </div>

@@ -17,7 +17,7 @@
   <a href="index.html">All screens</a>
   <span class="dim">·</span>
   <span>Skill Registry</span>
-  <span class="grow"></span>
+  <span style="flex:1"></span>
   <span class="seg">
     <button type="button" aria-pressed="true" onclick="setTheme('dark',this)">Dark</button>
     <button type="button" aria-pressed="false" onclick="setTheme('light',this)">Light</button>
@@ -38,13 +38,13 @@
         <div class="nav-label">Installation</div>
         <a href="administration.html"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2.5 3.5 5v4.2c0 3 2.3 5.2 5.5 6.3 3.2-1.1 5.5-3.3 5.5-6.3V5z M6.8 9l1.6 1.6L11.6 7"/></svg><span>Administration</span></a>
     </nav>
-    <div class="sidebar-foot">
+    <a class="sidebar-foot" href="preferences.html">
       <div class="avatar">FM</div>
       <div class="who">
         <b>Filip Majerík</b>
         <span>Installation admin</span>
       </div>
-    </div>
+    </a>
   </aside>
   <div class="main">
     <div class="topbar">
@@ -63,9 +63,9 @@
   <div class="actions"><button class="btn">Import</button><button class="btn btn-primary">New skill</button></div>
 </div>
 
-<div class="panel mb">
-  <div class="body row">
-    <input class="field grow" placeholder="Search skills by name…" value="review">
+<div class="panel" style="margin-bottom:14px">
+  <div class="body" style="display:flex;gap:10px;align-items:center">
+    <input class="field" style="flex:1" placeholder="Search skills by name…" value="review">
     <span class="seg">
       <button aria-pressed="true">All scopes</button>
       <button aria-pressed="false">Installation</button>
@@ -84,7 +84,7 @@
       <thead><tr><th>Skill</th><th>Lives at</th><th>Latest</th><th>Checksum</th><th>Trust</th><th>Author</th><th class="r"></th></tr></thead>
       <tbody>
         <tr>
-          <td><a href="registry-skill.html" class="mono">code-review</a><div class="sub-line">Check the error paths first, then the happy path</div></td>
+          <td><a href="registry-skill.html" class="mono">code-review</a><div class="dim" style="font-size:11.5px">Check the error paths first, then the happy path</div></td>
           <td><span class="scope project">filip/es-migration</span></td>
           <td class="mono">v3</td>
           <td class="mono dim">83e65ad0</td>
@@ -93,7 +93,7 @@
           <td class="r"><button class="btn btn-sm">Install</button></td>
         </tr>
         <tr>
-          <td><a href="registry-skill.html" class="mono">es-review</a><div class="sub-line">Verify mapping compatibility before reindexing</div></td>
+          <td><a href="registry-skill.html" class="mono">es-review</a><div class="dim" style="font-size:11.5px">Verify mapping compatibility before reindexing</div></td>
           <td><span class="scope organization">acme</span></td>
           <td class="mono">v3</td>
           <td class="mono dim">c732a13e</td>
@@ -102,7 +102,7 @@
           <td class="r"><button class="btn btn-sm">Install</button></td>
         </tr>
         <tr>
-          <td><a href="registry-skill.html" class="mono">security-review</a><div class="sub-line">Checklist applied before any release</div></td>
+          <td><a href="registry-skill.html" class="mono">security-review</a><div class="dim" style="font-size:11.5px">Checklist applied before any release</div></td>
           <td><span class="scope installation">installation</span></td>
           <td class="mono">v4</td>
           <td class="mono dim">38c1ffb3</td>
@@ -113,10 +113,10 @@
       </tbody>
     </table>
   </div>
-  <footer><div class="pager"><span class="count">Showing <span class="num">3</span> skills · complete</span><span class="spacer"></span><select aria-label="Page size"><option selected>25 per page</option><option>50 per page</option><option>100 per page</option><option>250 per page</option></select><span class="dim">end of list</span></div></footer>
+  <footer><span class="dim">A skill is visible where it lives. Publishing puts it in your project; promoting moves it to a wider shelf.</span></footer>
 </section>
 
-<div class="grid g2 mt">
+<div class="grid g2" style="margin-top:14px">
   <section class="panel">
     <header><h2>How agents use this</h2></header>
     <div class="body">
@@ -124,13 +124,13 @@
    → latest_version_id, latest_checksum
 skill.get     skill_version_id
    → content, verified against checksum</div>
-      <p class="dim tail">An agent remembers the checksum it loaded and compares on a later search. It re-downloads only when the skill actually changed.</p>
+      <p class="dim" style="margin:10px 0 0">An agent remembers the checksum it loaded and compares on a later search. It re-downloads only when the skill actually changed.</p>
     </div>
   </section>
   <section class="panel">
     <header><h2>Supply chain</h2></header>
     <div class="body">
-      <p class="sec lead-out">Every version is immutable and carries a SHA-256 of its packaged content, verified on every read. Content that no longer matches is refused rather than served.</p>
+      <p class="sec" style="margin:0 0 10px">Every version is immutable and carries a SHA-256 of its packaged content, verified on every read. Content that no longer matches is refused rather than served.</p>
       <div class="note warn">Trust status is <b>unverified</b> for everything published locally. Signing and an approval workflow are not built yet — the badge says so instead of implying a check that does not happen.</div>
     </div>
   </section>

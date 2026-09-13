@@ -17,7 +17,7 @@
   <a href="index.html">All screens</a>
   <span class="dim">·</span>
   <span>Project overview</span>
-  <span class="grow"></span>
+  <span style="flex:1"></span>
   <span class="seg">
     <button type="button" aria-pressed="true" onclick="setTheme('dark',this)">Dark</button>
     <button type="button" aria-pressed="false" onclick="setTheme('light',this)">Light</button>
@@ -38,13 +38,13 @@
         <div class="nav-label">Installation</div>
         <a href="administration.html"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2.5 3.5 5v4.2c0 3 2.3 5.2 5.5 6.3 3.2-1.1 5.5-3.3 5.5-6.3V5z M6.8 9l1.6 1.6L11.6 7"/></svg><span>Administration</span></a>
     </nav>
-    <div class="sidebar-foot">
+    <a class="sidebar-foot" href="preferences.html">
       <div class="avatar">FM</div>
       <div class="who">
         <b>Filip Majerík</b>
         <span>Installation admin</span>
       </div>
-    </div>
+    </a>
   </aside>
   <div class="main">
     <div class="topbar">
@@ -64,7 +64,7 @@
 </div>
 
 <div class="grid g-2-1">
-  <div class="grid">
+  <div class="grid" style="gap:14px">
 
     <section class="panel">
       <header>
@@ -73,17 +73,17 @@
         <div class="right"><span class="dim">claimed 38m ago by <span class="mono">Codex CLI</span></span></div>
       </header>
       <div class="body">
-        <div class="grid">
+        <div class="grid" style="gap:11px">
           <div>
-            <div class="dim label-caps">Summary</div>
+            <div class="dim" style="font-size:11px;text-transform:uppercase;letter-spacing:.07em;margin-bottom:3px">Summary</div>
             products index migrated, orders index still on the old mapping
           </div>
           <div>
-            <div class="dim label-caps">Next actions</div>
+            <div class="dim" style="font-size:11px;text-transform:uppercase;letter-spacing:.07em;margin-bottom:3px">Next actions</div>
             reindex orders the same way, then flip the alias
           </div>
           <div>
-            <div class="dim label-caps">References</div>
+            <div class="dim" style="font-size:11px;text-transform:uppercase;letter-spacing:.07em;margin-bottom:3px">References</div>
             <a href="#" class="mono">notes/decisions.md</a> <span class="dim">· v2</span>
           </div>
         </div>
@@ -138,13 +138,13 @@
     </section>
   </div>
 
-  <div class="grid">
+  <div class="grid" style="gap:14px; align-content:start">
     <section class="panel">
       <header><h2>Identity</h2></header>
       <div class="body">
         <dl class="defs">
           <dt>Path</dt><dd class="mono">filip/es-migration</dd>
-          <dt>UUID</dt><dd class="mono sub-line">be53de32-7597-495a-ba7c-2ed8546315b1</dd>
+          <dt>UUID</dt><dd class="mono" style="font-size:11.5px">be53de32-7597-495a-ba7c-2ed8546315b1</dd>
           <dt>Namespace</dt><dd>personal <span class="dim">· private</span></dd>
           <dt>You are</dt><dd><span class="badge b-active"><span class="dot"></span>OWNER</span></dd>
           <dt>Created</dt><dd class="dim">11 Sep 2026</dd>
@@ -158,9 +158,9 @@
       <div class="body tight">
         <table class="dt">
           <tbody>
-            <tr><td>Filip Majerík<div class="sub-line">user</div></td><td class="r">OWNER</td></tr>
-            <tr><td>Petr Novák<div class="sub-line">user</div></td><td class="r">READER</td></tr>
-            <tr><td><span class="mono">nightly-review-agent</span><div class="sub-line">service principal</div></td><td class="r">CONTRIBUTOR</td></tr>
+            <tr><td>Filip Majerík<div class="dim" style="font-size:11.5px">user</div></td><td class="r">OWNER</td></tr>
+            <tr><td>Petr Novák<div class="dim" style="font-size:11.5px">user</div></td><td class="r">READER</td></tr>
+            <tr><td><span class="mono">nightly-review-agent</span><div class="dim" style="font-size:11.5px">service principal</div></td><td class="r">CONTRIBUTOR</td></tr>
           </tbody>
         </table>
       </div>
@@ -171,7 +171,7 @@
       <div class="body tight">
         <table class="dt">
           <tbody>
-            <tr><td><span class="mono">secret-scanner</span><div class="sub-line">artifact.before_write</div></td><td class="r"><span class="badge b-ok"><span class="dot"></span>enforcing</span></td></tr>
+            <tr><td><span class="mono">secret-scanner</span><div class="dim" style="font-size:11.5px">artifact.before_write</div></td><td class="r"><span class="badge b-ok"><span class="dot"></span>enforcing</span></td></tr>
           </tbody>
         </table>
       </div>
@@ -181,8 +181,10 @@
     <section class="panel">
       <header><h2>Storage</h2></header>
       <div class="body">
-        <div class="kpi mb-sm"><span class="v">184<span class="unit"> MB</span></span><span class="k">of 2 GB project quota</span></div>
-        <div class="meter"><i style="width:9%"></i></div>
+        <div class="kpi" style="margin-bottom:9px"><span class="v">184<span style="font-size:13px"> MB</span></span><span class="k">of 2 GB project quota</span></div>
+        <div style="height:5px;border-radius:3px;background:var(--cc-surface-3);overflow:hidden">
+          <div style="width:9%;height:100%;background:var(--cc-accent-secondary-visual)"></div>
+        </div>
       </div>
     </section>
   </div>

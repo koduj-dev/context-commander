@@ -269,6 +269,25 @@ on the planned move to a public repo:
   - Keep the door open for scripts that are not Latin and for right-to-left,
     without building for them now: no text baked into images, no layout that
     depends on a string's length, no icon carrying meaning alone.
+- **Per-user localization, not just translation.** A language is only half of
+  it. The other half is how a person wants values written, and it belongs to
+  the account rather than the browser, so it follows them between machines and
+  clients:
+  - date format (ISO, DD/MM, MM/DD, or follow the language), 12/24-hour
+    clock, **time zone**, and whether audit and security screens also show
+    UTC — correlating an incident with someone in another zone is exactly
+    when a local-only timestamp costs an hour;
+  - number format (`1,284.50` / `1 284,50` / `1.284,50`) and **storage
+    units**: `2.40 GB` and `2.24 GiB` are the same 2,400,000,000 bytes, and
+    which one a person reads is their call, not the product's.
+  - Needs a home in the schema — a preferences row per user — and an endpoint
+    to read and write it. Nothing like it exists today.
+  - **The rule this imposes on every endpoint:** the server returns values,
+    never formatted strings. RFC3339 timestamps and integer byte counts, not
+    `"2.4 GB"` or `"13 Sep 2026"` — a server that formats has made the choice
+    on the user's behalf, in a language it guessed and a timezone it does not
+    know. The current API already does this; it must keep doing it.
+  - Mocked in `docs/mockups/preferences.html`.
 - **[security] Keep RLS honest as tables are added.** Every table with a
   policy now has a test that fails when the policy is removed — `artifacts`,
   `artifact_versions`, `handoffs`, `conversations`, `secret_values`,

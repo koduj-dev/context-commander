@@ -17,7 +17,7 @@
   <a href="index.html">All screens</a>
   <span class="dim">·</span>
   <span>security-review</span>
-  <span class="grow"></span>
+  <span style="flex:1"></span>
   <span class="seg">
     <button type="button" aria-pressed="true" onclick="setTheme('dark',this)">Dark</button>
     <button type="button" aria-pressed="false" onclick="setTheme('light',this)">Light</button>
@@ -38,13 +38,13 @@
         <div class="nav-label">Installation</div>
         <a href="administration.html"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2.5 3.5 5v4.2c0 3 2.3 5.2 5.5 6.3 3.2-1.1 5.5-3.3 5.5-6.3V5z M6.8 9l1.6 1.6L11.6 7"/></svg><span>Administration</span></a>
     </nav>
-    <div class="sidebar-foot">
+    <a class="sidebar-foot" href="preferences.html">
       <div class="avatar">FM</div>
       <div class="who">
         <b>Filip Majerík</b>
         <span>Installation admin</span>
       </div>
-    </div>
+    </a>
   </aside>
   <div class="main">
     <div class="topbar">
@@ -57,7 +57,7 @@
       
 <div class="page-head">
   <div>
-    <h1 class="mono">security-review</h1>
+    <h1 class="mono" style="font-size:18px">security-review</h1>
     <p>Checklist applied before any release. Lives on the installation shelf, so every project here can find it.</p>
   </div>
   <div class="actions">
@@ -67,17 +67,17 @@
 </div>
 
 <div class="grid g-2-1">
-  <div class="grid">
+  <div class="grid" style="gap:14px">
     <section class="panel">
       <header>
         <h2>Content</h2><span class="sub">v4 · read-only, published versions are immutable</span>
         <div class="right"><span class="seg"><button aria-pressed="true">Rendered</button><button aria-pressed="false">Source</button><button aria-pressed="false">Diff v3 → v4</button></span></div>
       </header>
       <div class="body">
-        <div class="doc">
-          <h3>Security review</h3>
-          <p class="sec lead-out">Run before tagging a release. Stop at the first item that fails and report it rather than continuing.</p>
-          <ol class="sec">
+        <div style="border:1px solid var(--cc-border);border-radius:6px;padding:16px;background:var(--cc-bg)">
+          <h3 style="margin:0 0 8px;font-size:15px">Security review</h3>
+          <p class="sec" style="margin:0 0 10px">Run before tagging a release. Stop at the first item that fails and report it rather than continuing.</p>
+          <ol class="sec" style="margin:0;padding-left:18px;line-height:1.7">
             <li>No credential-shaped strings in any changed file.</li>
             <li>Every new endpoint has an authorization check in the domain service, not the adapter.</li>
             <li>New tables have an RLS policy and a test that fails when the policy is removed.</li>
@@ -94,7 +94,7 @@
         <table class="dt">
           <thead><tr><th>Version</th><th>Checksum</th><th>Published</th><th>By</th><th class="r">In use</th></tr></thead>
           <tbody>
-            <tr><td class="mono">v4 <span class="badge b-active inline-badge"><span class="dot"></span>latest</span></td><td class="mono dim">38c1ffb3d951afe4</td><td class="dim">12 Sep 2026</td><td class="sec">Filip Majerík</td><td class="r"><span class="num">4</span> <span class="dim">projects</span></td></tr>
+            <tr><td class="mono">v4 <span class="badge b-active" style="margin-left:4px"><span class="dot"></span>latest</span></td><td class="mono dim">38c1ffb3d951afe4</td><td class="dim">12 Sep 2026</td><td class="sec">Filip Majerík</td><td class="r"><span class="num">4</span> <span class="dim">projects</span></td></tr>
             <tr><td class="mono">v3</td><td class="mono dim">a1f0c7ee2b34d905</td><td class="dim">04 Sep 2026</td><td class="sec">Filip Majerík</td><td class="r"><span class="num">3</span> <span class="dim">projects</span></td></tr>
             <tr><td class="mono">v2</td><td class="mono dim">7c22b9a4f1e8330d</td><td class="dim">28 Aug 2026</td><td class="sec">Filip Majerík</td><td class="r dim">—</td></tr>
             <tr><td class="mono">v1</td><td class="mono dim">0b5e1d7cc8a24416</td><td class="dim">21 Aug 2026</td><td class="sec">Filip Majerík</td><td class="r dim">—</td></tr>
@@ -105,12 +105,12 @@
     </section>
   </div>
 
-  <div class="grid">
+  <div class="grid" style="gap:14px;align-content:start">
     <section class="panel">
       <header><h2>Package</h2></header>
       <div class="body">
         <dl class="defs">
-          <dt>Skill ID</dt><dd class="mono sub-line">030c9d3b-149d-4308-814a</dd>
+          <dt>Skill ID</dt><dd class="mono" style="font-size:11.5px">030c9d3b-149d-4308-814a</dd>
           <dt>Lives at</dt><dd><span class="scope installation">installation</span></dd>
           <dt>Author</dt><dd>acme</dd>
           <dt>Origin</dt><dd class="mono">local</dd>
@@ -123,9 +123,9 @@
     <section class="panel">
       <header><h2>Declared capabilities</h2></header>
       <div class="body">
-        <p class="dim sub-line lead-out">What the package says it needs. Declared, not enforced — treat it as a label on the box.</p>
+        <p class="dim" style="margin:0 0 9px;font-size:12px">What the package says it needs. Declared, not enforced — treat it as a label on the box.</p>
         <span class="badge"><span class="dot"></span>filesystem</span>
-        <div class="note warn mt-sm">Contains no executable scripts and requests no network access.</div>
+        <div class="note warn" style="margin-top:12px">Contains no executable scripts and requests no network access.</div>
       </div>
     </section>
 

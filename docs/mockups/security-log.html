@@ -17,7 +17,7 @@
   <a href="index.html">All screens</a>
   <span class="dim">·</span>
   <span>Security log</span>
-  <span class="grow"></span>
+  <span style="flex:1"></span>
   <span class="seg">
     <button type="button" aria-pressed="true" onclick="setTheme('dark',this)">Dark</button>
     <button type="button" aria-pressed="false" onclick="setTheme('light',this)">Light</button>
@@ -38,13 +38,13 @@
         <div class="nav-label">Installation</div>
         <a href="administration.html" class="active"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2.5 3.5 5v4.2c0 3 2.3 5.2 5.5 6.3 3.2-1.1 5.5-3.3 5.5-6.3V5z M6.8 9l1.6 1.6L11.6 7"/></svg><span>Administration</span></a>
     </nav>
-    <div class="sidebar-foot">
+    <a class="sidebar-foot" href="preferences.html">
       <div class="avatar">FM</div>
       <div class="who">
         <b>Filip Majerík</b>
         <span>Installation admin</span>
       </div>
-    </div>
+    </a>
   </aside>
   <div class="main">
     <div class="topbar">
@@ -53,7 +53,7 @@
       <div class="search"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="5"/><path d="m12 12 3 3"/></svg><span>Search</span><kbd>⌘K</kbd></div>
     </div>
     <div class="page ">
-      <nav class="tabs"><a href="administration.html">Overview</a><a href="admin-users.html">Users</a><a href="admin-principals.html">Service principals</a><a href="admin-credentials.html">Credentials</a><a href="security-log.html" class="active">Security log</a><a href="admin-settings.html">Settings</a></nav>
+      
       
 <div class="page-head">
   <div>
@@ -63,9 +63,9 @@
   <div class="actions"><button class="btn">Export</button></div>
 </div>
 
-<div class="grid g3 mb">
+<div class="grid g3" style="margin-bottom:14px">
   <section class="panel"><div class="body"><div class="kpi"><span class="v">12</span><span class="k">refusals in 24h</span></div></div></section>
-  <section class="panel"><div class="body"><div class="kpi"><span class="v v-warn">3</span><span class="k">unknown credentials</span></div></div></section>
+  <section class="panel"><div class="body"><div class="kpi"><span class="v" style="color:var(--cc-warning)">3</span><span class="k">unknown credentials</span></div></div></section>
   <section class="panel"><div class="body"><div class="kpi"><span class="v">1</span><span class="k">rate-limited client</span></div></div></section>
 </div>
 
@@ -128,11 +128,10 @@
       </tbody>
     </table>
   </div>
-  <footer><div class="pager"><span class="count">Showing <span class="num">5</span> events · more available</span><span class="spacer"></span><select aria-label="Page size"><option>25 per page</option><option selected>50 per page</option><option>100 per page</option><option>250 per page</option></select><button class="btn btn-sm">Load more</button></div></footer>
+  <footer><span class="dim">Reasons are fixed strings. No request bodies, no tokens, no project content — this page is readable by every installation admin.</span></footer>
 </section>
 
-<div class="note mt">Reasons are fixed strings. No request bodies, no tokens, no project content — this page is readable by every installation admin.</div>
-<div class="note info mt">
+<div class="note info" style="margin-top:14px">
   Recording can be turned off with <span class="mono">ccd serve --security-log=false</span>. It is all-or-nothing on purpose: a half-recorded security timeline reads as a complete one. The server warns at startup when it runs without it.
 </div>
 

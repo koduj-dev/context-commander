@@ -88,13 +88,13 @@ def shell(fname, title, active, crumbs, body, tabs_active=None, page_class="", t
     <nav class="nav">
         {nav(active)}
     </nav>
-    <div class="sidebar-foot">
+    <a class="sidebar-foot" href="preferences.html">
       <div class="avatar">FM</div>
       <div class="who">
         <b>Filip Majerík</b>
         <span>Installation admin</span>
       </div>
-    </div>
+    </a>
   </aside>
   <div class="main">
     <div class="topbar">
