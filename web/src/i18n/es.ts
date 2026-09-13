@@ -394,4 +394,49 @@ export const es: Partial<Record<MessageKey, string>> = {
   "events.column.resource": "Recurso",
   "events.column.payload": "Carga",
   "events.empty": "Todavía no hay eventos",
+
+  "skill.versions": "Versiones",
+  "skill.versionsLead":
+    "Todas las versiones publicadas alguna vez con este nombre. Una versión publicada es inmutable — volver a publicar añade una fila aquí, nunca edita una.",
+  "skill.content": "Contenido",
+  "skill.contentLead": "Lo que recibe un agente cuando se resuelve esta versión.",
+  "skill.provenance": "Procedencia",
+  "skill.checksum": "Suma de verificación",
+  "skill.capabilities": "Capacidades declaradas",
+  "skill.author": "Autoría",
+  "skill.origin": "Origen",
+  "skill.promote": "Promover",
+  "skill.promoteLead":
+    "Llevar el skill a un ámbito más amplio para que lo vean más proyectos. Solo en un sentido: volver a estrecharlo se lo quitaría de debajo a vínculos que eran legítimos cuando se crearon.",
+  "skill.promoteTo": "Mover a",
+  "skill.promoted": "Ahora reside en el ámbito {scope}",
+  "skill.install": "Instalar",
+  "skill.installed": "Instalado",
+  "skill.installLead":
+    "Vincular una versión de un skill a este proyecto. El vínculo nombra una versión concreta — no hay resolutor de rangos de versión, así que nada cambia por debajo.",
+  "skill.notFound": "No existe ese skill",
+  "skill.notFoundBody": "Puede haberse publicado en un sitio que usted no puede ver.",
+  "skill.backToRegistry": "Volver al registro",
+  "skill.pin": "Fijar",
+  "skill.unpin": "Soltar",
+  "skill.pinned": "Fijado",
+
+  "handoff.createLead":
+    "Lo que la siguiente persona o el siguiente agente necesita para continuar. Aquí lo escribe una persona; los agentes escriben lo mismo por MCP.",
+  "handoff.summaryHelp": "Una línea. De qué va este trabajo.",
+  "handoff.completedHelp": "Lo que ya está hecho, para que nadie lo repita.",
+  "handoff.nextHelp": "Qué hacer a continuación, con detalle suficiente para empezar.",
+  "handoff.created": "Traspaso creado",
+  "handoff.confirmClose": "¿Cerrar este traspaso? Dejará de ser el actual y nadie podrá tomarlo.",
+  "handoff.openExists": "Aquí ya hay un traspaso abierto",
+  "handoff.openExistsBody":
+    "Ciérrelo antes de dejar otro — dos traspasos abiertos vuelven ambigua la pregunta «¿qué recojo?», que es justo la que existen para responder.",
+
+  "projects.create": "Nuevo proyecto",
+  "projects.createLead":
+    "Una ruta y un nombre. La ruta es como se refiere la gente al proyecto y no puede cambiarse después; usted pasa a ser su propietaria o propietario.",
+  "projects.path": "Ruta",
+  "projects.pathHelp": "espacio-de-nombres/identificador",
+  "projects.name": "Nombre visible",
+  "projects.created": "{path} creado",
 };

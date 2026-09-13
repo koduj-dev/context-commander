@@ -1,18 +1,23 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useT } from "../i18n";
 import { api } from "../lib/api";
-import { scopeLabel } from "../lib/labels";
-import { useResource } from "../lib/resource";
+import { scopeLabel, trustLabel } from "../lib/labels";
+import { useDebounced, useList, useResource } from "../lib/resource";
 import {
   Badge,
+  Btn,
+  Cell,
   DataTable,
   EmptyState,
   ErrorState,
   Loading,
   Mono,
   PageHead,
+  Pager,
   Panel,
   Scope,
+  TextField,
 } from "../ui";
 import { useProject } from "./ProjectLayout";
 
@@ -28,12 +33,14 @@ import { useProject } from "./ProjectLayout";
 export function ProjectSkills() {
   const t = useT();
   const { namespace, slug } = useProject();
+  const [installing, setInstalling] = useState(false);
   const { data, error, loading, reload } = useResource(
     () => api.effectiveSkills(namespace, slug),
     [namespace, slug],
   );
 
   const bindings = data ?? [];
+  const installed = new Set(bindings.map((b) => b.skill_id));
 
   return (
     <>
@@ -41,11 +48,28 @@ export function ProjectSkills() {
         title={t("skills.title")}
         lead={t("skills.lead")}
         actions={
-          <Link className="btn" to="/registry">
-            {t("skills.browse")}
-          </Link>
+          <>
+            <Link className="btn" to="/registry">
+              {t("skills.browse")}
+            </Link>
+            <Btn kind="primary" onClick={() => setInstalling((v) => !v)}>
+              {t("skills.install")}
+            </Btn>
+          </>
         }
       />
+
+      {installing && (
+        <div className="mb">
+          <InstallSkill
+            installed={installed}
+            onInstalled={() => {
+              reload();
+              setInstalling(false);
+            }}
+          />
+        </div>
+      )}
 
       <Panel title={t("skills.title")} tight>
         {loading ? (
@@ -86,5 +110,128 @@ export function ProjectSkills() {
         )}
       </Panel>
     </>
+  );
+}
+
+/**
+ * Installing a skill into this project.
+ *
+ * It searches the same catalogue the registry screen does, because that is
+ * the only list of installable things the API offers — and it pins the
+ * latest version, since a binding names one concrete version and the newest
+ * is the only one a person picking from a search result has actually seen.
+ * A specific older version is chosen from the skill's own screen.
+ */
+function InstallSkill({
+  installed,
+  onInstalled,
+}: {
+  installed: Set<string>;
+  onInstalled: () => void;
+}) {
+  const t = useT();
+  const { project, namespace, slug } = useProject();
+  const [query, setQuery] = useState("");
+  const debounced = useDebounced(query);
+  const [busy, setBusy] = useState<string>();
+  const [failure, setFailure] = useState<unknown>();
+
+  const list = useList((cursor) => api.searchSkills(debounced || undefined, cursor), [debounced]);
+
+  async function install(skillID: string, versionID: string) {
+    setBusy(skillID);
+    setFailure(undefined);
+    try {
+      await api.installSkill(namespace, slug, {
+        scope: "project",
+        scope_ref: project.id,
+        skill_id: skillID,
+        skill_version_id: versionID,
+        overridable: true,
+      });
+      onInstalled();
+    } catch (err) {
+      setFailure(err);
+    } finally {
+      setBusy(undefined);
+    }
+  }
+
+  return (
+    <Panel
+      title={t("skills.install")}
+      right={
+        <TextField
+          label={t("registry.search")}
+          type="search"
+          value={query}
+          onChange={setQuery}
+          placeholder={t("registry.search")}
+        />
+      }
+      tight
+      footer={
+        <>
+          <span className="dim">{t("skill.installLead")}</span>
+          <Pager
+            shown={list.items.length}
+            hasMore={list.hasMore}
+            onLoadMore={list.loadMore}
+            busy={list.loadingMore}
+          />
+        </>
+      }
+    >
+      {list.loading ? (
+        <Loading />
+      ) : list.error ? (
+        <ErrorState error={list.error} onRetry={list.reload} />
+      ) : list.items.length === 0 ? (
+        <EmptyState title={t("registry.empty")} body={t("registry.emptyBody")} />
+      ) : (
+        <DataTable
+          columns={[
+            { key: "skill", label: t("skills.column.skill") },
+            { key: "scope", label: t("registry.livesAt") },
+            { key: "trust", label: t("skills.column.trust") },
+            { key: "action", align: "r" },
+          ]}
+        >
+          {list.items.map((s) => (
+            <tr key={s.skill_id}>
+              <td>
+                <Cell
+                  primary={<Link to={`/registry/${s.skill_id}`}>{s.name}</Link>}
+                  secondary={<Mono dim>v{s.latest_version}</Mono>}
+                />
+              </td>
+              <td>
+                <Scope kind={s.scope}>{scopeLabel(t, s.scope)}</Scope>
+              </td>
+              <td>
+                <Badge tone={s.trust_status === "signed" ? "ok" : "warn"}>
+                  {trustLabel(t, s.trust_status)}
+                </Badge>
+              </td>
+              <td className="r">
+                {installed.has(s.skill_id) ? (
+                  <span className="dim">{t("skill.installed")}</span>
+                ) : (
+                  <Btn
+                    small
+                    kind="primary"
+                    disabled={busy !== undefined}
+                    onClick={() => void install(s.skill_id, s.latest_version_id)}
+                  >
+                    {busy === s.skill_id ? t("common.loading") : t("skill.install")}
+                  </Btn>
+                )}
+              </td>
+            </tr>
+          ))}
+        </DataTable>
+      )}
+      {failure !== undefined && <ErrorState error={failure} />}
+    </Panel>
   );
 }

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useT } from "../i18n";
 import { useFormat } from "../app/prefs";
 import { ApiError, api, type Handoff, type HandoffDetail } from "../lib/api";
@@ -5,6 +6,7 @@ import { useList, useResource } from "../lib/resource";
 import {
   Badge,
   Btn,
+  TextField,
   DataTable,
   Pager,
   Def,
@@ -48,7 +50,10 @@ export function ProjectOverview() {
           {handoff.loading ? (
             <Loading />
           ) : noneOpen ? (
-            <EmptyState title={t("handoff.none")} body={t("handoff.noneBody")} />
+            <>
+              <EmptyState title={t("handoff.none")} body={t("handoff.noneBody")} />
+              <CreateHandoff onCreated={handoff.reload} />
+            </>
           ) : handoff.error ? (
             <ErrorState error={handoff.error} onRetry={handoff.reload} />
           ) : handoff.data ? (
@@ -162,6 +167,19 @@ function HandoffBody({ handoff, onChanged }: { handoff: HandoffDetail; onChanged
     }
   }
 
+  async function close() {
+    // Confirmed because it is the one action here that cannot be undone: a
+    // closed handoff is no longer the current one and nobody can claim it.
+    if (!window.confirm(t("handoff.confirmClose"))) return;
+    try {
+      await api.closeHandoff(namespace, slug, handoff.id);
+    } catch {
+      // Same reasoning as claim: reloading shows the state that won.
+    } finally {
+      onChanged();
+    }
+  }
+
   return (
     <>
       <p className="sec lead-out">{handoff.summary}</p>
@@ -184,8 +202,13 @@ function HandoffBody({ handoff, onChanged }: { handoff: HandoffDetail; onChanged
         <span className="dim">{f.relative(handoff.created_at)}</span>
         <span className="spacer" />
         {handoff.status === "open" && (
-          <Btn kind="primary" small onClick={claim}>
+          <Btn kind="primary" small onClick={() => void claim()}>
             {t("handoff.claim")}
+          </Btn>
+        )}
+        {handoff.status !== "closed" && (
+          <Btn small onClick={() => void close()}>
+            {t("handoff.close")}
           </Btn>
         )}
       </div>
@@ -200,5 +223,78 @@ function HandoffBody({ handoff, onChanged }: { handoff: HandoffDetail; onChanged
         </div>
       )}
     </>
+  );
+}
+
+/**
+ * Leaving a handoff from the interface.
+ *
+ * The same three fields an agent writes over MCP, because it is the same
+ * record: a person picking up after an agent, or handing back to one, should
+ * not be writing a different shape of note.
+ */
+function CreateHandoff({ onCreated }: { onCreated: () => void }) {
+  const t = useT();
+  const { namespace, slug } = useProject();
+
+  const [summary, setSummary] = useState("");
+  const [completed, setCompleted] = useState("");
+  const [next, setNext] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState<unknown>();
+
+  async function submit() {
+    if (!summary.trim() || busy) return;
+    setBusy(true);
+    setFailure(undefined);
+    try {
+      await api.createHandoff(namespace, slug, {
+        summary: summary.trim(),
+        completed_work: completed.trim(),
+        next_actions: next.trim(),
+      });
+      setSummary("");
+      setCompleted("");
+      setNext("");
+      onCreated();
+    } catch (err) {
+      setFailure(err);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mt stack-sm">
+      <TextField
+        label={t("handoff.summary")}
+        value={summary}
+        onChange={setSummary}
+        placeholder={t("handoff.summaryHelp")}
+        grow
+      />
+      <TextField
+        label={t("handoff.completed")}
+        value={completed}
+        onChange={setCompleted}
+        placeholder={t("handoff.completedHelp")}
+        grow
+      />
+      <TextField
+        label={t("handoff.next")}
+        value={next}
+        onChange={setNext}
+        placeholder={t("handoff.nextHelp")}
+        grow
+      />
+      <div className="row row-sm">
+        <span className="dim">{t("handoff.createLead")}</span>
+        <span className="spacer" />
+        <Btn kind="primary" onClick={() => void submit()} disabled={busy || !summary.trim()}>
+          {busy ? t("common.loading") : t("handoff.create")}
+        </Btn>
+      </div>
+      {failure !== undefined && <ErrorState error={failure} />}
+    </div>
   );
 }

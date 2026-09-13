@@ -35,11 +35,27 @@ const i18nDir = join(here, "..", "src", "i18n");
 function readCatalog(file) {
   const src = readFileSync(file, "utf8");
   const out = new Map();
-  // "key.with.dots": "value", tolerating escaped quotes and multi-line
-  // template literals, which long sentences in en.ts use.
-  const re = /^\s*"([\w.]+)"\s*:\s*(?:"((?:[^"\\]|\\.)*)"|`((?:[^`\\]|\\.)*)`)\s*,?\s*$/gm;
+  // "key.with.dots": "value" — in all three quotings JavaScript allows,
+  // because the formatter picks one: a message containing a double quote is
+  // rewritten to single quotes, and a message parsed in only one quoting
+  // silently vanishes from the catalogue instead of failing.
+  const re =
+    /^\s*"([\w.]+)"\s*:\s*(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'|`((?:[^`\\]|\\.)*)`)\s*,?\s*$/gm;
   for (let m = re.exec(src); m; m = re.exec(src)) {
-    out.set(m[1], (m[2] ?? m[3] ?? "").replace(/\\"/g, '"').replace(/\\n/g, "\n"));
+    const raw = m[2] ?? m[3] ?? m[4] ?? "";
+    out.set(m[1], raw.replace(/\\(["'`])/g, "$1").replace(/\\n/g, "\n"));
+  }
+  // Every `"key":` line must have produced a message. Without this, a value
+  // the regex does not recognise — a quoting the formatter chose, a string
+  // concatenation someone added — drops that key silently, and the only
+  // symptom is every other locale reporting it as an orphan.
+  const declared = [...src.matchAll(/^\s*"([\w.]+)"\s*:/gm)].map((m) => m[1]);
+  const missed = declared.filter((k) => !out.has(k));
+  if (missed.length) {
+    throw new Error(
+      `${file}: ${missed.length} key(s) declared but not parsed — ${missed.join(", ")}. ` +
+        `The value is in a form readCatalog does not recognise.`,
+    );
   }
   if (out.size === 0) {
     throw new Error(`no messages parsed from ${file} — has the catalogue format changed?`);

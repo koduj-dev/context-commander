@@ -390,10 +390,56 @@ export const en = {
   "events.column.payload": "Payload",
   "events.empty": "No events yet",
 
+  "handoff.createLead":
+    "What the next agent needs to carry on. Written by a person here; agents write the same thing through MCP.",
+  "handoff.summaryHelp": "One line. What is this work.",
+  "handoff.completedHelp": "What is already done, so it is not done twice.",
+  "handoff.nextHelp": "What to do next, concretely enough to start on.",
+  "handoff.created": "Handoff created",
+  "handoff.confirmClose":
+    "Close this handoff? It stops being the current one and nobody can claim it.",
+  "handoff.openExists": "A handoff is already open here",
+  "handoff.openExistsBody":
+    "Close it before leaving another — two open handoffs make “what should I pick up” ambiguous, which is the question they exist to answer.",
+
+  "projects.create": "New project",
+  "projects.createLead":
+    "A path and a name. The path is how people refer to it and cannot be changed afterwards; you become its OWNER.",
+  "projects.path": "Path",
+  "projects.pathHelp": "namespace/slug",
+  "projects.name": "Display name",
+  "projects.created": "Created {path}",
+
   "handoff.history": "Earlier handoffs",
   "handoff.column.created": "Created",
   "handoff.column.status": "Status",
   "handoff.column.summary": "Summary",
+
+  "skill.versions": "Versions",
+  "skill.versionsLead":
+    "Every version ever published under this name. A published version is immutable — publishing again adds a row here, it never edits one.",
+  "skill.content": "Content",
+  "skill.contentLead": "What an agent is handed when this version resolves.",
+  "skill.provenance": "Provenance",
+  "skill.checksum": "Checksum",
+  "skill.capabilities": "Declared capabilities",
+  "skill.author": "Author",
+  "skill.origin": "Origin",
+  "skill.promote": "Promote",
+  "skill.promoteLead":
+    "Move the skill onto a wider shelf so more projects can see it. One way only: narrowing again would pull it out from under bindings that were legitimate when they were made.",
+  "skill.promoteTo": "Move to",
+  "skill.promoted": "Now lives at {scope}",
+  "skill.install": "Install",
+  "skill.installed": "Installed",
+  "skill.installLead":
+    "Pin a version of a skill to this project. The binding names one concrete version — there is no version-range resolver, so nothing changes under you.",
+  "skill.notFound": "No such skill",
+  "skill.notFoundBody": "It may have been published somewhere you cannot see.",
+  "skill.backToRegistry": "Back to the registry",
+  "skill.pin": "Pin",
+  "skill.unpin": "Unpin",
+  "skill.pinned": "Pinned",
 
   "registry.livesAt": "Lives at",
   "registry.empty": "The catalogue is empty",

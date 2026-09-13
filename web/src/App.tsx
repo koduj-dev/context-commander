@@ -14,6 +14,7 @@ import { ProjectPolicies } from "./pages/ProjectPolicies";
 import { ProjectSkills } from "./pages/ProjectSkills";
 import { ProjectActivity } from "./pages/ProjectActivity";
 import { Registry } from "./pages/Registry";
+import { SkillDetail } from "./pages/SkillDetail";
 import { Organizations } from "./pages/Organizations";
 import { Tokens } from "./pages/Tokens";
 import {
@@ -65,6 +66,7 @@ export function App() {
         </Route>
         <Route path="organizations" element={<Organizations />} />
         <Route path="registry" element={<Registry />} />
+        <Route path="registry/:skillID" element={<SkillDetail />} />
         <Route path="administration" element={<Administration />}>
           <Route index element={<AdminOverview />} />
           <Route path="identities" element={<AdminIdentities />} />

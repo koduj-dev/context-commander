@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useT } from "../i18n";
 import { useCrumbs } from "../app/crumbs";
 import { api } from "../lib/api";
@@ -88,7 +89,7 @@ export function Registry() {
               <tr key={s.skill_id}>
                 <td>
                   <Cell
-                    primary={s.name}
+                    primary={<Link to={`/registry/${s.skill_id}`}>{s.name}</Link>}
                     secondary={
                       <Mono dim truncate>
                         {s.latest_checksum}

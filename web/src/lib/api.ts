@@ -309,7 +309,14 @@ export type CatalogEntry = {
   trust_status: string;
 };
 
-export type SkillContent = {
+/**
+ * A version plus its bytes.
+ *
+ * Extends SkillVersion because the Go response embeds skillVersionResponse,
+ * and embedding flattens into the same JSON object — `checksum` and
+ * `declared_capabilities` arrive alongside `content`, not nested under it.
+ */
+export type SkillContent = SkillVersion & {
   skill_name: string;
   skill_author?: string;
   skill_origin?: string;
@@ -347,6 +354,31 @@ export type SecurityEvent = {
   reason: string;
   request_id?: string;
 };
+
+export type Conversation = { id: string; created_at: string };
+
+export type ExternalSession = {
+  id: string;
+  conversation_id: string;
+  provider: string;
+  client: string;
+  provider_session_id: string;
+  parent_external_session_id?: string;
+  relation: string;
+  started_at: string;
+};
+
+export type HistoryObject = {
+  id: string;
+  external_session_id: string;
+  type: string;
+  derived_from?: string;
+  content_hash: string;
+  content: string;
+  created_at: string;
+};
+
+export type LineageEdge = { from_id: string; to_id: string; kind: string };
 
 export type Credential = {
   id: string;
@@ -438,6 +470,11 @@ export const api = {
     request<HandoffDetail>(`${project(ns, slug)}/handoffs/current`),
   handoff: (ns: string, slug: string, id: string) =>
     request<HandoffDetail>(`${project(ns, slug)}/handoffs/${id}`),
+  createHandoff: (
+    ns: string,
+    slug: string,
+    body: { summary: string; completed_work: string; next_actions: string },
+  ) => request<Handoff>(`${project(ns, slug)}/handoffs`, { method: "POST", body }),
   claimHandoff: (ns: string, slug: string, id: string) =>
     request<Handoff>(`${project(ns, slug)}/handoffs/${id}/claim`, { method: "POST" }),
   closeHandoff: (ns: string, slug: string, id: string) =>
@@ -458,6 +495,40 @@ export const api = {
 
   effectiveSkills: (ns: string, slug: string) =>
     request<SkillBinding[]>(`${project(ns, slug)}/skills/effective`),
+  // Install is mounted under a project because that is what authorizes it;
+  // `scope`/`scope_ref` say where the binding applies, which can be wider.
+  installSkill: (
+    ns: string,
+    slug: string,
+    body: {
+      scope: string;
+      scope_ref?: string;
+      skill_id: string;
+      skill_version_id: string;
+      managed?: boolean;
+      overridable?: boolean;
+    },
+  ) => request<SkillBinding>(`${project(ns, slug)}/skills/install`, { method: "POST", body }),
+  setSkillPinned: (ns: string, slug: string, bindingID: string, pinned: boolean) =>
+    request<SkillBinding>(`${project(ns, slug)}/skills/${pinned ? "pin" : "unpin"}`, {
+      method: "POST",
+      body: { binding_id: bindingID },
+    }),
+  promoteSkill: (skillID: string, scope: string, scopeRef?: string) =>
+    request<{ skill_id: string; scope: string; scope_ref?: string }>("/skills/promote", {
+      method: "POST",
+      body: { skill_id: skillID, scope, scope_ref: scopeRef ?? null },
+    }),
+
+  conversations: (ns: string, slug: string, cursor?: string) =>
+    request<Page<Conversation>>(withQuery(`${project(ns, slug)}/conversations`, { cursor })),
+  historyObjects: (ns: string, slug: string, conversationID: string, cursor?: string) =>
+    request<Page<HistoryObject>>(
+      withQuery(`${project(ns, slug)}/conversations/${conversationID}/objects`, { cursor }),
+    ),
+  lineage: (ns: string, slug: string, conversationID: string) =>
+    request<Page<LineageEdge>>(`${project(ns, slug)}/conversations/${conversationID}/lineage`),
+
   searchSkills: (query?: string, cursor?: string, limit?: number) =>
     request<Page<CatalogEntry>>(withQuery("/skills", { q: query, cursor, limit })),
   skillVersions: (skillID: string, cursor?: string) =>

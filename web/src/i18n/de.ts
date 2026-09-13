@@ -403,4 +403,51 @@ export const de: Partial<Record<MessageKey, string>> = {
   "events.column.resource": "Ressource",
   "events.column.payload": "Nutzlast",
   "events.empty": "Noch keine Ereignisse",
+
+  "skill.versions": "Versionen",
+  "skill.versionsLead":
+    "Jede jemals unter diesem Namen veröffentlichte Version. Eine veröffentlichte Version ist unveränderlich — erneutes Veröffentlichen fügt hier eine Zeile hinzu und bearbeitet nie eine.",
+  "skill.content": "Inhalt",
+  "skill.contentLead": "Was ein Agent bekommt, wenn diese Version aufgelöst wird.",
+  "skill.provenance": "Herkunft",
+  "skill.checksum": "Prüfsumme",
+  "skill.capabilities": "Deklarierte Berechtigungen",
+  "skill.author": "Urheberin oder Urheber",
+  "skill.origin": "Herkunftsort",
+  "skill.promote": "Hochstufen",
+  "skill.promoteLead":
+    "Den Skill auf eine breitere Ebene heben, damit mehr Projekte ihn sehen. Nur in eine Richtung: ihn wieder zu verengen würde ihn unter Bindungen wegziehen, die bei ihrer Entstehung berechtigt waren.",
+  "skill.promoteTo": "Verschieben nach",
+  "skill.promoted": "Liegt jetzt auf der Ebene {scope}",
+  "skill.install": "Installieren",
+  "skill.installed": "Installiert",
+  "skill.installLead":
+    "Eine Version eines Skills an dieses Projekt binden. Die Bindung nennt genau eine Version — es gibt keinen Auflöser für Versionsbereiche, es ändert sich also nichts unter Ihnen.",
+  "skill.notFound": "Diesen Skill gibt es nicht",
+  "skill.notFoundBody":
+    "Er wurde vielleicht an einer Stelle veröffentlicht, die Sie nicht sehen können.",
+  "skill.backToRegistry": "Zurück zur Registry",
+  "skill.pin": "Festsetzen",
+  "skill.unpin": "Lösen",
+  "skill.pinned": "Festgesetzt",
+
+  "handoff.createLead":
+    "Was die nächste Person oder der nächste Agent zum Weiterarbeiten braucht. Hier von einem Menschen geschrieben; Agenten schreiben dasselbe über MCP.",
+  "handoff.summaryHelp": "Eine Zeile. Worum geht es bei dieser Arbeit.",
+  "handoff.completedHelp": "Was bereits erledigt ist, damit es niemand zweimal tut.",
+  "handoff.nextHelp": "Was als Nächstes zu tun ist, konkret genug zum Anfangen.",
+  "handoff.created": "Übergabe angelegt",
+  "handoff.confirmClose":
+    "Diese Übergabe abschließen? Sie ist dann nicht mehr die aktuelle und niemand kann sie übernehmen.",
+  "handoff.openExists": "Hier ist bereits eine Übergabe offen",
+  "handoff.openExistsBody":
+    "Schließen Sie sie, bevor Sie eine weitere hinterlassen — zwei offene Übergaben machen die Frage „was soll ich aufgreifen“ mehrdeutig, und genau die sollen sie beantworten.",
+
+  "projects.create": "Neues Projekt",
+  "projects.createLead":
+    "Ein Pfad und ein Name. Der Pfad ist, wie Menschen darauf verweisen, und lässt sich später nicht ändern; Sie werden seine Eigentümerin oder sein Eigentümer.",
+  "projects.path": "Pfad",
+  "projects.pathHelp": "namensraum/kurzname",
+  "projects.name": "Anzeigename",
+  "projects.created": "{path} angelegt",
 };

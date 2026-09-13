@@ -7,14 +7,17 @@ import { roleLabel } from "../lib/labels";
 import { useResource } from "../lib/resource";
 import {
   Badge,
+  Btn,
   Cell,
   DataTable,
   EmptyState,
   ErrorState,
   Loading,
   Mono,
+  Note,
   PageHead,
   Panel,
+  Row,
   TextField,
 } from "../ui";
 
@@ -30,6 +33,7 @@ export function Projects() {
   const t = useT();
   useCrumbs("projects", () => ({ path: [], current: t("projects.title") }));
   const [filter, setFilter] = useState("");
+  const [creating, setCreating] = useState(false);
   const { data, error, loading, reload } = useResource(() => api.myProjects(), []);
 
   const rows = useMemo(() => {
@@ -41,7 +45,26 @@ export function Projects() {
 
   return (
     <>
-      <PageHead title={t("projects.title")} lead={t("projects.lead")} />
+      <PageHead
+        title={t("projects.title")}
+        lead={t("projects.lead")}
+        actions={
+          <Btn kind="primary" onClick={() => setCreating((v) => !v)}>
+            {t("projects.create")}
+          </Btn>
+        }
+      />
+
+      {creating && (
+        <div className="mb">
+          <CreateProject
+            onCreated={() => {
+              reload();
+              setCreating(false);
+            }}
+          />
+        </div>
+      )}
 
       <Panel
         sub={t("projects.count", { count: rows.length })}
@@ -98,4 +121,78 @@ export function Projects() {
 
 function path(p: MyProject) {
   return `${p.namespace}/${p.slug}`;
+}
+
+/**
+ * Creating a project.
+ *
+ * The path is `namespace/slug` and it is the one field that cannot be changed
+ * afterwards — it is how people refer to the project and what every CLI and
+ * MCP call names. A personal namespace is bound to its owner, so a second one
+ * under the same account is refused; that refusal reads as a conflict here
+ * rather than as an unexplained failure.
+ */
+function CreateProject({ onCreated }: { onCreated: () => void }) {
+  const t = useT();
+  const [path, setPath] = useState("");
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState<unknown>();
+  const [created, setCreated] = useState<string>();
+
+  async function submit() {
+    if (!path.trim() || !name.trim() || busy) return;
+    setBusy(true);
+    setFailure(undefined);
+    try {
+      const project = await api.createProject(path.trim(), name.trim());
+      setCreated(`${project.namespace}/${project.slug}`);
+      setPath("");
+      setName("");
+      onCreated();
+    } catch (err) {
+      setFailure(err);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Panel title={t("projects.create")}>
+      <p className="sec lead-out">{t("projects.createLead")}</p>
+      <Row gap="sm">
+        <TextField
+          label={t("projects.path")}
+          value={path}
+          onChange={setPath}
+          placeholder={t("projects.pathHelp")}
+          grow
+        />
+        <TextField
+          label={t("projects.name")}
+          value={name}
+          onChange={setName}
+          placeholder={t("projects.name")}
+          grow
+        />
+        <Btn
+          kind="primary"
+          onClick={() => void submit()}
+          disabled={busy || !path.trim() || !name.trim()}
+        >
+          {busy ? t("common.loading") : t("projects.create")}
+        </Btn>
+      </Row>
+      {failure !== undefined && (
+        <div className="mt">
+          <ErrorState error={failure} />
+        </div>
+      )}
+      {created && (
+        <div className="mt">
+          <Note tone="info">{t("projects.created", { path: created })}</Note>
+        </div>
+      )}
+    </Panel>
+  );
 }
