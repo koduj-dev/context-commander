@@ -223,19 +223,6 @@ on the planned move to a public repo:
   rest. Needs `--trusted-proxies` (a CIDR allowlist) plus
   `middleware.RealIP` gated on it, and only then a per-IP limit on
   unauthenticated traffic.
-- **Sharing artifacts across projects — wanted, and currently impossible.**
-  The maintainer named it as part of what shared agent storage is for. It
-  does not exist, and it runs straight into the isolation model: every
-  artifact is project-scoped, RLS enforces that at the database, and the
-  cookbook calls cross-project access "one of the easiest mistakes for an AI
-  client to make" — i.e. the thing the design deliberately prevents. So this
-  is a design decision, not a feature to add: something has to say what a
-  shared artifact IS (a copy? a reference? a read-only publication into a
-  wider scope?) and who may create one. The skill registry just answered the
-  same question for packages by giving them a scope of their own
-  (docs/adr/0018), and that is the shape to consider first — an artifact
-  published to an organization rather than reachable across projects
-  sideways.
 - **Serving artifact content as a rendered page.** Observed while scoping
   the UI: the store is content-type aware and holds arbitrary bytes, so
   "give any LLM a tool to publish an HTML page" is already most of the way
