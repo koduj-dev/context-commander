@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard · Context Commander</title>
+<link rel="icon" href="../brand/svg/cc-favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../brand/tokens/ui-colors.css">
+<link rel="stylesheet" href="assets/mockup.css">
+</head>
+<body>
+<div class="mockbar">
+  <span class="tag">Mockup</span>
+  <a href="index.html">All screens</a>
+  <span class="dim">·</span>
+  <span>Dashboard</span>
+  <span class="grow"></span>
+  <span class="seg">
+    <button type="button" aria-pressed="true" onclick="setTheme('dark',this)">Dark</button>
+    <button type="button" aria-pressed="false" onclick="setTheme('light',this)">Light</button>
+  </span>
+</div>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <img class="logo-dark" src="../brand/svg/cc-logo-horizontal-on-dark.svg" alt="Context Commander">
+      <img class="logo-light" src="../brand/svg/cc-logo-horizontal-on-light.svg" alt="Context Commander" hidden>
+    </div>
+    <nav class="nav">
+        <div class="nav-label">Workspace</div>
+        <a href="dashboard.html" class="active"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 9 4l6 5.5M4.5 8.5V15h9V8.5"/></svg><span>Dashboard</span></a>
+        <a href="projects.html"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5.5h5l1.2 1.5H16V14H2zM2 5.5V3.5h4l1 1.5"/></svg><span>Projects</span><span class="count num">7</span></a>
+        <a href="organizations.html"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 15V4.5h5V15M11 15V7.5h4V15M2 15h14M5 7h1M5 9.5h1M13 10h1"/></svg><span>Organizations</span><span class="count num">1</span></a>
+        <a href="registry.html"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3.5h8l2 2.5v9H4zM6 7h6M6 9.5h6M6 12h4"/></svg><span>Skill Registry</span><span class="count num">14</span></a>
+        <div class="nav-label">Installation</div>
+        <a href="administration.html"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2.5 3.5 5v4.2c0 3 2.3 5.2 5.5 6.3 3.2-1.1 5.5-3.3 5.5-6.3V5z M6.8 9l1.6 1.6L11.6 7"/></svg><span>Administration</span></a>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="avatar">FM</div>
+      <div class="who">
+        <b>Filip Majerík</b>
+        <span>Installation admin</span>
+      </div>
+    </div>
+  </aside>
+  <div class="main">
+    <div class="topbar">
+      <div class="crumbs"><b>Dashboard</b></div>
+      <div class="spacer"></div>
+      <div class="search"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="5"/><path d="m12 12 3 3"/></svg><span>Search</span><kbd>⌘K</kbd></div>
+    </div>
+    <div class="page ">
+      
+      
+<div class="page-head">
+  <div>
+    <h1>Dashboard</h1>
+    <p>What changed, where you were working, and whether anything is waiting on you.</p>
+  </div>
+  <div class="actions"><button class="btn">Issue token</button><button class="btn btn-primary">New project</button></div>
+</div>
+
+<div class="grid g-2-1">
+  <div class="grid">
+
+    <section class="panel">
+      <header>
+        <h2>Waiting on you</h2>
+        <span class="sub">Handoffs left open, and refusals worth a look</span>
+      </header>
+      <div class="body tight">
+        <ul class="feed">
+          <li>
+            <span class="when">2h ago</span>
+            <span class="what">
+              <span class="badge b-active"><span class="dot"></span>Open handoff</span>
+              <a href="project-overview.html">reindex orders, then flip the alias</a>
+              <div class="dim sub-line">filip/es-migration · created by <span class="mono">agent-a</span> via Claude Code</div>
+            </span>
+            <button class="btn btn-sm">Claim</button>
+          </li>
+          <li>
+            <span class="when">5h ago</span>
+            <span class="what">
+              <span class="badge b-warn"><span class="dot"></span>12 refusals</span>
+              one credential, five projects, all <span class="mono">authorization_denied</span>
+              <div class="dim sub-line">A pattern no single project's audit would show</div>
+            </span>
+            <a class="btn btn-sm" href="security-log.html">Inspect</a>
+          </li>
+          <li>
+            <span class="when">yesterday</span>
+            <span class="what">
+              <span class="badge b-shared"><span class="dot"></span>Registry</span>
+              <span class="mono">security-review</span> published v4 — 3 projects still pinned to v2
+            </span>
+            <a class="btn btn-sm" href="registry-skill.html">Review</a>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="panel">
+      <header>
+        <h2>Recent activity</h2>
+        <span class="sub">Across projects you belong to</span>
+        <div class="right"><span class="seg"><button aria-pressed="true">All</button><button aria-pressed="false">Mine</button></span></div>
+      </header>
+      <div class="body tight">
+        <table class="dt">
+          <thead><tr><th>When</th><th>Action</th><th>Resource</th><th>Principal</th><th>Client</th><th class="r">Result</th></tr></thead>
+          <tbody>
+            <tr><td class="dim mono">09:41:07</td><td class="mono">handoff.closed</td><td class="mono truncate">852e385d-cf5e-4171-86a0</td><td>Filip Majerík</td><td class="sec">Codex CLI</td><td class="r"><span class="badge b-ok"><span class="dot"></span>allow</span></td></tr>
+            <tr><td class="dim mono">09:40:55</td><td class="mono">artifact.updated</td><td class="mono truncate">notes/decisions.md</td><td>Filip Majerík</td><td class="sec">Codex CLI</td><td class="r"><span class="badge b-ok"><span class="dot"></span>allow</span></td></tr>
+            <tr><td class="dim mono">09:38:12</td><td class="mono">handoff.claimed</td><td class="mono truncate">852e385d-cf5e-4171-86a0</td><td>Filip Majerík</td><td class="sec">Codex CLI</td><td class="r"><span class="badge b-ok"><span class="dot"></span>allow</span></td></tr>
+            <tr><td class="dim mono">09:12:44</td><td class="mono">artifact.write</td><td class="mono truncate">context/overview.md</td><td>Petr Novák</td><td class="sec">Claude Code</td><td class="r"><span class="badge b-danger"><span class="dot"></span>deny</span></td></tr>
+            <tr><td class="dim mono">08:55:01</td><td class="mono">skill.promote</td><td class="mono truncate">house-rules → installation</td><td>Filip Majerík</td><td class="sec">ccd</td><td class="r"><span class="badge b-ok"><span class="dot"></span>allow</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <footer><a href="project-activity.html">Open activity</a><span class="dim">· 5 of 1,284</span></footer>
+    </section>
+  </div>
+
+  <div class="grid">
+    <section class="panel">
+      <header><h2>Your projects</h2></header>
+      <div class="body tight">
+        <table class="dt">
+          <tbody>
+            <tr><td><a href="project-overview.html" class="mono">filip/es-migration</a><div class="sub-line">2h ago · OWNER</div></td><td class="r"><span class="scope project">personal</span></td></tr>
+            <tr><td><span class="mono">acme/platform</span><div class="sub-line">yesterday · CONTRIBUTOR</div></td><td class="r"><span class="scope organization">acme</span></td></tr>
+            <tr><td><span class="mono">acme/billing-rewrite</span><div class="sub-line">3d ago · READER</div></td><td class="r"><span class="scope organization">acme</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <footer><a href="projects.html">All 7 projects</a></footer>
+    </section>
+
+    <section class="panel">
+      <header><h2>Connected clients</h2><span class="sub">Credentials, last seen</span></header>
+      <div class="body tight">
+        <table class="dt">
+          <tbody>
+            <tr><td>Claude Code<div class="dim mono sub-line">cc_6f1c2d3e…</div></td><td class="r dim">2m ago</td></tr>
+            <tr><td>Codex CLI<div class="dim mono sub-line">cc_ae71084d…</div></td><td class="r dim">14m ago</td></tr>
+            <tr><td>nightly-review-agent<div class="sub-line">service principal</div></td><td class="r dim">6h ago</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <footer><a href="administration.html">Manage credentials</a></footer>
+    </section>
+
+    <section class="panel">
+      <header><h2>Installation</h2></header>
+      <div class="body">
+        <div class="grid g2">
+          <div class="kpi"><span class="v">7</span><span class="k">projects</span></div>
+          <div class="kpi"><span class="v">14</span><span class="k">skills</span></div>
+          <div class="kpi"><span class="v">2.4<span class="unit"> GB</span></span><span class="k">stored</span></div>
+          <div class="kpi"><span class="v">12</span><span class="k">refusals / 24h</span></div>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+    </div>
+  </div>
+</div>
+<script>
+function setTheme(t, el) {
+  document.documentElement.setAttribute('data-theme', t);
+  el.parentNode.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === el)));
+  document.querySelector('.logo-dark').hidden = (t === 'light');
+  document.querySelector('.logo-light').hidden = (t !== 'light');
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>acme · Context Commander</title>
+<link rel="icon" href="../brand/svg/cc-favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../brand/tokens/ui-colors.css">
+<link rel="stylesheet" href="assets/mockup.css">
+</head>
+<body>
+<div class="mockbar">
+  <span class="tag">Mockup</span>
+  <a href="index.html">All screens</a>
+  <span class="dim">·</span>
+  <span>acme</span>
+  <span class="grow"></span>
+  <span class="seg">
+    <button type="button" aria-pressed="true" onclick="setTheme('dark',this)">Dark</button>
+    <button type="button" aria-pressed="false" onclick="setTheme('light',this)">Light</button>
+  </span>
+</div>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <img class="logo-dark" src="../brand/svg/cc-logo-horizontal-on-dark.svg" alt="Context Commander">
+      <img class="logo-light" src="../brand/svg/cc-logo-horizontal-on-light.svg" alt="Context Commander" hidden>
+    </div>
+    <nav class="nav">
+        <div class="nav-label">Workspace</div>
+        <a href="dashboard.html"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 9 4l6 5.5M4.5 8.5V15h9V8.5"/></svg><span>Dashboard</span></a>
+        <a href="projects.html"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5.5h5l1.2 1.5H16V14H2zM2 5.5V3.5h4l1 1.5"/></svg><span>Projects</span><span class="count num">7</span></a>
+        <a href="organizations.html" class="active"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 15V4.5h5V15M11 15V7.5h4V15M2 15h14M5 7h1M5 9.5h1M13 10h1"/></svg><span>Organizations</span><span class="count num">1</span></a>
+        <a href="registry.html"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3.5h8l2 2.5v9H4zM6 7h6M6 9.5h6M6 12h4"/></svg><span>Skill Registry</span><span class="count num">14</span></a>
+        <div class="nav-label">Installation</div>
+        <a href="administration.html"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2.5 3.5 5v4.2c0 3 2.3 5.2 5.5 6.3 3.2-1.1 5.5-3.3 5.5-6.3V5z M6.8 9l1.6 1.6L11.6 7"/></svg><span>Administration</span></a>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="avatar">FM</div>
+      <div class="who">
+        <b>Filip Majerík</b>
+        <span>Installation admin</span>
+      </div>
+    </div>
+  </aside>
+  <div class="main">
+    <div class="topbar">
+      <div class="crumbs"><span>Organizations</span><span class="sep">/</span><b class="mono">acme</b></div>
+      <div class="spacer"></div>
+      <div class="search"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="5"/><path d="m12 12 3 3"/></svg><span>Search</span><kbd>⌘K</kbd></div>
+    </div>
+    <div class="page ">
+      
+      
+<div class="page-head">
+  <div><h1 class="mono">acme</h1><p>One organization, four projects. Membership here administers the organization — it does not by itself grant access to any project's content.</p></div>
+  <div class="actions"><button class="btn btn-primary">Add member</button></div>
+</div>
+<div class="grid g-2-1"><div class="stack"><section class="panel"><header><h2>Projects</h2></header><div class="body tight"><table class="dt"><thead><tr><th>Project</th><th>Your role</th><th class="r">Members</th><th class="r">Last activity</th></tr></thead><tbody><tr><td><span class="mono">acme/platform</span></td><td><span class="badge"><span class="dot"></span>CONTRIBUTOR</span></td><td class="r"><span class="num">8</span></td><td class="r"><span class="dim">yesterday</span></td></tr><tr><td><span class="mono">acme/billing-rewrite</span></td><td><span class="badge"><span class="dot"></span>READER</span></td><td class="r"><span class="num">5</span></td><td class="r"><span class="dim">3d ago</span></td></tr><tr><td><span class="mono">acme/data-platform</span></td><td><span class="badge"><span class="dot"></span>CONTRIBUTOR</span></td><td class="r"><span class="num">6</span></td><td class="r"><span class="dim">6d ago</span></td></tr><tr><td><span class="mono">acme/infra</span></td><td><span class="dim">not a member</span></td><td class="r"><span class="num">4</span></td><td class="r"><span class="dim">2w ago</span></td></tr></tbody></table></div><footer><span class="dim">You administer this organization but are not a member of every project in it. That is the model, not a gap.</span></footer></section><section class="panel"><header><h2>Members</h2><span class="sub">3</span></header><div class="body tight"><table class="dt"><thead><tr><th>User</th><th>Email</th><th>Role</th><th class="r">Added</th></tr></thead><tbody><tr><td>Filip Majerík</td><td><span class="mono sec">filip@majerik.cz</span></td><td><span class="badge b-active"><span class="dot"></span>OWNER</span></td><td class="r"><span class="dim">28 Aug</span></td></tr><tr><td>Jana Dvořáková</td><td><span class="mono sec">jana@example.com</span></td><td><span class="badge"><span class="dot"></span>ADMIN</span></td><td class="r"><span class="dim">02 Sep</span></td></tr><tr><td>Petr Novák</td><td><span class="mono sec">petr@example.com</span></td><td><span class="badge"><span class="dot"></span>MEMBER</span></td><td class="r"><span class="dim">12 Sep</span></td></tr></tbody></table></div></section><section class="panel"><header><h2>Organization audit</h2></header><div class="body tight"><table class="dt"><thead><tr><th>When</th><th>Action</th><th>Subject</th><th>By</th></tr></thead><tbody><tr><td><span class="dim mono">12 Sep 09:04</span></td><td><span class="mono">organization.member.add</span></td><td>Petr Novák</td><td>Filip Majerík</td></tr><tr><td><span class="dim mono">02 Sep 14:22</span></td><td><span class="mono">organization.member.add</span></td><td>Jana Dvořáková</td><td>Filip Majerík</td></tr></tbody></table></div><footer><span class="dim">Visible to organization ADMIN and OWNER. A plain MEMBER can see who is here, not who put them here.</span></footer></section></div><div class="stack stack-start"><section class="panel"><header><h2>Identity</h2></header><div class="body"><dl class="defs"><dt>Name</dt><dd>acme</dd><dt>UUID</dt><dd><span class="mono">27143075-5a86-46b9-939d</span></dd><dt>You are</dt><dd><span class="badge b-active"><span class="dot"></span>OWNER</span></dd><dt>Projects</dt><dd><span class="num">4</span></dd><dt>Members</dt><dd><span class="num">3</span></dd></dl></div></section><section class="panel"><header><h2>Organization skills</h2></header><div class="body tight"><table class="dt"><thead><tr><th>Skill</th><th class="r">Version</th></tr></thead><tbody><tr><td><span class="mono">security-review</span></td><td class="r"><span class="mono dim">v4</span></td></tr><tr><td><span class="mono">es-review</span></td><td class="r"><span class="mono dim">v3</span></td></tr></tbody></table></div><footer><a class="btn btn-sm" href="registry.html">Open registry</a></footer></section><section class="panel"><header><h2>Storage</h2></header><div class="body"><div class="kpi"><span class="v">1.9<span class="unit"> GB</span></span><span class="k">of 10 GB organization quota</span></div><div class="mt"><div class="meter"><i style="width:19%"></i></div></div></div></section></div></div>
+
+    </div>
+  </div>
+</div>
+<script>
+function setTheme(t, el) {
+  document.documentElement.setAttribute('data-theme', t);
+  el.parentNode.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === el)));
+  document.querySelector('.logo-dark').hidden = (t === 'light');
+  document.querySelector('.logo-light').hidden = (t !== 'light');
+}
+</script>
+</body>
+</html>

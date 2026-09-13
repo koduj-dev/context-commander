@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Project overview · Context Commander</title>
+<link rel="icon" href="../brand/svg/cc-favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../brand/tokens/ui-colors.css">
+<link rel="stylesheet" href="assets/mockup.css">
+</head>
+<body>
+<div class="mockbar">
+  <span class="tag">Mockup</span>
+  <a href="index.html">All screens</a>
+  <span class="dim">·</span>
+  <span>Project overview</span>
+  <span class="grow"></span>
+  <span class="seg">
+    <button type="button" aria-pressed="true" onclick="setTheme('dark',this)">Dark</button>
+    <button type="button" aria-pressed="false" onclick="setTheme('light',this)">Light</button>
+  </span>
+</div>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <img class="logo-dark" src="../brand/svg/cc-logo-horizontal-on-dark.svg" alt="Context Commander">
+      <img class="logo-light" src="../brand/svg/cc-logo-horizontal-on-light.svg" alt="Context Commander" hidden>
+    </div>
+    <nav class="nav">
+        <div class="nav-label">Workspace</div>
+        <a href="dashboard.html"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 9 4l6 5.5M4.5 8.5V15h9V8.5"/></svg><span>Dashboard</span></a>
+        <a href="projects.html" class="active"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5.5h5l1.2 1.5H16V14H2zM2 5.5V3.5h4l1 1.5"/></svg><span>Projects</span><span class="count num">7</span></a>
+        <a href="organizations.html"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 15V4.5h5V15M11 15V7.5h4V15M2 15h14M5 7h1M5 9.5h1M13 10h1"/></svg><span>Organizations</span><span class="count num">1</span></a>
+        <a href="registry.html"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3.5h8l2 2.5v9H4zM6 7h6M6 9.5h6M6 12h4"/></svg><span>Skill Registry</span><span class="count num">14</span></a>
+        <div class="nav-label">Installation</div>
+        <a href="administration.html"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2.5 3.5 5v4.2c0 3 2.3 5.2 5.5 6.3 3.2-1.1 5.5-3.3 5.5-6.3V5z M6.8 9l1.6 1.6L11.6 7"/></svg><span>Administration</span></a>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="avatar">FM</div>
+      <div class="who">
+        <b>Filip Majerík</b>
+        <span>Installation admin</span>
+      </div>
+    </div>
+  </aside>
+  <div class="main">
+    <div class="topbar">
+      <div class="crumbs"><span>Projects</span><span class="sep">/</span><b class="mono">filip/es-migration</b></div>
+      <div class="spacer"></div>
+      <div class="search"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="5"/><path d="m12 12 3 3"/></svg><span>Search</span><kbd>⌘K</kbd></div>
+    </div>
+    <div class="page ">
+      <nav class="tabs"><a href="project-overview.html" class="active">Overview</a><a href="project-members.html">Members</a><a href="project-connections.html">Connections</a><a href="project-skills.html">Skills</a><a href="project-policies.html">Policies</a><a href="project-secrets.html">Secrets</a><a href="project-activity.html">Activity</a><a href="project-settings.html">Settings</a></nav>
+      
+<div class="page-head">
+  <div>
+    <h1>es-migration</h1>
+    <p>Moving the ES 7 mappings to ES 8. Three agents and two people work here.</p>
+  </div>
+  <div class="actions"><button class="btn">Connect a client</button><button class="btn btn-primary">Create handoff</button></div>
+</div>
+
+<div class="grid g-2-1">
+  <div class="grid">
+
+    <section class="panel">
+      <header>
+        <h2>Current handoff</h2>
+        <span class="badge b-active"><span class="dot"></span>claimed</span>
+        <div class="right"><span class="dim">claimed 38m ago by <span class="mono">Codex CLI</span></span></div>
+      </header>
+      <div class="body">
+        <div class="grid">
+          <div>
+            <div class="dim label-caps">Summary</div>
+            products index migrated, orders index still on the old mapping
+          </div>
+          <div>
+            <div class="dim label-caps">Next actions</div>
+            reindex orders the same way, then flip the alias
+          </div>
+          <div>
+            <div class="dim label-caps">References</div>
+            <a href="#" class="mono">notes/decisions.md</a> <span class="dim">· v2</span>
+          </div>
+        </div>
+      </div>
+      <footer>
+        <button class="btn btn-sm">Close handoff</button>
+        <span class="dim">Created by Filip Majerík via Claude Code · 2h ago</span>
+      </footer>
+    </section>
+
+    <section class="panel">
+      <header><h2>Activity</h2><span class="sub">Events and audit, merged</span>
+        <div class="right"><a href="project-activity.html">Open</a></div></header>
+      <div class="body tight">
+        <ul class="feed">
+          <li><span class="when">09:41</span><span class="what"><span class="mono">handoff.closed</span> <span class="dim">by Filip via Codex CLI</span></span></li>
+          <li><span class="when">09:40</span><span class="what"><span class="mono">artifact.updated</span> <a href="#" class="mono">notes/decisions.md</a> <span class="dim">v1 → v2</span></span></li>
+          <li><span class="when">09:38</span><span class="what"><span class="mono">handoff.claimed</span> <span class="dim">by Filip via Codex CLI</span></span></li>
+          <li><span class="when">09:12</span><span class="what"><span class="mono">artifact.write</span> <span class="dim">refused — role READER does not hold this capability</span> <span class="badge b-danger"><span class="dot"></span>deny</span></span></li>
+          <li><span class="when">08:30</span><span class="what"><span class="mono">artifact.updated</span> <a href="#" class="mono">context/overview.md</a> <span class="dim">v1</span></span></li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="panel">
+      <header><h2>Effective skills</h2><span class="sub">What agents in this project load</span>
+        <div class="right"><a href="project-skills.html">Manage</a></div></header>
+      <div class="body tight">
+        <table class="dt">
+          <tbody>
+            <tr>
+              <td><span class="mono">house-rules</span></td>
+              <td><span class="scope installation">installation</span></td>
+              <td class="dim">v2</td>
+              <td class="r"><span class="badge"><span class="dot"></span>managed</span></td>
+            </tr>
+            <tr>
+              <td><span class="mono">security-review</span></td>
+              <td><span class="scope organization">acme</span></td>
+              <td class="dim">v4</td>
+              <td class="r"><span class="badge b-warn"><span class="dot"></span>not overridable</span></td>
+            </tr>
+            <tr>
+              <td><span class="mono">es-review</span></td>
+              <td><span class="scope project">this project</span></td>
+              <td class="dim">v1</td>
+              <td class="r"><span class="badge b-shared"><span class="dot"></span>overrides acme</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <div class="grid">
+    <section class="panel">
+      <header><h2>Identity</h2></header>
+      <div class="body">
+        <dl class="defs">
+          <dt>Path</dt><dd class="mono">filip/es-migration</dd>
+          <dt>UUID</dt><dd class="mono sub-line">be53de32-7597-495a-ba7c-2ed8546315b1</dd>
+          <dt>Namespace</dt><dd>personal <span class="dim">· private</span></dd>
+          <dt>You are</dt><dd><span class="badge b-active"><span class="dot"></span>OWNER</span></dd>
+          <dt>Created</dt><dd class="dim">11 Sep 2026</dd>
+        </dl>
+      </div>
+      <footer><span class="dim">Paths are human identity. The UUID is canonical.</span></footer>
+    </section>
+
+    <section class="panel">
+      <header><h2>Members</h2><div class="right"><a href="project-members.html">Manage</a></div></header>
+      <div class="body tight">
+        <table class="dt">
+          <tbody>
+            <tr><td>Filip Majerík<div class="sub-line">user</div></td><td class="r">OWNER</td></tr>
+            <tr><td>Petr Novák<div class="sub-line">user</div></td><td class="r">READER</td></tr>
+            <tr><td><span class="mono">nightly-review-agent</span><div class="sub-line">service principal</div></td><td class="r">CONTRIBUTOR</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <header><h2>Policies</h2><div class="right"><a href="project-policies.html">Manage</a></div></header>
+      <div class="body tight">
+        <table class="dt">
+          <tbody>
+            <tr><td><span class="mono">secret-scanner</span><div class="sub-line">artifact.before_write</div></td><td class="r"><span class="badge b-ok"><span class="dot"></span>enforcing</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <footer><span class="dim">1 denial in the last 7 days</span></footer>
+    </section>
+
+    <section class="panel">
+      <header><h2>Storage</h2></header>
+      <div class="body">
+        <div class="kpi mb-sm"><span class="v">184<span class="unit"> MB</span></span><span class="k">of 2 GB project quota</span></div>
+        <div class="meter"><i style="width:9%"></i></div>
+      </div>
+    </section>
+  </div>
+</div>
+
+    </div>
+  </div>
+</div>
+<script>
+function setTheme(t, el) {
+  document.documentElement.setAttribute('data-theme', t);
+  el.parentNode.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === el)));
+  document.querySelector('.logo-dark').hidden = (t === 'light');
+  document.querySelector('.logo-light').hidden = (t !== 'light');
+}
+</script>
+</body>
+</html>

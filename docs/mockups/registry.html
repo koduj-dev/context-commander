@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Skill Registry · Context Commander</title>
+<link rel="icon" href="../brand/svg/cc-favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../brand/tokens/ui-colors.css">
+<link rel="stylesheet" href="assets/mockup.css">
+</head>
+<body>
+<div class="mockbar">
+  <span class="tag">Mockup</span>
+  <a href="index.html">All screens</a>
+  <span class="dim">·</span>
+  <span>Skill Registry</span>
+  <span class="grow"></span>
+  <span class="seg">
+    <button type="button" aria-pressed="true" onclick="setTheme('dark',this)">Dark</button>
+    <button type="button" aria-pressed="false" onclick="setTheme('light',this)">Light</button>
+  </span>
+</div>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <img class="logo-dark" src="../brand/svg/cc-logo-horizontal-on-dark.svg" alt="Context Commander">
+      <img class="logo-light" src="../brand/svg/cc-logo-horizontal-on-light.svg" alt="Context Commander" hidden>
+    </div>
+    <nav class="nav">
+        <div class="nav-label">Workspace</div>
+        <a href="dashboard.html"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 9 4l6 5.5M4.5 8.5V15h9V8.5"/></svg><span>Dashboard</span></a>
+        <a href="projects.html"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5.5h5l1.2 1.5H16V14H2zM2 5.5V3.5h4l1 1.5"/></svg><span>Projects</span><span class="count num">7</span></a>
+        <a href="organizations.html"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 15V4.5h5V15M11 15V7.5h4V15M2 15h14M5 7h1M5 9.5h1M13 10h1"/></svg><span>Organizations</span><span class="count num">1</span></a>
+        <a href="registry.html" class="active"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3.5h8l2 2.5v9H4zM6 7h6M6 9.5h6M6 12h4"/></svg><span>Skill Registry</span><span class="count num">14</span></a>
+        <div class="nav-label">Installation</div>
+        <a href="administration.html"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2.5 3.5 5v4.2c0 3 2.3 5.2 5.5 6.3 3.2-1.1 5.5-3.3 5.5-6.3V5z M6.8 9l1.6 1.6L11.6 7"/></svg><span>Administration</span></a>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="avatar">FM</div>
+      <div class="who">
+        <b>Filip Majerík</b>
+        <span>Installation admin</span>
+      </div>
+    </div>
+  </aside>
+  <div class="main">
+    <div class="topbar">
+      <div class="crumbs"><b>Skill Registry</b></div>
+      <div class="spacer"></div>
+      <div class="search"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="5"/><path d="m12 12 3 3"/></svg><span>Search</span><kbd>⌘K</kbd></div>
+    </div>
+    <div class="page ">
+      
+      
+<div class="page-head">
+  <div>
+    <h1>Skill Registry</h1>
+    <p>Everything you can see: skills in your projects, in your organizations, and on the installation shelf. Agents search this same catalogue over MCP.</p>
+  </div>
+  <div class="actions"><button class="btn">Import</button><button class="btn btn-primary">New skill</button></div>
+</div>
+
+<div class="panel mb">
+  <div class="body row">
+    <input class="field grow" placeholder="Search skills by name…" value="review">
+    <span class="seg">
+      <button aria-pressed="true">All scopes</button>
+      <button aria-pressed="false">Installation</button>
+      <button aria-pressed="false">acme</button>
+      <button aria-pressed="false">My projects</button>
+    </span>
+  </div>
+</div>
+
+<section class="panel">
+  <header><h2>3 results for “review”</h2>
+    <div class="right"><span class="dim">sorted by name</span></div>
+  </header>
+  <div class="body tight">
+    <table class="dt">
+      <thead><tr><th>Skill</th><th>Lives at</th><th>Latest</th><th>Checksum</th><th>Trust</th><th>Author</th><th class="r"></th></tr></thead>
+      <tbody>
+        <tr>
+          <td><a href="registry-skill.html" class="mono">code-review</a><div class="sub-line">Check the error paths first, then the happy path</div></td>
+          <td><span class="scope project">filip/es-migration</span></td>
+          <td class="mono">v3</td>
+          <td class="mono dim">83e65ad0</td>
+          <td><span class="badge b-warn"><span class="dot"></span>unverified</span></td>
+          <td class="sec">filip</td>
+          <td class="r"><button class="btn btn-sm">Install</button></td>
+        </tr>
+        <tr>
+          <td><a href="registry-skill.html" class="mono">es-review</a><div class="sub-line">Verify mapping compatibility before reindexing</div></td>
+          <td><span class="scope organization">acme</span></td>
+          <td class="mono">v3</td>
+          <td class="mono dim">c732a13e</td>
+          <td><span class="badge b-warn"><span class="dot"></span>unverified</span></td>
+          <td class="sec">acme</td>
+          <td class="r"><button class="btn btn-sm">Install</button></td>
+        </tr>
+        <tr>
+          <td><a href="registry-skill.html" class="mono">security-review</a><div class="sub-line">Checklist applied before any release</div></td>
+          <td><span class="scope installation">installation</span></td>
+          <td class="mono">v4</td>
+          <td class="mono dim">38c1ffb3</td>
+          <td><span class="badge b-ok"><span class="dot"></span>signed</span></td>
+          <td class="sec">acme</td>
+          <td class="r"><button class="btn btn-sm">Installed</button></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <footer><span class="dim">A skill is visible where it lives. Publishing puts it in your project; promoting moves it to a wider shelf.</span></footer>
+</section>
+
+<div class="grid g2 mt">
+  <section class="panel">
+    <header><h2>How agents use this</h2></header>
+    <div class="body">
+      <div class="code mono">skill.search  query: "review"
+   → latest_version_id, latest_checksum
+skill.get     skill_version_id
+   → content, verified against checksum</div>
+      <p class="dim tail">An agent remembers the checksum it loaded and compares on a later search. It re-downloads only when the skill actually changed.</p>
+    </div>
+  </section>
+  <section class="panel">
+    <header><h2>Supply chain</h2></header>
+    <div class="body">
+      <p class="sec lead-out">Every version is immutable and carries a SHA-256 of its packaged content, verified on every read. Content that no longer matches is refused rather than served.</p>
+      <div class="note warn">Trust status is <b>unverified</b> for everything published locally. Signing and an approval workflow are not built yet — the badge says so instead of implying a check that does not happen.</div>
+    </div>
+  </section>
+</div>
+
+    </div>
+  </div>
+</div>
+<script>
+function setTheme(t, el) {
+  document.documentElement.setAttribute('data-theme', t);
+  el.parentNode.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === el)));
+  document.querySelector('.logo-dark').hidden = (t === 'light');
+  document.querySelector('.logo-light').hidden = (t !== 'light');
+}
+</script>
+</body>
+</html>

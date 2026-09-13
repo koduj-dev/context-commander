@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>security-review · Context Commander</title>
+<link rel="icon" href="../brand/svg/cc-favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../brand/tokens/ui-colors.css">
+<link rel="stylesheet" href="assets/mockup.css">
+</head>
+<body>
+<div class="mockbar">
+  <span class="tag">Mockup</span>
+  <a href="index.html">All screens</a>
+  <span class="dim">·</span>
+  <span>security-review</span>
+  <span class="grow"></span>
+  <span class="seg">
+    <button type="button" aria-pressed="true" onclick="setTheme('dark',this)">Dark</button>
+    <button type="button" aria-pressed="false" onclick="setTheme('light',this)">Light</button>
+  </span>
+</div>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <img class="logo-dark" src="../brand/svg/cc-logo-horizontal-on-dark.svg" alt="Context Commander">
+      <img class="logo-light" src="../brand/svg/cc-logo-horizontal-on-light.svg" alt="Context Commander" hidden>
+    </div>
+    <nav class="nav">
+        <div class="nav-label">Workspace</div>
+        <a href="dashboard.html"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 9 4l6 5.5M4.5 8.5V15h9V8.5"/></svg><span>Dashboard</span></a>
+        <a href="projects.html"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5.5h5l1.2 1.5H16V14H2zM2 5.5V3.5h4l1 1.5"/></svg><span>Projects</span><span class="count num">7</span></a>
+        <a href="organizations.html"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 15V4.5h5V15M11 15V7.5h4V15M2 15h14M5 7h1M5 9.5h1M13 10h1"/></svg><span>Organizations</span><span class="count num">1</span></a>
+        <a href="registry.html" class="active"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3.5h8l2 2.5v9H4zM6 7h6M6 9.5h6M6 12h4"/></svg><span>Skill Registry</span><span class="count num">14</span></a>
+        <div class="nav-label">Installation</div>
+        <a href="administration.html"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2.5 3.5 5v4.2c0 3 2.3 5.2 5.5 6.3 3.2-1.1 5.5-3.3 5.5-6.3V5z M6.8 9l1.6 1.6L11.6 7"/></svg><span>Administration</span></a>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="avatar">FM</div>
+      <div class="who">
+        <b>Filip Majerík</b>
+        <span>Installation admin</span>
+      </div>
+    </div>
+  </aside>
+  <div class="main">
+    <div class="topbar">
+      <div class="crumbs"><span>Skill Registry</span><span class="sep">/</span><b class="mono">security-review</b></div>
+      <div class="spacer"></div>
+      <div class="search"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="5"/><path d="m12 12 3 3"/></svg><span>Search</span><kbd>⌘K</kbd></div>
+    </div>
+    <div class="page ">
+      
+      
+<div class="page-head">
+  <div>
+    <h1 class="mono">security-review</h1>
+    <p>Checklist applied before any release. Lives on the installation shelf, so every project here can find it.</p>
+  </div>
+  <div class="actions">
+    <button class="btn">Install into project…</button>
+    <button class="btn btn-primary">Publish new version</button>
+  </div>
+</div>
+
+<div class="grid g-2-1">
+  <div class="grid">
+    <section class="panel">
+      <header>
+        <h2>Content</h2><span class="sub">v4 · read-only, published versions are immutable</span>
+        <div class="right"><span class="seg"><button aria-pressed="true">Rendered</button><button aria-pressed="false">Source</button><button aria-pressed="false">Diff v3 → v4</button></span></div>
+      </header>
+      <div class="body">
+        <div class="doc">
+          <h3>Security review</h3>
+          <p class="sec lead-out">Run before tagging a release. Stop at the first item that fails and report it rather than continuing.</p>
+          <ol class="sec">
+            <li>No credential-shaped strings in any changed file.</li>
+            <li>Every new endpoint has an authorization check in the domain service, not the adapter.</li>
+            <li>New tables have an RLS policy and a test that fails when the policy is removed.</li>
+            <li>Migrations are reversible, or say in a comment why they are not.</li>
+          </ol>
+        </div>
+      </div>
+      <footer><span class="dim">To change this, publish v5. Editing a published version is impossible by design.</span></footer>
+    </section>
+
+    <section class="panel">
+      <header><h2>Versions</h2><span class="sub">4</span></header>
+      <div class="body tight">
+        <table class="dt">
+          <thead><tr><th>Version</th><th>Checksum</th><th>Published</th><th>By</th><th class="r">In use</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">v4 <span class="badge b-active inline-badge"><span class="dot"></span>latest</span></td><td class="mono dim">38c1ffb3d951afe4</td><td class="dim">12 Sep 2026</td><td class="sec">Filip Majerík</td><td class="r"><span class="num">4</span> <span class="dim">projects</span></td></tr>
+            <tr><td class="mono">v3</td><td class="mono dim">a1f0c7ee2b34d905</td><td class="dim">04 Sep 2026</td><td class="sec">Filip Majerík</td><td class="r"><span class="num">3</span> <span class="dim">projects</span></td></tr>
+            <tr><td class="mono">v2</td><td class="mono dim">7c22b9a4f1e8330d</td><td class="dim">28 Aug 2026</td><td class="sec">Filip Majerík</td><td class="r dim">—</td></tr>
+            <tr><td class="mono">v1</td><td class="mono dim">0b5e1d7cc8a24416</td><td class="dim">21 Aug 2026</td><td class="sec">Filip Majerík</td><td class="r dim">—</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <footer><span class="dim">Publishing never moves a pinned project. Three projects are still on v3 — that is deliberate until someone installs v4.</span></footer>
+    </section>
+  </div>
+
+  <div class="grid">
+    <section class="panel">
+      <header><h2>Package</h2></header>
+      <div class="body">
+        <dl class="defs">
+          <dt>Skill ID</dt><dd class="mono sub-line">030c9d3b-149d-4308-814a</dd>
+          <dt>Lives at</dt><dd><span class="scope installation">installation</span></dd>
+          <dt>Author</dt><dd>acme</dd>
+          <dt>Origin</dt><dd class="mono">local</dd>
+          <dt>Size</dt><dd class="num">3.1 kB</dd>
+          <dt>Trust</dt><dd><span class="badge b-ok"><span class="dot"></span>signed</span></dd>
+        </dl>
+      </div>
+    </section>
+
+    <section class="panel">
+      <header><h2>Declared capabilities</h2></header>
+      <div class="body">
+        <p class="dim sub-line lead-out">What the package says it needs. Declared, not enforced — treat it as a label on the box.</p>
+        <span class="badge"><span class="dot"></span>filesystem</span>
+        <div class="note warn mt-sm">Contains no executable scripts and requests no network access.</div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <header><h2>Where it applies</h2></header>
+      <div class="body tight">
+        <table class="dt">
+          <tbody>
+            <tr><td><span class="mono">acme/platform</span></td><td class="r mono dim">v4</td></tr>
+            <tr><td><span class="mono">acme/billing-rewrite</span></td><td class="r mono dim">v4</td></tr>
+            <tr><td><span class="mono">filip/es-migration</span></td><td class="r mono dim">v4</td></tr>
+            <tr><td><span class="mono">acme/data-platform</span></td><td class="r"><span class="badge b-warn"><span class="dot"></span>v3</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+</div>
+
+    </div>
+  </div>
+</div>
+<script>
+function setTheme(t, el) {
+  document.documentElement.setAttribute('data-theme', t);
+  el.parentNode.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === el)));
+  document.querySelector('.logo-dark').hidden = (t === 'light');
+  document.querySelector('.logo-light').hidden = (t !== 'light');
+}
+</script>
+</body>
+</html>

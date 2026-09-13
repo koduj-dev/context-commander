@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Policies · Context Commander</title>
+<link rel="icon" href="../brand/svg/cc-favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../brand/tokens/ui-colors.css">
+<link rel="stylesheet" href="assets/mockup.css">
+</head>
+<body>
+<div class="mockbar">
+  <span class="tag">Mockup</span>
+  <a href="index.html">All screens</a>
+  <span class="dim">·</span>
+  <span>Policies</span>
+  <span class="grow"></span>
+  <span class="seg">
+    <button type="button" aria-pressed="true" onclick="setTheme('dark',this)">Dark</button>
+    <button type="button" aria-pressed="false" onclick="setTheme('light',this)">Light</button>
+  </span>
+</div>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <img class="logo-dark" src="../brand/svg/cc-logo-horizontal-on-dark.svg" alt="Context Commander">
+      <img class="logo-light" src="../brand/svg/cc-logo-horizontal-on-light.svg" alt="Context Commander" hidden>
+    </div>
+    <nav class="nav">
+        <div class="nav-label">Workspace</div>
+        <a href="dashboard.html"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 9 4l6 5.5M4.5 8.5V15h9V8.5"/></svg><span>Dashboard</span></a>
+        <a href="projects.html" class="active"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5.5h5l1.2 1.5H16V14H2zM2 5.5V3.5h4l1 1.5"/></svg><span>Projects</span><span class="count num">7</span></a>
+        <a href="organizations.html"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 15V4.5h5V15M11 15V7.5h4V15M2 15h14M5 7h1M5 9.5h1M13 10h1"/></svg><span>Organizations</span><span class="count num">1</span></a>
+        <a href="registry.html"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3.5h8l2 2.5v9H4zM6 7h6M6 9.5h6M6 12h4"/></svg><span>Skill Registry</span><span class="count num">14</span></a>
+        <div class="nav-label">Installation</div>
+        <a href="administration.html"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2.5 3.5 5v4.2c0 3 2.3 5.2 5.5 6.3 3.2-1.1 5.5-3.3 5.5-6.3V5z M6.8 9l1.6 1.6L11.6 7"/></svg><span>Administration</span></a>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="avatar">FM</div>
+      <div class="who">
+        <b>Filip Majerík</b>
+        <span>Installation admin</span>
+      </div>
+    </div>
+  </aside>
+  <div class="main">
+    <div class="topbar">
+      <div class="crumbs"><span>Projects</span><span class="sep">/</span><b class="mono">filip/es-migration</b></div>
+      <div class="spacer"></div>
+      <div class="search"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="5"/><path d="m12 12 3 3"/></svg><span>Search</span><kbd>⌘K</kbd></div>
+    </div>
+    <div class="page ">
+      <nav class="tabs"><a href="project-overview.html">Overview</a><a href="project-members.html">Members</a><a href="project-connections.html">Connections</a><a href="project-skills.html">Skills</a><a href="project-policies.html" class="active">Policies</a><a href="project-secrets.html">Secrets</a><a href="project-activity.html">Activity</a><a href="project-settings.html">Settings</a></nav>
+      
+<div class="page-head">
+  <div>
+    <h1>Policies</h1>
+    <p>Gates run server-side, in-process, before and after operations. They are enforcement — separate from skills, which are capability.</p>
+  </div>
+  <div class="actions"><button class="btn btn-primary">Bind a gate</button></div>
+</div>
+
+<section class="panel">
+  <header><h2>Active gates</h2><span class="sub">Composed from installation, organization and project scope</span></header>
+  <div class="body tight">
+    <table class="dt">
+      <thead><tr><th>Gate</th><th>Hook</th><th>Scope</th><th>State</th><th class="r">Last 7 days</th><th class="r"></th></tr></thead>
+      <tbody>
+        <tr>
+          <td><span class="mono">secret-scanner</span><div class="sub-line">Refuses writes that carry credentials</div></td>
+          <td class="mono">artifact.before_write</td>
+          <td><span class="scope installation">installation</span></td>
+          <td><span class="badge b-ok"><span class="dot"></span>enforcing</span></td>
+          <td class="r"><span class="num">1</span> <span class="dim">denial</span></td>
+          <td class="r"><button class="btn btn-sm" disabled title="Managed at installation scope">Configure</button></td>
+        </tr>
+        <tr>
+          <td><span class="mono">require-handoff</span><div class="sub-line">Warns when work starts with no handoff claimed</div></td>
+          <td class="mono">artifact.before_write</td>
+          <td><span class="scope project">this project</span></td>
+          <td><span class="badge b-info"><span class="dot"></span>guidance</span></td>
+          <td class="r"><span class="num">6</span> <span class="dim">warnings</span></td>
+          <td class="r"><button class="btn btn-sm">Configure</button></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <footer><span class="dim">Decisions aggregate deterministically: <span class="mono">DENY &gt; ALLOW_WITH_GUIDANCE &gt; ALLOW</span>.</span></footer>
+</section>
+
+<div class="grid g-2-1 mt">
+  <section class="panel">
+    <header><h2>Recent decisions</h2></header>
+    <div class="body tight">
+      <table class="dt">
+        <thead><tr><th>When</th><th>Gate</th><th>Decision</th><th>Operation</th><th>Principal</th></tr></thead>
+        <tbody>
+          <tr><td class="dim mono">12 Sep 09:12</td><td class="mono">secret-scanner</td><td><span class="badge b-danger"><span class="dot"></span>DENY</span></td><td class="mono truncate">artifact.write config/.env</td><td>Petr Novák</td></tr>
+          <tr><td class="dim mono">12 Sep 08:04</td><td class="mono">require-handoff</td><td><span class="badge b-warn"><span class="dot"></span>GUIDANCE</span></td><td class="mono truncate">artifact.write notes/scratch.md</td><td>Filip Majerík</td></tr>
+          <tr><td class="dim mono">11 Sep 17:51</td><td class="mono">require-handoff</td><td><span class="badge b-warn"><span class="dot"></span>GUIDANCE</span></td><td class="mono truncate">artifact.write notes/scratch.md</td><td>Filip Majerík</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    <header><h2>Available gates</h2></header>
+    <div class="body">
+      <p class="sec lead-out">Gates are trusted Go code compiled into the server. This page configures which ones run where; it never uploads policy code.</p>
+      <dl class="defs">
+        <dt class="mono">secret-scanner</dt><dd class="dim">bound</dd>
+        <dt class="mono">require-handoff</dt><dd class="dim">bound</dd>
+        <dt class="mono">protected-artifacts</dt><dd><button class="btn btn-sm">Bind</button></dd>
+      </dl>
+      <div class="note warn mt-sm">A gate that errors in a <b>before_*</b> hook fails closed. A technical failure never becomes a silent allow.</div>
+    </div>
+  </section>
+</div>
+
+    </div>
+  </div>
+</div>
+<script>
+function setTheme(t, el) {
+  document.documentElement.setAttribute('data-theme', t);
+  el.parentNode.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === el)));
+  document.querySelector('.logo-dark').hidden = (t === 'light');
+  document.querySelector('.logo-light').hidden = (t !== 'light');
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,435 @@
+/* Context Commander — mockup stylesheet.
+ *
+ * Every colour here comes from ../../brand/tokens/ui-colors.css, imported
+ * above this file. Nothing is hardcoded: if a token changes, these screens
+ * change with it, which is the only way a mockup stays honest about the
+ * brand it claims to follow.
+ *
+ * Density is deliberate. This is an operator's control plane, not a
+ * marketing page — a row should carry a fact, not whitespace. */
+
+* { box-sizing: border-box; }
+
+html { color-scheme: dark light; }
+
+body {
+  margin: 0;
+  font-family: Inter, "Inter var", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 1.45;
+  background: var(--cc-bg);
+  color: var(--cc-text);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Identifiers, hashes, paths and counts. Tabular figures so columns of
+ * numbers line up instead of shimmering. */
+.mono {
+  font-family: "SF Mono", "JetBrains Mono", "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+}
+.num { font-variant-numeric: tabular-nums; }
+
+a { color: var(--cc-accent-primary); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+:focus-visible {
+  outline: 2px solid var(--cc-focus-ring);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+/* ---------- shell ---------- */
+
+.app { display: grid; grid-template-columns: 232px 1fr; min-height: 100vh; }
+
+.sidebar {
+  background: var(--cc-surface-1);
+  border-right: 1px solid var(--cc-border);
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+
+.brand {
+  padding: 18px 16px 14px;
+  border-bottom: 1px solid var(--cc-border);
+}
+.brand img { display: block; height: 26px; width: auto; }
+
+.nav { padding: 12px 8px; overflow-y: auto; flex: 1; }
+.nav-label {
+  padding: 12px 8px 6px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cc-text-muted);
+}
+.nav a {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 8px;
+  border-radius: 5px;
+  color: var(--cc-text-secondary);
+  font-size: 13px;
+  text-decoration: none;
+}
+.nav a:hover { background: var(--cc-surface-2); color: var(--cc-text); text-decoration: none; }
+/* Pink marks the thing you are looking at — "active/current context" is
+ * the one meaning the brand assigns it. A 2px rail, not a filled block:
+ * large saturated areas are explicitly against the brand rules. */
+.nav a.active {
+  background: var(--cc-surface-3);
+  color: var(--cc-text);
+  box-shadow: inset 2px 0 0 var(--cc-accent-primary-visual);
+}
+.nav a .ico { width: 15px; height: 15px; flex: none; opacity: .75; }
+.nav a.active .ico { opacity: 1; }
+.nav .count { margin-left: auto; font-size: 11px; color: var(--cc-text-muted); }
+
+.sidebar-foot {
+  border-top: 1px solid var(--cc-border);
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.avatar {
+  width: 26px; height: 26px; flex: none;
+  border-radius: 50%;
+  background: var(--cc-surface-3);
+  border: 1px solid var(--cc-border-strong);
+  display: grid; place-items: center;
+  font-size: 10.5px; font-weight: 600; color: var(--cc-text-secondary);
+}
+.sidebar-foot .who { min-width: 0; }
+.sidebar-foot .who b { display: block; font-weight: 500; font-size: 12.5px; }
+.sidebar-foot .who span { display: block; font-size: 11px; color: var(--cc-text-muted); }
+
+.main { min-width: 0; display: flex; flex-direction: column; }
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 22px;
+  height: 48px;
+  border-bottom: 1px solid var(--cc-border);
+  background: var(--cc-bg);
+  position: sticky; top: 0; z-index: 5;
+}
+.crumbs { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--cc-text-muted); }
+.crumbs .sep { opacity: .5; }
+.crumbs b { color: var(--cc-text); font-weight: 500; }
+.topbar .spacer { flex: 1; }
+
+.search {
+  display: flex; align-items: center; gap: 7px;
+  background: var(--cc-surface-2);
+  border: 1px solid var(--cc-border);
+  border-radius: 5px;
+  padding: 4px 9px;
+  width: 260px;
+  color: var(--cc-text-muted);
+  font-size: 12.5px;
+}
+.search kbd {
+  margin-left: auto;
+  font-family: inherit; font-size: 10.5px;
+  border: 1px solid var(--cc-border-strong);
+  border-radius: 3px; padding: 0 4px;
+  color: var(--cc-text-muted);
+}
+
+.page { padding: 22px; max-width: 1320px; }
+
+.page-head { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 18px; }
+.page-head h1 { margin: 0 0 3px; font-size: 19px; font-weight: 600; letter-spacing: -0.01em; }
+.page-head p { margin: 0; color: var(--cc-text-secondary); font-size: 12.5px; max-width: 62ch; }
+.page-head .actions { margin-left: auto; display: flex; gap: 8px; flex: none; }
+
+/* ---------- controls ---------- */
+
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid var(--cc-border-strong);
+  background: var(--cc-surface-2);
+  color: var(--cc-text);
+  border-radius: 5px;
+  padding: 5px 11px;
+  font: inherit; font-size: 12.5px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn:hover { background: var(--cc-surface-3); }
+.btn-primary {
+  background: var(--cc-accent-primary-visual);
+  border-color: var(--cc-accent-primary-visual);
+  color: var(--cc-void);
+  font-weight: 600;
+}
+.btn-primary:hover { background: var(--cc-accent-primary-visual); filter: brightness(1.08); }
+.btn-danger { color: var(--cc-danger); border-color: var(--cc-border-strong); }
+.btn-sm { padding: 3px 8px; font-size: 12px; }
+.btn[disabled] { opacity: .45; cursor: not-allowed; }
+
+.seg { display: inline-flex; border: 1px solid var(--cc-border); border-radius: 5px; overflow: hidden; }
+.seg button {
+  border: 0; background: var(--cc-surface-1); color: var(--cc-text-secondary);
+  font: inherit; font-size: 12.5px; padding: 4px 11px; cursor: pointer;
+}
+.seg button + button { border-left: 1px solid var(--cc-border); }
+.seg button[aria-pressed="true"] { background: var(--cc-surface-3); color: var(--cc-text); }
+
+.field {
+  background: var(--cc-surface-2);
+  border: 1px solid var(--cc-border);
+  border-radius: 5px;
+  padding: 5px 9px;
+  color: var(--cc-text);
+  font: inherit; font-size: 12.5px;
+  width: 100%;
+}
+.field::placeholder { color: var(--cc-text-muted); }
+
+/* ---------- panels ---------- */
+
+.grid { display: grid; gap: 14px; }
+.g2 { grid-template-columns: 1fr 1fr; }
+.g3 { grid-template-columns: repeat(3, 1fr); }
+.g-2-1 { grid-template-columns: 2fr 1fr; }
+
+.panel {
+  background: var(--cc-surface-1);
+  border: 1px solid var(--cc-border);
+  border-radius: 7px;
+  overflow: hidden;
+}
+.panel > header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--cc-border);
+}
+.panel > header h2 { margin: 0; font-size: 13px; font-weight: 600; }
+.panel > header .sub { font-size: 11.5px; color: var(--cc-text-muted); }
+.panel > header .right { margin-left: auto; display: flex; gap: 7px; align-items: center; }
+.panel .body { padding: 14px; }
+.panel .body.tight { padding: 0; }
+.panel > footer {
+  padding: 8px 14px; border-top: 1px solid var(--cc-border);
+  font-size: 12px; color: var(--cc-text-muted);
+  display: flex; align-items: center; gap: 10px;
+}
+
+/* ---------- definition rows ---------- */
+
+.defs { display: grid; grid-template-columns: max-content 1fr; gap: 7px 18px; align-items: baseline; }
+.defs dt { color: var(--cc-text-muted); font-size: 12px; }
+.defs dd { margin: 0; }
+
+/* ---------- tables ---------- */
+
+table.dt { width: 100%; border-collapse: collapse; }
+table.dt th {
+  text-align: left;
+  font-size: 10.5px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase;
+  color: var(--cc-text-muted);
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--cc-border);
+  white-space: nowrap;
+  background: var(--cc-surface-1);
+  position: sticky; top: 48px;
+}
+table.dt td {
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--cc-border);
+  vertical-align: middle;
+}
+table.dt tbody tr:hover td { background: var(--cc-surface-2); }
+table.dt tbody tr:last-child td { border-bottom: 0; }
+table.dt td.r, table.dt th.r { text-align: right; }
+.dim { color: var(--cc-text-muted); }
+.sec { color: var(--cc-text-secondary); }
+.truncate { max-width: 34ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; vertical-align: bottom; }
+
+/* ---------- badges ----------
+ * Status never rides on colour alone: every badge carries a glyph and a
+ * word, so it survives greyscale and colour blindness. */
+
+.badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  border: 1px solid var(--cc-border-strong);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--cc-text-secondary);
+  background: var(--cc-surface-2);
+}
+.badge .dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; flex: none; }
+.b-ok      { color: var(--cc-success); border-color: color-mix(in srgb, var(--cc-success) 40%, transparent); }
+.b-warn    { color: var(--cc-warning); border-color: color-mix(in srgb, var(--cc-warning) 40%, transparent); }
+.b-danger  { color: var(--cc-danger);  border-color: color-mix(in srgb, var(--cc-danger) 45%, transparent); }
+.b-info    { color: var(--cc-info);    border-color: color-mix(in srgb, var(--cc-info) 40%, transparent); }
+/* Pink = active/current context. Violet = shared/relay/inherited. That
+ * distinction is the brand's one semantic rule and it is kept everywhere. */
+.b-active  { color: var(--cc-accent-primary); border-color: color-mix(in srgb, var(--cc-accent-primary) 45%, transparent); }
+.b-shared  { color: var(--cc-accent-secondary); border-color: color-mix(in srgb, var(--cc-accent-secondary) 50%, transparent); }
+
+/* ---------- scope rail ----------
+ * Where a thing lives: installation / organization / project. Violet for
+ * inherited scopes, pink for the project you are in. */
+.scope { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--cc-text-secondary); }
+.scope::before { content: ""; width: 3px; height: 12px; border-radius: 2px; background: var(--cc-border-strong); }
+.scope.installation::before { background: var(--cc-accent-secondary-visual); }
+.scope.organization::before { background: color-mix(in srgb, var(--cc-accent-secondary-visual) 55%, var(--cc-border-strong)); }
+.scope.project::before { background: var(--cc-accent-primary-visual); }
+
+/* ---------- misc ---------- */
+
+.kpi { display: flex; flex-direction: column; gap: 2px; }
+.kpi .v { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.kpi .k { font-size: 11.5px; color: var(--cc-text-muted); }
+
+.feed { list-style: none; margin: 0; padding: 0; }
+.feed li { display: flex; gap: 11px; padding: 9px 14px; border-bottom: 1px solid var(--cc-border); align-items: baseline; }
+.feed li:last-child { border-bottom: 0; }
+.feed .when { color: var(--cc-text-muted); font-size: 11.5px; white-space: nowrap; min-width: 62px; }
+.feed .what { flex: 1; min-width: 0; }
+
+.empty { padding: 28px 14px; text-align: center; color: var(--cc-text-muted); }
+.empty b { display: block; color: var(--cc-text-secondary); font-weight: 500; margin-bottom: 3px; }
+
+.note {
+  border-left: 2px solid var(--cc-border-strong);
+  padding: 8px 12px;
+  background: var(--cc-surface-2);
+  border-radius: 0 5px 5px 0;
+  color: var(--cc-text-secondary);
+  font-size: 12.5px;
+}
+.note.warn { border-left-color: var(--cc-warning); }
+.note.danger { border-left-color: var(--cc-danger); }
+.note.info { border-left-color: var(--cc-info); }
+.note b { color: var(--cc-text); font-weight: 600; }
+
+.code {
+  background: var(--cc-surface-2);
+  border: 1px solid var(--cc-border);
+  border-radius: 5px;
+  padding: 10px 12px;
+  overflow-x: auto;
+  white-space: pre;
+  color: var(--cc-text-secondary);
+}
+
+.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--cc-border); margin-bottom: 16px; }
+.tabs a {
+  padding: 7px 12px; font-size: 12.5px; color: var(--cc-text-secondary);
+  border-bottom: 2px solid transparent; text-decoration: none;
+}
+.tabs a:hover { color: var(--cc-text); text-decoration: none; }
+.tabs a.active { color: var(--cc-text); border-bottom-color: var(--cc-accent-primary-visual); }
+
+/* Mockup chrome — the strip that says this is a mockup, not the product. */
+.mockbar {
+  background: var(--cc-surface-2);
+  border-bottom: 1px solid var(--cc-border);
+  padding: 5px 14px;
+  font-size: 11.5px;
+  color: var(--cc-text-muted);
+  display: flex; align-items: center; gap: 12px;
+}
+.mockbar a { color: var(--cc-text-secondary); }
+.mockbar .tag {
+  border: 1px solid var(--cc-border-strong); border-radius: 3px;
+  padding: 0 5px; font-size: 10.5px; letter-spacing: .05em; text-transform: uppercase;
+}
+
+@media (max-width: 1100px) {
+  .app { grid-template-columns: 1fr; }
+  .sidebar { position: static; height: auto; }
+  .g2, .g3, .g-2-1 { grid-template-columns: 1fr; }
+}
+
+/* ---------- layout utilities ----------
+ * These exist so a page never needs an inline style. Every inline style is
+ * a small private decision, and a hundred of them is what turns a kit back
+ * into a pile of one-off pages. If a layout need recurs, it gets a name
+ * here rather than a style attribute there. */
+
+.stack { display: grid; gap: 14px; }
+.stack-sm { display: grid; gap: 9px; }
+.stack-start { align-content: start; }
+.row { display: flex; align-items: center; gap: 10px; }
+.row-sm { display: flex; align-items: center; gap: 7px; }
+.grow { flex: 1; min-width: 0; }
+.mt { margin-top: 14px; }
+.mb { margin-bottom: 14px; }
+.nowrap { white-space: nowrap; }
+
+/* The small uppercase caption above a value inside a panel body. */
+.label-caps {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: var(--cc-text-muted);
+  margin-bottom: 3px;
+}
+
+/* Secondary line under a table cell's primary value — a description, an
+ * email, a type. One class instead of a per-page font-size guess. */
+.sub-line { font-size: 11.5px; color: var(--cc-text-muted); }
+
+/* Usage meter. Violet, because storage is shared/inherited state rather
+ * than the thing you are currently looking at. */
+.meter { height: 5px; border-radius: 3px; background: var(--cc-surface-3); overflow: hidden; }
+.meter > i { display: block; height: 100%; background: var(--cc-accent-secondary-visual); }
+.meter.warn > i { background: var(--cc-warning); }
+.meter.danger > i { background: var(--cc-danger); }
+
+.unit { font-size: 13px; font-weight: 500; }
+
+/* A document preview: rendered markdown, a skill body, a handoff note. */
+.doc {
+  border: 1px solid var(--cc-border);
+  border-radius: 6px;
+  padding: 16px;
+  background: var(--cc-bg);
+}
+.doc h3 { margin: 0 0 8px; font-size: 15px; }
+.doc p { margin: 0 0 10px; color: var(--cc-text-secondary); }
+.doc ol, .doc ul { margin: 0; padding-left: 18px; color: var(--cc-text-secondary); line-height: 1.7; }
+
+/* ---------- foundations page only ---------- */
+.swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 10px; }
+.sw { border: 1px solid var(--cc-border); border-radius: 6px; overflow: hidden; }
+.sw .chip { height: 46px; }
+.sw .meta { padding: 7px 9px; }
+.sw .meta b { display: block; font-size: 12px; font-weight: 500; }
+.sw .meta span { display: block; font-size: 11px; color: var(--cc-text-muted); }
+.specimen { border: 1px solid var(--cc-border); border-radius: 6px; padding: 14px; background: var(--cc-bg); }
+.specimen + .specimen { margin-top: 10px; }
+.spec-note { font-size: 12px; color: var(--cc-text-secondary); margin: 8px 0 0; }
+
+/* Utilities that replaced the last of the inline styles. Anything used more
+ * than twice across the screens earns a name here. */
+.lead-out { margin: 0 0 10px; }   /* paragraph that opens a panel body */
+.tail     { margin: 10px 0 0; }   /* explanatory line closing a panel body */
+.mt-sm    { margin-top: 10px; }
+.mb-sm    { margin-bottom: 10px; }
+.inline-badge { margin-left: 4px; }
+.wrap { flex-wrap: wrap; }
+.v-warn { color: var(--cc-warning); }
+.strong { font-weight: 600; }
+
+/* Theme-swapped logo. The toggle flips the `hidden` attribute on these two,
+ * so the lockup is always the variant drawn for the background it sits on —
+ * the brand ships both and neither is a recolour of the other. */
+.logo-dark, .logo-light { display: block; }

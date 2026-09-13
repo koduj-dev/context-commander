@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Settings · Context Commander</title>
+<link rel="icon" href="../brand/svg/cc-favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../brand/tokens/ui-colors.css">
+<link rel="stylesheet" href="assets/mockup.css">
+</head>
+<body>
+<div class="mockbar">
+  <span class="tag">Mockup</span>
+  <a href="index.html">All screens</a>
+  <span class="dim">·</span>
+  <span>Settings</span>
+  <span class="grow"></span>
+  <span class="seg">
+    <button type="button" aria-pressed="true" onclick="setTheme('dark',this)">Dark</button>
+    <button type="button" aria-pressed="false" onclick="setTheme('light',this)">Light</button>
+  </span>
+</div>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <img class="logo-dark" src="../brand/svg/cc-logo-horizontal-on-dark.svg" alt="Context Commander">
+      <img class="logo-light" src="../brand/svg/cc-logo-horizontal-on-light.svg" alt="Context Commander" hidden>
+    </div>
+    <nav class="nav">
+        <div class="nav-label">Workspace</div>
+        <a href="dashboard.html"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 9 4l6 5.5M4.5 8.5V15h9V8.5"/></svg><span>Dashboard</span></a>
+        <a href="projects.html" class="active"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5.5h5l1.2 1.5H16V14H2zM2 5.5V3.5h4l1 1.5"/></svg><span>Projects</span><span class="count num">7</span></a>
+        <a href="organizations.html"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 15V4.5h5V15M11 15V7.5h4V15M2 15h14M5 7h1M5 9.5h1M13 10h1"/></svg><span>Organizations</span><span class="count num">1</span></a>
+        <a href="registry.html"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3.5h8l2 2.5v9H4zM6 7h6M6 9.5h6M6 12h4"/></svg><span>Skill Registry</span><span class="count num">14</span></a>
+        <div class="nav-label">Installation</div>
+        <a href="administration.html"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2.5 3.5 5v4.2c0 3 2.3 5.2 5.5 6.3 3.2-1.1 5.5-3.3 5.5-6.3V5z M6.8 9l1.6 1.6L11.6 7"/></svg><span>Administration</span></a>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="avatar">FM</div>
+      <div class="who">
+        <b>Filip Majerík</b>
+        <span>Installation admin</span>
+      </div>
+    </div>
+  </aside>
+  <div class="main">
+    <div class="topbar">
+      <div class="crumbs"><span>Projects</span><span class="sep">/</span><b class="mono">filip/es-migration</b></div>
+      <div class="spacer"></div>
+      <div class="search"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="5"/><path d="m12 12 3 3"/></svg><span>Search</span><kbd>⌘K</kbd></div>
+    </div>
+    <div class="page ">
+      <nav class="tabs"><a href="project-overview.html">Overview</a><a href="project-members.html">Members</a><a href="project-connections.html">Connections</a><a href="project-skills.html">Skills</a><a href="project-policies.html">Policies</a><a href="project-secrets.html">Secrets</a><a href="project-activity.html">Activity</a><a href="project-settings.html" class="active">Settings</a></nav>
+      
+<div class="page-head">
+  <div><h1>Settings</h1><p>Project identity and the things only an owner should touch.</p></div>
+  
+</div>
+<div class="grid g-2-1"><div class="stack"><section class="panel"><header><h2>Identity</h2><span class="sub">Paths are identity for humans, not for authorization</span></header><div class="body">
+      <div class="stack-sm">
+        <div><div class="label-caps">Display name</div><input class="field" value="ES migration"></div>
+        <div><div class="label-caps">Slug</div><input class="field mono" value="es-migration"></div>
+        <div><div class="label-caps">Namespace</div><input class="field mono" value="filip" disabled></div>
+      </div>
+      <div class="note info">Namespace transfer is not supported. The canonical UUID never changes; the path is only how people say it.</div>
+      <div class="row mt"><button class="btn btn-primary">Save changes</button></div></div></section><section class="panel"><header><h2>Visibility</h2><span class="sub">Discovery, not authorization</span></header><div class="body">
+      <div class="row-sm"><span class="seg"><button type="button" aria-pressed="true">Private</button><button type="button" aria-pressed="false">Organization</button><button type="button" aria-pressed="false">Public</button></span></div>
+      <div class="note warn"><b>Visibility is discovery metadata only.</b> It never grants access — membership does, and nothing else. Making a project organization-visible does not let organization members read its content.</div></div></section><section class="panel"><header><h2>Danger zone</h2></header><div class="body">
+      <div class="row">
+        <div class="grow">
+          <b class="strong">Delete this project</b>
+          <div class="sub-line">Artifacts, handoffs, history and skill bindings go with it. Audit rows are retained.</div>
+        </div>
+        <button class="btn btn-danger">Delete project</button>
+      </div></div><footer><span class="dim">OWNER only — ADMIN cannot delete a project or grant ownership.</span></footer></section></div><div class="stack stack-start"><section class="panel"><header><h2>Canonical</h2></header><div class="body"><dl class="defs"><dt>UUID</dt><dd><span class="mono">be53de32-7597-495a-ba7c</span></dd><dt>Created</dt><dd><span class="dim">11 Sep 2026</span></dd><dt>By</dt><dd>Filip Majerík</dd></dl></div></section><section class="panel"><header><h2>Encryption</h2></header><div class="body"><dl class="defs"><dt>Project key</dt><dd><span class="mono">v1</span></dd><dt>Rotated</dt><dd><span class="dim">never</span></dd><dt>Algorithm</dt><dd><span class="mono">AES-256-GCM</span></dd></dl>
+    <div class="note">Rotating a project key rewraps the per-version keys. It never rewrites an immutable content version.</div></div><footer><button class="btn btn-sm">Rotate project key</button></footer></section></div></div>
+
+    </div>
+  </div>
+</div>
+<script>
+function setTheme(t, el) {
+  document.documentElement.setAttribute('data-theme', t);
+  el.parentNode.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === el)));
+  document.querySelector('.logo-dark').hidden = (t === 'light');
+  document.querySelector('.logo-light').hidden = (t !== 'light');
+}
+</script>
+</body>
+</html>
