@@ -37,6 +37,14 @@ type Membership struct {
 	UserID         uuid.UUID
 	Role           Role
 	CreatedAt      time.Time
+
+	// Email and DisplayName come from the users row this membership points
+	// at. They are carried here rather than left to the caller because a
+	// membership is about a person, and every interface that shows one was
+	// otherwise reduced to printing a UUID — a list of UUIDs answers "who
+	// is in this organization" with "I am not going to tell you".
+	Email       string
+	DisplayName string
 }
 
 var ErrNotFound = errors.New("organizations: not found")
@@ -46,9 +54,13 @@ var ErrNotFound = errors.New("organizations: not found")
 // not: organizations could be added to and never enumerated, so the only
 // way to answer "who is in this organization" was SQL.
 func (s *Store) ListMembers(ctx context.Context, tx pgx.Tx, organizationID uuid.UUID) ([]Membership, error) {
+	// Joined rather than looked up per row: one query answers it, and the
+	// users table has no RLS of its own to route around.
 	rows, err := tx.Query(ctx,
-		`SELECT organization_id, user_id, role, created_at FROM organization_members
-		 WHERE organization_id = $1 ORDER BY created_at ASC`,
+		`SELECT m.organization_id, m.user_id, m.role, m.created_at, u.email, u.display_name
+		 FROM organization_members m
+		 JOIN users u ON u.id = m.user_id
+		 WHERE m.organization_id = $1 ORDER BY m.created_at ASC`,
 		organizationID,
 	)
 	if err != nil {
@@ -59,7 +71,7 @@ func (s *Store) ListMembers(ctx context.Context, tx pgx.Tx, organizationID uuid.
 	var out []Membership
 	for rows.Next() {
 		var m Membership
-		if err := rows.Scan(&m.OrganizationID, &m.UserID, &m.Role, &m.CreatedAt); err != nil {
+		if err := rows.Scan(&m.OrganizationID, &m.UserID, &m.Role, &m.CreatedAt, &m.Email, &m.DisplayName); err != nil {
 			return nil, fmt.Errorf("organizations: list members: scan: %w", err)
 		}
 		out = append(out, m)

@@ -235,7 +235,14 @@ export type Member = {
   display_name?: string;
 };
 
-export type OrganizationMember = { user_id: string; role: string; created_at: string };
+export type OrganizationMember = {
+  user_id: string;
+  role: string;
+  created_at: string;
+  /** Joined from the users row, so a membership can be shown as a person. */
+  email?: string;
+  display_name?: string;
+};
 
 export type Handoff = {
   id: string;
@@ -713,6 +720,14 @@ export const api = {
     request<Page<AuditRecord>>(withQuery(`/organizations/${id}/audit`, { cursor, limit })),
 
   installationAdmins: () => request<InstallationAdmin[]>("/installation/admins"),
+  // The directory. Installation-admin only, which is why every screen that
+  // uses it falls back to a plain id field when the caller is not one.
+  users: (cursor?: string, limit?: number) =>
+    request<Page<InstallationUser>>(withQuery("/installation/users", { cursor, limit })),
+  servicePrincipals: (cursor?: string, limit?: number) =>
+    request<Page<ServicePrincipal>>(
+      withQuery("/installation/service-principals", { cursor, limit }),
+    ),
   securityEvents: (cursor?: string, limit?: number) =>
     request<Page<SecurityEvent>>(withQuery("/installation/security-events", { cursor, limit })),
   credentialsFor: (principalID: string) =>
@@ -721,6 +736,12 @@ export const api = {
     request<InstallationUser>("/installation/users", {
       method: "POST",
       body: { email, display_name: displayName },
+    }),
+  // The raw token comes back here and nowhere else, exactly like /me/tokens.
+  issueTokenFor: (principalID: string, clientType: string, expiresInSeconds?: number) =>
+    request<IssuedToken>(`/installation/principals/${principalID}/tokens`, {
+      method: "POST",
+      body: { client_type: clientType, expires_in_seconds: expiresInSeconds ?? null },
     }),
   createServicePrincipal: (name: string, description: string) =>
     request<ServicePrincipal>("/installation/service-principals", {

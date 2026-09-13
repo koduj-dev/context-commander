@@ -108,9 +108,11 @@ func (d Deps) addOrganizationMember(w http.ResponseWriter, r *http.Request) {
 }
 
 type organizationMemberResponse struct {
-	UserID    string `json:"user_id"`
-	Role      string `json:"role"`
-	CreatedAt string `json:"created_at"`
+	UserID      string `json:"user_id"`
+	Role        string `json:"role"`
+	CreatedAt   string `json:"created_at"`
+	Email       string `json:"email,omitempty"`
+	DisplayName string `json:"display_name,omitempty"`
 }
 
 // listOrganizationMembers is the counterpart projects had and organizations
@@ -139,6 +141,7 @@ func (d Deps) listOrganizationMembers(w http.ResponseWriter, r *http.Request) {
 	for i, m := range members {
 		out[i] = organizationMemberResponse{
 			UserID: m.UserID.String(), Role: string(m.Role), CreatedAt: m.CreatedAt.Format(time.RFC3339),
+			Email: m.Email, DisplayName: m.DisplayName,
 		}
 	}
 	// A bounded set, like a project's member list: no cursor

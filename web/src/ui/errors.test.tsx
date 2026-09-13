@@ -29,10 +29,18 @@ describe("ErrorState", () => {
     expect(out).not.toContain("You do not have access");
   });
 
-  it("tells a 409 to merge rather than to retry blindly", () => {
-    const out = html(<ErrorState error={new ApiError("conflict", 409, "conflict", "stale")} />);
-    expect(out).toContain("changed while you were reading it");
-    expect(out).toContain("merge");
+  // A 409 is not one thing. An artifact written under you wants a merge; a
+  // skill that cannot be promoted any wider wants no such advice. The screen
+  // that owns the merge case says so itself, so this one repeats what the
+  // server said instead of inventing a story.
+  it("repeats what the server said about a conflict", () => {
+    const out = html(
+      <ErrorState
+        error={new ApiError("conflict", 409, "conflict", "skills: scope can only be widened")}
+      />,
+    );
+    expect(out).toContain("scope can only be widened");
+    expect(out).not.toContain("merge");
   });
 
   it("says nothing was changed when the server is unreachable", () => {

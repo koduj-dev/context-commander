@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { copyToClipboard } from "../lib/clipboard";
 import { useT } from "../i18n";
 import { ApiError } from "../lib/api";
 
@@ -74,24 +75,26 @@ export function Mono({
  * by hand is the most common thing anyone does in this interface, and it is
  * the thing most likely to go wrong silently.
  *
- * Falls back to doing nothing visible rather than throwing: the clipboard is
- * unavailable over plain HTTP in some browsers, which is exactly how a
- * self-hosted instance is often reached first.
+ * When copying cannot be done at all the button says so instead of failing
+ * silently — a control that does nothing and reports nothing teaches people
+ * it is broken everywhere, including where it works.
  */
 export function Copyable({ value, children }: { value: string; children?: ReactNode }) {
   const t = useT();
-  const [copied, setCopied] = useState(false);
+  const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
 
   async function copy() {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      // No clipboard permission, or an insecure origin. The value is still
-      // on screen and selectable.
-    }
+    const ok = await copyToClipboard(value);
+    setState(ok ? "copied" : "failed");
+    setTimeout(() => setState("idle"), ok ? 1500 : 4000);
   }
+
+  const label =
+    state === "copied"
+      ? t("common.copied")
+      : state === "failed"
+        ? t("common.copyFailed")
+        : t("common.copy");
 
   return (
     <span className="copy">
@@ -99,11 +102,12 @@ export function Copyable({ value, children }: { value: string; children?: ReactN
       <button
         type="button"
         onClick={() => void copy()}
-        data-copied={copied ? "true" : undefined}
-        title={copied ? t("common.copied") : t("common.copy")}
-        aria-label={copied ? t("common.copied") : t("common.copy")}
+        data-copied={state === "copied" ? "true" : undefined}
+        data-failed={state === "failed" ? "true" : undefined}
+        title={label}
+        aria-label={label}
       >
-        {copied ? "✓" : "⧉"}
+        {state === "copied" ? "✓" : state === "failed" ? "!" : "⧉"}
       </button>
     </span>
   );
@@ -358,11 +362,17 @@ export function EmptyState({ title, body }: { title: ReactNode; body?: ReactNode
 export function ErrorState({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
   const t = useT();
   const kind = error instanceof ApiError ? error.kind : "server";
+  const serverSaid = error instanceof ApiError ? error.message : "";
 
+  // A 409 means several different things: an artifact written under you, a
+  // handoff claimed first, a skill that cannot be promoted any wider. Only
+  // the first is a merge problem, and the editor that owns it says so
+  // itself — so here a conflict reports what the server actually said
+  // rather than telling someone to merge a change they never made.
   const titles: Record<string, ReturnType<typeof t>> = {
     forbidden: t("error.forbidden.title"),
     not_found: t("error.notFound.title"),
-    conflict: t("error.conflict.title"),
+    conflict: t("error.conflict.generic"),
     rate_limited: t("error.rateLimited.title"),
     unavailable: t("error.unavailable.title"),
     network: t("error.unavailable.title"),
@@ -370,7 +380,6 @@ export function ErrorState({ error, onRetry }: { error: unknown; onRetry?: () =>
   const bodies: Record<string, ReturnType<typeof t>> = {
     forbidden: t("error.forbidden.body"),
     not_found: t("error.notFound.body"),
-    conflict: t("error.conflict.body"),
     rate_limited: t("error.rateLimited.body"),
     unavailable: t("error.unavailable.body"),
     network: t("error.unavailable.body"),
@@ -382,7 +391,9 @@ export function ErrorState({ error, onRetry }: { error: unknown; onRetry?: () =>
     <div className="empty">
       <Note tone={tone}>
         <b>{titles[kind] ?? t("error.generic.title")}</b>
-        <div className="mt-sm">{bodies[kind] ?? (error instanceof Error ? error.message : "")}</div>
+        <div className="mt-sm">
+          {bodies[kind] ?? serverSaid ?? (error instanceof Error ? error.message : "")}
+        </div>
       </Note>
       {onRetry && (
         <div className="mt">

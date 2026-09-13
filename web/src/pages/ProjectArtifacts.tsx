@@ -146,16 +146,13 @@ function ArtifactRow({
   onSelect: () => void;
 }) {
   return (
-    <tr className={active ? "active" : ""}>
+    <tr className={active ? "pick active" : "pick"} onClick={onSelect}>
       <td>
         <Cell
           primary={
             <a
               href={`?path=${encodeURIComponent(artifact.logical_path)}`}
-              onClick={(e) => {
-                e.preventDefault();
-                onSelect();
-              }}
+              onClick={(e) => e.preventDefault()}
             >
               <Mono>{artifact.logical_path}</Mono>
             </a>

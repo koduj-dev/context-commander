@@ -1,6 +1,7 @@
 package http
 
 import (
+	"errors"
 	"net/http"
 	"time"
 
@@ -44,6 +45,13 @@ func (d Deps) createInstallationUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	u, err := d.Installation.CreateUser(r.Context(), principalID, callerUserID, body.Email, body.DisplayName)
+	if errors.Is(err, identity.ErrAlreadyExists) {
+		// Said here rather than in writeDomainError because only this
+		// handler knows the clash was an email — and "that already exists"
+		// leaves someone re-reading their own form to work out what.
+		writeError(w, http.StatusConflict, "conflict", "a user with this email address already exists")
+		return
+	}
 	if err != nil {
 		writeDomainError(w, err)
 		return
@@ -215,4 +223,61 @@ func (d Deps) listInstallationAdmins(w http.ResponseWriter, r *http.Request) {
 		out[i] = resp
 	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+// listInstallationUsers is the directory every "who is this" control needed
+// and none had. Paginated like every other growing list; admin-gated by the
+// service, the same as the create endpoints beside it.
+func (d Deps) listInstallationUsers(w http.ResponseWriter, r *http.Request) {
+	principalID := principalIDFrom(r.Context())
+	callerUserID, err := resolveCallerUserID(r, d.Pool, principalID)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	opts, ok := pagingFrom(w, r)
+	if !ok {
+		return
+	}
+
+	page, err := d.Installation.ListUsers(r.Context(), principalID, callerUserID, opts)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	out := make([]userResponse, len(page.Items))
+	for i, u := range page.Items {
+		out[i] = userResponse{
+			ID: u.ID.String(), Email: u.Email, DisplayName: u.DisplayName,
+			CreatedAt: u.CreatedAt.Format(time.RFC3339),
+		}
+	}
+	writeList(w, out, page.NextCursor)
+}
+
+func (d Deps) listServicePrincipals(w http.ResponseWriter, r *http.Request) {
+	principalID := principalIDFrom(r.Context())
+	callerUserID, err := resolveCallerUserID(r, d.Pool, principalID)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	opts, ok := pagingFrom(w, r)
+	if !ok {
+		return
+	}
+
+	page, err := d.Installation.ListServicePrincipals(r.Context(), principalID, callerUserID, opts)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	out := make([]servicePrincipalResponse, len(page.Items))
+	for i, sp := range page.Items {
+		out[i] = servicePrincipalResponse{
+			ID: sp.ID.String(), Name: sp.Name, Description: sp.Description,
+			CreatedAt: sp.CreatedAt.Format(time.RFC3339),
+		}
+	}
+	writeList(w, out, page.NextCursor)
 }

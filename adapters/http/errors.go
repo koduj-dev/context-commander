@@ -89,6 +89,12 @@ func writeDomainError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusForbidden, "forbidden", "forbidden")
 	case errors.Is(err, installation.ErrAlreadyAdmin):
 		writeError(w, http.StatusConflict, "conflict", "user is already an installation admin")
+	case errors.Is(err, identity.ErrAlreadyExists):
+		// Deliberately not err.Error(): that string is a chain of package
+		// prefixes written for a log, and it reaches a person through the
+		// interface. Handlers that can say which field clashed answer before
+		// reaching here (createInstallationUser); this is the fallback.
+		writeError(w, http.StatusConflict, "conflict", "that already exists")
 	case errors.Is(err, artifacts.ErrConflict):
 		writeError(w, http.StatusConflict, "conflict", "version conflict: the artifact was modified since your expected_version")
 	case errors.Is(err, artifacts.ErrBlockedByGate):

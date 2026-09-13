@@ -64,15 +64,14 @@ export const en = {
   "common.you": "You",
   "common.copy": "Copy",
   "common.copied": "Copied",
+  "common.copyFailed": "Could not copy — select the value and copy it yourself",
 
   "error.forbidden.title": "You do not have access to this",
   "error.forbidden.body":
     "Your role on this project does not include the capability this screen needs. Ask an owner or admin if you should.",
   "error.notFound.title": "Not found",
   "error.notFound.body": "This either does not exist or is not visible to you.",
-  "error.conflict.title": "This changed while you were reading it",
-  "error.conflict.body":
-    "Someone wrote a newer version since you loaded this one. Read the newest version, merge your change into it and try again — saving over it would delete their work.",
+  "error.conflict.generic": "That could not be done",
   "error.unavailable.title": "The server is not responding",
   "error.unavailable.body": "Nothing was changed. Try again in a moment.",
   "error.rateLimited.title": "Too many requests",
@@ -141,6 +140,10 @@ export const en = {
   "members.addHelp":
     "By principal UUID. Nothing in the API lists the principals of an installation, so there is nothing to pick from — copy the UUID from the person's own account screen.",
   "members.principalPlaceholder": "Principal UUID",
+  "picker.choose": "Choose someone…",
+  "picker.userId": "User id",
+  "picker.noDirectory":
+    "Only an installation admin can list the people on this installation, so this asks for an id rather than offering a choice. Ask an admin for it, or paste it from the person's own account screen.",
   "members.noRemoval":
     "Removing a member and changing a role are not built: the API has no write for either, so this screen does not offer one.",
 
@@ -237,11 +240,21 @@ export const en = {
     "A non-human identity — a CI job, a scheduled agent. It acts in projects and shows up in audit like anyone else.",
   "admin.name": "Name",
   "admin.description": "Description",
-  "admin.created": "Created {name}",
-  "admin.credentials": "Credentials",
-  "admin.credentialsLead":
-    "Tokens issued to one principal. Paste a principal UUID to look them up.",
-  "admin.lookup": "Look up",
+  "admin.users": "People",
+  "admin.usersLead":
+    "Everyone with an identity on this installation. Their project roles live on the project, not here.",
+  "admin.servicePrincipals": "Agents",
+  "admin.servicePrincipalsLead":
+    "Non-human identities — a CI job, a scheduled agent. One acts in projects and shows up in audit exactly like a person does, which is the point: what an agent did is attributable to the agent rather than to whoever set it up.",
+  "admin.column.name": "Name",
+  "admin.column.created": "Created",
+  "admin.noUsers": "No one but you yet",
+  "admin.noServicePrincipals": "No agents registered",
+  "admin.noServicePrincipalsBody":
+    "Register one, then issue it a token — that token is what a CI job or a scheduled agent presents when it calls this server.",
+  "admin.issueFor": "Issue a token",
+  "admin.issueForLead":
+    "A token for this identity, not for you. It is shown once and never again, and whatever holds it acts as this identity.",
   "admin.security": "Security log",
   "admin.identitiesLead":
     "Creating the identities everything else hangs off. Nothing in the API lists users or service principals, so this page creates them and shows what it just created — it has no directory to show you.",
@@ -529,6 +542,15 @@ export const en = {
   "skill.promote": "Promote",
   "skill.promoteLead":
     "Move the skill onto a wider shelf so more projects can see it. One way only: narrowing again would pull it out from under bindings that were legitimate when they were made.",
+  "skill.livesAtNow": "Lives at",
+  "skill.alreadyWidest": "Already on the installation shelf",
+  "skill.alreadyWidestBody":
+    "That is the widest scope there is, so there is nowhere further to move it.",
+  "skill.newVersion": "Publish a new version",
+  "skill.newVersionLead":
+    "A published version is immutable, so correcting a skill means publishing the next one. Both stay, and anything pinned to the old version keeps getting the old version until it is repointed.",
+  "skill.newVersionFrom": "Starting from v{version}",
+  "skill.publishedVersion": "Published v{version}",
   "skill.promoteTo": "Move to",
   "skill.promoted": "Now lives at {scope}",
   "skill.install": "Install",

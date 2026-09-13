@@ -121,7 +121,9 @@ func NewHandler(deps Deps) http.Handler {
 
 		r.Route("/installation", func(r chi.Router) {
 			r.Get("/admins", deps.listInstallationAdmins)
+			r.Get("/users", deps.listInstallationUsers)
 			r.Post("/users", deps.createInstallationUser)
+			r.Get("/service-principals", deps.listServicePrincipals)
 			r.Post("/service-principals", deps.createServicePrincipal)
 			r.Post("/principals/{id}/tokens", deps.issueCredentialFor)
 			r.Get("/principals/{id}/tokens", deps.listCredentialsFor)

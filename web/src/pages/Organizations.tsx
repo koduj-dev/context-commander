@@ -8,6 +8,7 @@ import { useList, useResource } from "../lib/resource";
 import {
   Badge,
   Btn,
+  Cell,
   Copyable,
   DataTable,
   EmptyState,
@@ -25,6 +26,7 @@ import {
   TextField,
 } from "../ui";
 import { useSearchParams } from "react-router-dom";
+import { PrincipalPicker, PickerNote } from "../ui/PrincipalPicker";
 
 /**
  * Organizations, and what can be seen inside one.
@@ -86,13 +88,18 @@ export function Organizations() {
                 ]}
               >
                 {orgs.map((o) => (
-                  <tr key={o.id} className={o.id === selected ? "active" : ""}>
+                  <tr
+                    key={o.id}
+                    className={o.id === selected ? "pick active" : "pick"}
+                    onClick={() => setParams({ org: o.id }, { replace: true })}
+                  >
                     <td>
                       <a
                         href={`?org=${o.id}`}
                         onClick={(e) => {
+                          // The row handles it; this keeps the anchor a real
+                          // link without navigating twice.
                           e.preventDefault();
-                          setParams({ org: o.id }, { replace: true });
                         }}
                       >
                         {o.name}
@@ -161,7 +168,16 @@ function OrganizationMembers({ id, name, role }: { id: string; name: string; rol
             {members.map((m) => (
               <tr key={m.user_id}>
                 <td>
-                  <Copyable value={m.user_id} />
+                  <Cell
+                    primary={m.display_name ?? m.email ?? <Mono>{m.user_id}</Mono>}
+                    secondary={
+                      m.display_name && m.email ? (
+                        <span className="dim">{m.email}</span>
+                      ) : (
+                        <Copyable value={m.user_id} />
+                      )
+                    }
+                  />
                 </td>
                 <td>
                   <Badge tone={m.role === "OWNER" ? "active" : "neutral"}>
@@ -269,13 +285,7 @@ function AddOrganizationMember({ id, onAdded }: { id: string; onAdded: () => voi
     <Panel title={t("orgs.addMember")}>
       <p className="sec lead-out">{t("orgs.addMemberLead")}</p>
       <Row gap="sm">
-        <TextField
-          label={t("orgs.userId")}
-          value={userID}
-          onChange={setUserID}
-          placeholder={t("orgs.userId")}
-          grow
-        />
+        <PrincipalPicker kind="user" label={t("orgs.userId")} value={userID} onChange={setUserID} />
         <SelectField
           label={t("members.column.role")}
           value={role}
@@ -294,7 +304,8 @@ function AddOrganizationMember({ id, onAdded }: { id: string; onAdded: () => voi
           <ErrorState error={failure} />
         </div>
       )}
-      <div className="mt">
+      <div className="mt stack-sm">
+        <PickerNote />
         <Note tone="info">{t("members.noRemoval")}</Note>
       </div>
     </Panel>

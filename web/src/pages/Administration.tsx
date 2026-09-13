@@ -3,13 +3,14 @@ import { NavLink, Outlet } from "react-router-dom";
 import { useT } from "../i18n";
 import { useCrumbs } from "../app/crumbs";
 import { useFormat } from "../app/prefs";
-import { api } from "../lib/api";
+import { api, type InstallationUser, type IssuedToken, type ServicePrincipal } from "../lib/api";
 import { roleLabel } from "../lib/labels";
 import { useList, useResource } from "../lib/resource";
 import {
   Badge,
   Btn,
   Cell,
+  Code,
   Copyable,
   DataTable,
   EmptyState,
@@ -149,52 +150,222 @@ export function AdminOverview() {
 }
 
 /**
- * Creating identities, and looking up what a principal holds.
+ * Who and what exists on this installation.
  *
- * There is no endpoint that lists users or service principals, so this screen
- * creates them and shows what it just created — it cannot show a directory,
- * and does not pretend to have one.
+ * Two lists and the forms that add to them. The lists are the point: before
+ * them, an interface that needed to name a person could only ask for a UUID,
+ * and this screen could show what it had just created and nothing else.
  */
 export function AdminIdentities() {
   const t = useT();
-  useCrumbs("admin:identities", () => ({
-    path: [t("admin.title")],
-    current: t("admin.tab.identities"),
-  }));
+  const users = useList((cursor) => api.users(cursor), []);
+  const agents = useList((cursor) => api.servicePrincipals(cursor), []);
 
   return (
     <>
       <PageHead title={t("admin.tab.identities")} lead={t("admin.identitiesLead")} />
+
       <Grid cols={2}>
         <Stack>
-          <CreateUser />
-          <CreateServicePrincipal />
+          <Panel
+            title={t("admin.users")}
+            tight
+            footer={
+              <>
+                <span className="dim">{t("admin.usersLead")}</span>
+                <Pager
+                  shown={users.items.length}
+                  hasMore={users.hasMore}
+                  onLoadMore={users.loadMore}
+                  busy={users.loadingMore}
+                />
+              </>
+            }
+          >
+            {users.loading ? (
+              <Loading />
+            ) : users.error ? (
+              <ErrorState error={users.error} onRetry={users.reload} />
+            ) : users.items.length === 0 ? (
+              <EmptyState title={t("admin.noUsers")} />
+            ) : (
+              <DataTable
+                columns={[
+                  { key: "who", label: t("admin.column.user") },
+                  { key: "created", label: t("admin.column.created"), align: "r" },
+                ]}
+              >
+                {users.items.map((u) => (
+                  <UserRow key={u.id} user={u} />
+                ))}
+              </DataTable>
+            )}
+          </Panel>
+
+          <CreateUser onCreated={users.reload} />
         </Stack>
+
         <Stack>
-          <CredentialLookup />
+          <Panel
+            title={t("admin.servicePrincipals")}
+            tight
+            footer={
+              <>
+                <span className="dim">{t("admin.servicePrincipalsLead")}</span>
+                <Pager
+                  shown={agents.items.length}
+                  hasMore={agents.hasMore}
+                  onLoadMore={agents.loadMore}
+                  busy={agents.loadingMore}
+                />
+              </>
+            }
+          >
+            {agents.loading ? (
+              <Loading />
+            ) : agents.error ? (
+              <ErrorState error={agents.error} onRetry={agents.reload} />
+            ) : agents.items.length === 0 ? (
+              <EmptyState
+                title={t("admin.noServicePrincipals")}
+                body={t("admin.noServicePrincipalsBody")}
+              />
+            ) : (
+              <DataTable
+                columns={[
+                  { key: "name", label: t("admin.column.name") },
+                  { key: "created", label: t("admin.column.created"), align: "r" },
+                ]}
+              >
+                {agents.items.map((a) => (
+                  <AgentRow key={a.id} agent={a} />
+                ))}
+              </DataTable>
+            )}
+          </Panel>
+
+          <CreateServicePrincipal onCreated={agents.reload} />
         </Stack>
       </Grid>
     </>
   );
 }
 
-function CreateUser() {
+function UserRow({ user }: { user: InstallationUser }) {
+  const f = useFormat();
+  return (
+    <tr>
+      <td>
+        <Cell
+          primary={user.display_name || user.email}
+          secondary={
+            user.display_name ? (
+              <span className="dim">{user.email}</span>
+            ) : (
+              <Copyable value={user.id} />
+            )
+          }
+        />
+      </td>
+      <td className="r">
+        <span className="dim">{f.date(user.created_at)}</span>
+      </td>
+    </tr>
+  );
+}
+
+/**
+ * An agent, and the one thing anyone wants to do with it.
+ *
+ * Registering a service principal creates an identity and nothing else —
+ * which is why "what is this for" is a fair question. The answer is the
+ * token: issue one here and whatever holds it acts as this agent.
+ */
+function AgentRow({ agent }: { agent: ServicePrincipal }) {
+  const t = useT();
+  const f = useFormat();
+  const [issued, setIssued] = useState<IssuedToken>();
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState<unknown>();
+
+  async function issue() {
+    if (busy) return;
+    setBusy(true);
+    setFailure(undefined);
+    try {
+      setIssued(await api.issueTokenFor(agent.id, agent.name, 365 * 86400));
+    } catch (err) {
+      setFailure(err);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <tr>
+        <td>
+          <Cell
+            primary={<Mono>{agent.name}</Mono>}
+            secondary={
+              agent.description ? (
+                <span className="dim">{agent.description}</span>
+              ) : (
+                <Copyable value={agent.id} />
+              )
+            }
+          />
+        </td>
+        <td className="r">
+          <span className="dim">{f.date(agent.created_at)}</span>{" "}
+          <Btn small onClick={() => void issue()} disabled={busy}>
+            {busy ? t("common.loading") : t("admin.issueFor")}
+          </Btn>
+        </td>
+      </tr>
+      {(issued || failure !== undefined) && (
+        <tr>
+          <td colSpan={2}>
+            {failure !== undefined ? (
+              <ErrorState error={failure} />
+            ) : (
+              <>
+                <Note tone="warn">{t("admin.issueForLead")}</Note>
+                <div className="mt">
+                  <Copyable value={issued!.token}>
+                    <Code>{issued!.token}</Code>
+                  </Copyable>
+                </div>
+                <div className="mt">
+                  <Btn small onClick={() => setIssued(undefined)}>
+                    {t("common.close")}
+                  </Btn>
+                </div>
+              </>
+            )}
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
+function CreateUser({ onCreated }: { onCreated: () => void }) {
   const t = useT();
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<unknown>();
-  const [created, setCreated] = useState<string>();
 
   async function submit() {
-    if (!email.trim() || busy) return;
+    if (!email.trim() || !name.trim() || busy) return;
     setBusy(true);
     setFailure(undefined);
     try {
-      const user = await api.createUser(email.trim(), name.trim());
-      setCreated(user.id);
+      await api.createUser(email.trim(), name.trim());
       setEmail("");
       setName("");
+      onCreated();
     } catch (err) {
       setFailure(err);
     } finally {
@@ -220,7 +391,11 @@ function CreateUser() {
           placeholder={t("admin.displayName")}
           grow
         />
-        <Btn kind="primary" onClick={() => void submit()} disabled={busy || !email.trim()}>
+        <Btn
+          kind="primary"
+          onClick={() => void submit()}
+          disabled={busy || !email.trim() || !name.trim()}
+        >
           {busy ? t("common.loading") : t("admin.createUser")}
         </Btn>
       </Row>
@@ -229,34 +404,26 @@ function CreateUser() {
           <ErrorState error={failure} />
         </div>
       )}
-      {created && (
-        <div className="mt">
-          <Note tone="info">
-            {t("admin.created", { name: "" })} <Copyable value={created} />
-          </Note>
-        </div>
-      )}
     </Panel>
   );
 }
 
-function CreateServicePrincipal() {
+function CreateServicePrincipal({ onCreated }: { onCreated: () => void }) {
   const t = useT();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<unknown>();
-  const [created, setCreated] = useState<string>();
 
   async function submit() {
     if (!name.trim() || busy) return;
     setBusy(true);
     setFailure(undefined);
     try {
-      const sp = await api.createServicePrincipal(name.trim(), description.trim());
-      setCreated(sp.id);
+      await api.createServicePrincipal(name.trim(), description.trim());
       setName("");
       setDescription("");
+      onCreated();
     } catch (err) {
       setFailure(err);
     } finally {
@@ -291,85 +458,7 @@ function CreateServicePrincipal() {
           <ErrorState error={failure} />
         </div>
       )}
-      {created && (
-        <div className="mt">
-          <Note tone="info">
-            {t("admin.created", { name: "" })} <Copyable value={created} />
-          </Note>
-        </div>
-      )}
     </Panel>
-  );
-}
-
-function CredentialLookup() {
-  const t = useT();
-  const f = useFormat();
-  const [input, setInput] = useState("");
-  const [principal, setPrincipal] = useState("");
-
-  const creds = useResource(
-    () => (principal ? api.credentialsFor(principal) : Promise.resolve([])),
-    [principal],
-  );
-
-  return (
-    <>
-      <Panel title={t("admin.credentials")}>
-        <p className="sec lead-out">{t("admin.credentialsLead")}</p>
-        <Row gap="sm">
-          <TextField
-            label={t("members.column.principal")}
-            value={input}
-            onChange={setInput}
-            placeholder={t("members.principalPlaceholder")}
-            grow
-          />
-          <Btn onClick={() => setPrincipal(input.trim())} disabled={!input.trim()}>
-            {t("admin.lookup")}
-          </Btn>
-        </Row>
-      </Panel>
-
-      {principal && (
-        <Panel title={t("tokens.title")} tight>
-          {creds.loading ? (
-            <Loading />
-          ) : creds.error ? (
-            <ErrorState error={creds.error} onRetry={creds.reload} />
-          ) : (creds.data ?? []).length === 0 ? (
-            <EmptyState title={t("tokens.empty")} />
-          ) : (
-            <DataTable
-              columns={[
-                { key: "type", label: t("tokens.column.type") },
-                { key: "used", label: t("tokens.column.lastUsed"), align: "r" },
-              ]}
-            >
-              {(creds.data ?? []).map((c) => (
-                <tr key={c.id}>
-                  <td>
-                    <Cell
-                      primary={<Mono>{c.client_type}</Mono>}
-                      secondary={
-                        <Mono dim truncate>
-                          {c.id}
-                        </Mono>
-                      }
-                    />
-                  </td>
-                  <td className="r">
-                    <span className="dim">
-                      {c.last_used_at ? f.relative(c.last_used_at) : t("common.never")}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </DataTable>
-          )}
-        </Panel>
-      )}
-    </>
   );
 }
 

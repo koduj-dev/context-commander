@@ -20,8 +20,8 @@ import {
   Panel,
   Row,
   SelectField,
-  TextField,
 } from "../ui";
+import { PrincipalPicker } from "../ui/PrincipalPicker";
 import { useProject } from "./ProjectLayout";
 
 const ROLES = ["OWNER", "ADMIN", "CONTRIBUTOR", "READER"] as const;
@@ -146,12 +146,11 @@ function AddMember({ onAdded }: { onAdded: () => void }) {
     <Panel title={t("members.add")}>
       <p className="sec lead-out">{t("members.addHelp")}</p>
       <Row gap="sm">
-        <TextField
+        <PrincipalPicker
+          kind="principal"
           label={t("members.column.principal")}
           value={principal}
           onChange={setPrincipal}
-          placeholder={t("members.principalPlaceholder")}
-          grow
         />
         <SelectField
           label={t("members.column.role")}

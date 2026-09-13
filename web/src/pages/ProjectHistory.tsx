@@ -79,15 +79,13 @@ export function ProjectHistory() {
                 ]}
               >
                 {list.items.map((c) => (
-                  <tr key={c.id} className={c.id === selected ? "active" : ""}>
+                  <tr
+                    key={c.id}
+                    className={c.id === selected ? "pick active" : "pick"}
+                    onClick={() => setParams({ c: c.id }, { replace: true })}
+                  >
                     <td>
-                      <a
-                        href={`?c=${c.id}`}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          setParams({ c: c.id }, { replace: true });
-                        }}
-                      >
+                      <a href={`?c=${c.id}`} onClick={(e) => e.preventDefault()}>
                         <Mono truncate>{c.id}</Mono>
                       </a>
                     </td>

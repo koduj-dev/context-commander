@@ -54,9 +54,6 @@ export const es: Partial<Record<MessageKey, string>> = {
     "Su rol en este proyecto no incluye la capacidad que necesita esta pantalla. Pregunte a una persona propietaria o administradora si debería tenerla.",
   "error.notFound.title": "No encontrado",
   "error.notFound.body": "Esto no existe o no es visible para usted.",
-  "error.conflict.title": "Esto cambió mientras lo estaba leyendo",
-  "error.conflict.body":
-    "Alguien escribió una versión más reciente desde que cargó esta. Lea la versión más reciente, incorpore su cambio y vuelva a intentarlo — sobrescribirla borraría el trabajo de esa persona.",
   "error.unavailable.title": "El servidor no responde",
   "error.unavailable.body": "No se ha cambiado nada. Inténtelo de nuevo en un momento.",
   "error.rateLimited.title": "Demasiadas solicitudes",
@@ -263,11 +260,6 @@ export const es: Partial<Record<MessageKey, string>> = {
     "Una identidad no humana — una tarea de CI, un agente programado. Actúa en los proyectos y aparece en la auditoría como cualquier otra.",
   "admin.name": "Nombre",
   "admin.description": "Descripción",
-  "admin.created": "Creado: {name}",
-  "admin.credentials": "Credenciales",
-  "admin.credentialsLead":
-    "Los tokens emitidos a un principal. Pegue un UUID de principal para consultarlos.",
-  "admin.lookup": "Consultar",
   "admin.security": "Registro de seguridad",
   "admin.identitiesLead":
     "Aquí se crean las identidades de las que cuelga todo lo demás. Nada en la API enumera cuentas ni principals de servicio, así que esta página los crea y muestra lo que acaba de crear — no tiene ningún directorio que enseñarle.",
@@ -551,4 +543,36 @@ export const es: Partial<Record<MessageKey, string>> = {
   "error.notFoundPage.title": "No existe esa página",
   "error.notFoundPage.body": "Esa dirección no corresponde a nada de esta interfaz.",
   "error.backToDashboard": "Ir al panel",
+
+  "common.copyFailed": "No se ha podido copiar — seleccione el valor y cópielo usted",
+  "error.conflict.generic": "Eso no se ha podido hacer",
+  "skill.livesAtNow": "Reside en",
+  "skill.alreadyWidest": "Ya está en el estante de la instalación",
+  "skill.alreadyWidestBody": "Es el ámbito más amplio que hay, así que no puede ir más lejos.",
+  "skill.newVersion": "Publicar una versión nueva",
+  "skill.newVersionLead":
+    "Una versión publicada es inmutable, así que corregir un skill significa publicar la siguiente. Ambas se conservan, y lo que esté vinculado a la antigua seguirá recibiendo la antigua hasta que se reapunte.",
+  "skill.newVersionFrom": "A partir de la v{version}",
+  "skill.publishedVersion": "v{version} publicada",
+
+  "picker.choose": "Elija a alguien…",
+  "picker.userId": "Id de cuenta",
+  "picker.noDirectory":
+    "Solo quien administra la instalación puede enumerar a las personas que hay en ella, así que esto pide un id en lugar de ofrecer una lista. Pídaselo a quien administre, o cópielo de la pantalla de cuenta de esa persona.",
+
+  "admin.users": "Personas",
+  "admin.usersLead":
+    "Todo el mundo con una identidad en esta instalación. Sus roles de proyecto viven en el proyecto, no aquí.",
+  "admin.servicePrincipals": "Agentes",
+  "admin.servicePrincipalsLead":
+    "Identidades no humanas — una tarea de CI, un agente programado. Actúa en los proyectos y aparece en la auditoría igual que una persona, y de eso se trata: lo que hizo un agente es atribuible al agente y no a quien lo configuró.",
+  "admin.column.name": "Nombre",
+  "admin.column.created": "Creado",
+  "admin.noUsers": "Nadie más que usted todavía",
+  "admin.noServicePrincipals": "No hay agentes registrados",
+  "admin.noServicePrincipalsBody":
+    "Registre uno y emítale después un token — ese token es lo que presenta una tarea de CI o un agente programado cuando llama a este servidor.",
+  "admin.issueFor": "Emitir un token",
+  "admin.issueForLead":
+    "Un token para esta identidad, no para usted. Se muestra una vez y nunca más, y quien lo tenga actúa como esta identidad.",
 };

@@ -11,6 +11,7 @@ import (
 
 	"github.com/koduj-dev/context-commander/internal/db"
 	"github.com/koduj-dev/context-commander/internal/identity"
+	"github.com/koduj-dev/context-commander/internal/paging"
 )
 
 // ErrForbidden is returned when a caller lacks the requested Capability —
@@ -205,4 +206,44 @@ func (s *Service) RevokeCredentialFor(ctx context.Context, principalID, callerUs
 		return fmt.Errorf("installation: revoke credential: %w", err)
 	}
 	return nil
+}
+
+// ListUsers returns one page of the installation's users.
+//
+// Gated on CapAdminRead rather than on a capability of its own: it is a read
+// of installation-wide state, which is exactly what that capability already
+// governs. It exists so that naming a person in an interface does not
+// require knowing their UUID — every screen that adds a member, looks up a
+// credential or grants a role had no way to offer a choice before this.
+func (s *Service) ListUsers(ctx context.Context, principalID, callerUserID uuid.UUID, opts paging.Options) (paging.Page[identity.User], error) {
+	if err := s.checkCapability(ctx, principalID, callerUserID, CapAdminRead); err != nil {
+		return paging.Page[identity.User]{}, err
+	}
+	var page paging.Page[identity.User]
+	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+		var err error
+		page, err = s.identity.ListUsers(ctx, tx, opts)
+		return err
+	})
+	if err != nil {
+		return paging.Page[identity.User]{}, fmt.Errorf("installation: list users: %w", err)
+	}
+	return page, nil
+}
+
+// ListServicePrincipals is ListUsers' counterpart for agents.
+func (s *Service) ListServicePrincipals(ctx context.Context, principalID, callerUserID uuid.UUID, opts paging.Options) (paging.Page[identity.ServicePrincipal], error) {
+	if err := s.checkCapability(ctx, principalID, callerUserID, CapAdminRead); err != nil {
+		return paging.Page[identity.ServicePrincipal]{}, err
+	}
+	var page paging.Page[identity.ServicePrincipal]
+	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+		var err error
+		page, err = s.identity.ListServicePrincipals(ctx, tx, opts)
+		return err
+	})
+	if err != nil {
+		return paging.Page[identity.ServicePrincipal]{}, fmt.Errorf("installation: list service principals: %w", err)
+	}
+	return page, nil
 }

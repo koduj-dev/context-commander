@@ -8,6 +8,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+
+	"github.com/koduj-dev/context-commander/internal/paging"
 )
 
 // Repository methods take a pgx.Tx directly rather than an abstract querier
@@ -23,6 +26,25 @@ import (
 
 var ErrNotFound = errors.New("identity: not found")
 
+// ErrAlreadyExists is a unique-constraint violation on an identity someone
+// asked to create — a second user with the same email, a second service
+// principal with the same name.
+//
+// It is a distinct error because the caller made a legitimate request about
+// a real conflict, and the two answers call for different things: "internal
+// error" tells an operator their installation is broken, while "that email
+// already has an account" tells them what to do next. Without this, the
+// only signal was a 500.
+var ErrAlreadyExists = errors.New("identity: already exists")
+
+// isUniqueViolation reports whether err is Postgres 23505. Checked on the
+// SQLSTATE rather than on the message, which is localized and changes
+// between versions.
+func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505"
+}
+
 // Store is the Postgres-backed identity repository.
 type Store struct{}
 
@@ -35,6 +57,9 @@ func (s *Store) CreateUser(ctx context.Context, tx pgx.Tx, email, displayName st
 		 RETURNING id, email, display_name, created_at`,
 		email, displayName,
 	).Scan(&u.ID, &u.Email, &u.DisplayName, &u.CreatedAt)
+	if isUniqueViolation(err) {
+		return User{}, fmt.Errorf("%w: a user with this email", ErrAlreadyExists)
+	}
 	if err != nil {
 		return User{}, fmt.Errorf("identity: create user: %w", err)
 	}
@@ -116,6 +141,9 @@ func (s *Store) CreateServicePrincipal(ctx context.Context, tx pgx.Tx, name, des
 		 RETURNING id, name, description, created_at`,
 		name, description,
 	).Scan(&sp.ID, &sp.Name, &sp.Description, &sp.CreatedAt)
+	if isUniqueViolation(err) {
+		return ServicePrincipal{}, fmt.Errorf("%w: a service principal with this name", ErrAlreadyExists)
+	}
 	if err != nil {
 		return ServicePrincipal{}, fmt.Errorf("identity: create service principal: %w", err)
 	}
@@ -318,4 +346,94 @@ func (s *Store) RevokeCredentialByID(ctx context.Context, tx pgx.Tx, id uuid.UUI
 		return ErrNotFound
 	}
 	return nil
+}
+
+// ListUsers returns one page of users, oldest first.
+//
+// It exists because nothing else did: every screen that needs to name a
+// person could only ask the caller to paste a UUID, which is both the
+// clumsiest thing in the product and a reliable source of mistakes. Reading
+// the directory is an installation-admin operation — see
+// installation.Service.ListUsers, which is the only caller.
+func (s *Store) ListUsers(ctx context.Context, tx pgx.Tx, opts paging.Options) (paging.Page[User], error) {
+	cursorTime, cursorID, hasCursor, err := opts.DecodeTimeUUID()
+	if err != nil {
+		return paging.Page[User]{}, err
+	}
+	limit := opts.ClampedLimit()
+
+	rows, err := tx.Query(ctx,
+		`SELECT id, email, display_name, created_at
+		 FROM users
+		 WHERE (NOT $1::bool OR (created_at, id) > ($2::timestamptz, $3::uuid))
+		 ORDER BY created_at ASC, id ASC LIMIT $4`,
+		hasCursor, cursorTime, cursorID, limit+1,
+	)
+	if err != nil {
+		return paging.Page[User]{}, fmt.Errorf("identity: list users: %w", err)
+	}
+	defer rows.Close()
+
+	out := make([]User, 0, limit)
+	for rows.Next() {
+		var u User
+		if err := rows.Scan(&u.ID, &u.Email, &u.DisplayName, &u.CreatedAt); err != nil {
+			return paging.Page[User]{}, fmt.Errorf("identity: scan user: %w", err)
+		}
+		out = append(out, u)
+	}
+	if err := rows.Err(); err != nil {
+		return paging.Page[User]{}, fmt.Errorf("identity: list users: %w", err)
+	}
+
+	page, hasMore := paging.More(out, limit)
+	next := ""
+	if hasMore {
+		last := page[len(page)-1]
+		next = paging.EncodeTimeUUID(last.CreatedAt, last.ID)
+	}
+	return paging.Page[User]{Items: page, NextCursor: next}, nil
+}
+
+// ListServicePrincipals is ListUsers' counterpart for agents. Same ordering,
+// same reasoning: an agent is named by a UUID everywhere until something can
+// list them.
+func (s *Store) ListServicePrincipals(ctx context.Context, tx pgx.Tx, opts paging.Options) (paging.Page[ServicePrincipal], error) {
+	cursorTime, cursorID, hasCursor, err := opts.DecodeTimeUUID()
+	if err != nil {
+		return paging.Page[ServicePrincipal]{}, err
+	}
+	limit := opts.ClampedLimit()
+
+	rows, err := tx.Query(ctx,
+		`SELECT id, name, COALESCE(description, ''), created_at
+		 FROM service_principals
+		 WHERE (NOT $1::bool OR (created_at, id) > ($2::timestamptz, $3::uuid))
+		 ORDER BY created_at ASC, id ASC LIMIT $4`,
+		hasCursor, cursorTime, cursorID, limit+1,
+	)
+	if err != nil {
+		return paging.Page[ServicePrincipal]{}, fmt.Errorf("identity: list service principals: %w", err)
+	}
+	defer rows.Close()
+
+	out := make([]ServicePrincipal, 0, limit)
+	for rows.Next() {
+		var sp ServicePrincipal
+		if err := rows.Scan(&sp.ID, &sp.Name, &sp.Description, &sp.CreatedAt); err != nil {
+			return paging.Page[ServicePrincipal]{}, fmt.Errorf("identity: scan service principal: %w", err)
+		}
+		out = append(out, sp)
+	}
+	if err := rows.Err(); err != nil {
+		return paging.Page[ServicePrincipal]{}, fmt.Errorf("identity: list service principals: %w", err)
+	}
+
+	page, hasMore := paging.More(out, limit)
+	next := ""
+	if hasMore {
+		last := page[len(page)-1]
+		next = paging.EncodeTimeUUID(last.CreatedAt, last.ID)
+	}
+	return paging.Page[ServicePrincipal]{Items: page, NextCursor: next}, nil
 }

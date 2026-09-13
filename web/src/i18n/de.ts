@@ -58,9 +58,6 @@ export const de: Partial<Record<MessageKey, string>> = {
     "Ihre Rolle in diesem Projekt umfasst nicht die Berechtigung, die dieser Bildschirm benötigt. Fragen Sie eine Eigentümerin oder einen Administrator, falls Sie sie haben sollten.",
   "error.notFound.title": "Nicht gefunden",
   "error.notFound.body": "Das existiert entweder nicht oder ist für Sie nicht sichtbar.",
-  "error.conflict.title": "Das wurde geändert, während Sie es gelesen haben",
-  "error.conflict.body":
-    "Seit Sie diese Fassung geladen haben, hat jemand eine neuere geschrieben. Lesen Sie die neueste Fassung, führen Sie Ihre Änderung darin zusammen und versuchen Sie es erneut — Überschreiben würde die Arbeit der anderen Person löschen.",
   "error.unavailable.title": "Der Server antwortet nicht",
   "error.unavailable.body": "Es wurde nichts geändert. Versuchen Sie es gleich noch einmal.",
   "error.rateLimited.title": "Zu viele Anfragen",
@@ -270,11 +267,6 @@ export const de: Partial<Record<MessageKey, string>> = {
     "Eine nicht-menschliche Identität — ein CI-Lauf, ein geplanter Agent. Sie handelt in Projekten und erscheint im Audit wie alle anderen.",
   "admin.name": "Name",
   "admin.description": "Beschreibung",
-  "admin.created": "Angelegt: {name}",
-  "admin.credentials": "Zugangsmerkmale",
-  "admin.credentialsLead":
-    "Die Token eines Principals. Fügen Sie eine Principal-UUID ein, um sie nachzuschlagen.",
-  "admin.lookup": "Nachschlagen",
   "admin.security": "Sicherheitsprotokoll",
   "admin.identitiesLead":
     "Hier entstehen die Identitäten, an denen alles andere hängt. Kein Endpunkt der API listet Benutzerkonten oder Dienst-Principals auf, diese Seite legt sie also an und zeigt, was gerade angelegt wurde — ein Verzeichnis kann sie nicht zeigen.",
@@ -564,4 +556,37 @@ export const de: Partial<Record<MessageKey, string>> = {
   "error.notFoundPage.title": "Diese Seite gibt es nicht",
   "error.notFoundPage.body": "Diese Adresse passt zu nichts in dieser Oberfläche.",
   "error.backToDashboard": "Zur Übersicht",
+
+  "common.copyFailed":
+    "Kopieren nicht möglich — markieren Sie den Wert und kopieren Sie ihn selbst",
+  "error.conflict.generic": "Das ließ sich nicht ausführen",
+  "skill.livesAtNow": "Liegt auf der Ebene",
+  "skill.alreadyWidest": "Liegt bereits installationsweit",
+  "skill.alreadyWidestBody": "Weiter geht es nicht — das ist die breiteste Ebene, die es gibt.",
+  "skill.newVersion": "Neue Version veröffentlichen",
+  "skill.newVersionLead":
+    "Eine veröffentlichte Version ist unveränderlich, einen Skill zu korrigieren heißt also, die nächste zu veröffentlichen. Beide bleiben bestehen, und was an die alte Version gebunden ist, bekommt weiter die alte, bis es umgehängt wird.",
+  "skill.newVersionFrom": "Ausgehend von v{version}",
+  "skill.publishedVersion": "v{version} veröffentlicht",
+
+  "picker.choose": "Jemanden auswählen…",
+  "picker.userId": "Benutzer-ID",
+  "picker.noDirectory":
+    "Nur wer die Installation administriert, kann die Personen darauf auflisten — deshalb fragt dies nach einer ID, statt eine Auswahl anzubieten. Fragen Sie danach, oder kopieren Sie sie aus dem Konto der betreffenden Person.",
+
+  "admin.users": "Personen",
+  "admin.usersLead":
+    "Alle mit einer Identität auf dieser Installation. Ihre Projektrollen liegen am Projekt, nicht hier.",
+  "admin.servicePrincipals": "Agenten",
+  "admin.servicePrincipalsLead":
+    "Nicht-menschliche Identitäten — ein CI-Lauf, ein geplanter Agent. So eine handelt in Projekten und erscheint im Audit genauso wie ein Mensch, und genau darum geht es: was ein Agent getan hat, ist dem Agenten zuzuordnen und nicht der Person, die ihn eingerichtet hat.",
+  "admin.column.name": "Name",
+  "admin.column.created": "Angelegt",
+  "admin.noUsers": "Außer Ihnen noch niemand",
+  "admin.noServicePrincipals": "Keine Agenten registriert",
+  "admin.noServicePrincipalsBody":
+    "Registrieren Sie einen und stellen Sie ihm dann ein Token aus — dieses Token legt ein CI-Lauf oder ein geplanter Agent vor, wenn er diesen Server aufruft.",
+  "admin.issueFor": "Token ausstellen",
+  "admin.issueForLead":
+    "Ein Token für diese Identität, nicht für Sie. Es wird einmal angezeigt und nie wieder, und wer es hat, handelt als diese Identität.",
 };
