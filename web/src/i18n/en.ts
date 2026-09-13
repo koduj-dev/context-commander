@@ -34,7 +34,7 @@ export const en = {
   "find.skill": "Skill",
   "find.screen": "Screen",
   "find.nothing": "Nothing matches that",
-  "find.hint": "Type to search. ↑↓ to move, Enter to go, Esc to close.",
+  "find.hint": "{shortcut} opens this. ↑↓ to move, Enter to go, Esc to close.",
 
   "theme.dark": "Dark",
   "theme.light": "Light",

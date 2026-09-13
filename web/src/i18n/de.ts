@@ -552,7 +552,7 @@ export const de: Partial<Record<MessageKey, string>> = {
   "find.skill": "Skill",
   "find.screen": "Bildschirm",
   "find.nothing": "Dazu passt nichts",
-  "find.hint": "Tippen zum Suchen. ↑↓ bewegt, Enter springt, Esc schließt.",
+  "find.hint": "{shortcut} öffnet dies. ↑↓ bewegt, Enter springt, Esc schließt.",
 
   "common.copy": "Kopieren",
   "common.copied": "Kopiert",

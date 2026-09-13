@@ -5,6 +5,7 @@ import { principalName } from "../lib/api";
 import { useAuth } from "./auth";
 import { useCrumbsValue, useDocumentTitle } from "./crumbs";
 import { QuickFind } from "./QuickFind";
+import { modifierLabel } from "../lib/platform";
 import { useTheme } from "./theme";
 
 /**
@@ -173,7 +174,7 @@ export function Shell() {
               <path d="m12 12 3 3" />
             </svg>
             <span>{t("find.open")}</span>
-            <kbd>⌘K</kbd>
+            <kbd>{modifierLabel("K")}</kbd>
           </button>
           <span className="seg" role="group" aria-label={t("prefs.language")}>
             {(["en", "de", "es"] as const).map((l) => (

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useT } from "../i18n";
 import { api, type MyProject } from "../lib/api";
 import { useDebounced, useResource } from "../lib/resource";
+import { modifierLabel } from "../lib/platform";
 
 /**
  * Getting somewhere without navigating there.
@@ -139,7 +140,7 @@ export function QuickFind({ onClose }: { onClose: () => void }) {
           )}
         </div>
 
-        <div className="palette-empty">{t("find.hint")}</div>
+        <div className="palette-empty">{t("find.hint", { shortcut: modifierLabel("K") })}</div>
       </div>
     </div>
   );

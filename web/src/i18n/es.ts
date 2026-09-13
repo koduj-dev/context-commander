@@ -539,7 +539,7 @@ export const es: Partial<Record<MessageKey, string>> = {
   "find.skill": "Skill",
   "find.screen": "Pantalla",
   "find.nothing": "Nada coincide con eso",
-  "find.hint": "Escriba para buscar. ↑↓ se mueve, Intro va, Esc cierra.",
+  "find.hint": "{shortcut} abre esto. ↑↓ se mueve, Intro va, Esc cierra.",
 
   "common.copy": "Copiar",
   "common.copied": "Copiado",
