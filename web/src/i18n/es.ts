@@ -32,6 +32,10 @@ export const es: Partial<Record<MessageKey, string>> = {
   "auth.submit": "Iniciar sesión",
   "auth.failed": "Ese token no se ha aceptado.",
   "auth.signedInAs": "Sesión iniciada como {name}",
+  "auth.sameToken":
+    "El mismo token que usa una CLI o un cliente MCP. No hay una sesión web aparte.",
+  "auth.indistinct":
+    "Un token revocado y uno que nunca existió se leen aquí igual. Decir cuál de los dos es revelaría, a quien tenga un token robado, que la mitad de su suposición era correcta.",
 
   "common.loading": "Cargando…",
   "common.retry": "Reintentar",

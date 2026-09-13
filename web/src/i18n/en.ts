@@ -40,6 +40,10 @@ export const en = {
   "auth.submit": "Sign in",
   "auth.failed": "That token was not accepted.",
   "auth.signedInAs": "Signed in as {name}",
+  "auth.sameToken":
+    "The same token a CLI or an MCP client uses. There is no separate web session.",
+  "auth.indistinct":
+    "A token that has been revoked and one that never existed read the same here. Saying which is which would tell whoever is holding a stolen token that half their guess was right.",
 
   "common.loading": "Loading…",
   "common.retry": "Try again",

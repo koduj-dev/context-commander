@@ -36,6 +36,10 @@ export const de: Partial<Record<MessageKey, string>> = {
   "auth.submit": "Anmelden",
   "auth.failed": "Dieses Token wurde nicht akzeptiert.",
   "auth.signedInAs": "Angemeldet als {name}",
+  "auth.sameToken":
+    "Dasselbe Token, das auch eine Kommandozeile oder ein MCP-Client verwendet. Eine eigene Web-Sitzung gibt es nicht.",
+  "auth.indistinct":
+    "Ein widerrufenes Token und eines, das es nie gab, lesen sich hier gleich. Zu sagen, welches von beidem vorliegt, würde jemandem mit einem gestohlenen Token verraten, dass die Hälfte seiner Vermutung stimmte.",
 
   "common.loading": "Wird geladen…",
   "common.retry": "Erneut versuchen",

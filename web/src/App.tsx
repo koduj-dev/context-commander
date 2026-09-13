@@ -35,8 +35,18 @@ export function App() {
   const { me, loading } = useAuth();
 
   // Nothing renders until the stored token has been checked. Showing the
-  // shell first and yanking it away is worse than a moment of nothing.
-  if (loading) return <Loading />;
+  // shell first and yanking it away is worse than a moment of nothing — and
+  // it goes in the same sidebar-less layout sign-in uses, since at this point
+  // there is still no principal and so nothing to navigate.
+  if (loading) {
+    return (
+      <div className="solo">
+        <main className="page">
+          <Loading />
+        </main>
+      </div>
+    );
+  }
   if (!me) return <SignIn />;
 
   return (

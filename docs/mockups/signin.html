@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in · Context Commander</title>
+<link rel="icon" href="../brand/svg/cc-favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../brand/tokens/ui-colors.css">
+<link rel="stylesheet" href="assets/mockup.css">
+</head>
+<body>
+<div class="mockbar">
+  <span class="tag">Mockup</span>
+  <a href="index.html">All screens</a>
+  <span class="dim">·</span>
+  <span>Sign in</span>
+  <span style="flex:1"></span>
+  <span class="seg">
+    <button type="button" aria-pressed="true" onclick="setTheme('dark',this)">Dark</button>
+    <button type="button" aria-pressed="false" onclick="setTheme('light',this)">Light</button>
+  </span>
+</div>
+<!-- No sidebar and no crumbs: there is no principal yet, so there is nothing
+     to navigate. `solo` rather than `app` because `app` is a two-column grid
+     whose first track is the 232px sidebar. -->
+<div class="solo">
+  <div class="topbar">
+    <div class="spacer"></div>
+    <span class="seg" role="group" aria-label="Interface language">
+      <button type="button" aria-pressed="true">EN</button>
+      <button type="button" aria-pressed="false">DE</button>
+      <button type="button" aria-pressed="false">ES</button>
+    </span>
+  </div>
+  <div class="page">
+      <div class="solo-card">
+        <div class="brand">
+          <img class="logo-dark" src="../brand/svg/cc-logo-horizontal-on-dark.svg" alt="Context Commander">
+          <img class="logo-light" src="../brand/svg/cc-logo-horizontal-on-light.svg" alt="Context Commander" hidden>
+        </div>
+
+        <section class="panel">
+          <header><h2>Sign in</h2></header>
+          <div class="body">
+            <p class="sec lead-out">Paste a personal access token. Create one with <span class="mono">ccd token create</span>.</p>
+            <div class="code mono">ccd token create --name "web ui"</div>
+            <div class="mt row row-sm">
+              <input class="field grow" type="password" value="cc_6bc74111_························" aria-label="Access token">
+              <button class="btn btn-primary" type="button">Sign in</button>
+            </div>
+          </div>
+          <footer><span class="dim">The same token a CLI or an MCP client uses. There is no separate web session.</span></footer>
+        </section>
+
+        <div class="mt">
+          <div class="note info">A token that has been revoked and one that never existed read the same here. Saying which is which would tell whoever is holding a stolen token that half their guess was right.</div>
+        </div>
+      </div>
+  </div>
+</div>
+<script>
+function setTheme(t, el) {
+  document.documentElement.setAttribute('data-theme', t);
+  el.parentNode.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === el)));
+  document.querySelectorAll('.logo-dark').forEach(e => e.hidden = (t === 'light'));
+  document.querySelectorAll('.logo-light').forEach(e => e.hidden = (t !== 'light'));
+}
+</script>
+</body>
+</html>

@@ -588,3 +588,41 @@ table.dt td.r, table.dt th.r { text-align: right; }
 a.sidebar-foot { text-decoration: none; color: inherit; }
 a.sidebar-foot:hover { background: var(--cc-surface-2); text-decoration: none; }
 
+/* ---------- solo: a screen with no navigation ----------
+ *
+ * Sign-in is the only screen that renders without a principal, and it must
+ * not reuse `.app`: that is a two-column grid whose first track is a fixed
+ * 232px sidebar, so a page with no sidebar in it lands in the 232px column
+ * and arrives squeezed to the width of navigation that is not there.
+ *
+ * One centred column instead, capped at a reading width. The cap is on the
+ * card rather than on the viewport so the ground still fills the screen —
+ * the dark ground is the strongest thing the brand owns and this is the
+ * first screen anyone sees. */
+.solo {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--cc-bg);
+}
+.solo > .topbar { background: transparent; border-bottom: 0; }
+.solo > .page {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  /* Vertical only in the shorthand's place: side padding is set separately
+   * so a narrow screen keeps its gutter. */
+  padding: 32px 22px 64px;
+}
+.solo .solo-card { width: 100%; max-width: 420px; }
+.solo .solo-card .brand { padding: 0; border: 0; margin-bottom: 18px; justify-content: center; }
+.solo .solo-card .brand img { height: 30px; }
+
+/* Below this the card is the page: a max-width that exceeds the viewport is
+ * the same mistake as a fixed one. */
+@media (max-width: 480px) {
+  .solo > .page { justify-content: flex-start; padding-top: 24px; }
+}
+
