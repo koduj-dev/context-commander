@@ -139,7 +139,23 @@ Only on top of a core loop people actually use:
       exploited vulnerabilities applied from 2026-09-11; full application is
       2027-12-11.
 - [ ] Org-level credential management, policy, audit export.
-- [ ] SSO/OIDC and short-lived credentials.
+- [ ] **SSO/OIDC (and LDAP) — and the UI assumes it.** The deployment the
+      maintainer describes is: a company installs this, hands out access
+      authorized through OAuth/LDAP, and agents connect over MCP. What
+      exists is Personal Access Tokens and nothing else — the web UI's sign
+      in is "paste a PAT". The UI rework should keep its auth surface
+      swappable rather than build a PAT-shaped login it will have to
+      unpick, but the gap is real and it is here, not in the UI.
+- [ ] **Storage quotas per user/organization.** Raised by the maintainer
+      while scoping the UI: an organization deployment will want a ceiling
+      on what accumulates, and nothing measures or limits anything today —
+      artifacts, skill packages and history objects all grow without bound.
+      Needs accounting per scope (the object store and the encrypted tables
+      both), a limit, and an answer for what happens at the ceiling
+      (refuse the write is the only honest one; silent eviction of a
+      project's own context would be worse than the disk filling). Not
+      small, and worth doing before a real organization uses it rather than
+      after.
 - [ ] Retention rules, legal hold, controlled purge workflow.
 - [ ] Signed/trusted skill packages and an approval workflow.
 - [ ] Operational telemetry that doesn't leak content.
