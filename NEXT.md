@@ -223,6 +223,28 @@ on the planned move to a public repo:
   rest. Needs `--trusted-proxies` (a CIDR allowlist) plus
   `middleware.RealIP` gated on it, and only then a per-IP limit on
   unauthenticated traffic.
+- **Sharing artifacts across projects — wanted, and currently impossible.**
+  The maintainer named it as part of what shared agent storage is for. It
+  does not exist, and it runs straight into the isolation model: every
+  artifact is project-scoped, RLS enforces that at the database, and the
+  cookbook calls cross-project access "one of the easiest mistakes for an AI
+  client to make" — i.e. the thing the design deliberately prevents. So this
+  is a design decision, not a feature to add: something has to say what a
+  shared artifact IS (a copy? a reference? a read-only publication into a
+  wider scope?) and who may create one. The skill registry just answered the
+  same question for packages by giving them a scope of their own
+  (docs/adr/0018), and that is the shape to consider first — an artifact
+  published to an organization rather than reachable across projects
+  sideways.
+- **Serving artifact content as a rendered page.** Observed while scoping
+  the UI: the store is content-type aware and holds arbitrary bytes, so
+  "give any LLM a tool to publish an HTML page" is already most of the way
+  built — `artifact.write` with `content_type: text/html`. The missing half
+  is serving it, and that half is the dangerous one: rendering
+  caller-supplied HTML from the same origin as the API hands an attacker the
+  session of anyone who opens it. It needs a separate origin (or a sandboxed
+  iframe with a strict CSP and no credentials), which is a deployment
+  decision as much as a code one. Worth doing; not worth doing casually.
 - **[security] Keep RLS honest as tables are added.** Every table with a
   policy now has a test that fails when the policy is removed — `artifacts`,
   `artifact_versions`, `handoffs`, `conversations`, `secret_values`,

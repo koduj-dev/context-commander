@@ -590,6 +590,42 @@ For large/binary artifacts prefer upload/download mechanisms backed by object st
 
 ## 8.2 Artifact model
 
+### What artifacts are for
+
+Stated here because everything below describes the *shape* of an artifact
+and nothing said what it is **for** — which left the name to carry the
+meaning, and "artifact" carries the wrong one for anyone who has met the
+word in an AI product recently.
+
+An artifact is **shared storage for agent data**. Its job is to end the
+manual hand-carrying of files between agents: today, moving a markdown file
+from one agent's session to another's means a human copying text between two
+windows. Here, one agent writes it and another reads it, both through the
+same project, with provenance and versions kept.
+
+Three shapes that follow from that, all of them ordinary uses rather than
+special cases:
+
+- **Producer/consumer.** One side fills, the other drains. The versioning
+  and optimistic concurrency in §8.3 exist because both sides may be
+  working at once.
+- **Durable findings.** Whatever an LLM concluded, decided, or measured and
+  should not have to keep in its context window — written down once,
+  readable by whoever comes next. The handoff (§9) carries the *state of the
+  work*; artifacts carry the material the work produced.
+- **Anything with bytes and a content type.** The store is content-type
+  aware and does not interpret what it holds, so a rendered document is as
+  valid an artifact as a set of notes. What the server does NOT do is serve
+  that content back as a web page — see NEXT.md, where that is recorded as
+  an opportunity with a security caveat rather than a feature.
+
+What an artifact is **not**: general "memory for AI" with relevance and
+retrieval as the product (§3 non-goals, NEXT.md). The difference is that an
+artifact is addressed by a logical path a caller chose, not found by a query
+it hopes will match.
+
+### Fields
+
 An artifact is more than a file path.
 
 Suggested metadata:
