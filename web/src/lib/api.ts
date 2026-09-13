@@ -83,7 +83,13 @@ export function storeToken(token: string | null) {
 
 type Options = {
   method?: string;
+  /** Serialized as JSON. */
   body?: unknown;
+  /**
+   * Sent verbatim, with no Content-Type of ours. Artifact content is bytes
+   * the caller already has; wrapping it in JSON would change what is stored.
+   */
+  rawBody?: string;
   signal?: AbortSignal;
   /** Sent as a bearer token; defaults to the stored one. */
   token?: string;
@@ -108,7 +114,7 @@ export async function raw(path: string, opts: Options = {}): Promise<Response> {
     res = await fetch(`/v1${path}`, {
       method: opts.method ?? "GET",
       headers,
-      body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
+      body: opts.rawBody ?? (opts.body === undefined ? undefined : JSON.stringify(opts.body)),
       signal: opts.signal,
     });
   } catch (cause) {
@@ -525,6 +531,38 @@ export const api = {
 
   artifacts: (ns: string, slug: string, cursor?: string, limit?: number) =>
     request<Page<Artifact>>(withQuery(`${project(ns, slug)}/artifacts`, { cursor, limit })),
+  /**
+   * Writes a new version.
+   *
+   * `expectedVersion` is the version the editor was opened on, and 0 for a
+   * path that does not exist yet. The server refuses with a 409 when someone
+   * else wrote in between — that refusal is the whole point: without it a
+   * save would silently discard their work.
+   *
+   * The body is raw bytes, not JSON, so it does not go through request<T>.
+   */
+  writeArtifact: async (
+    ns: string,
+    slug: string,
+    path: string,
+    content: string,
+    contentType: string,
+    expectedVersion: number,
+  ) => {
+    const res = await raw(
+      withQuery(`${project(ns, slug)}/artifacts/content`, {
+        path,
+        content_type: contentType,
+        expected_version: expectedVersion,
+      }),
+      { method: "PUT", rawBody: content },
+    );
+    return (await res.json()) as ArtifactVersion;
+  },
+  deleteArtifact: (ns: string, slug: string, path: string) =>
+    request<void>(withQuery(`${project(ns, slug)}/artifacts/content`, { path }), {
+      method: "DELETE",
+    }),
   artifactHistory: (ns: string, slug: string, path: string) =>
     request<ArtifactVersion[]>(withQuery(`${project(ns, slug)}/artifacts/history`, { path })),
   artifactStat: (ns: string, slug: string, path: string) =>
@@ -568,6 +606,19 @@ export const api = {
 
   gateBindings: (ns: string, slug: string) =>
     request<GateBinding[]>(`${project(ns, slug)}/gates/bindings`),
+  bindGate: (
+    ns: string,
+    slug: string,
+    body: { scope: string; scope_ref?: string; gate_name: string; hook: string; config?: unknown },
+  ) =>
+    request<GateBinding>(`${project(ns, slug)}/gates/bindings`, {
+      method: "POST",
+      body: { ...body, config: body.config ?? null },
+    }),
+  unbindGate: (ns: string, slug: string, bindingID: string) =>
+    request<void>(withQuery(`${project(ns, slug)}/gates/bindings`, { id: bindingID }), {
+      method: "DELETE",
+    }),
 
   effectiveSkills: (ns: string, slug: string) =>
     request<SkillBinding[]>(`${project(ns, slug)}/skills/effective`),
@@ -594,6 +645,29 @@ export const api = {
       method: "POST",
       body: { binding_id: bindingID },
     }),
+  // Publishing is mounted at the top level, not under a project: a skill can
+  // be published straight onto the installation shelf, and requiring a
+  // project in the path would exclude exactly that caller.
+  publishSkill: (body: {
+    scope: string;
+    scope_ref?: string;
+    skill_id?: string;
+    name: string;
+    author: string;
+    origin: string;
+    content: string;
+    declared_capabilities?: string[];
+  }) => request<SkillVersion>("/skills", { method: "POST", body }),
+  overrideSkill: (
+    ns: string,
+    slug: string,
+    body: {
+      skill_id: string;
+      skill_version_id: string;
+      managed?: boolean;
+      overridable?: boolean;
+    },
+  ) => request<SkillBinding>(`${project(ns, slug)}/skills/override`, { method: "POST", body }),
   promoteSkill: (skillID: string, scope: string, scopeRef?: string) =>
     request<{ skill_id: string; scope: string; scope_ref?: string }>("/skills/promote", {
       method: "POST",
@@ -623,6 +697,16 @@ export const api = {
   events: (ns: string, slug: string, cursor?: string, limit?: number) =>
     request<Page<EventRecord>>(withQuery(`${project(ns, slug)}/events`, { cursor, limit })),
 
+  createOrganization: (name: string) =>
+    request<{ id: string; name: string; created_at: string }>("/organizations", {
+      method: "POST",
+      body: { name },
+    }),
+  addOrganizationMember: (id: string, userID: string, role: string) =>
+    request<{ organization_id: string; user_id: string; role: string }>(
+      `/organizations/${id}/members`,
+      { method: "POST", body: { user_id: userID, role } },
+    ),
   organizationMembers: (id: string) =>
     request<OrganizationMember[]>(`/organizations/${id}/members`),
   organizationAudit: (id: string, cursor?: string, limit?: number) =>

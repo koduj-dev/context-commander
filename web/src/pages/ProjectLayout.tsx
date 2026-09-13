@@ -62,6 +62,7 @@ export function ProjectLayout() {
         {tab(`${base}/members`, t("project.tab.members"))}
         {tab(`${base}/history`, t("history.title"))}
         {tab(`${base}/activity`, t("project.tab.activity"))}
+        {tab(`${base}/settings`, t("settings.title"))}
       </Tabs>
 
       <Outlet />

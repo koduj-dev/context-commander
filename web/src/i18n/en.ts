@@ -170,6 +170,16 @@ export const en = {
   "registry.column.checksum": "Checksum",
   "registry.column.author": "Author",
   "registry.publish": "New skill",
+  "registry.publishLead":
+    "A skill is instruction text an agent is handed. Publishing creates an immutable version — editing later means publishing again, and both versions stay.",
+  "registry.publishName": "Name",
+  "registry.publishAuthor": "Author",
+  "registry.publishOrigin": "Origin",
+  "registry.publishScope": "Publish to",
+  "registry.publishContent": "Instructions",
+  "registry.published": "Published version {version}",
+  "registry.publishScopeHelp":
+    "Where it lives, which is who can see it in the catalogue — not where it applies. A project can install a skill that lives anywhere it can see.",
   "registry.results": "{count, plural, one {# result} other {# results}} for “{query}”",
 
   "orgs.title": "Organizations",
@@ -376,8 +386,26 @@ export const en = {
     "The content type says this is not text, so it is not rendered. The version, the size and the hash above are what this screen can tell you about it.",
   "artifacts.viewing": "Viewing version {version}",
   "artifacts.latest": "Latest",
-  "artifacts.noWrite":
-    "Writing an artifact from here is not built. Agents write through the API, the CLI and MCP, and an editor that could silently lose a concurrent write is worse than no editor.",
+  "artifacts.edit": "Edit",
+  "artifacts.new": "New artifact",
+  "artifacts.save": "Save",
+  "artifacts.saved": "Saved as version {version}",
+  "artifacts.delete": "Delete",
+  "artifacts.confirmDelete":
+    "Delete {path}? Its versions go with it, and anything reading that path starts failing.",
+  "artifacts.editingFrom": "Editing from version {version}",
+  "artifacts.editingNew": "A new artifact at this path",
+  "artifacts.newPath": "Path",
+  "artifacts.newPathHelp": "notes/decisions.md",
+  "artifacts.contentType": "Content type",
+  "artifacts.staleWrite": "Someone wrote a newer version while you were editing",
+  "artifacts.staleWriteBody":
+    "Your save was refused rather than applied — applying it would have deleted their work. Reload to see the newest version, put your change into it, and save again.",
+  "artifacts.reload": "Reload the newest version",
+  "artifacts.concurrency":
+    "A save names the version it started from. If someone else wrote in between, the server refuses it instead of overwriting them.",
+  "artifacts.binaryNoEdit":
+    "This is not text, so it cannot be edited here. Agents write it through the API, the CLI and MCP.",
 
   "secrets.title": "Secrets",
   "secrets.lead":
@@ -406,6 +434,49 @@ export const en = {
   "gates.empty": "No gates apply here",
   "gates.emptyBody": "Nothing is intercepting operations in this project.",
   "gates.config": "Configuration",
+  "gates.bind": "Bind a gate",
+  "gates.bindLead":
+    "Only gates the server actually registered can be bound; a binding naming an unregistered gate fails the whole operation rather than being ignored, so this list is what exists.",
+  "gates.gateName": "Gate",
+  "gates.hook": "Hook",
+  "gates.unbind": "Unbind",
+  "gates.confirmUnbind":
+    "Unbind {gate} from {hook}? Operations it was refusing start going through.",
+  "gates.inherited": "Inherited",
+
+  "skills.override": "Override",
+  "skills.overrideLead":
+    "Bind a different version at this project, shadowing what a wider scope mandated. A binding marked not overridable refuses this — that is the point of the flag.",
+  "skills.overrideVersion": "Version to bind",
+
+  "orgs.create": "New organization",
+  "orgs.createLead": "You become its first OWNER. Projects and skills can then be scoped to it.",
+  "orgs.name": "Name",
+  "orgs.created": "Created {name}",
+  "orgs.addMember": "Add member",
+  "orgs.addMemberLead":
+    "By user id, not principal: an organization role is about a person. Nothing in the API lists users, so there is nothing to pick from.",
+  "orgs.userId": "User id",
+
+  "settings.title": "Settings",
+  "settings.lead": "What this project is, and what can be changed about it from here.",
+  "settings.identity": "Identity",
+  "settings.visibility": "Visibility",
+  "settings.encryption": "Encryption",
+  "settings.encryptionBody":
+    "Content is encrypted at rest under a key belonging to this project, itself wrapped by the installation root key. Handoff bodies and secrets travel through that envelope; artifact bytes go to the object store.",
+  "settings.danger": "Irreversible",
+  "settings.noWrites":
+    "Nothing on this screen can be changed here: the API has no update or delete for a project. Renaming, changing visibility and deleting are CLI operations, and a control that opened a dialog and then failed would be worse than its absence.",
+  "settings.connect": "Connecting an agent",
+  "settings.connectLead":
+    "Point an MCP client at this server with a personal access token. The project is named per call, so one token reaches every project you are a member of.",
+  "settings.mcpEndpoint": "MCP endpoint",
+  "settings.restEndpoint": "REST",
+
+  "dashboard.waitingLead":
+    "Projects where a handoff is open or claimed — work someone left for whoever comes next.",
+  "dashboard.checking": "Checking your projects…",
 
   "history.title": "Conversations",
   "history.lead":

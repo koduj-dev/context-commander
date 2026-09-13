@@ -435,6 +435,33 @@ export function TextField({
   );
 }
 
+/** A content editor. Monospaced, because what goes in it is structured text. */
+export function TextArea({
+  value,
+  onChange,
+  label,
+  rows,
+  disabled,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  label: string;
+  rows?: number;
+  disabled?: boolean;
+}) {
+  return (
+    <textarea
+      className="field"
+      value={value}
+      rows={rows}
+      aria-label={label}
+      disabled={disabled}
+      spellCheck={false}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  );
+}
+
 export function SelectField<T extends string>({
   value,
   onChange,

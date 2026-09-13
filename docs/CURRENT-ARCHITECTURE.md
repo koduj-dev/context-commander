@@ -187,24 +187,34 @@ The UI is a **management and control plane**, not a browser for every
 context-plane primitive. Most of what Context Commander stores is there for
 MCP clients; a human does not need a tab for each table.
 
-Navigation:
+Navigation, as built (`web/src/App.tsx`):
 
 ```text
-Dashboard
+Dashboard          what is waiting on you
 
 Projects
 └── <namespace>/<project>
-    ├── Overview
-    ├── Members
-    ├── Connections / Integrations
-    ├── Skills
-    ├── Policies / Gates
-    └── Settings
+    ├── Overview       current handoff and what came before
+    ├── Context        the assembled pack an agent receives, with its budget
+    ├── Artifacts      versions, content, a versioned editor
+    ├── Skills         the effective set: install, override, pin
+    ├── Policies       gate bindings: bind, unbind
+    ├── Secrets        names and references, never a value
+    ├── Members        principals and roles
+    ├── Conversations  what clients recorded, and lineage
+    ├── Activity       audit and events on one timeline
+    └── Settings       identity, how to connect an agent
 
-Organizations
-Skill Registry
-Administration
+Organizations      members and organization-scoped audit
+Skill Registry     search, publish, per-skill detail and versions
+Access tokens      your own credentials
+Administration     admins, identity creation, credentials, security log
 ```
+
+The tree is wider than the sketch it replaced because each entry answers a
+question someone actually arrives with, not because a table exists. Context
+is the one addition worth naming: it is the only screen that answers "why is
+the agent behaving like that" without reading a transcript.
 
 Artifacts, Handoffs, Events, Conversations, ExternalSessions and
 HistoryObjects are domain primitives, **not automatically navigation items**.

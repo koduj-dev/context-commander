@@ -17,6 +17,7 @@ import {
   Pager,
   Panel,
   Scope,
+  SelectField,
   TextField,
 } from "../ui";
 import { useProject } from "./ProjectLayout";
@@ -35,6 +36,7 @@ export function ProjectSkills() {
   const { project, namespace, slug } = useProject();
   const [installing, setInstalling] = useState(false);
   const [pinning, setPinning] = useState<string>();
+  const [overriding, setOverriding] = useState<string>();
   const { data, error, loading, reload } = useResource(
     () => api.effectiveSkills(namespace, slug),
     [namespace, slug],
@@ -71,6 +73,19 @@ export function ProjectSkills() {
           </>
         }
       />
+
+      {overriding && (
+        <div className="mb">
+          <OverrideSkill
+            skillID={overriding}
+            onDone={() => {
+              reload();
+              setOverriding(undefined);
+            }}
+            onCancel={() => setOverriding(undefined)}
+          />
+        </div>
+      )}
 
       {installing && (
         <div className="mb">
@@ -126,6 +141,13 @@ export function ProjectSkills() {
                   {b.pinned && <Badge tone="active">{t("skill.pinned")}</Badge>}
                 </td>
                 <td className="r">
+                  {/* An inherited binding can be shadowed, unless whoever
+                      mandated it marked it not overridable. */}
+                  {b.scope !== "project" && b.overridable && (
+                    <Btn small onClick={() => setOverriding(b.skill_id)}>
+                      {t("skills.override")}
+                    </Btn>
+                  )}{" "}
                   {/* Only a binding this project made is this project's to
                       hold; the server refuses an inherited one. */}
                   {b.scope === "project" && b.scope_ref === project.id ? (
@@ -272,6 +294,89 @@ function InstallSkill({
         </DataTable>
       )}
       {failure !== undefined && <ErrorState error={failure} />}
+    </Panel>
+  );
+}
+
+/**
+ * Shadowing an inherited binding with a version this project chose.
+ *
+ * Offered only where it can work: a binding marked not overridable refuses
+ * this, which is the whole point of the flag — it is how a mandated
+ * security-review skill stays mandated.
+ */
+function OverrideSkill({
+  skillID,
+  onDone,
+  onCancel,
+}: {
+  skillID: string;
+  onDone: () => void;
+  onCancel: () => void;
+}) {
+  const t = useT();
+  const { namespace, slug } = useProject();
+  const versions = useList((cursor) => api.skillVersions(skillID, cursor), [skillID]);
+  const [chosen, setChosen] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState<unknown>();
+
+  // Default to the newest, which is what "override" usually means in
+  // practice; versions come back oldest-first.
+  const newest = versions.items.length
+    ? versions.items.reduce((a, b) => (b.version > a.version ? b : a))
+    : undefined;
+  const selected = chosen || newest?.id || "";
+
+  async function submit() {
+    if (!selected || busy) return;
+    setBusy(true);
+    setFailure(undefined);
+    try {
+      await api.overrideSkill(namespace, slug, {
+        skill_id: skillID,
+        skill_version_id: selected,
+        overridable: true,
+      });
+      onDone();
+    } catch (err) {
+      setFailure(err);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Panel
+      title={t("skills.override")}
+      footer={<span className="dim">{t("skills.overrideLead")}</span>}
+    >
+      {versions.loading ? (
+        <Loading />
+      ) : versions.error ? (
+        <ErrorState error={versions.error} onRetry={versions.reload} />
+      ) : (
+        <div className="row row-sm">
+          <SelectField
+            label={t("skills.overrideVersion")}
+            value={selected}
+            onChange={setChosen}
+            options={versions.items.map((v) => ({ value: v.id, label: `v${v.version}` }))}
+          />
+          <span className="spacer" />
+          <Btn onClick={onCancel} disabled={busy}>
+            {t("common.cancel")}
+          </Btn>
+          <Btn kind="primary" onClick={() => void submit()} disabled={busy || !selected}>
+            {busy ? t("common.loading") : t("skills.override")}
+          </Btn>
+        </div>
+      )}
+      {failure !== undefined && (
+        <div className="mt">
+          <ErrorState error={failure} />
+        </div>
+      )}
     </Panel>
   );
 }

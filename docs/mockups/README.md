@@ -3,6 +3,21 @@
 Static HTML mockups of the Context Commander management plane. Open
 [`index.html`](index.html) — no build step, no dependencies.
 
+## What these are now
+
+These are how the design was agreed **before the interface existed**. It
+exists now, in [`../../web/`](../../web), and for a screen that is built the
+running app is the thing to look at — a static second copy of it would only
+be a second thing to keep in step.
+
+What stays authoritative here is the **component kit**:
+`assets/mockup.css` is where a component is decided, and
+`web/scripts/check-design-sync.mjs` fails the build when the app's stylesheet
+does not carry the same one. Screens added after the rebuild live only in the
+app; the check prints how many exist in each place so the difference is
+visible rather than forgotten. See
+[`.claude/skills/ui-design/SKILL.md`](../../.claude/skills/ui-design/SKILL.md).
+
 ## Read this first
 
 [`foundations.html`](foundations.html) is the base. Tokens, type scale,

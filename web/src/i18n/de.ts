@@ -364,8 +364,27 @@ export const de: Partial<Record<MessageKey, string>> = {
     "Laut Inhaltstyp ist das kein Text und wird deshalb nicht dargestellt. Version, Größe und Prüfsumme oben sind das, was dieser Bildschirm darüber sagen kann.",
   "artifacts.viewing": "Version {version} wird angezeigt",
   "artifacts.latest": "Neueste",
-  "artifacts.noWrite":
-    "Artefakte von hier aus zu schreiben ist nicht gebaut. Agenten schreiben über die API, die Kommandozeile und MCP, und ein Editor, der einen gleichzeitigen Schreibvorgang unbemerkt verlieren kann, ist schlechter als gar keiner.",
+  "artifacts.edit": "Bearbeiten",
+  "artifacts.new": "Neues Artefakt",
+  "artifacts.save": "Speichern",
+  "artifacts.saved": "Als Version {version} gespeichert",
+  "artifacts.delete": "Löschen",
+  "artifacts.confirmDelete":
+    "{path} löschen? Die Versionen gehen mit, und alles, was diesen Pfad liest, beginnt zu scheitern.",
+  "artifacts.editingFrom": "Bearbeitet ausgehend von Version {version}",
+  "artifacts.editingNew": "Ein neues Artefakt an diesem Pfad",
+  "artifacts.newPath": "Pfad",
+  "artifacts.newPathHelp": "notizen/entscheidungen.md",
+  "artifacts.contentType": "Inhaltstyp",
+  "artifacts.staleWrite":
+    "Während Sie bearbeitet haben, hat jemand eine neuere Version geschrieben",
+  "artifacts.staleWriteBody":
+    "Ihr Speichern wurde abgelehnt statt angewendet — anwenden hätte die Arbeit der anderen Person gelöscht. Laden Sie die neueste Version, tragen Sie Ihre Änderung dort ein und speichern Sie erneut.",
+  "artifacts.reload": "Neueste Version laden",
+  "artifacts.concurrency":
+    "Ein Speichervorgang nennt die Version, von der er ausging. Hat jemand anderes dazwischen geschrieben, lehnt der Server ihn ab, statt die andere Person zu überschreiben.",
+  "artifacts.binaryNoEdit":
+    "Das ist kein Text und lässt sich hier nicht bearbeiten. Agenten schreiben es über die API, die Kommandozeile und MCP.",
 
   "secrets.title": "Geheimnisse",
   "secrets.lead":
@@ -509,4 +528,60 @@ export const de: Partial<Record<MessageKey, string>> = {
   "history.notText": "Kein Text",
   "history.notTextBody":
     "Ein Historienobjekt ist das, was der Client aufgezeichnet hat, und diese Bytes sind kein gültiges UTF-8. Prüfsumme und Typ oben sind das, was dieser Bildschirm darüber sagen kann.",
+
+  "registry.publishLead":
+    "Ein Skill ist Anweisungstext, den ein Agent bekommt. Veröffentlichen legt eine unveränderliche Version an — späteres Bearbeiten heißt erneut veröffentlichen, und beide Versionen bleiben bestehen.",
+  "registry.publishName": "Name",
+  "registry.publishAuthor": "Urheberin oder Urheber",
+  "registry.publishOrigin": "Herkunftsort",
+  "registry.publishScope": "Veröffentlichen nach",
+  "registry.publishContent": "Anweisungen",
+  "registry.published": "Version {version} veröffentlicht",
+  "registry.publishScopeHelp":
+    "Wo der Skill liegt, also wer ihn im Katalog sieht — nicht, wo er gilt. Ein Projekt kann einen Skill installieren, der irgendwo liegt, wohin es sehen kann.",
+
+  "gates.bind": "Gate binden",
+  "gates.bindLead":
+    "Binden lassen sich nur Gates, die der Server tatsächlich registriert hat; eine Bindung auf ein nicht registriertes Gate lässt die gesamte Operation scheitern, statt ignoriert zu werden — diese Liste ist also das, was existiert.",
+  "gates.gateName": "Gate",
+  "gates.hook": "Hook",
+  "gates.unbind": "Lösen",
+  "gates.confirmUnbind":
+    "{gate} von {hook} lösen? Operationen, die es verweigert hat, gehen danach durch.",
+  "gates.inherited": "Geerbt",
+
+  "skills.override": "Überschreiben",
+  "skills.overrideLead":
+    "Eine andere Version an dieses Projekt binden und damit überdecken, was eine breitere Ebene vorgeschrieben hat. Eine als nicht überschreibbar markierte Bindung verweigert das — genau dafür ist das Kennzeichen da.",
+  "skills.overrideVersion": "Zu bindende Version",
+
+  "orgs.create": "Neue Organisation",
+  "orgs.createLead":
+    "Sie werden ihre erste Eigentümerin oder ihr erster Eigentümer. Projekte und Skills lassen sich danach auf sie beziehen.",
+  "orgs.name": "Name",
+  "orgs.created": "{name} angelegt",
+  "orgs.addMember": "Mitglied hinzufügen",
+  "orgs.addMemberLead":
+    "Über die Benutzer-ID, nicht die des Principals: eine Organisationsrolle betrifft einen Menschen. Kein Endpunkt der API listet Benutzerkonten auf, es gibt also nichts zur Auswahl.",
+  "orgs.userId": "Benutzer-ID",
+
+  "settings.title": "Einstellungen",
+  "settings.lead": "Was dieses Projekt ist und was sich hier daran ändern lässt.",
+  "settings.identity": "Identität",
+  "settings.visibility": "Sichtbarkeit",
+  "settings.encryption": "Verschlüsselung",
+  "settings.encryptionBody":
+    "Inhalte sind im Ruhezustand unter einem Schlüssel dieses Projekts verschlüsselt, der selbst vom Wurzelschlüssel der Installation umschlossen wird. Übergabetexte und Geheimnisse gehen durch diesen Umschlag; die Bytes von Artefakten gehen in den Objektspeicher.",
+  "settings.danger": "Nicht umkehrbar",
+  "settings.noWrites":
+    "Auf diesem Bildschirm lässt sich nichts ändern: die API hat weder ein Update noch ein Löschen für ein Projekt. Umbenennen, Sichtbarkeit ändern und Löschen sind Operationen der Kommandozeile, und ein Bedienelement, das einen Dialog öffnet und dann scheitert, wäre schlechter als sein Fehlen.",
+  "settings.connect": "Einen Agenten verbinden",
+  "settings.connectLead":
+    "Richten Sie einen MCP-Client auf diesen Server, mit einem persönlichen Zugriffstoken. Das Projekt wird pro Aufruf benannt, ein Token erreicht also jedes Projekt, in dem Sie Mitglied sind.",
+  "settings.mcpEndpoint": "MCP-Endpunkt",
+  "settings.restEndpoint": "REST",
+
+  "dashboard.waitingLead":
+    "Projekte, in denen eine Übergabe offen oder übernommen ist — Arbeit, die jemand für die nächste Person oder den nächsten Agenten hinterlassen hat.",
+  "dashboard.checking": "Ihre Projekte werden geprüft…",
 };

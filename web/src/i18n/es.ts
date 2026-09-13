@@ -355,8 +355,26 @@ export const es: Partial<Record<MessageKey, string>> = {
     "El tipo de contenido dice que esto no es texto, así que no se representa. La versión, el tamaño y el hash de arriba son lo que esta pantalla puede contarle sobre ello.",
   "artifacts.viewing": "Mostrando la versión {version}",
   "artifacts.latest": "Última",
-  "artifacts.noWrite":
-    "Escribir un artefacto desde aquí no está construido. Los agentes escriben por la API, la CLI y MCP, y un editor capaz de perder en silencio una escritura simultánea es peor que no tener editor.",
+  "artifacts.edit": "Editar",
+  "artifacts.new": "Nuevo artefacto",
+  "artifacts.save": "Guardar",
+  "artifacts.saved": "Guardado como versión {version}",
+  "artifacts.delete": "Eliminar",
+  "artifacts.confirmDelete":
+    "¿Eliminar {path}? Sus versiones se van con él, y todo lo que lea esa ruta empezará a fallar.",
+  "artifacts.editingFrom": "Editando a partir de la versión {version}",
+  "artifacts.editingNew": "Un artefacto nuevo en esta ruta",
+  "artifacts.newPath": "Ruta",
+  "artifacts.newPathHelp": "notas/decisiones.md",
+  "artifacts.contentType": "Tipo de contenido",
+  "artifacts.staleWrite": "Alguien escribió una versión más reciente mientras usted editaba",
+  "artifacts.staleWriteBody":
+    "Su guardado se rechazó en lugar de aplicarse — aplicarlo habría borrado el trabajo de esa persona. Cargue la versión más reciente, incorpore su cambio y vuelva a guardar.",
+  "artifacts.reload": "Cargar la versión más reciente",
+  "artifacts.concurrency":
+    "Un guardado nombra la versión de la que partió. Si otra persona escribió entretanto, el servidor lo rechaza en vez de sobrescribirla.",
+  "artifacts.binaryNoEdit":
+    "Esto no es texto, así que no puede editarse aquí. Los agentes lo escriben por la API, la CLI y MCP.",
 
   "secrets.title": "Secretos",
   "secrets.lead":
@@ -497,4 +515,60 @@ export const es: Partial<Record<MessageKey, string>> = {
   "history.notText": "No es texto",
   "history.notTextBody":
     "Un objeto de historial es lo que el cliente registró, y estos bytes no son UTF-8 válido. El hash y el tipo de arriba son lo que esta pantalla puede contarle sobre ello.",
+
+  "registry.publishLead":
+    "Un skill es texto de instrucciones que se le entrega a un agente. Publicar crea una versión inmutable — editarla después significa volver a publicar, y ambas versiones se conservan.",
+  "registry.publishName": "Nombre",
+  "registry.publishAuthor": "Autoría",
+  "registry.publishOrigin": "Origen",
+  "registry.publishScope": "Publicar en",
+  "registry.publishContent": "Instrucciones",
+  "registry.published": "Versión {version} publicada",
+  "registry.publishScopeHelp":
+    "Dónde reside, es decir quién lo ve en el catálogo — no dónde se aplica. Un proyecto puede instalar un skill que resida en cualquier sitio que alcance a ver.",
+
+  "gates.bind": "Vincular una gate",
+  "gates.bindLead":
+    "Solo pueden vincularse gates que el servidor haya registrado de verdad; un vínculo que nombre una gate no registrada hace fallar toda la operación en lugar de ignorarse, así que esta lista es lo que existe.",
+  "gates.gateName": "Gate",
+  "gates.hook": "Hook",
+  "gates.unbind": "Desvincular",
+  "gates.confirmUnbind":
+    "¿Desvincular {gate} de {hook}? Las operaciones que rechazaba empezarán a pasar.",
+  "gates.inherited": "Heredada",
+
+  "skills.override": "Sustituir",
+  "skills.overrideLead":
+    "Vincular otra versión en este proyecto, tapando lo que impuso un ámbito más amplio. Un vínculo marcado como no sustituible lo rechaza — para eso está esa marca.",
+  "skills.overrideVersion": "Versión a vincular",
+
+  "orgs.create": "Nueva organización",
+  "orgs.createLead":
+    "Usted pasa a ser su primera propietaria o propietario. Después podrán asociarse proyectos y skills a ella.",
+  "orgs.name": "Nombre",
+  "orgs.created": "{name} creada",
+  "orgs.addMember": "Añadir miembro",
+  "orgs.addMemberLead":
+    "Por id de cuenta, no de principal: un rol de organización habla de una persona. Nada en la API enumera cuentas, así que no hay nada entre lo que elegir.",
+  "orgs.userId": "Id de cuenta",
+
+  "settings.title": "Ajustes",
+  "settings.lead": "Qué es este proyecto y qué puede cambiarse de él desde aquí.",
+  "settings.identity": "Identidad",
+  "settings.visibility": "Visibilidad",
+  "settings.encryption": "Cifrado",
+  "settings.encryptionBody":
+    "El contenido está cifrado en reposo bajo una clave propia de este proyecto, envuelta a su vez por la clave raíz de la instalación. Los cuerpos de los traspasos y los secretos pasan por ese sobre; los bytes de los artefactos van al almacén de objetos.",
+  "settings.danger": "Irreversible",
+  "settings.noWrites":
+    "Nada de esta pantalla puede cambiarse aquí: la API no tiene actualización ni borrado de un proyecto. Renombrar, cambiar la visibilidad y eliminar son operaciones de la CLI, y un control que abriera un diálogo y luego fallara sería peor que su ausencia.",
+  "settings.connect": "Conectar un agente",
+  "settings.connectLead":
+    "Apunte un cliente MCP a este servidor con un token de acceso personal. El proyecto se nombra en cada llamada, así que un solo token alcanza todos los proyectos de los que es miembro.",
+  "settings.mcpEndpoint": "Punto de acceso MCP",
+  "settings.restEndpoint": "REST",
+
+  "dashboard.waitingLead":
+    "Proyectos con un traspaso abierto o tomado — trabajo que alguien dejó para quien venga después.",
+  "dashboard.checking": "Comprobando sus proyectos…",
 };

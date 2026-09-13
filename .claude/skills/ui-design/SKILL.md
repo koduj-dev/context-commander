@@ -102,7 +102,10 @@ rewrite.
 
 ## Changing the design
 
-1. Change `docs/mockups/assets/mockup.css` and regenerate the mockup pages.
+**A component** — anything a second screen could reuse: a layout, a control,
+a readout:
+
+1. Decide it in `docs/mockups/assets/mockup.css`.
 2. Port the same change into `web/src/styles/app.css`.
 3. Add or update the React component in `web/src/ui/index.tsx`.
 4. Run `npm test` in `web/`. The sync check will tell you what you missed.
@@ -111,14 +114,44 @@ If a component exists only in the mockups, the check fails: a design nobody
 built is a design nobody can trust. If it exists only in the app, it was never
 reviewed.
 
+**A screen** — assembled from components that already exist: build it in the
+app and review it running. The mockups were how the design was agreed before
+the app existed, and for the screens they cover they still are; they are not
+a place to draw a second copy of a screen that now exists for real. A screen
+that needs markup the kit cannot express is telling you the kit is missing a
+component — go back to the list above rather than improvising in the page.
+The sync check prints how many screens exist in each place so the difference
+stays visible.
+
+Every class a screen uses must still be a kit class. That is enforced, and it
+is the part that actually prevents drift.
+
 Anything below the `foundations page only` marker in `mockup.css` documents
 the kit rather than being part of it, and is not ported. **Keep that block
 last** — a component added after it is silently dropped from the app.
 
+Two things live in both stylesheets spelled out rather than tokenised,
+because the brand has no token for them: the monospace stack (in `.mono` and
+`textarea.field`) and nothing else. Change them in both files.
+
 ## Where the design is already decided
 
-`docs/mockups/` has 23 screens and `foundations.html` documents the kit.
-Before designing a screen, check whether it is already there. The navigation,
-the information architecture and the answer to "is this a management plane or
-a database browser" are settled in `docs/CURRENT-ARCHITECTURE.md` §6: domain
-primitives are not automatically navigation items.
+`docs/mockups/` has the screens the design was agreed on and
+`foundations.html` documents the kit. Before designing a screen, check whether
+it is already there, and check `web/src/pages/` for whether it is already
+built. The navigation, the information architecture and the answer to "is this
+a management plane or a database browser" are settled in
+`docs/CURRENT-ARCHITECTURE.md` §6: domain primitives are not automatically
+navigation items.
+
+## What the interface can actually do
+
+Before writing a control, read the handler that would serve it — not the
+domain type, the handler in `adapters/http/`. They differ in ways that decide
+what a screen can show: a response flattens a nested type, omits a field
+rather than sending null, returns a bare array where the domain paginates,
+answers 204 where you expected the updated row, or base64-encodes a body.
+Every one of those has already produced a screen in this project that
+rendered blank or highlighted the wrong row, and none of them was caught by
+the type checker — they were caught by running the thing against a real
+server.

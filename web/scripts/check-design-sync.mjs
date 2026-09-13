@@ -22,6 +22,14 @@
  *      of pages. (The handful that are genuinely data — a meter's width —
  *      are listed as exceptions below and must stay tiny.)
  *
+ * What it deliberately does NOT enforce: that every screen in the app has a
+ * matching page in docs/mockups. The mockups were how the design was agreed
+ * before the app existed; screens built after it are reviewed in the running
+ * app, which is a better review than a static copy of one. The contract that
+ * actually prevents drift is the component one above, and that is enforced.
+ * The screen inventory is printed as a note so the gap stays visible rather
+ * than being quietly forgotten.
+ *
  * Run with `npm test`; it also runs in CI.
  */
 import { readFile, readdir } from "node:fs/promises";
@@ -145,8 +153,20 @@ if (inlineStyles.length) {
   );
 }
 
-// A count worth seeing even when everything passes.
+// Counts worth seeing even when everything passes.
 notes.push(`design kit: ${appClasses.size} classes, ${classesIn(mockupCss).size} in the mockups`);
+
+// Which screens exist in each place. Informational: a screen with no mockup
+// is normal for anything built after the rebuild, and a mockup with no screen
+// is a design that has not been built yet — both are worth knowing, neither
+// is a failure.
+const pages = (await readdir(join(SRC, "pages"))).filter(
+  (f) => f.endsWith(".tsx") && !f.endsWith(".test.tsx"),
+);
+const mockupPages = (await readdir(join(repo, "docs", "mockups"))).filter(
+  (f) => f.endsWith(".html") && f !== "index.html" && f !== "foundations.html",
+);
+notes.push(`screens: ${pages.length} built, ${mockupPages.length} designed in the mockups`);
 
 if (failures.length) {
   console.error("\n✗ design sync\n");

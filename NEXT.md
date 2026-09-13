@@ -97,10 +97,9 @@ README, the package doc).
 Two things Phase 1 deliberately did NOT do, so the next reader doesn't
 re-derive them:
 
-- **No web UI work.** The Handoffs tab still only shows and creates — it
-  cannot claim or close, even though the endpoints now exist. That was the
-  stated trade ("no web UI before the CLI/MCP core loop is proven"); wiring
-  the tab to the new endpoints is now small and listed under UI below.
+- **No web UI work** — the stated trade ("no web UI before the CLI/MCP core
+  loop is proven"). Superseded on 2026-09-13 by the green-field rebuild
+  described under "UI" below, which is now built.
 - **No `context.pull`.** The roadmap named "`context.bootstrap` /
   `context.pull`" but asked for *one* well-described operation. Continuation
   is `event.list` with the cursor the pack already returns, so a second
@@ -162,10 +161,10 @@ Only on top of a core loop people actually use:
 
 ### UI — remaining spec surface
 
-`docs/context-commander-ui-spec.md` (2026-09-02) describes a larger target than
-what exists. Phases 1–3 of it shipped (design system, Handoffs/Conversations/
-Events tabs, Administration page — see `CHANGELOG.md`). Deliberately parked
-behind Phase 1 above, per "no web UI before the CLI/MCP core loop is proven":
+`docs/context-commander-ui-spec.md` (2026-09-02) describes a target that
+predates the rebuild; where it and the built interface disagree, the built
+one is what exists. It was deliberately parked behind Phase 1 above, per "no
+web UI before the CLI/MCP core loop is proven":
 
 > **The web UI is a green-field rebuild** (maintainer, 2026-09-13). Not a
 > rework of what exists — the existing `web/` is discarded whole and the new
@@ -187,8 +186,43 @@ behind Phase 1 above, per "no web UI before the CLI/MCP core loop is proven":
 > event timeline. The existing tabs predate every one of those and work
 > around several of them by asking the user to paste a UUID.
 
-- [ ] Organizations / Skill Registry top-level nav, and the remaining project
-  tabs (Integrations, Settings) — not yet planned.
+**The rebuild is done** (2026-09-13). `web/` was deleted and rebuilt from
+nothing: React 19 + Vite, no CSS framework, no i18n library, the component kit
+ported from `docs/mockups/assets/mockup.css` and kept in step by
+`web/scripts/check-design-sync.mjs`. English is the source language; German
+and Spanish are complete and `npm run i18n:check` fails on a dropped
+placeholder, an orphaned key or a plural with no `other` form. Per-reader
+localisation (date order, 12/24 h, time zone, UTC alongside, GB vs GiB) is in
+from the first commit.
+
+What it covers: sign-in, dashboard ("is anything waiting on you", assembled
+from `current` per project), projects with creation, and per project —
+context pack with its budget report, artifacts with a versioned editor,
+skills with install/override/pin, policies with gate bind/unbind, secrets,
+members with add, conversations with lineage, activity (audit and events),
+settings. Plus the skill registry with publish and per-skill detail,
+organizations with creation and membership, administration (admins, identity
+creation, credential lookup, security log) and personal access tokens.
+
+What it deliberately does not offer, because the API has no write for it:
+removing a project member or changing a role, renaming or deleting a project,
+changing visibility, revoking installation admin. Each of those says so on
+the screen rather than showing a control that would fail.
+
+- [ ] **No user or service-principal directory.** `POST /installation/users`
+  and `/service-principals` exist; nothing lists them. Every screen that
+  needs to name a principal therefore asks for a UUID — adding a member,
+  looking up credentials, adding someone to an organization. This is the
+  single biggest usability gap in the interface and it is a server gap, not
+  a UI one.
+- [ ] **No `GET /skills/{id}`.** The skill detail screen finds its own name
+  and scope by reading a version, because there is no read of the skill
+  itself.
+- [ ] **No cross-project reads.** The dashboard answers "waiting on you" with
+  one request per project. Bounded by membership and acceptable at this size,
+  but it is the shape that will not hold at a hundred projects.
+- [ ] Project templates — agreed in the mockups (`templates.html`), no
+  schema and no endpoint.
 
 ### CI/pipeline hardening (blocked on going public)
 

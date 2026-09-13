@@ -15,6 +15,7 @@ import { ProjectPolicies } from "./pages/ProjectPolicies";
 import { ProjectSkills } from "./pages/ProjectSkills";
 import { ProjectActivity } from "./pages/ProjectActivity";
 import { ProjectHistory } from "./pages/ProjectHistory";
+import { ProjectSettings } from "./pages/ProjectSettings";
 import { Registry } from "./pages/Registry";
 import { SkillDetail } from "./pages/SkillDetail";
 import { Organizations } from "./pages/Organizations";
@@ -67,6 +68,7 @@ export function App() {
           <Route path="members" element={<ProjectMembers />} />
           <Route path="history" element={<ProjectHistory />} />
           <Route path="activity" element={<ProjectActivity />} />
+          <Route path="settings" element={<ProjectSettings />} />
         </Route>
         <Route path="organizations" element={<Organizations />} />
         <Route path="registry" element={<Registry />} />

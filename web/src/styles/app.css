@@ -387,6 +387,24 @@ a:hover {
   color: var(--cc-text-muted);
 }
 
+/* An editor for artifact content. Monospaced because what goes in it is
+ * usually structured text an agent wrote — JSON, Markdown, a config — and
+ * proportional type hides the alignment that carries meaning there. The
+ * stack is the one .mono uses; there is no token for it, so it is spelled
+ * out in both places and must be changed in both.
+ * `resize: vertical` only: horizontal resizing inside a grid column
+ * overflows the panel it sits in. */
+textarea.field {
+  font-family:
+    "SF Mono", "JetBrains Mono", "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  min-height: 240px;
+  resize: vertical;
+  white-space: pre;
+  tab-size: 2;
+}
+
 /* ---------- panels ---------- */
 
 .grid {
