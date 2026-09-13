@@ -157,7 +157,12 @@ a:hover { text-decoration: underline; }
   color: var(--cc-text-muted);
 }
 
-.page { padding: 22px; max-width: 1320px; }
+/* No max-width. This is an operator's console on whatever monitor they
+ * have — capping it at 1320px left a QHD screen 40% empty while the tables
+ * that most want the room were the ones being squeezed. Prose that genuinely
+ * needs a measure caps itself (see .page-head p); tables, status rows and
+ * metrics all read better wide. */
+.page { padding: 22px; width: 100%; }
 
 .page-head { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 18px; }
 .page-head h1 { margin: 0 0 3px; font-size: 19px; font-weight: 600; letter-spacing: -0.01em; }
@@ -246,11 +251,9 @@ a:hover { text-decoration: underline; }
 
 /* ---------- tables ---------- */
 
-/* border-collapse: separate, not collapse. A collapsed table drops the
- * border of a sticky header cell — the header then floats with nothing
- * under it and the first body row appears to slide beneath it. With
- * separate borders the header owns its own rule, drawn as an inset shadow
- * so it travels with the cell while it is stuck. */
+/* border-collapse: separate. The header rule is drawn as an inset shadow on
+ * the cell rather than a collapsed border, so it belongs to the header and
+ * cannot be lost to the row below it. */
 table.dt { width: 100%; border-collapse: separate; border-spacing: 0; }
 table.dt th {
   text-align: left;
@@ -258,12 +261,10 @@ table.dt th {
   color: var(--cc-text-muted);
   padding: 8px 14px;
   white-space: nowrap;
-  /* Opaque, or scrolled rows show through it. */
   background: var(--cc-surface-1);
+  /* An inset shadow rather than border-bottom: with border-collapse the
+   * two would fight over the same pixel row and one of them loses. */
   box-shadow: inset 0 -1px 0 var(--cc-border);
-  position: sticky;
-  top: var(--topbar-h);
-  z-index: 2;
 }
 table.dt td {
   padding: 9px 14px;
@@ -272,10 +273,10 @@ table.dt td {
   background: var(--cc-surface-1);
 }
 table.dt tbody tr:hover td { background: var(--cc-surface-2); }
-/* A panel body that scrolls sideways becomes the sticky container, which
- * would silently stop the header sticking. Keep the page as the scroll
- * parent and let the container scroll only when it must. */
-.panel .body.tight { overflow-x: auto; overflow-y: visible; }
+/* Sideways scrolling is applied only where it is needed — see the narrow
+ * breakpoint. `overflow-x: auto` with `overflow-y: visible` is not a thing
+ * CSS honours: setting one axis forces the other to `auto` too, creating a
+ * scroll container nobody asked for. */
 table.dt tbody tr:last-child td { border-bottom: 0; }
 table.dt td.r, table.dt th.r { text-align: right; }
 .dim { color: var(--cc-text-muted); }
@@ -390,6 +391,18 @@ table.dt td.r, table.dt th.r { text-align: right; }
 .panel .body.tight { overflow-x: auto; }
 .tabs { overflow-x: auto; scrollbar-width: thin; }
 
+/* Wide screens: more room means more columns, not more whitespace. */
+@media (min-width: 1700px) {
+  .page { padding: 26px 34px; }
+  .g-2-1 { grid-template-columns: 2.4fr 1fr; }
+}
+
+@media (min-width: 2200px) {
+  .page { padding: 30px 46px; }
+  .g2 { grid-template-columns: repeat(2, 1fr); }
+  .g-2-1 { grid-template-columns: 3fr 1fr; }
+}
+
 @media (max-width: 1180px) {
   .app { grid-template-columns: 200px 1fr; }
   .g3, .g4 { grid-template-columns: 1fr 1fr; }
@@ -427,7 +440,9 @@ table.dt td.r, table.dt th.r { text-align: right; }
   .g4 { grid-template-columns: 1fr 1fr; }
   .page { padding: 16px; }
   .search { display: none; }
-  table.dt th { position: static; }
+  /* Now the container may scroll — there is no sticky header left to break
+   * and a squeezed security log is harder to read than a scrolled one. */
+  .panel .body.tight { overflow-x: auto; }
 }
 
 @media (max-width: 640px) {
