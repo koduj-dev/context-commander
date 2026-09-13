@@ -1,4 +1,5 @@
 import { LOCALES, LOCALE_NAMES, useI18n, useT } from "../i18n";
+import { useCrumbs } from "../app/crumbs";
 import { useAuth } from "../app/auth";
 import { useFormat, usePrefs } from "../app/prefs";
 import { principalName } from "../lib/api";
@@ -33,6 +34,7 @@ import {
  */
 export function Preferences() {
   const t = useT();
+  useCrumbs("preferences", () => ({ path: [], current: t("prefs.title") }));
   const f = useFormat();
   const { locale, setLocale } = useI18n();
   const { prefs, setPrefs } = usePrefs();
@@ -41,10 +43,14 @@ export function Preferences() {
   // A fixed instant, so the previews do not shuffle while someone reads them.
   const sample = "2026-09-13T12:05:22Z";
   const deviceZone = fmt.localTimeZone();
-  const zones = Array.from(new Set(["", "UTC", deviceZone, "Europe/Prague", "Europe/Berlin", "America/New_York"]));
+  const zones = Array.from(
+    new Set(["", "UTC", deviceZone, "Europe/Prague", "Europe/Berlin", "America/New_York"]),
+  );
 
-  const withOrder = (order: fmt.DateOrder) => fmt.date(sample, locale, order, prefs.timeZone || undefined);
-  const withCycle = (cycle: fmt.HourCycle) => fmt.time(sample, locale, cycle, prefs.timeZone || undefined);
+  const withOrder = (order: fmt.DateOrder) =>
+    fmt.date(sample, locale, order, prefs.timeZone || undefined);
+  const withCycle = (cycle: fmt.HourCycle) =>
+    fmt.time(sample, locale, cycle, prefs.timeZone || undefined);
   const withUnits = (units: fmt.UnitSystem) => fmt.bytes(2_400_000_000, locale, units);
 
   return (
@@ -62,7 +68,11 @@ export function Preferences() {
       <Grid cols={2}>
         <Stack>
           <Panel title={t("prefs.section.language")} tight>
-            <Pref title={t("prefs.language")} help={t("prefs.languageHelp")} preview={LOCALE_NAMES[locale]}>
+            <Pref
+              title={t("prefs.language")}
+              help={t("prefs.languageHelp")}
+              preview={LOCALE_NAMES[locale]}
+            >
               <SelectField
                 label={t("prefs.language")}
                 value={locale}

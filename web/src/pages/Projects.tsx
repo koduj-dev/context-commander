@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useT } from "../i18n";
+import { useCrumbs } from "../app/crumbs";
 import { api, type MyProject } from "../lib/api";
 import { roleLabel } from "../lib/labels";
 import { useResource } from "../lib/resource";
@@ -27,6 +28,7 @@ import {
  */
 export function Projects() {
   const t = useT();
+  useCrumbs("projects", () => ({ path: [], current: t("projects.title") }));
   const [filter, setFilter] = useState("");
   const { data, error, loading, reload } = useResource(() => api.myProjects(), []);
 
@@ -81,7 +83,9 @@ export function Projects() {
                   />
                 </td>
                 <td>
-                  <Badge tone={p.role === "OWNER" ? "active" : "neutral"}>{roleLabel(t, p.role)}</Badge>
+                  <Badge tone={p.role === "OWNER" ? "active" : "neutral"}>
+                    {roleLabel(t, p.role)}
+                  </Badge>
                 </td>
               </tr>
             ))}
@@ -95,4 +99,3 @@ export function Projects() {
 function path(p: MyProject) {
   return `${p.namespace}/${p.slug}`;
 }
-

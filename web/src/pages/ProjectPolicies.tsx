@@ -10,6 +10,7 @@ import {
   ErrorState,
   Loading,
   Mono,
+  PageHead,
   Panel,
   Scope,
 } from "../ui";
@@ -37,49 +38,51 @@ export function ProjectPolicies() {
   const bindings = data ?? [];
 
   return (
-    <Panel title={t("gates.title")} tight>
-      <p className="sec lead-out">{t("gates.lead")}</p>
+    <>
+      <PageHead title={t("gates.title")} lead={t("gates.lead")} />
 
-      {loading ? (
-        <Loading />
-      ) : error ? (
-        <ErrorState error={error} onRetry={reload} />
-      ) : bindings.length === 0 ? (
-        <EmptyState title={t("gates.empty")} body={t("gates.emptyBody")} />
-      ) : (
-        <DataTable
-          columns={[
-            { key: "gate", label: t("gates.column.gate") },
-            { key: "hook", label: t("gates.column.hook") },
-            { key: "scope", label: t("gates.column.scope") },
-            { key: "state", label: t("gates.column.enabled"), align: "r" },
-          ]}
-        >
-          {bindings.map((b) => (
-            <tr key={b.id}>
-              <td>
-                <Mono>{b.gate_name}</Mono>
-                {b.config !== null && b.config !== undefined && (
-                  <div className="sub-line">
-                    <Code>{JSON.stringify(b.config)}</Code>
-                  </div>
-                )}
-              </td>
-              <td>
-                <Mono dim>{b.hook}</Mono>
-              </td>
-              <td>
-                <Scope kind={b.scope}>{scopeLabel(t, b.scope)}</Scope>
-              </td>
-              <td className="r">
-                <Badge tone={b.enabled ? "ok" : "neutral"}>
-                  {b.enabled ? t("gates.enabled") : t("gates.disabled")}
-                </Badge>
-              </td>
-            </tr>
-          ))}
-        </DataTable>
-      )}
-    </Panel>
+      <Panel title={t("gates.title")} tight>
+        {loading ? (
+          <Loading />
+        ) : error ? (
+          <ErrorState error={error} onRetry={reload} />
+        ) : bindings.length === 0 ? (
+          <EmptyState title={t("gates.empty")} body={t("gates.emptyBody")} />
+        ) : (
+          <DataTable
+            columns={[
+              { key: "gate", label: t("gates.column.gate") },
+              { key: "hook", label: t("gates.column.hook") },
+              { key: "scope", label: t("gates.column.scope") },
+              { key: "state", label: t("gates.column.enabled"), align: "r" },
+            ]}
+          >
+            {bindings.map((b) => (
+              <tr key={b.id}>
+                <td>
+                  <Mono>{b.gate_name}</Mono>
+                  {b.config !== null && b.config !== undefined && (
+                    <div className="sub-line">
+                      <Code>{JSON.stringify(b.config)}</Code>
+                    </div>
+                  )}
+                </td>
+                <td>
+                  <Mono dim>{b.hook}</Mono>
+                </td>
+                <td>
+                  <Scope kind={b.scope}>{scopeLabel(t, b.scope)}</Scope>
+                </td>
+                <td className="r">
+                  <Badge tone={b.enabled ? "ok" : "neutral"}>
+                    {b.enabled ? t("gates.enabled") : t("gates.disabled")}
+                  </Badge>
+                </td>
+              </tr>
+            ))}
+          </DataTable>
+        )}
+      </Panel>
+    </>
   );
 }

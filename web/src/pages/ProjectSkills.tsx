@@ -10,6 +10,7 @@ import {
   ErrorState,
   Loading,
   Mono,
+  PageHead,
   Panel,
   Scope,
 } from "../ui";
@@ -35,53 +36,55 @@ export function ProjectSkills() {
   const bindings = data ?? [];
 
   return (
-    <Panel
-      title={t("skills.title")}
-      tight
-      right={
-        <Link className="btn btn-sm" to="/registry">
-          {t("skills.browse")}
-        </Link>
-      }
-    >
-      <p className="sec lead-out">{t("skills.lead")}</p>
+    <>
+      <PageHead
+        title={t("skills.title")}
+        lead={t("skills.lead")}
+        actions={
+          <Link className="btn" to="/registry">
+            {t("skills.browse")}
+          </Link>
+        }
+      />
 
-      {loading ? (
-        <Loading />
-      ) : error ? (
-        <ErrorState error={error} onRetry={reload} />
-      ) : bindings.length === 0 ? (
-        <EmptyState title={t("skills.empty")} body={t("skills.emptyBody")} />
-      ) : (
-        <DataTable
-          columns={[
-            { key: "skill", label: t("skills.column.skill") },
-            { key: "scope", label: t("skills.column.livesAt") },
-            { key: "version", label: t("skills.column.version") },
-            { key: "state", label: t("skills.column.state"), align: "r" },
-          ]}
-        >
-          {bindings.map((b) => (
-            <tr key={b.id}>
-              <td>
-                <Mono truncate>{b.skill_id}</Mono>
-              </td>
-              <td>
-                <Scope kind={b.scope}>{scopeLabel(t, b.scope)}</Scope>
-              </td>
-              <td>
-                <Mono dim truncate>
-                  {b.skill_version_id}
-                </Mono>
-              </td>
-              <td className="r">
-                {b.managed && <Badge tone="info">managed</Badge>}{" "}
-                {b.overridable ? null : <Badge tone="warn">locked</Badge>}
-              </td>
-            </tr>
-          ))}
-        </DataTable>
-      )}
-    </Panel>
+      <Panel title={t("skills.title")} tight>
+        {loading ? (
+          <Loading />
+        ) : error ? (
+          <ErrorState error={error} onRetry={reload} />
+        ) : bindings.length === 0 ? (
+          <EmptyState title={t("skills.empty")} body={t("skills.emptyBody")} />
+        ) : (
+          <DataTable
+            columns={[
+              { key: "skill", label: t("skills.column.skill") },
+              { key: "scope", label: t("skills.column.livesAt") },
+              { key: "version", label: t("skills.column.version") },
+              { key: "state", label: t("skills.column.state"), align: "r" },
+            ]}
+          >
+            {bindings.map((b) => (
+              <tr key={b.id}>
+                <td>
+                  <Mono truncate>{b.skill_id}</Mono>
+                </td>
+                <td>
+                  <Scope kind={b.scope}>{scopeLabel(t, b.scope)}</Scope>
+                </td>
+                <td>
+                  <Mono dim truncate>
+                    {b.skill_version_id}
+                  </Mono>
+                </td>
+                <td className="r">
+                  {b.managed && <Badge tone="info">managed</Badge>}{" "}
+                  {b.overridable ? null : <Badge tone="warn">locked</Badge>}
+                </td>
+              </tr>
+            ))}
+          </DataTable>
+        )}
+      </Panel>
+    </>
   );
 }

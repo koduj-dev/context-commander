@@ -9,10 +9,12 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "test": "npm run design:check && npm run i18n:check && vitest run",
+    "test": "npm run format:check && npm run design:check && npm run i18n:check && vitest run",
     "i18n:check": "node scripts/check-translations.mjs",
     "design:check": "node scripts/check-design-sync.mjs",
-    "test:unit": "vitest run"
+    "test:unit": "vitest run",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \"scripts/*.mjs\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\" \"scripts/*.mjs\""
   },
   "dependencies": {
     "react": "^19.2.8",
@@ -24,6 +26,7 @@
     "@types/react-dom": "^19.2.4",
     "@vitejs/plugin-react": "^6.1.1",
     "happy-dom": "^20.12.0",
+    "prettier": "^3.9.6",
     "typescript": "^7.0.2",
     "vite": "^8.2.2",
     "vitest": "^4.1.11"

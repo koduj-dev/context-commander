@@ -282,8 +282,7 @@ export const es: Partial<Record<MessageKey, string>> = {
   "admin.column.granted": "Concedido",
   "admin.column.grantedBy": "Concedido por",
   "admin.createUser": "Crear una cuenta",
-  "admin.createUserLead":
-    "Una persona que puede tener un token y ser añadida a proyectos.",
+  "admin.createUserLead": "Una persona que puede tener un token y ser añadida a proyectos.",
   "admin.email": "Correo electrónico",
   "admin.displayName": "Nombre visible",
   "admin.createService": "Crear un principal de servicio",
@@ -297,8 +296,12 @@ export const es: Partial<Record<MessageKey, string>> = {
     "Los tokens emitidos a un principal. Pegue un UUID de principal para consultarlos.",
   "admin.lookup": "Consultar",
   "admin.security": "Registro de seguridad",
+  "admin.identitiesLead":
+    "Aquí se crean las identidades de las que cuelga todo lo demás. Nada en la API enumera cuentas ni principals de servicio, así que esta página los crea y muestra lo que acaba de crear — no tiene ningún directorio que enseñarle.",
   "admin.securityLead":
-    "Las denegaciones y lo que ocurre a su alrededor, separadas a propósito de la auditoría de proyecto: una denegación trata a menudo de un proyecto que quien la provoca ni siquiera puede ver, y el patrón que de verdad importa — una credencial tanteando varios proyectos — es invisible desde dentro de cualquiera de ellos.",
+    "Lo que el servidor rechazó: un token que no se resolvió, una capacidad denegada, una llamada limitada. Separado a propósito de la auditoría de proyecto — una denegación trata a menudo de un proyecto que quien la provoca ni siquiera puede ver, y el patrón que de verdad importa, una credencial tanteando varios proyectos, es invisible desde dentro de cualquiera de ellos.",
+  "admin.securityNote":
+    "Un inicio de sesión correcto no es un rechazo y no se registra aquí. Lo último que hizo una credencial está en el propio token, como su hora de último uso.",
   "admin.column.kind": "Tipo",
   "admin.column.reason": "Motivo",
   "admin.column.capability": "Capacidad",
@@ -342,8 +345,7 @@ export const es: Partial<Record<MessageKey, string>> = {
   "artifacts.column.size": "Tamaño",
   "artifacts.column.hash": "Hash del contenido",
   "artifacts.empty": "Todavía no hay artefactos",
-  "artifacts.emptyBody":
-    "El primero aparece cuando un agente escribe por la API, la CLI o MCP.",
+  "artifacts.emptyBody": "El primero aparece cuando un agente escribe por la API, la CLI o MCP.",
   "artifacts.history": "Versiones",
   "artifacts.content": "Contenido",
   "artifacts.select": "Seleccione un artefacto",

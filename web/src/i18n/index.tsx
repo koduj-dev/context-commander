@@ -1,11 +1,4 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useMemo,
-  useState,
-  type ReactNode,
-} from "react";
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 import { en, type MessageKey } from "./en";
 
 /**
@@ -71,8 +64,7 @@ export function render(template: string, values: Values, locale: Locale): string
       for (let m = formRe.exec(body); m; m = formRe.exec(body)) {
         forms.set(m[1]!, m[2]!);
       }
-      const chosen =
-        forms.get(`=${n}`) ?? forms.get(plural.select(n)) ?? forms.get("other") ?? "";
+      const chosen = forms.get(`=${n}`) ?? forms.get(plural.select(n)) ?? forms.get("other") ?? "";
       return chosen.replace(/#/g, number.format(n));
     },
   );

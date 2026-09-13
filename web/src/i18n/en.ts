@@ -40,8 +40,7 @@ export const en = {
   "auth.submit": "Sign in",
   "auth.failed": "That token was not accepted.",
   "auth.signedInAs": "Signed in as {name}",
-  "auth.sameToken":
-    "The same token a CLI or an MCP client uses. There is no separate web session.",
+  "auth.sameToken": "The same token a CLI or an MCP client uses. There is no separate web session.",
   "auth.indistinct":
     "A token that has been revoked and one that never existed read the same here. Saying which is which would tell whoever is holding a stolen token that half their guess was right.",
 
@@ -71,7 +70,8 @@ export const en = {
   "error.unavailable.title": "The server is not responding",
   "error.unavailable.body": "Nothing was changed. Try again in a moment.",
   "error.rateLimited.title": "Too many requests",
-  "error.rateLimited.body": "This credential is making requests too quickly. Wait a moment and retry.",
+  "error.rateLimited.body":
+    "This credential is making requests too quickly. Wait a moment and retry.",
   "error.generic.title": "Something went wrong",
 
   "empty.noResults": "Nothing matches that",
@@ -88,7 +88,8 @@ export const en = {
   "dashboard.noneWaitingBody": "No open handoffs, no refusals worth a look.",
 
   "projects.title": "Projects",
-  "projects.lead": "Every project you can act in. The path is how people say it; the UUID is what the system means.",
+  "projects.lead":
+    "Every project you can act in. The path is how people say it; the UUID is what the system means.",
   "projects.filter": "Filter projects…",
   "projects.column.project": "Project",
   "projects.column.namespace": "Namespace",
@@ -237,17 +238,23 @@ export const en = {
   "admin.description": "Description",
   "admin.created": "Created {name}",
   "admin.credentials": "Credentials",
-  "admin.credentialsLead": "Tokens issued to one principal. Paste a principal UUID to look them up.",
+  "admin.credentialsLead":
+    "Tokens issued to one principal. Paste a principal UUID to look them up.",
   "admin.lookup": "Look up",
   "admin.security": "Security log",
+  "admin.identitiesLead":
+    "Creating the identities everything else hangs off. Nothing in the API lists users or service principals, so this page creates them and shows what it just created — it has no directory to show you.",
   "admin.securityLead":
-    "Refusals and the events around them, kept apart from project audit on purpose: a refusal is often about a project the caller cannot see, and the pattern worth catching — one credential probing several projects — is invisible from inside any one of them.",
+    "What the server refused: a token that did not resolve, a capability denied, a caller throttled. Kept apart from project audit on purpose — a refusal is often about a project the caller cannot even see, and the pattern worth catching, one credential probing several projects, is invisible from inside any one of them.",
+  "admin.securityNote":
+    "A successful sign-in is not a refusal and is not recorded here. What a credential last did is on the token itself, as its last-used time.",
   "admin.column.kind": "Kind",
   "admin.column.reason": "Reason",
   "admin.column.capability": "Capability",
   "admin.column.credential": "Credential",
   "admin.securityEmpty": "Nothing recorded",
-  "admin.securityEmptyBody": "No refusals, no unknown credentials, nothing to look at. That is the good case.",
+  "admin.securityEmptyBody":
+    "No refusals, no unknown credentials, nothing to look at. That is the good case.",
 
   "tokens.title": "Access tokens",
   "tokens.lead":
@@ -276,10 +283,10 @@ export const en = {
     "Revoke this credential? Anything still using it stops working immediately.",
 
   "prefs.title": "Preferences",
-  "prefs.lead":
-    "How this installation speaks to you. These follow your account, not this browser.",
+  "prefs.lead": "How this installation speaks to you. These follow your account, not this browser.",
   "prefs.language": "Interface language",
-  "prefs.languageHelp": "Everything the product writes. Content other people wrote is never translated.",
+  "prefs.languageHelp":
+    "Everything the product writes. Content other people wrote is never translated.",
   "prefs.dateFormat": "Date format",
   "prefs.timeFormat": "Time format",
   "prefs.timeZone": "Time zone",
@@ -293,11 +300,13 @@ export const en = {
   "prefs.section.language": "Language",
   "prefs.section.dates": "Dates and time",
   "prefs.section.numbers": "Numbers and units",
-  "prefs.dateFormatHelp": "How a calendar date is written. 03-09-2026 means two different days depending on who reads it.",
+  "prefs.dateFormatHelp":
+    "How a calendar date is written. 03-09-2026 means two different days depending on who reads it.",
   "prefs.timeFormatHelp": "Clock convention.",
   "prefs.timeZoneHelp": "Timestamps are stored in UTC and shown in this zone.",
   "prefs.showUTCHelp": "For audit and security screens, where a shared reference matters.",
-  "prefs.storageUnitsHelp": "How byte counts are written. The stored value never changes — only how it reads.",
+  "prefs.storageUnitsHelp":
+    "How byte counts are written. The stored value never changes — only how it reads.",
   "prefs.date.locale": "Follow language",
   "prefs.date.ymd": "YYYY-MM-DD",
   "prefs.date.dmy": "DD-MM-YYYY",
@@ -356,7 +365,8 @@ export const en = {
   "secrets.emptyBody": "Add one here, or with the CLI.",
   "secrets.neverShown":
     "The value is written once and is never readable again, by anyone, through any adapter. Deleting and re-adding is the only way to change one.",
-  "secrets.confirmDelete": "Delete the secret {name}? Anything using its reference will start failing.",
+  "secrets.confirmDelete":
+    "Delete the secret {name}? Anything using its reference will start failing.",
 
   "gates.title": "Policies",
   "gates.lead":
@@ -387,10 +397,12 @@ export const en = {
 
   "registry.livesAt": "Lives at",
   "registry.empty": "The catalogue is empty",
-  "registry.emptyBody": "Publish a skill from a project, or promote one onto the installation shelf.",
+  "registry.emptyBody":
+    "Publish a skill from a project, or promote one onto the installation shelf.",
 
   "activity.empty": "Nothing has happened here yet",
-  "activity.emptyBody": "Reads and writes through the API, the CLI and MCP all land on this timeline.",
+  "activity.emptyBody":
+    "Reads and writes through the API, the CLI and MCP all land on this timeline.",
 } as const;
 
 export type MessageKey = keyof typeof en;

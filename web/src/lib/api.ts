@@ -424,9 +424,7 @@ export const api = {
   // Content is served as application/octet-stream with the version in a
   // header, so it does not go through request<T>'s JSON path.
   artifactContent: async (ns: string, slug: string, path: string, version?: number) => {
-    const res = await raw(
-      withQuery(`${project(ns, slug)}/artifacts/content`, { path, version }),
-    );
+    const res = await raw(withQuery(`${project(ns, slug)}/artifacts/content`, { path, version }));
     return {
       version: Number(res.headers.get("X-Artifact-Version") ?? 0),
       hash: res.headers.get("X-Content-Hash") ?? "",

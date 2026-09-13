@@ -85,7 +85,10 @@ export function SignIn() {
             />
           </div>
 
-          <Panel title={t("auth.title")} footer={<span className="dim">{t("auth.sameToken")}</span>}>
+          <Panel
+            title={t("auth.title")}
+            footer={<span className="dim">{t("auth.sameToken")}</span>}
+          >
             <p className="sec lead-out">{t("auth.lead", { command: "ccd token create" })}</p>
             <Code>ccd token create --name "web ui"</Code>
 

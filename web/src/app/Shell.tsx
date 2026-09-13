@@ -2,6 +2,7 @@ import { NavLink, Outlet, Link } from "react-router-dom";
 import { useI18n, useT } from "../i18n";
 import { principalName } from "../lib/api";
 import { useAuth } from "./auth";
+import { useCrumbsValue } from "./crumbs";
 import { useTheme } from "./theme";
 
 /**
@@ -16,7 +17,16 @@ import { useTheme } from "./theme";
 type IconProps = { d: string };
 function Icon({ d }: IconProps) {
   return (
-    <svg className="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg
+      className="ico"
+      viewBox="0 0 18 18"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
       <path d={d} />
     </svg>
   );
@@ -27,8 +37,10 @@ const ICONS = {
   projects: "M2 5.5h5l1.2 1.5H16V14H2zM2 5.5V3.5h4l1 1.5",
   organizations: "M3 15V4.5h5V15M11 15V7.5h4V15M2 15h14M5 7h1M5 9.5h1M13 10h1",
   registry: "M4 3.5h8l2 2.5v9H4zM6 7h6M6 9.5h6M6 12h4",
-  administration: "M9 2.5 3.5 5v4.2c0 3 2.3 5.2 5.5 6.3 3.2-1.1 5.5-3.3 5.5-6.3V5z M6.8 9l1.6 1.6L11.6 7",
-  tokens: "M11.5 3.5a3.5 3.5 0 1 0-3.3 4.6L4 12.3V15h2.7l.7-.7v-1.4h1.4l.9-.9v-1.4h1.4l.7-.7a3.5 3.5 0 0 0-.3-6.4M12 6h.01",
+  administration:
+    "M9 2.5 3.5 5v4.2c0 3 2.3 5.2 5.5 6.3 3.2-1.1 5.5-3.3 5.5-6.3V5z M6.8 9l1.6 1.6L11.6 7",
+  tokens:
+    "M11.5 3.5a3.5 3.5 0 1 0-3.3 4.6L4 12.3V15h2.7l.7-.7v-1.4h1.4l.9-.9v-1.4h1.4l.7-.7a3.5 3.5 0 0 0-.3-6.4M12 6h.01",
 };
 
 function initials(name: string) {
@@ -45,6 +57,7 @@ export function Shell() {
   const { locale, setLocale } = useI18n();
   const { theme, setTheme } = useTheme();
   const { me } = useAuth();
+  const crumbs = useCrumbsValue();
 
   return (
     <div className="app">
@@ -92,7 +105,10 @@ export function Shell() {
           {me?.is_installation_admin && (
             <>
               <div className="nav-label">{t("nav.installation")}</div>
-              <NavLink to="/administration" className={({ isActive }) => (isActive ? "active" : "")}>
+              <NavLink
+                to="/administration"
+                className={({ isActive }) => (isActive ? "active" : "")}
+              >
                 <Icon d={ICONS.administration} />
                 <span>{t("nav.administration")}</span>
               </NavLink>
@@ -113,11 +129,24 @@ export function Shell() {
 
       <div className="main">
         <div className="topbar">
-          <div className="crumbs" id="crumbs" />
+          <div className="crumbs">
+            {crumbs?.path.map((part, i) => (
+              <span key={i}>
+                {part}
+                <span className="sep">/</span>
+              </span>
+            ))}
+            {crumbs && <b>{crumbs.current}</b>}
+          </div>
           <div className="spacer" />
           <span className="seg" role="group" aria-label={t("prefs.language")}>
             {(["en", "de", "es"] as const).map((l) => (
-              <button key={l} type="button" aria-pressed={l === locale} onClick={() => setLocale(l)}>
+              <button
+                key={l}
+                type="button"
+                aria-pressed={l === locale}
+                onClick={() => setLocale(l)}
+              >
                 {l.toUpperCase()}
               </button>
             ))}
@@ -126,7 +155,11 @@ export function Shell() {
             <button type="button" aria-pressed={theme === "dark"} onClick={() => setTheme("dark")}>
               {t("theme.dark")}
             </button>
-            <button type="button" aria-pressed={theme === "light"} onClick={() => setTheme("light")}>
+            <button
+              type="button"
+              aria-pressed={theme === "light"}
+              onClick={() => setTheme("light")}
+            >
               {t("theme.light")}
             </button>
           </span>

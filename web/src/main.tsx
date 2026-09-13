@@ -4,6 +4,7 @@ import { BrowserRouter } from "react-router-dom";
 import { App } from "./App";
 import { I18nProvider } from "./i18n";
 import { AuthProvider } from "./app/auth";
+import { CrumbsProvider } from "./app/crumbs";
 import { PrefsProvider } from "./app/prefs";
 import { ThemeProvider } from "./app/theme";
 import "./styles/app.css";
@@ -18,7 +19,9 @@ createRoot(root).render(
         <ThemeProvider>
           <AuthProvider>
             <BrowserRouter>
-              <App />
+              <CrumbsProvider>
+                <App />
+              </CrumbsProvider>
             </BrowserRouter>
           </AuthProvider>
         </ThemeProvider>

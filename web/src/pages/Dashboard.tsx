@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { useT } from "../i18n";
+import { useCrumbs } from "../app/crumbs";
 import { useAuth } from "../app/auth";
 import { useFormat } from "../app/prefs";
 import { api, principalName } from "../lib/api";
@@ -32,6 +33,7 @@ import {
  */
 export function Dashboard() {
   const t = useT();
+  useCrumbs("dashboard", () => ({ path: [], current: t("dashboard.title") }));
   const f = useFormat();
   const { me } = useAuth();
   const { data, error, loading, reload } = useResource(() => api.myProjects(), []);
@@ -48,7 +50,11 @@ export function Dashboard() {
 
       <Grid cols="2-1">
         <Stack>
-          <Panel title={t("dashboard.yourProjects")} sub={t("projects.count", { count: projects.length })} tight>
+          <Panel
+            title={t("dashboard.yourProjects")}
+            sub={t("projects.count", { count: projects.length })}
+            tight
+          >
             {loading ? (
               <Loading />
             ) : error ? (
@@ -71,7 +77,9 @@ export function Dashboard() {
                       />
                     </td>
                     <td>
-                      <Badge tone={p.role === "OWNER" ? "active" : "neutral"}>{roleLabel(t, p.role)}</Badge>
+                      <Badge tone={p.role === "OWNER" ? "active" : "neutral"}>
+                        {roleLabel(t, p.role)}
+                      </Badge>
                     </td>
                   </tr>
                 ))}

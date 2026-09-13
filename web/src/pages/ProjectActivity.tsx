@@ -12,6 +12,7 @@ import {
   Loading,
   Mono,
   Pager,
+  PageHead,
   Panel,
 } from "../ui";
 import { useProject } from "./ProjectLayout";
@@ -29,17 +30,21 @@ export function ProjectActivity() {
 
   return (
     <>
-      <div className="mb">
-        <Seg
-          label={t("activity.title")}
-          value={view}
-          onChange={setView}
-          options={[
-            { value: "audit", label: t("activity.title") },
-            { value: "events", label: t("events.title") },
-          ]}
-        />
-      </div>
+      <PageHead
+        title={view === "audit" ? t("activity.title") : t("events.title")}
+        lead={view === "audit" ? t("activity.lead") : t("events.lead")}
+        actions={
+          <Seg
+            label={t("activity.title")}
+            value={view}
+            onChange={setView}
+            options={[
+              { value: "audit", label: t("activity.title") },
+              { value: "events", label: t("events.title") },
+            ]}
+          />
+        }
+      />
       {view === "audit" ? <AuditView /> : <EventsView />}
     </>
   );
@@ -50,10 +55,7 @@ function AuditView() {
   const f = useFormat();
   const { namespace, slug } = useProject();
 
-  const list = useList(
-    (cursor) => api.audit(namespace, slug, cursor),
-    [namespace, slug],
-  );
+  const list = useList((cursor) => api.audit(namespace, slug, cursor), [namespace, slug]);
 
   return (
     <Panel
@@ -68,8 +70,6 @@ function AuditView() {
         />
       }
     >
-      <p className="sec lead-out">{t("activity.lead")}</p>
-
       {list.loading ? (
         <Loading />
       ) : list.error ? (
@@ -108,7 +108,9 @@ function AuditView() {
                 </Mono>
               </td>
               <td>
-                <span className="dim">{r.actor_email ?? r.principal_id ?? t("common.unknown")}</span>
+                <span className="dim">
+                  {r.actor_email ?? r.principal_id ?? t("common.unknown")}
+                </span>
               </td>
               <td className="r">
                 <ResultBadge result={r.result} />
@@ -148,8 +150,6 @@ function EventsView() {
         />
       }
     >
-      <p className="sec lead-out">{t("events.lead")}</p>
-
       {list.loading ? (
         <Loading />
       ) : list.error ? (

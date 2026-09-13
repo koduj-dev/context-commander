@@ -52,8 +52,18 @@ export function Scope({ kind, children }: { kind: string; children?: ReactNode }
   return <span className={SCOPE_CLASS[kind] ?? "scope"}>{children ?? kind}</span>;
 }
 
-export function Mono({ children, truncate, dim }: { children: ReactNode; truncate?: boolean; dim?: boolean }) {
-  return <span className={`mono${truncate ? " truncate" : ""}${dim ? " dim" : ""}`}>{children}</span>;
+export function Mono({
+  children,
+  truncate,
+  dim,
+}: {
+  children: ReactNode;
+  truncate?: boolean;
+  dim?: boolean;
+}) {
+  return (
+    <span className={`mono${truncate ? " truncate" : ""}${dim ? " dim" : ""}`}>{children}</span>
+  );
 }
 
 export function Cell({ primary, secondary }: { primary: ReactNode; secondary?: ReactNode }) {
@@ -65,7 +75,17 @@ export function Cell({ primary, secondary }: { primary: ReactNode; secondary?: R
   );
 }
 
-export function Kpi({ value, label, unit, tone }: { value: ReactNode; label: ReactNode; unit?: string; tone?: "warn" }) {
+export function Kpi({
+  value,
+  label,
+  unit,
+  tone,
+}: {
+  value: ReactNode;
+  label: ReactNode;
+  unit?: string;
+  tone?: "warn";
+}) {
   return (
     <div className="kpi">
       <span className={`v${tone === "warn" ? " v-warn" : ""}`}>
@@ -86,7 +106,13 @@ export function Meter({ percent, tone }: { percent: number; tone?: "warn" | "dan
   );
 }
 
-export function Note({ children, tone }: { children: ReactNode; tone?: "warn" | "danger" | "info" }) {
+export function Note({
+  children,
+  tone,
+}: {
+  children: ReactNode;
+  tone?: "warn" | "danger" | "info";
+}) {
   return <div className={`note${tone ? " " + tone : ""}`}>{children}</div>;
 }
 
@@ -113,7 +139,15 @@ type BtnProps = {
   type?: "button" | "submit";
 };
 
-export function Btn({ children, kind, small, disabled, title, onClick, type = "button" }: BtnProps) {
+export function Btn({
+  children,
+  kind,
+  small,
+  disabled,
+  title,
+  onClick,
+  type = "button",
+}: BtnProps) {
   const cls = ["btn", kind && `btn-${kind}`, small && "btn-sm"].filter(Boolean).join(" ");
   return (
     <button className={cls} disabled={disabled} title={title} onClick={onClick} type={type}>
@@ -136,7 +170,12 @@ export function Seg<T extends string>({
   return (
     <span className="seg" role="group" aria-label={label}>
       {options.map((o) => (
-        <button key={o.value} type="button" aria-pressed={o.value === value} onClick={() => onChange(o.value)}>
+        <button
+          key={o.value}
+          type="button"
+          aria-pressed={o.value === value}
+          onClick={() => onChange(o.value)}
+        >
           {o.label}
         </button>
       ))}
@@ -241,7 +280,9 @@ export function Pager({
   return (
     <div className="pager">
       <span className="count">
-        {hasMore ? t("common.showingMore", { count: shown }) : t("common.showingAll", { count: shown })}
+        {hasMore
+          ? t("common.showingMore", { count: shown })
+          : t("common.showingAll", { count: shown })}
       </span>
       <span className="spacer" />
       {hasMore ? (
@@ -365,20 +406,6 @@ export function Tabs({ label, children }: { label: string; children: ReactNode }
   );
 }
 
-export function Crumbs({ trail, current }: { trail: ReactNode[]; current: ReactNode }) {
-  return (
-    <div className="crumbs">
-      {trail.map((part, i) => (
-        <span key={i}>
-          {part}
-          <span className="sep">/</span>
-        </span>
-      ))}
-      <b>{current}</b>
-    </div>
-  );
-}
-
 // ---------------------------------------------------------------- inputs
 
 export function TextField({
@@ -420,7 +447,12 @@ export function SelectField<T extends string>({
   label: string;
 }) {
   return (
-    <select className="field" value={value} aria-label={label} onChange={(e) => onChange(e.target.value as T)}>
+    <select
+      className="field"
+      value={value}
+      aria-label={label}
+      onChange={(e) => onChange(e.target.value as T)}
+    >
       {options.map((o) => (
         <option key={o.value} value={o.value}>
           {o.label}

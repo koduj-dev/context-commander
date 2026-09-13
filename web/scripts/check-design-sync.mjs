@@ -36,15 +36,18 @@ const SRC = join(here, "..", "src");
 
 /** Classes that exist only to frame a mockup and have no place in the app. */
 const MOCKUP_ONLY = new Set([
-  "mockbar", "tag",           // the "this is a mockup" strip
-  "swatches", "sw", "chip", "meta",  // the colour specimen grid
-  "specimen", "spec-note",           // type and component specimens
+  "mockbar",
+  "tag", // the "this is a mockup" strip
+  "swatches",
+  "sw",
+  "chip",
+  "meta", // the colour specimen grid
+  "specimen",
+  "spec-note", // type and component specimens
 ]);
 
 /** Inline styles that are data rather than styling, and why. */
-const INLINE_STYLE_ALLOWED = new Map([
-  ["Meter", "the fill width IS the value being displayed"],
-]);
+const INLINE_STYLE_ALLOWED = new Map([["Meter", "the fill width IS the value being displayed"]]);
 
 const failures = [];
 const notes = [];
@@ -71,7 +74,10 @@ if (missing.length) {
 }
 
 // 2 — colour comes from the brand tokens, never from a literal
-for (const [label, css] of [["docs/mockups/assets/mockup.css", mockupCss], ["web/src/styles/app.css", appCss]]) {
+for (const [label, css] of [
+  ["docs/mockups/assets/mockup.css", mockupCss],
+  ["web/src/styles/app.css", appCss],
+]) {
   const hex = [...css.matchAll(/#[0-9a-fA-F]{3,8}\b/g)].map((m) => m[0]);
   if (hex.length) {
     failures.push(
@@ -111,7 +117,10 @@ for await (const file of walk(SRC)) {
 
   for (const m of src.matchAll(/style=\{\{/g)) {
     void m;
-    const component = rel.split("/").pop().replace(/\.tsx?$/, "");
+    const component = rel
+      .split("/")
+      .pop()
+      .replace(/\.tsx?$/, "");
     const allowedFor = [...INLINE_STYLE_ALLOWED.keys()].some((k) => src.includes(`function ${k}(`));
     if (!allowedFor) inlineStyles.push(rel);
   }

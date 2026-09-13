@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useT } from "../i18n";
+import { useCrumbs } from "../app/crumbs";
 import { useFormat } from "../app/prefs";
 import { api, type IssuedToken } from "../lib/api";
 import { useResource } from "../lib/resource";
@@ -39,6 +40,7 @@ type ExpiryKey = keyof typeof EXPIRY;
  */
 export function Tokens() {
   const t = useT();
+  useCrumbs("tokens", () => ({ path: [], current: t("tokens.title") }));
   const f = useFormat();
   const { data, error, loading, reload } = useResource(() => api.tokens(), []);
 
@@ -128,7 +130,11 @@ export function Tokens() {
                   </td>
                   <td>
                     <Badge tone={revoked ? "danger" : expired ? "warn" : "ok"}>
-                      {revoked ? t("tokens.revoked") : expired ? t("tokens.expired") : t("tokens.active")}
+                      {revoked
+                        ? t("tokens.revoked")
+                        : expired
+                          ? t("tokens.expired")
+                          : t("tokens.active")}
                     </Badge>
                   </td>
                   <td className="r">
@@ -137,7 +143,9 @@ export function Tokens() {
                     </span>
                   </td>
                   <td className="r">
-                    <span className="dim">{c.expires_at ? f.date(c.expires_at) : t("common.never")}</span>
+                    <span className="dim">
+                      {c.expires_at ? f.date(c.expires_at) : t("common.never")}
+                    </span>
                   </td>
                   <td className="r">
                     {!revoked && (

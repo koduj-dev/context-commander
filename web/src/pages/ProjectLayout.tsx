@@ -1,17 +1,21 @@
 import { createContext, useContext } from "react";
 import { NavLink, Outlet, useParams } from "react-router-dom";
 import { useT } from "../i18n";
+import { useCrumbs } from "../app/crumbs";
 import { api, type Project } from "../lib/api";
 import { useResource } from "../lib/resource";
-import { Crumbs, ErrorState, Loading, Mono, PageHead, Tabs } from "../ui";
+import { ErrorState, Loading, Mono, Tabs } from "../ui";
 
 /**
  * The frame around every project screen.
  *
  * It loads the project once and hands it to the tabs through context, so
- * switching tabs does not re-fetch the same row four times — and so a 403 on
- * the project itself is answered once, here, instead of four times in four
- * different shapes.
+ * switching tabs does not re-fetch the same row, and so a 403 on the project
+ * itself is answered once, here, rather than four times in four shapes.
+ *
+ * The project's own name is not repeated as a page heading: it is in the
+ * breadcrumbs, and each tab's heading names the tab. Two headings stacked on
+ * every screen would say the same thing twice and push the content down.
  */
 
 type Ctx = { project: Project; namespace: string; slug: string };
@@ -31,6 +35,11 @@ export function ProjectLayout() {
     [namespace, slug],
   );
 
+  useCrumbs(`project:${namespace}/${slug}:${data?.name ?? ""}`, () => ({
+    path: [t("nav.projects"), <Mono key="ns">{namespace}</Mono>],
+    current: data?.name ?? slug,
+  }));
+
   if (loading) return <Loading />;
   if (error || !data) return <ErrorState error={error} onRetry={reload} />;
 
@@ -43,10 +52,6 @@ export function ProjectLayout() {
 
   return (
     <ProjectCtx.Provider value={{ project: data, namespace, slug }}>
-      <Crumbs trail={[t("nav.projects"), <Mono key="ns">{namespace}</Mono>]} current={data.name} />
-
-      <PageHead title={data.name} lead={<Mono dim>{`${namespace}/${slug}`}</Mono>} />
-
       <Tabs label={data.name}>
         {tab(base, t("project.tab.overview"), true)}
         {tab(`${base}/artifacts`, t("artifacts.title"))}

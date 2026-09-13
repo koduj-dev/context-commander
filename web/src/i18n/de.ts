@@ -83,7 +83,8 @@ export const de: Partial<Record<MessageKey, string>> = {
   "dashboard.clients": "Verbundene Clients",
   "dashboard.openHandoff": "Offene Übergabe",
   "dashboard.noneWaiting": "Nichts wartet auf Sie",
-  "dashboard.noneWaitingBody": "Keine offenen Übergaben, keine Ablehnungen, die einen Blick lohnen.",
+  "dashboard.noneWaitingBody":
+    "Keine offenen Übergaben, keine Ablehnungen, die einen Blick lohnen.",
   "dashboard.noProjects": "Sie sind noch in keinem Projekt",
   "dashboard.activityHere": "Aktivität erscheint hier, sobald es ein Projekt zu beobachten gibt.",
 
@@ -302,8 +303,12 @@ export const de: Partial<Record<MessageKey, string>> = {
     "Die Token eines Principals. Fügen Sie eine Principal-UUID ein, um sie nachzuschlagen.",
   "admin.lookup": "Nachschlagen",
   "admin.security": "Sicherheitsprotokoll",
+  "admin.identitiesLead":
+    "Hier entstehen die Identitäten, an denen alles andere hängt. Kein Endpunkt der API listet Benutzerkonten oder Dienst-Principals auf, diese Seite legt sie also an und zeigt, was gerade angelegt wurde — ein Verzeichnis kann sie nicht zeigen.",
   "admin.securityLead":
-    "Ablehnungen und was um sie herum geschieht, bewusst getrennt vom Projekt-Audit: eine Ablehnung betrifft oft ein Projekt, das die anfragende Seite gar nicht sehen kann, und das eigentlich interessante Muster — ein Zugangsmerkmal, das mehrere Projekte abklopft — ist aus jedem einzelnen Projekt heraus unsichtbar.",
+    "Was der Server abgelehnt hat: ein Token, das sich nicht auflösen ließ, eine verweigerte Berechtigung, eine gedrosselte Anfrage. Bewusst getrennt vom Projekt-Audit — eine Ablehnung betrifft oft ein Projekt, das die anfragende Seite gar nicht sehen kann, und das eigentlich interessante Muster, ein Zugangsmerkmal, das mehrere Projekte abklopft, ist aus jedem einzelnen Projekt heraus unsichtbar.",
+  "admin.securityNote":
+    "Eine erfolgreiche Anmeldung ist keine Ablehnung und wird hier nicht aufgezeichnet. Wann ein Zugangsmerkmal zuletzt etwas getan hat, steht am Token selbst als Zeitpunkt der letzten Verwendung.",
   "admin.column.kind": "Art",
   "admin.column.reason": "Grund",
   "admin.column.capability": "Berechtigung",
@@ -331,7 +336,8 @@ export const de: Partial<Record<MessageKey, string>> = {
   "tokens.expired": "Abgelaufen",
   "tokens.active": "Aktiv",
   "tokens.empty": "Noch keine Token",
-  "tokens.emptyBody": "Stellen Sie eines aus, um einen Agenten mit dieser Installation zu verbinden.",
+  "tokens.emptyBody":
+    "Stellen Sie eines aus, um einen Agenten mit dieser Installation zu verbinden.",
   "tokens.justIssued": "Kopieren Sie dieses Token jetzt",
   "tokens.justIssuedBody":
     "Gespeichert wird nur sein Hash, dies ist also das einzige Mal, dass es angezeigt werden kann. Dieses Feld zu schließen widerruft es nicht — es bedeutet nur, dass es nie wieder lesbar ist.",

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { useT } from "../i18n";
+import { useCrumbs } from "../app/crumbs";
 import { useFormat } from "../app/prefs";
 import { api } from "../lib/api";
 import { roleLabel } from "../lib/labels";
@@ -42,7 +43,6 @@ export function Administration() {
 
   return (
     <>
-      <PageHead title={t("admin.title")} lead={t("admin.lead")} />
       <Tabs label={t("admin.title")}>
         {tab("/administration", t("admin.tab.overview"), true)}
         {tab("/administration/identities", t("admin.tab.identities"))}
@@ -55,83 +55,95 @@ export function Administration() {
 
 export function AdminOverview() {
   const t = useT();
+  useCrumbs("admin:overview", () => ({
+    path: [t("admin.title")],
+    current: t("admin.tab.overview"),
+  }));
   const f = useFormat();
   const admins = useResource(() => api.installationAdmins(), []);
   const recent = useList((cursor) => api.securityEvents(cursor, 5), []);
 
   return (
-    <Grid cols="2-1">
-      <Stack>
-        <Panel title={t("admin.admins")} tight>
-          <p className="sec lead-out">{t("admin.adminsLead")}</p>
-          {admins.loading ? (
-            <Loading />
-          ) : admins.error ? (
-            <ErrorState error={admins.error} onRetry={admins.reload} />
-          ) : (
-            <DataTable
-              columns={[
-                { key: "user", label: t("admin.column.user") },
-                { key: "role", label: t("admin.column.role") },
-                { key: "granted", label: t("admin.column.granted"), align: "r" },
-              ]}
-            >
-              {(admins.data ?? []).map((a) => (
-                <tr key={a.user_id}>
-                  <td>
-                    <Cell
-                      primary={<Mono truncate>{a.user_id}</Mono>}
-                      secondary={
-                        a.granted_by && (
-                          <Mono dim truncate>
-                            {a.granted_by}
-                          </Mono>
-                        )
-                      }
-                    />
-                  </td>
-                  <td>
-                    <Badge tone="active">{roleLabel(t, a.role)}</Badge>
-                  </td>
-                  <td className="r">
-                    <span className="dim">{f.date(a.granted_at)}</span>
-                  </td>
-                </tr>
-              ))}
-            </DataTable>
-          )}
-        </Panel>
-      </Stack>
+    <>
+      <PageHead title={t("admin.title")} lead={t("admin.lead")} />
 
-      <Stack top>
-        <Panel title={t("admin.security")} tight>
-          {recent.loading ? (
-            <Loading />
-          ) : recent.error ? (
-            <ErrorState error={recent.error} onRetry={recent.reload} />
-          ) : recent.items.length === 0 ? (
-            <EmptyState title={t("admin.securityEmpty")} body={t("admin.securityEmptyBody")} />
-          ) : (
-            <DataTable columns={[{ key: "e" }]}>
-              {recent.items.map((e) => (
-                <tr key={e.id}>
-                  <td>
-                    <Cell
-                      primary={
-                        <>
-                          <Badge tone="danger">{e.kind}</Badge> <span className="dim">{e.reason}</span>
-                        </>
-                      }
-                      secondary={<span className="dim">{f.relative(e.ts)}</span>}
-                    />
-                  </td>
-                </tr>
-              ))}
-            </DataTable>
-          )}
-        </Panel>
-      </Stack>
-    </Grid>
+      <Grid cols="2-1">
+        <Stack>
+          <Panel
+            title={t("admin.admins")}
+            tight
+            footer={<span className="dim">{t("admin.adminsLead")}</span>}
+          >
+            {admins.loading ? (
+              <Loading />
+            ) : admins.error ? (
+              <ErrorState error={admins.error} onRetry={admins.reload} />
+            ) : (
+              <DataTable
+                columns={[
+                  { key: "user", label: t("admin.column.user") },
+                  { key: "role", label: t("admin.column.role") },
+                  { key: "granted", label: t("admin.column.granted"), align: "r" },
+                ]}
+              >
+                {(admins.data ?? []).map((a) => (
+                  <tr key={a.user_id}>
+                    <td>
+                      <Cell
+                        primary={<Mono truncate>{a.user_id}</Mono>}
+                        secondary={
+                          a.granted_by && (
+                            <Mono dim truncate>
+                              {a.granted_by}
+                            </Mono>
+                          )
+                        }
+                      />
+                    </td>
+                    <td>
+                      <Badge tone="active">{roleLabel(t, a.role)}</Badge>
+                    </td>
+                    <td className="r">
+                      <span className="dim">{f.date(a.granted_at)}</span>
+                    </td>
+                  </tr>
+                ))}
+              </DataTable>
+            )}
+          </Panel>
+        </Stack>
+
+        <Stack top>
+          <Panel title={t("admin.security")} tight>
+            {recent.loading ? (
+              <Loading />
+            ) : recent.error ? (
+              <ErrorState error={recent.error} onRetry={recent.reload} />
+            ) : recent.items.length === 0 ? (
+              <EmptyState title={t("admin.securityEmpty")} body={t("admin.securityEmptyBody")} />
+            ) : (
+              <DataTable columns={[{ key: "e" }]}>
+                {recent.items.map((e) => (
+                  <tr key={e.id}>
+                    <td>
+                      <Cell
+                        primary={
+                          <>
+                            <Badge tone="danger">{e.kind}</Badge>{" "}
+                            <span className="dim">{e.reason}</span>
+                          </>
+                        }
+                        secondary={<span className="dim">{f.relative(e.ts)}</span>}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </DataTable>
+            )}
+          </Panel>
+        </Stack>
+      </Grid>
+    </>
   );
 }
 
@@ -144,20 +156,24 @@ export function AdminOverview() {
  */
 export function AdminIdentities() {
   const t = useT();
+  useCrumbs("admin:identities", () => ({
+    path: [t("admin.title")],
+    current: t("admin.tab.identities"),
+  }));
 
   return (
-    <Grid cols={2}>
-      <Stack>
-        <CreateUser />
-        <CreateServicePrincipal />
-      </Stack>
-      <Stack>
-        <CredentialLookup />
-        <Panel title={t("project.notBuilt.title")}>
-          <Note tone="info">{t("admin.adminsLead")}</Note>
-        </Panel>
-      </Stack>
-    </Grid>
+    <>
+      <PageHead title={t("admin.tab.identities")} lead={t("admin.identitiesLead")} />
+      <Grid cols={2}>
+        <Stack>
+          <CreateUser />
+          <CreateServicePrincipal />
+        </Stack>
+        <Stack>
+          <CredentialLookup />
+        </Stack>
+      </Grid>
+    </>
   );
 }
 
@@ -189,8 +205,20 @@ function CreateUser() {
     <Panel title={t("admin.createUser")}>
       <p className="sec lead-out">{t("admin.createUserLead")}</p>
       <Row gap="sm">
-        <TextField label={t("admin.email")} value={email} onChange={setEmail} placeholder={t("admin.email")} grow />
-        <TextField label={t("admin.displayName")} value={name} onChange={setName} placeholder={t("admin.displayName")} grow />
+        <TextField
+          label={t("admin.email")}
+          value={email}
+          onChange={setEmail}
+          placeholder={t("admin.email")}
+          grow
+        />
+        <TextField
+          label={t("admin.displayName")}
+          value={name}
+          onChange={setName}
+          placeholder={t("admin.displayName")}
+          grow
+        />
         <Btn kind="primary" onClick={() => void submit()} disabled={busy || !email.trim()}>
           {busy ? t("common.loading") : t("admin.createUser")}
         </Btn>
@@ -239,7 +267,13 @@ function CreateServicePrincipal() {
     <Panel title={t("admin.createService")}>
       <p className="sec lead-out">{t("admin.createServiceLead")}</p>
       <Row gap="sm">
-        <TextField label={t("admin.name")} value={name} onChange={setName} placeholder={t("admin.name")} grow />
+        <TextField
+          label={t("admin.name")}
+          value={name}
+          onChange={setName}
+          placeholder={t("admin.name")}
+          grow
+        />
         <TextField
           label={t("admin.description")}
           value={description}
@@ -279,122 +313,144 @@ function CredentialLookup() {
   );
 
   return (
-    <Panel title={t("admin.credentials")} tight>
-      <p className="sec lead-out">{t("admin.credentialsLead")}</p>
-      <Row gap="sm">
-        <TextField
-          label={t("members.column.principal")}
-          value={input}
-          onChange={setInput}
-          placeholder={t("members.principalPlaceholder")}
-          grow
-        />
-        <Btn onClick={() => setPrincipal(input.trim())} disabled={!input.trim()}>
-          {t("admin.lookup")}
-        </Btn>
-      </Row>
+    <>
+      <Panel title={t("admin.credentials")}>
+        <p className="sec lead-out">{t("admin.credentialsLead")}</p>
+        <Row gap="sm">
+          <TextField
+            label={t("members.column.principal")}
+            value={input}
+            onChange={setInput}
+            placeholder={t("members.principalPlaceholder")}
+            grow
+          />
+          <Btn onClick={() => setPrincipal(input.trim())} disabled={!input.trim()}>
+            {t("admin.lookup")}
+          </Btn>
+        </Row>
+      </Panel>
 
-      <div className="mt">
-        {!principal ? null : creds.loading ? (
-          <Loading />
-        ) : creds.error ? (
-          <ErrorState error={creds.error} onRetry={creds.reload} />
-        ) : (creds.data ?? []).length === 0 ? (
-          <EmptyState title={t("tokens.empty")} />
-        ) : (
-          <DataTable
-            columns={[
-              { key: "type", label: t("tokens.column.type") },
-              { key: "used", label: t("tokens.column.lastUsed"), align: "r" },
-            ]}
-          >
-            {(creds.data ?? []).map((c) => (
-              <tr key={c.id}>
-                <td>
-                  <Cell primary={<Mono>{c.client_type}</Mono>} secondary={<Mono dim truncate>{c.id}</Mono>} />
-                </td>
-                <td className="r">
-                  <span className="dim">{c.last_used_at ? f.relative(c.last_used_at) : t("common.never")}</span>
-                </td>
-              </tr>
-            ))}
-          </DataTable>
-        )}
-      </div>
-    </Panel>
+      {principal && (
+        <Panel title={t("tokens.title")} tight>
+          {creds.loading ? (
+            <Loading />
+          ) : creds.error ? (
+            <ErrorState error={creds.error} onRetry={creds.reload} />
+          ) : (creds.data ?? []).length === 0 ? (
+            <EmptyState title={t("tokens.empty")} />
+          ) : (
+            <DataTable
+              columns={[
+                { key: "type", label: t("tokens.column.type") },
+                { key: "used", label: t("tokens.column.lastUsed"), align: "r" },
+              ]}
+            >
+              {(creds.data ?? []).map((c) => (
+                <tr key={c.id}>
+                  <td>
+                    <Cell
+                      primary={<Mono>{c.client_type}</Mono>}
+                      secondary={
+                        <Mono dim truncate>
+                          {c.id}
+                        </Mono>
+                      }
+                    />
+                  </td>
+                  <td className="r">
+                    <span className="dim">
+                      {c.last_used_at ? f.relative(c.last_used_at) : t("common.never")}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </DataTable>
+          )}
+        </Panel>
+      )}
+    </>
   );
 }
 
 export function AdminSecurityLog() {
   const t = useT();
+  useCrumbs("admin:security", () => ({
+    path: [t("admin.title")],
+    current: t("admin.tab.security"),
+  }));
   const f = useFormat();
   const list = useList((cursor) => api.securityEvents(cursor), []);
 
   return (
-    <Panel
-      title={t("admin.security")}
-      tight
-      footer={
-        <Pager
-          shown={list.items.length}
-          hasMore={list.hasMore}
-          onLoadMore={list.loadMore}
-          busy={list.loadingMore}
-        />
-      }
-    >
-      <p className="sec lead-out">{t("admin.securityLead")}</p>
+    <>
+      <PageHead title={t("admin.security")} lead={t("admin.securityLead")} />
 
-      {list.loading ? (
-        <Loading />
-      ) : list.error ? (
-        <ErrorState error={list.error} onRetry={list.reload} />
-      ) : list.items.length === 0 ? (
-        <EmptyState title={t("admin.securityEmpty")} body={t("admin.securityEmptyBody")} />
-      ) : (
-        <DataTable
-          columns={[
-            { key: "time", label: t("activity.column.time") },
-            { key: "kind", label: t("admin.column.kind") },
-            { key: "principal", label: t("activity.column.principal") },
-            { key: "capability", label: t("admin.column.capability") },
-            { key: "reason", label: t("admin.column.reason") },
-          ]}
-        >
-          {list.items.map((e) => (
-            <tr key={e.id}>
-              <td className="nowrap">
-                <span className="dim">{f.stamp(e.ts)}</span>
-                {f.showUTC && (
-                  <>
-                    <br />
-                    <span className="dim">{f.utc(e.ts)}</span>
-                  </>
-                )}
-              </td>
-              <td>
-                <Badge tone="danger">{e.kind}</Badge>
-              </td>
-              <td>
-                <Cell
-                  primary={<Mono truncate>{e.principal_id ?? t("common.unknown")}</Mono>}
-                  secondary={
-                    e.credential_id && (
-                      <Mono dim truncate>
-                        {e.credential_id}
-                      </Mono>
-                    )
-                  }
-                />
-              </td>
-              <td>{e.capability ? <Mono dim>{e.capability}</Mono> : null}</td>
-              <td>
-                <span className="dim">{e.reason}</span>
-              </td>
-            </tr>
-          ))}
-        </DataTable>
-      )}
-    </Panel>
+      <Panel
+        title={t("admin.security")}
+        tight
+        footer={
+          <>
+            <span className="dim">{t("admin.securityNote")}</span>
+            <Pager
+              shown={list.items.length}
+              hasMore={list.hasMore}
+              onLoadMore={list.loadMore}
+              busy={list.loadingMore}
+            />
+          </>
+        }
+      >
+        {list.loading ? (
+          <Loading />
+        ) : list.error ? (
+          <ErrorState error={list.error} onRetry={list.reload} />
+        ) : list.items.length === 0 ? (
+          <EmptyState title={t("admin.securityEmpty")} body={t("admin.securityEmptyBody")} />
+        ) : (
+          <DataTable
+            columns={[
+              { key: "time", label: t("activity.column.time") },
+              { key: "kind", label: t("admin.column.kind") },
+              { key: "principal", label: t("activity.column.principal") },
+              { key: "capability", label: t("admin.column.capability") },
+              { key: "reason", label: t("admin.column.reason") },
+            ]}
+          >
+            {list.items.map((e) => (
+              <tr key={e.id}>
+                <td className="nowrap">
+                  <span className="dim">{f.stamp(e.ts)}</span>
+                  {f.showUTC && (
+                    <>
+                      <br />
+                      <span className="dim">{f.utc(e.ts)}</span>
+                    </>
+                  )}
+                </td>
+                <td>
+                  <Badge tone="danger">{e.kind}</Badge>
+                </td>
+                <td>
+                  <Cell
+                    primary={<Mono truncate>{e.principal_id ?? t("common.unknown")}</Mono>}
+                    secondary={
+                      e.credential_id && (
+                        <Mono dim truncate>
+                          {e.credential_id}
+                        </Mono>
+                      )
+                    }
+                  />
+                </td>
+                <td>{e.capability ? <Mono dim>{e.capability}</Mono> : null}</td>
+                <td>
+                  <span className="dim">{e.reason}</span>
+                </td>
+              </tr>
+            ))}
+          </DataTable>
+        )}
+      </Panel>
+    </>
   );
 }

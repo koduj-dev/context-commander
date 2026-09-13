@@ -16,6 +16,7 @@ import {
   Mono,
   Note,
   Pager,
+  PageHead,
   Panel,
   Stack,
 } from "../ui";
@@ -34,10 +35,7 @@ export function ProjectArtifacts() {
   const [params, setParams] = useSearchParams();
   const selected = params.get("path") ?? "";
 
-  const list = useList(
-    (cursor) => api.artifacts(namespace, slug, cursor),
-    [namespace, slug],
-  );
+  const list = useList((cursor) => api.artifacts(namespace, slug, cursor), [namespace, slug]);
 
   function select(path: string) {
     // `replace` so browsing paths does not build a back-button history of
@@ -46,62 +44,64 @@ export function ProjectArtifacts() {
   }
 
   return (
-    <Grid cols="2-1">
-      <Stack>
-        <Panel
-          title={t("artifacts.title")}
-          sub={list.items.length ? undefined : t("artifacts.empty")}
-          tight
-          footer={
-            <Pager
-              shown={list.items.length}
-              hasMore={list.hasMore}
-              onLoadMore={list.loadMore}
-              busy={list.loadingMore}
-            />
-          }
-        >
-          <p className="sec lead-out">{t("artifacts.lead")}</p>
+    <>
+      <PageHead title={t("artifacts.title")} lead={t("artifacts.lead")} />
 
-          {list.loading ? (
-            <Loading />
-          ) : list.error ? (
-            <ErrorState error={list.error} onRetry={list.reload} />
-          ) : list.items.length === 0 ? (
-            <EmptyState title={t("artifacts.empty")} body={t("artifacts.emptyBody")} />
-          ) : (
-            <DataTable
-              columns={[
-                { key: "path", label: t("artifacts.column.path") },
-                { key: "version", label: t("artifacts.column.version"), align: "r" },
-              ]}
-            >
-              {list.items.map((a) => (
-                <ArtifactRow
-                  key={a.logical_path}
-                  artifact={a}
-                  active={a.logical_path === selected}
-                  onSelect={() => select(a.logical_path)}
-                />
-              ))}
-            </DataTable>
-          )}
-        </Panel>
-      </Stack>
-
-      <Stack top>
-        {selected ? (
-          <ArtifactDetail path={selected} />
-        ) : (
-          <Panel title={t("artifacts.select")}>
-            <EmptyState title={t("artifacts.select")} body={t("artifacts.selectBody")} />
+      <Grid cols="2-1">
+        <Stack>
+          <Panel
+            title={t("artifacts.title")}
+            sub={list.items.length ? undefined : t("artifacts.empty")}
+            tight
+            footer={
+              <Pager
+                shown={list.items.length}
+                hasMore={list.hasMore}
+                onLoadMore={list.loadMore}
+                busy={list.loadingMore}
+              />
+            }
+          >
+            {list.loading ? (
+              <Loading />
+            ) : list.error ? (
+              <ErrorState error={list.error} onRetry={list.reload} />
+            ) : list.items.length === 0 ? (
+              <EmptyState title={t("artifacts.empty")} body={t("artifacts.emptyBody")} />
+            ) : (
+              <DataTable
+                columns={[
+                  { key: "path", label: t("artifacts.column.path") },
+                  { key: "version", label: t("artifacts.column.version"), align: "r" },
+                ]}
+              >
+                {list.items.map((a) => (
+                  <ArtifactRow
+                    key={a.logical_path}
+                    artifact={a}
+                    active={a.logical_path === selected}
+                    onSelect={() => select(a.logical_path)}
+                  />
+                ))}
+              </DataTable>
+            )}
           </Panel>
-        )}
-        <Panel title={t("project.notBuilt.title")}>
-          <Note tone="info">{t("artifacts.noWrite")}</Note>
-        </Panel>
-      </Stack>
-    </Grid>
+        </Stack>
+
+        <Stack top>
+          {selected ? (
+            <ArtifactDetail path={selected} />
+          ) : (
+            <Panel title={t("artifacts.select")}>
+              <EmptyState title={t("artifacts.select")} body={t("artifacts.selectBody")} />
+            </Panel>
+          )}
+          <Panel title={t("project.notBuilt.title")}>
+            <Note tone="info">{t("artifacts.noWrite")}</Note>
+          </Panel>
+        </Stack>
+      </Grid>
+    </>
   );
 }
 
@@ -199,7 +199,9 @@ function ArtifactDetail({ path }: { path: string }) {
                   <Btn small onClick={() => setVersion(v.version)}>
                     v{v.version}
                   </Btn>
-                  {v.version === latest && <span className="inline-badge">{t("artifacts.latest")}</span>}
+                  {v.version === latest && (
+                    <span className="inline-badge">{t("artifacts.latest")}</span>
+                  )}
                 </td>
                 <td className="r">
                   <span className="num">{f.bytes(v.size_bytes)}</span>

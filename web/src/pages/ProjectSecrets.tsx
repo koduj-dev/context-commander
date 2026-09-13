@@ -12,6 +12,7 @@ import {
   Mono,
   Note,
   Pager,
+  PageHead,
   Panel,
   Row,
   TextField,
@@ -69,6 +70,8 @@ export function ProjectSecrets() {
 
   return (
     <>
+      <PageHead title={t("secrets.title")} lead={t("secrets.lead")} />
+
       <Panel
         title={t("secrets.title")}
         tight
@@ -81,8 +84,6 @@ export function ProjectSecrets() {
           />
         }
       >
-        <p className="sec lead-out">{t("secrets.lead")}</p>
-
         {list.loading ? (
           <Loading />
         ) : list.error ? (
@@ -99,7 +100,10 @@ export function ProjectSecrets() {
             {list.items.map((s) => (
               <tr key={s.name}>
                 <td>
-                  <Cell primary={<Mono>{s.name}</Mono>} secondary={<Mono dim>{s.reference}</Mono>} />
+                  <Cell
+                    primary={<Mono>{s.name}</Mono>}
+                    secondary={<Mono dim>{s.reference}</Mono>}
+                  />
                 </td>
                 <td className="r">
                   <Btn kind="danger" small onClick={() => void remove(s.name)}>
@@ -129,7 +133,11 @@ export function ProjectSecrets() {
               placeholder={t("secrets.value")}
               grow
             />
-            <Btn kind="primary" onClick={() => void add()} disabled={busy || !name.trim() || !value}>
+            <Btn
+              kind="primary"
+              onClick={() => void add()}
+              disabled={busy || !name.trim() || !value}
+            >
               {busy ? t("common.loading") : t("secrets.add")}
             </Btn>
           </Row>

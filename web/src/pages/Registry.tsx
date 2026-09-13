@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useT } from "../i18n";
+import { useCrumbs } from "../app/crumbs";
 import { api } from "../lib/api";
 import { scopeLabel, trustLabel } from "../lib/labels";
 import { useDebounced, useList } from "../lib/resource";
@@ -28,13 +29,11 @@ import {
  */
 export function Registry() {
   const t = useT();
+  useCrumbs("registry", () => ({ path: [], current: t("registry.title") }));
   const [query, setQuery] = useState("");
   const debounced = useDebounced(query);
 
-  const list = useList(
-    (cursor) => api.searchSkills(debounced || undefined, cursor),
-    [debounced],
-  );
+  const list = useList((cursor) => api.searchSkills(debounced || undefined, cursor), [debounced]);
 
   return (
     <>
@@ -42,7 +41,11 @@ export function Registry() {
 
       <Panel
         title={t("registry.title")}
-        sub={debounced ? t("registry.results", { count: list.items.length, query: debounced }) : undefined}
+        sub={
+          debounced
+            ? t("registry.results", { count: list.items.length, query: debounced })
+            : undefined
+        }
         right={
           <TextField
             label={t("registry.search")}

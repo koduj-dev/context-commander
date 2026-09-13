@@ -135,7 +135,8 @@ function HandoffHistory() {
 
 function HandoffStatus({ handoff }: { handoff: Handoff }) {
   const t = useT();
-  const tone = handoff.status === "open" ? "active" : handoff.status === "claimed" ? "warn" : "neutral";
+  const tone =
+    handoff.status === "open" ? "active" : handoff.status === "claimed" ? "warn" : "neutral";
   const label =
     handoff.status === "open"
       ? t("handoff.status.open")

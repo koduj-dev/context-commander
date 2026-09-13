@@ -1,4 +1,5 @@
 import { useT } from "../i18n";
+import { useCrumbs } from "../app/crumbs";
 import { useFormat } from "../app/prefs";
 import { api } from "../lib/api";
 import { roleLabel } from "../lib/labels";
@@ -27,6 +28,7 @@ import { useSearchParams } from "react-router-dom";
  */
 export function Organizations() {
   const t = useT();
+  useCrumbs("organizations", () => ({ path: [], current: t("orgs.title") }));
   const [params, setParams] = useSearchParams();
   const selected = params.get("org") ?? "";
 
@@ -107,8 +109,12 @@ function OrganizationMembers({ id, name }: { id: string; name: string }) {
   const members = data ?? [];
 
   return (
-    <Panel title={t("orgs.members")} sub={name} tight>
-      <p className="sec lead-out">{t("orgs.membersLead")}</p>
+    <Panel
+      title={t("orgs.members")}
+      sub={name}
+      tight
+      footer={<span className="dim">{t("orgs.membersLead")}</span>}
+    >
       {loading ? (
         <Loading />
       ) : error ? (
@@ -129,7 +135,9 @@ function OrganizationMembers({ id, name }: { id: string; name: string }) {
                 <Mono truncate>{m.user_id}</Mono>
               </td>
               <td>
-                <Badge tone={m.role === "OWNER" ? "active" : "neutral"}>{roleLabel(t, m.role)}</Badge>
+                <Badge tone={m.role === "OWNER" ? "active" : "neutral"}>
+                  {roleLabel(t, m.role)}
+                </Badge>
               </td>
               <td className="r">
                 <span className="dim">{f.date(m.created_at)}</span>
@@ -191,7 +199,9 @@ function OrganizationAudit({ id }: { id: string }) {
                 <Mono>{r.action}</Mono>
               </td>
               <td>
-                <span className="dim">{r.actor_email ?? r.principal_id ?? t("common.unknown")}</span>
+                <span className="dim">
+                  {r.actor_email ?? r.principal_id ?? t("common.unknown")}
+                </span>
               </td>
               <td className="r">
                 <Badge tone={r.result === "deny" ? "danger" : r.result === "error" ? "warn" : "ok"}>

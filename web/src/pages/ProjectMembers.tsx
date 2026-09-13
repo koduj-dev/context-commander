@@ -15,6 +15,7 @@ import {
   Loading,
   Mono,
   Note,
+  PageHead,
   Panel,
   Row,
   SelectField,
@@ -53,13 +54,9 @@ export function ProjectMembers() {
 
   return (
     <>
-      <Panel
-        title={t("members.title")}
-        sub={t("members.count", { count: members.length })}
-        tight
-      >
-        <p className="sec lead-out">{t("members.lead")}</p>
+      <PageHead title={t("members.title")} lead={t("members.lead")} />
 
+      <Panel title={t("members.title")} sub={t("members.count", { count: members.length })} tight>
         {loading ? (
           <Loading />
         ) : error ? (
@@ -94,7 +91,9 @@ export function ProjectMembers() {
                   />
                 </td>
                 <td>
-                  <Badge tone={m.role === "OWNER" ? "active" : "neutral"}>{roleLabel(t, m.role)}</Badge>
+                  <Badge tone={m.role === "OWNER" ? "active" : "neutral"}>
+                    {roleLabel(t, m.role)}
+                  </Badge>
                 </td>
                 <td className="r">
                   <span className="dim">{f.date(m.created_at)}</span>
