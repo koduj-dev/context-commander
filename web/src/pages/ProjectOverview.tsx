@@ -1,10 +1,12 @@
 import { useT } from "../i18n";
 import { useFormat } from "../app/prefs";
-import { ApiError, api, type Handoff } from "../lib/api";
-import { useResource } from "../lib/resource";
+import { ApiError, api, type Handoff, type HandoffDetail } from "../lib/api";
+import { useList, useResource } from "../lib/resource";
 import {
   Badge,
   Btn,
+  DataTable,
+  Pager,
   Def,
   Defs,
   EmptyState,
@@ -56,6 +58,8 @@ export function ProjectOverview() {
       </Stack>
 
       <Stack top>
+        <HandoffHistory />
+
         <Panel title={t("project.identity")}>
           <Defs>
             <Def term={t("project.path")}>
@@ -76,6 +80,59 @@ export function ProjectOverview() {
   );
 }
 
+/**
+ * What came before.
+ *
+ * Paginated by cursor like everything that grows. Bodies are not fetched: the
+ * list endpoint returns status and timestamps only, and pulling a body per
+ * row to show a preview would be one request per row for text nobody asked
+ * to read.
+ */
+function HandoffHistory() {
+  const t = useT();
+  const f = useFormat();
+  const { namespace, slug } = useProject();
+
+  const list = useList((cursor) => api.handoffs(namespace, slug, cursor), [namespace, slug]);
+
+  if (list.loading) return null;
+  if (list.error) return <ErrorState error={list.error} onRetry={list.reload} />;
+  if (list.items.length === 0) return null;
+
+  return (
+    <Panel
+      title={t("handoff.history")}
+      tight
+      footer={
+        <Pager
+          shown={list.items.length}
+          hasMore={list.hasMore}
+          onLoadMore={list.loadMore}
+          busy={list.loadingMore}
+        />
+      }
+    >
+      <DataTable
+        columns={[
+          { key: "created", label: t("handoff.column.created") },
+          { key: "status", label: t("handoff.column.status"), align: "r" },
+        ]}
+      >
+        {list.items.map((h) => (
+          <tr key={h.id}>
+            <td>
+              <span className="dim">{f.relative(h.created_at)}</span>
+            </td>
+            <td className="r">
+              <HandoffStatus handoff={h} />
+            </td>
+          </tr>
+        ))}
+      </DataTable>
+    </Panel>
+  );
+}
+
 function HandoffStatus({ handoff }: { handoff: Handoff }) {
   const t = useT();
   const tone = handoff.status === "open" ? "active" : handoff.status === "claimed" ? "warn" : "neutral";
@@ -88,7 +145,7 @@ function HandoffStatus({ handoff }: { handoff: Handoff }) {
   return <Badge tone={tone}>{label}</Badge>;
 }
 
-function HandoffBody({ handoff, onChanged }: { handoff: Handoff; onChanged: () => void }) {
+function HandoffBody({ handoff, onChanged }: { handoff: HandoffDetail; onChanged: () => void }) {
   const t = useT();
   const f = useFormat();
   const { namespace, slug } = useProject();

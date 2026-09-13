@@ -1,5 +1,6 @@
 import { NavLink, Outlet, Link } from "react-router-dom";
 import { useI18n, useT } from "../i18n";
+import { principalName } from "../lib/api";
 import { useAuth } from "./auth";
 import { useTheme } from "./theme";
 
@@ -27,6 +28,7 @@ const ICONS = {
   organizations: "M3 15V4.5h5V15M11 15V7.5h4V15M2 15h14M5 7h1M5 9.5h1M13 10h1",
   registry: "M4 3.5h8l2 2.5v9H4zM6 7h6M6 9.5h6M6 12h4",
   administration: "M9 2.5 3.5 5v4.2c0 3 2.3 5.2 5.5 6.3 3.2-1.1 5.5-3.3 5.5-6.3V5z M6.8 9l1.6 1.6L11.6 7",
+  tokens: "M11.5 3.5a3.5 3.5 0 1 0-3.3 4.6L4 12.3V15h2.7l.7-.7v-1.4h1.4l.9-.9v-1.4h1.4l.7-.7a3.5 3.5 0 0 0-.3-6.4M12 6h.01",
 };
 
 function initials(name: string) {
@@ -74,9 +76,17 @@ export function Shell() {
             <Icon d={ICONS.projects} />
             <span>{t("nav.projects")}</span>
           </NavLink>
+          <NavLink to="/organizations" className={({ isActive }) => (isActive ? "active" : "")}>
+            <Icon d={ICONS.organizations} />
+            <span>{t("nav.organizations")}</span>
+          </NavLink>
           <NavLink to="/registry" className={({ isActive }) => (isActive ? "active" : "")}>
             <Icon d={ICONS.registry} />
             <span>{t("nav.registry")}</span>
+          </NavLink>
+          <NavLink to="/tokens" className={({ isActive }) => (isActive ? "active" : "")}>
+            <Icon d={ICONS.tokens} />
+            <span>{t("tokens.title")}</span>
           </NavLink>
 
           {me?.is_installation_admin && (
@@ -92,10 +102,10 @@ export function Shell() {
 
         <Link className="sidebar-foot" to="/preferences">
           <div className="avatar" aria-hidden="true">
-            {initials(me?.display_name ?? "?")}
+            {initials(principalName(me) || "?")}
           </div>
           <div className="who">
-            <b>{me?.display_name}</b>
+            <b>{principalName(me)}</b>
             <span>{me?.email}</span>
           </div>
         </Link>

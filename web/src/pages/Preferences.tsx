@@ -1,6 +1,7 @@
 import { LOCALES, LOCALE_NAMES, useI18n, useT } from "../i18n";
 import { useAuth } from "../app/auth";
 import { useFormat, usePrefs } from "../app/prefs";
+import { principalName } from "../lib/api";
 import * as fmt from "../lib/format";
 import {
   Btn,
@@ -176,7 +177,7 @@ export function Preferences() {
             <div className="mt">
               <Defs>
                 <Def term={t("auth.signedInAs", { name: "" })}>
-                  <Mono>{me?.email}</Mono>
+                  <Mono>{principalName(me)}</Mono>
                 </Def>
               </Defs>
             </div>

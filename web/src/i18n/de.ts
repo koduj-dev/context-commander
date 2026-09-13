@@ -245,4 +245,152 @@ export const de: Partial<Record<MessageKey, string>> = {
   "prefs.off": "Aus",
   "prefs.serverFormat":
     "Der Server sendet nie eine formatierte Zeichenkette. Er sendet den Wert; die Oberfläche liest ihn.",
+
+  "members.addHelp":
+    "Über die Principal-UUID. Kein Endpunkt listet die Principals einer Installation auf, es gibt also nichts zur Auswahl — kopieren Sie die UUID aus dem Konto der betreffenden Person.",
+  "members.principalPlaceholder": "Principal-UUID",
+  "members.noRemoval":
+    "Mitglieder zu entfernen und Rollen zu ändern ist nicht gebaut: die API hat dafür keinen Schreibpfad, also bietet dieser Bildschirm auch keinen an.",
+
+  "orgs.title": "Organisationen",
+  "orgs.lead":
+    "Die Ebene über Ihren Projekten. In einer Organisation wird ein Skill oder ein Gate einmal vorgeschrieben statt in jedem Projekt einzeln.",
+  "orgs.column.name": "Organisation",
+  "orgs.column.role": "Ihre Rolle",
+  "orgs.column.members": "Mitglieder",
+  "orgs.empty": "Sie gehören zu keiner Organisation",
+  "orgs.emptyBody":
+    "Die Mitgliedschaft hängt am Benutzerkonto, ein Dienst-Principal hat deshalb nie eine — das ist für ihn die richtige Antwort und keine Ablehnung.",
+  "orgs.members": "Mitglieder",
+  "orgs.membersLead":
+    "Die Mitgliedschaft gilt für Benutzerkonten, nicht für Principals: eine Organisationsrolle betrifft einen Menschen, während ein Dienst-Principal innerhalb eines Projekts handelt.",
+  "orgs.audit": "Aktivität",
+  "orgs.column.user": "Benutzerkonto",
+  "orgs.select": "Organisation auswählen",
+  "orgs.selectBody": "Wählen Sie links eine aus, um ihre Mitglieder und ihre Aktivität zu sehen.",
+
+  "admin.title": "Verwaltung",
+  "admin.lead":
+    "Die Installation selbst: wer sie verwaltet, wer abgelehnt wurde und die Identitäten, an denen alles andere hängt.",
+  "admin.tab.overview": "Überblick",
+  "admin.tab.identities": "Identitäten",
+  "admin.tab.security": "Sicherheitsprotokoll",
+  "admin.admins": "Administration der Installation",
+  "admin.adminsLead":
+    "Wer die Installation administriert, kann projektübergreifend lesen. Das Erteilen und Entziehen dieser Berechtigung gibt es hier bewusst nicht — es ist eine Operation der Kommandozeile.",
+  "admin.column.user": "Benutzerkonto",
+  "admin.column.role": "Rolle",
+  "admin.column.granted": "Erteilt",
+  "admin.column.grantedBy": "Erteilt von",
+  "admin.createUser": "Benutzerkonto anlegen",
+  "admin.createUserLead":
+    "Eine Person, die ein Token halten und zu Projekten hinzugefügt werden kann.",
+  "admin.email": "E-Mail",
+  "admin.displayName": "Anzeigename",
+  "admin.createService": "Dienst-Principal anlegen",
+  "admin.createServiceLead":
+    "Eine nicht-menschliche Identität — ein CI-Lauf, ein geplanter Agent. Sie handelt in Projekten und erscheint im Audit wie alle anderen.",
+  "admin.name": "Name",
+  "admin.description": "Beschreibung",
+  "admin.created": "Angelegt: {name}",
+  "admin.credentials": "Zugangsmerkmale",
+  "admin.credentialsLead":
+    "Die Token eines Principals. Fügen Sie eine Principal-UUID ein, um sie nachzuschlagen.",
+  "admin.lookup": "Nachschlagen",
+  "admin.security": "Sicherheitsprotokoll",
+  "admin.securityLead":
+    "Ablehnungen und was um sie herum geschieht, bewusst getrennt vom Projekt-Audit: eine Ablehnung betrifft oft ein Projekt, das die anfragende Seite gar nicht sehen kann, und das eigentlich interessante Muster — ein Zugangsmerkmal, das mehrere Projekte abklopft — ist aus jedem einzelnen Projekt heraus unsichtbar.",
+  "admin.column.kind": "Art",
+  "admin.column.reason": "Grund",
+  "admin.column.capability": "Berechtigung",
+  "admin.column.credential": "Zugangsmerkmal",
+  "admin.securityEmpty": "Nichts aufgezeichnet",
+  "admin.securityEmptyBody":
+    "Keine Ablehnungen, keine unbekannten Zugangsmerkmale, nichts anzusehen. Das ist der gute Fall.",
+
+  "tokens.title": "Zugriffstoken",
+  "tokens.lead":
+    "Die Zugangsmerkmale, die Sie aus einer Kommandozeile, einem Editor oder einem MCP-Client verwenden. Jedes gehört Ihnen allein — ein Token für jemand anderen lässt sich hier nicht ausstellen.",
+  "tokens.column.type": "Client",
+  "tokens.column.created": "Erstellt",
+  "tokens.column.lastUsed": "Zuletzt verwendet",
+  "tokens.column.expires": "Läuft ab",
+  "tokens.issue": "Token ausstellen",
+  "tokens.clientType": "Art des Clients",
+  "tokens.expiry": "Gültig für",
+  "tokens.expiry.never": "Unbegrenzt",
+  "tokens.expiry.30d": "30 Tage",
+  "tokens.expiry.90d": "90 Tage",
+  "tokens.expiry.1y": "1 Jahr",
+  "tokens.revoke": "Widerrufen",
+  "tokens.revoked": "Widerrufen",
+  "tokens.expired": "Abgelaufen",
+  "tokens.active": "Aktiv",
+  "tokens.empty": "Noch keine Token",
+  "tokens.emptyBody": "Stellen Sie eines aus, um einen Agenten mit dieser Installation zu verbinden.",
+  "tokens.justIssued": "Kopieren Sie dieses Token jetzt",
+  "tokens.justIssuedBody":
+    "Gespeichert wird nur sein Hash, dies ist also das einzige Mal, dass es angezeigt werden kann. Dieses Feld zu schließen widerruft es nicht — es bedeutet nur, dass es nie wieder lesbar ist.",
+  "tokens.confirmRevoke":
+    "Dieses Zugangsmerkmal widerrufen? Alles, was es noch verwendet, hört sofort auf zu funktionieren.",
+
+  "artifacts.title": "Artefakte",
+  "artifacts.lead":
+    "Der gemeinsame Speicher, aus dem Agenten lesen und in den sie schreiben. Jeder Schreibvorgang legt eine neue Version an; nichts wird an Ort und Stelle überschrieben, ein schlechter Schreibvorgang lässt sich also überlesen statt aus einem Backup zurückholen.",
+  "artifacts.column.path": "Pfad",
+  "artifacts.column.type": "Inhaltstyp",
+  "artifacts.column.version": "Version",
+  "artifacts.column.size": "Größe",
+  "artifacts.column.hash": "Prüfsumme des Inhalts",
+  "artifacts.empty": "Noch keine Artefakte",
+  "artifacts.emptyBody":
+    "Das erste entsteht, sobald ein Agent über die API, die Kommandozeile oder MCP schreibt.",
+  "artifacts.history": "Versionen",
+  "artifacts.content": "Inhalt",
+  "artifacts.select": "Artefakt auswählen",
+  "artifacts.selectBody": "Wählen Sie links einen Pfad, um Versionen und Inhalt zu sehen.",
+  "artifacts.binary": "Das ist kein Text",
+  "artifacts.binaryBody":
+    "Laut Inhaltstyp ist das kein Text und wird deshalb nicht dargestellt. Version, Größe und Prüfsumme oben sind das, was dieser Bildschirm darüber sagen kann.",
+  "artifacts.viewing": "Version {version} wird angezeigt",
+  "artifacts.latest": "Neueste",
+  "artifacts.noWrite":
+    "Artefakte von hier aus zu schreiben ist nicht gebaut. Agenten schreiben über die API, die Kommandozeile und MCP, und ein Editor, der einen gleichzeitigen Schreibvorgang unbemerkt verlieren kann, ist schlechter als gar keiner.",
+
+  "secrets.title": "Geheimnisse",
+  "secrets.lead":
+    "Nur Namen und Verweise. Ein Wert geht einmal hinein und kommt über diese Oberfläche nie wieder heraus — ein Projekt erhält einen Verweis, den es einem Gate übergibt.",
+  "secrets.column.name": "Name",
+  "secrets.column.reference": "Verweis",
+  "secrets.add": "Geheimnis hinzufügen",
+  "secrets.value": "Wert",
+  "secrets.delete": "Löschen",
+  "secrets.empty": "Keine Geheimnisse in diesem Projekt",
+  "secrets.emptyBody": "Fügen Sie hier eines hinzu, oder über die Kommandozeile.",
+  "secrets.neverShown":
+    "Der Wert wird einmal geschrieben und ist danach für niemanden und über keinen Adapter wieder lesbar. Löschen und neu anlegen ist der einzige Weg, ihn zu ändern.",
+  "secrets.confirmDelete":
+    "Das Geheimnis {name} löschen? Alles, was seinen Verweis verwendet, beginnt zu scheitern.",
+
+  "gates.title": "Richtlinien",
+  "gates.lead":
+    "Die an dieses Projekt gebundenen Gates und die, die es erbt. Ein Gate läuft an einem Hook und kann die Operation verweigern — die Ablehnung landet auf der Zeitleiste der Aktivität.",
+  "gates.column.gate": "Gate",
+  "gates.column.hook": "Hook",
+  "gates.column.scope": "Gebunden an",
+  "gates.column.enabled": "Zustand",
+  "gates.enabled": "Durchgesetzt",
+  "gates.disabled": "Aus",
+  "gates.empty": "Hier greift kein Gate",
+  "gates.emptyBody": "In diesem Projekt greift nichts in Operationen ein.",
+  "gates.config": "Konfiguration",
+
+  "events.title": "Ereignisse",
+  "events.lead":
+    "Der Strom aus der Outbox. Ein Ereignis ist das, was andere Systeme konsumieren; der Audit-Eintrag daneben ist das, was ein Mensch liest.",
+  "events.column.seq": "Nr.",
+  "events.column.type": "Typ",
+  "events.column.resource": "Ressource",
+  "events.column.payload": "Nutzlast",
+  "events.empty": "Noch keine Ereignisse",
 };

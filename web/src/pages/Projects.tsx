@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useT } from "../i18n";
-import { api, type ProjectSummary } from "../lib/api";
+import { api, type MyProject } from "../lib/api";
 import { roleLabel } from "../lib/labels";
 import { useResource } from "../lib/resource";
 import {
@@ -34,7 +34,7 @@ export function Projects() {
     const all = data ?? [];
     const q = filter.trim().toLowerCase();
     if (!q) return all;
-    return all.filter((p) => path(p).toLowerCase().includes(q) || p.project.name.toLowerCase().includes(q));
+    return all.filter((p) => path(p).toLowerCase().includes(q) || p.name.toLowerCase().includes(q));
   }, [data, filter]);
 
   return (
@@ -73,10 +73,10 @@ export function Projects() {
             ]}
           >
             {rows.map((p) => (
-              <tr key={p.project.id}>
+              <tr key={path(p)}>
                 <td>
                   <Cell
-                    primary={<Link to={`/p/${p.project.namespace}/${p.project.slug}`}>{p.project.name}</Link>}
+                    primary={<Link to={`/p/${p.namespace}/${p.slug}`}>{p.name}</Link>}
                     secondary={<Mono dim>{path(p)}</Mono>}
                   />
                 </td>
@@ -92,7 +92,7 @@ export function Projects() {
   );
 }
 
-function path(p: ProjectSummary) {
-  return `${p.project.namespace}/${p.project.slug}`;
+function path(p: MyProject) {
+  return `${p.namespace}/${p.slug}`;
 }
 

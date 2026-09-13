@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { useT } from "../i18n";
 import { useAuth } from "../app/auth";
 import { useFormat } from "../app/prefs";
-import { api } from "../lib/api";
+import { api, principalName } from "../lib/api";
 import { roleLabel } from "../lib/labels";
 import { useResource } from "../lib/resource";
 import {
@@ -43,7 +43,7 @@ export function Dashboard() {
       <PageHead
         title={t("dashboard.title")}
         lead={t("dashboard.lead")}
-        actions={<span className="dim">{t("auth.signedInAs", { name: me?.display_name ?? "" })}</span>}
+        actions={<span className="dim">{t("auth.signedInAs", { name: principalName(me) })}</span>}
       />
 
       <Grid cols="2-1">
@@ -63,15 +63,11 @@ export function Dashboard() {
                 ]}
               >
                 {projects.map((p) => (
-                  <tr key={p.project.id}>
+                  <tr key={`${p.namespace}/${p.slug}`}>
                     <td>
                       <Cell
-                        primary={
-                          <Link to={`/p/${p.project.namespace}/${p.project.slug}`}>{p.project.name}</Link>
-                        }
-                        secondary={
-                          <Mono dim>{`${p.project.namespace}/${p.project.slug}`}</Mono>
-                        }
+                        primary={<Link to={`/p/${p.namespace}/${p.slug}`}>{p.name}</Link>}
+                        secondary={<Mono dim>{`${p.namespace}/${p.slug}`}</Mono>}
                       />
                     </td>
                     <td>

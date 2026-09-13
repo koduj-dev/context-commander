@@ -286,6 +286,12 @@ table.dt td {
   background: var(--cc-surface-1);
 }
 table.dt tbody tr:hover td { background: var(--cc-surface-2); }
+/* The row a master/detail screen is currently showing. Pink is "the context
+ * you are in", so a selected row gets the same rail the active nav item has —
+ * and a background shift as well, because a 2px rail alone is easy to miss at
+ * the top of a long table. */
+table.dt tbody tr.active td { background: var(--cc-surface-2); }
+table.dt tbody tr.active td:first-child { box-shadow: inset 2px 0 0 var(--cc-accent-primary-visual); }
 /* Sideways scrolling is applied only where it is needed — see the narrow
  * breakpoint. `overflow-x: auto` with `overflow-y: visible` is not a thing
  * CSS honours: setting one axis forces the other to `auto` too, creating a

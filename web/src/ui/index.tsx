@@ -38,10 +38,18 @@ export function Badge({ children, tone = "neutral" }: { children: ReactNode; ton
   );
 }
 
+// Spelled out so scripts/check-design-sync.mjs can see the classes, and so a
+// scope the server invents later renders as a plain rail rather than as an
+// element with an undefined class and no styling at all.
+const SCOPE_CLASS: Record<string, string> = {
+  installation: "scope installation",
+  organization: "scope organization",
+  project: "scope project",
+};
+
 /** Where a thing lives. Violet for inherited scopes, pink for this project. */
-export function Scope({ kind, children }: { kind: "installation" | "organization" | "project"; children?: ReactNode }) {
-  const t = useT();
-  return <span className={`scope ${kind}`}>{children ?? t(`scope.${kind}` as const)}</span>;
+export function Scope({ kind, children }: { kind: string; children?: ReactNode }) {
+  return <span className={SCOPE_CLASS[kind] ?? "scope"}>{children ?? kind}</span>;
 }
 
 export function Mono({ children, truncate, dim }: { children: ReactNode; truncate?: boolean; dim?: boolean }) {

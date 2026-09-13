@@ -138,6 +138,11 @@ export const en = {
   "members.type.service": "Service principal",
   "members.add": "Add principal",
   "members.count": "{count, plural, one {# member} other {# members}}",
+  "members.addHelp":
+    "By principal UUID. Nothing in the API lists the principals of an installation, so there is nothing to pick from — copy the UUID from the person's own account screen.",
+  "members.principalPlaceholder": "Principal UUID",
+  "members.noRemoval":
+    "Removing a member and changing a role are not built: the API has no write for either, so this screen does not offer one.",
 
   "skills.title": "Skills",
   "skills.lead":
@@ -161,6 +166,23 @@ export const en = {
   "registry.column.author": "Author",
   "registry.publish": "New skill",
   "registry.results": "{count, plural, one {# result} other {# results}} for “{query}”",
+
+  "orgs.title": "Organizations",
+  "orgs.lead":
+    "The scopes above your projects. An organization is where a skill or a gate is mandated once instead of project by project.",
+  "orgs.column.name": "Organization",
+  "orgs.column.role": "Your role",
+  "orgs.column.members": "Members",
+  "orgs.empty": "You are not in any organization",
+  "orgs.emptyBody":
+    "Organization membership is keyed by user, so a service principal never has one — that is the correct answer for it, not a refusal.",
+  "orgs.members": "Members",
+  "orgs.membersLead":
+    "Membership is by user, not by principal: an organization role is about a person, and a service principal acts inside a project instead.",
+  "orgs.audit": "Activity",
+  "orgs.column.user": "User",
+  "orgs.select": "Select an organization",
+  "orgs.selectBody": "Pick one on the left to see its members and its activity.",
 
   "scope.installation": "Installation",
   "scope.organization": "Organization",
@@ -186,6 +208,68 @@ export const en = {
   "activity.result.allow": "Allowed",
   "activity.result.deny": "Denied",
   "activity.result.error": "Error",
+
+  "admin.title": "Administration",
+  "admin.lead":
+    "The installation itself: who administers it, who was refused, and the identities everything else hangs off.",
+  "admin.tab.overview": "Overview",
+  "admin.tab.identities": "Identities",
+  "admin.tab.security": "Security log",
+  "admin.admins": "Installation admins",
+  "admin.adminsLead":
+    "An installation admin can read across every project. There is no write for granting or revoking that here — it is a CLI operation on purpose.",
+  "admin.column.user": "User",
+  "admin.column.role": "Role",
+  "admin.column.granted": "Granted",
+  "admin.column.grantedBy": "Granted by",
+  "admin.createUser": "Create user",
+  "admin.createUserLead": "A person who can hold a token and be added to projects.",
+  "admin.email": "Email",
+  "admin.displayName": "Display name",
+  "admin.createService": "Create service principal",
+  "admin.createServiceLead":
+    "A non-human identity — a CI job, a scheduled agent. It acts in projects and shows up in audit like anyone else.",
+  "admin.name": "Name",
+  "admin.description": "Description",
+  "admin.created": "Created {name}",
+  "admin.credentials": "Credentials",
+  "admin.credentialsLead": "Tokens issued to one principal. Paste a principal UUID to look them up.",
+  "admin.lookup": "Look up",
+  "admin.security": "Security log",
+  "admin.securityLead":
+    "Refusals and the events around them, kept apart from project audit on purpose: a refusal is often about a project the caller cannot see, and the pattern worth catching — one credential probing several projects — is invisible from inside any one of them.",
+  "admin.column.kind": "Kind",
+  "admin.column.reason": "Reason",
+  "admin.column.capability": "Capability",
+  "admin.column.credential": "Credential",
+  "admin.securityEmpty": "Nothing recorded",
+  "admin.securityEmptyBody": "No refusals, no unknown credentials, nothing to look at. That is the good case.",
+
+  "tokens.title": "Access tokens",
+  "tokens.lead":
+    "The credentials you use from a CLI, an editor or an MCP client. Each one is yours alone — there is no way to issue a token for someone else from here.",
+  "tokens.column.type": "Client",
+  "tokens.column.created": "Created",
+  "tokens.column.lastUsed": "Last used",
+  "tokens.column.expires": "Expires",
+  "tokens.issue": "Issue token",
+  "tokens.clientType": "Client type",
+  "tokens.expiry": "Expires in",
+  "tokens.expiry.never": "Never",
+  "tokens.expiry.30d": "30 days",
+  "tokens.expiry.90d": "90 days",
+  "tokens.expiry.1y": "1 year",
+  "tokens.revoke": "Revoke",
+  "tokens.revoked": "Revoked",
+  "tokens.expired": "Expired",
+  "tokens.active": "Active",
+  "tokens.empty": "No tokens yet",
+  "tokens.emptyBody": "Issue one to connect an agent to this installation.",
+  "tokens.justIssued": "Copy this token now",
+  "tokens.justIssuedBody":
+    "Only its hash is stored, so this is the one and only time it can be shown. Closing this panel does not revoke it — but it does mean it cannot be read again.",
+  "tokens.confirmRevoke":
+    "Revoke this credential? Anything still using it stops working immediately.",
 
   "prefs.title": "Preferences",
   "prefs.lead":
@@ -233,6 +317,64 @@ export const en = {
   "project.notBuilt.title": "Not built yet",
   "project.notBuilt.artifacts":
     "Artifacts, notes, policies and secrets have screens in the mockups but no read path in the API yet.",
+
+  "artifacts.title": "Artifacts",
+  "artifacts.lead":
+    "The shared store agents read and write. Every write makes a new version; nothing is overwritten in place, so a bad write can be read past rather than recovered from a backup.",
+  "artifacts.column.path": "Path",
+  "artifacts.column.type": "Content type",
+  "artifacts.column.version": "Version",
+  "artifacts.column.size": "Size",
+  "artifacts.column.hash": "Content hash",
+  "artifacts.empty": "No artifacts yet",
+  "artifacts.emptyBody": "An agent writing through the API, the CLI or MCP creates the first one.",
+  "artifacts.history": "Versions",
+  "artifacts.content": "Content",
+  "artifacts.select": "Select an artifact",
+  "artifacts.selectBody": "Pick a path on the left to see its versions and content.",
+  "artifacts.binary": "This is not text",
+  "artifacts.binaryBody":
+    "The content type says this is not text, so it is not rendered. The version, the size and the hash above are what this screen can tell you about it.",
+  "artifacts.viewing": "Viewing version {version}",
+  "artifacts.latest": "Latest",
+  "artifacts.noWrite":
+    "Writing an artifact from here is not built. Agents write through the API, the CLI and MCP, and an editor that could silently lose a concurrent write is worse than no editor.",
+
+  "secrets.title": "Secrets",
+  "secrets.lead":
+    "Names and references only. A value goes in once and never comes back out through this interface — what a project gets is a reference it hands to a gate.",
+  "secrets.column.name": "Name",
+  "secrets.column.reference": "Reference",
+  "secrets.add": "Add secret",
+  "secrets.value": "Value",
+  "secrets.delete": "Delete",
+  "secrets.empty": "No secrets in this project",
+  "secrets.emptyBody": "Add one here, or with the CLI.",
+  "secrets.neverShown":
+    "The value is written once and is never readable again, by anyone, through any adapter. Deleting and re-adding is the only way to change one.",
+  "secrets.confirmDelete": "Delete the secret {name}? Anything using its reference will start failing.",
+
+  "gates.title": "Policies",
+  "gates.lead":
+    "Gates bound to this project, and the ones it inherits. A gate runs on a hook and can refuse the operation — the refusal lands on the activity timeline.",
+  "gates.column.gate": "Gate",
+  "gates.column.hook": "Hook",
+  "gates.column.scope": "Bound at",
+  "gates.column.enabled": "State",
+  "gates.enabled": "Enforcing",
+  "gates.disabled": "Off",
+  "gates.empty": "No gates apply here",
+  "gates.emptyBody": "Nothing is intercepting operations in this project.",
+  "gates.config": "Configuration",
+
+  "events.title": "Events",
+  "events.lead":
+    "The outbox stream. An event is what other systems consume; the audit record next to it is what a person reads.",
+  "events.column.seq": "Seq",
+  "events.column.type": "Type",
+  "events.column.resource": "Resource",
+  "events.column.payload": "Payload",
+  "events.empty": "No events yet",
 
   "handoff.history": "Earlier handoffs",
   "handoff.column.created": "Created",

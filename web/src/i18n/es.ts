@@ -240,4 +240,152 @@ export const es: Partial<Record<MessageKey, string>> = {
   "prefs.off": "No",
   "prefs.serverFormat":
     "El servidor nunca envía una cadena con formato. Envía el valor; la interfaz lo lee.",
+
+  "members.addHelp":
+    "Por UUID del principal. Ningún punto de la API enumera los principals de una instalación, así que no hay nada entre lo que elegir — copie el UUID de la pantalla de cuenta de esa persona.",
+  "members.principalPlaceholder": "UUID del principal",
+  "members.noRemoval":
+    "Quitar a un miembro y cambiar un rol no están construidos: la API no tiene escritura para ninguno de los dos, así que esta pantalla tampoco la ofrece.",
+
+  "orgs.title": "Organizaciones",
+  "orgs.lead":
+    "El ámbito que hay por encima de sus proyectos. En una organización un skill o una gate se imponen una sola vez en lugar de proyecto por proyecto.",
+  "orgs.column.name": "Organización",
+  "orgs.column.role": "Su rol",
+  "orgs.column.members": "Miembros",
+  "orgs.empty": "No pertenece a ninguna organización",
+  "orgs.emptyBody":
+    "La pertenencia va ligada a la cuenta de una persona, de modo que un principal de servicio nunca tiene ninguna — esa es la respuesta correcta para él, no una denegación.",
+  "orgs.members": "Miembros",
+  "orgs.membersLead":
+    "La pertenencia es de cuentas de persona, no de principals: un rol de organización habla de una persona, mientras que un principal de servicio actúa dentro de un proyecto.",
+  "orgs.audit": "Actividad",
+  "orgs.column.user": "Cuenta",
+  "orgs.select": "Seleccione una organización",
+  "orgs.selectBody": "Elija una a la izquierda para ver sus miembros y su actividad.",
+
+  "admin.title": "Administración",
+  "admin.lead":
+    "La instalación en sí: quién la administra, a quién se le ha denegado algo y las identidades de las que cuelga todo lo demás.",
+  "admin.tab.overview": "Resumen",
+  "admin.tab.identities": "Identidades",
+  "admin.tab.security": "Registro de seguridad",
+  "admin.admins": "Administración de la instalación",
+  "admin.adminsLead":
+    "Quien administra la instalación puede leer en todos los proyectos. Conceder o retirar ese permiso no está aquí a propósito — es una operación de la CLI.",
+  "admin.column.user": "Cuenta",
+  "admin.column.role": "Rol",
+  "admin.column.granted": "Concedido",
+  "admin.column.grantedBy": "Concedido por",
+  "admin.createUser": "Crear una cuenta",
+  "admin.createUserLead":
+    "Una persona que puede tener un token y ser añadida a proyectos.",
+  "admin.email": "Correo electrónico",
+  "admin.displayName": "Nombre visible",
+  "admin.createService": "Crear un principal de servicio",
+  "admin.createServiceLead":
+    "Una identidad no humana — una tarea de CI, un agente programado. Actúa en los proyectos y aparece en la auditoría como cualquier otra.",
+  "admin.name": "Nombre",
+  "admin.description": "Descripción",
+  "admin.created": "Creado: {name}",
+  "admin.credentials": "Credenciales",
+  "admin.credentialsLead":
+    "Los tokens emitidos a un principal. Pegue un UUID de principal para consultarlos.",
+  "admin.lookup": "Consultar",
+  "admin.security": "Registro de seguridad",
+  "admin.securityLead":
+    "Las denegaciones y lo que ocurre a su alrededor, separadas a propósito de la auditoría de proyecto: una denegación trata a menudo de un proyecto que quien la provoca ni siquiera puede ver, y el patrón que de verdad importa — una credencial tanteando varios proyectos — es invisible desde dentro de cualquiera de ellos.",
+  "admin.column.kind": "Tipo",
+  "admin.column.reason": "Motivo",
+  "admin.column.capability": "Capacidad",
+  "admin.column.credential": "Credencial",
+  "admin.securityEmpty": "No hay nada registrado",
+  "admin.securityEmptyBody":
+    "Ninguna denegación, ninguna credencial desconocida, nada que mirar. Ese es el caso bueno.",
+
+  "tokens.title": "Tokens de acceso",
+  "tokens.lead":
+    "Las credenciales que usa desde una CLI, un editor o un cliente MCP. Cada una es solo suya — desde aquí no hay forma de emitir un token para otra persona.",
+  "tokens.column.type": "Cliente",
+  "tokens.column.created": "Creado",
+  "tokens.column.lastUsed": "Último uso",
+  "tokens.column.expires": "Caduca",
+  "tokens.issue": "Emitir un token",
+  "tokens.clientType": "Tipo de cliente",
+  "tokens.expiry": "Validez",
+  "tokens.expiry.never": "Sin caducidad",
+  "tokens.expiry.30d": "30 días",
+  "tokens.expiry.90d": "90 días",
+  "tokens.expiry.1y": "1 año",
+  "tokens.revoke": "Revocar",
+  "tokens.revoked": "Revocado",
+  "tokens.expired": "Caducado",
+  "tokens.active": "Activo",
+  "tokens.empty": "Todavía no hay tokens",
+  "tokens.emptyBody": "Emita uno para conectar un agente a esta instalación.",
+  "tokens.justIssued": "Copie este token ahora",
+  "tokens.justIssuedBody":
+    "Solo se guarda su hash, así que esta es la única vez que puede mostrarse. Cerrar este panel no lo revoca — pero sí significa que ya no podrá volver a leerse.",
+  "tokens.confirmRevoke":
+    "¿Revocar esta credencial? Todo lo que siga usándola dejará de funcionar de inmediato.",
+
+  "artifacts.title": "Artefactos",
+  "artifacts.lead":
+    "El almacén compartido que los agentes leen y escriben. Cada escritura crea una versión nueva; nada se sobrescribe en su sitio, de modo que una mala escritura se deja atrás leyendo la anterior en lugar de recuperarse de una copia de seguridad.",
+  "artifacts.column.path": "Ruta",
+  "artifacts.column.type": "Tipo de contenido",
+  "artifacts.column.version": "Versión",
+  "artifacts.column.size": "Tamaño",
+  "artifacts.column.hash": "Hash del contenido",
+  "artifacts.empty": "Todavía no hay artefactos",
+  "artifacts.emptyBody":
+    "El primero aparece cuando un agente escribe por la API, la CLI o MCP.",
+  "artifacts.history": "Versiones",
+  "artifacts.content": "Contenido",
+  "artifacts.select": "Seleccione un artefacto",
+  "artifacts.selectBody": "Elija una ruta a la izquierda para ver sus versiones y su contenido.",
+  "artifacts.binary": "Esto no es texto",
+  "artifacts.binaryBody":
+    "El tipo de contenido dice que esto no es texto, así que no se representa. La versión, el tamaño y el hash de arriba son lo que esta pantalla puede contarle sobre ello.",
+  "artifacts.viewing": "Mostrando la versión {version}",
+  "artifacts.latest": "Última",
+  "artifacts.noWrite":
+    "Escribir un artefacto desde aquí no está construido. Los agentes escriben por la API, la CLI y MCP, y un editor capaz de perder en silencio una escritura simultánea es peor que no tener editor.",
+
+  "secrets.title": "Secretos",
+  "secrets.lead":
+    "Solo nombres y referencias. Un valor entra una vez y nunca vuelve a salir por esta interfaz — lo que un proyecto obtiene es una referencia que entrega a una gate.",
+  "secrets.column.name": "Nombre",
+  "secrets.column.reference": "Referencia",
+  "secrets.add": "Añadir un secreto",
+  "secrets.value": "Valor",
+  "secrets.delete": "Eliminar",
+  "secrets.empty": "No hay secretos en este proyecto",
+  "secrets.emptyBody": "Añada uno aquí, o con la CLI.",
+  "secrets.neverShown":
+    "El valor se escribe una vez y después nadie puede volver a leerlo, por ningún adaptador. Eliminarlo y volver a añadirlo es la única forma de cambiarlo.",
+  "secrets.confirmDelete":
+    "¿Eliminar el secreto {name}? Todo lo que use su referencia empezará a fallar.",
+
+  "gates.title": "Políticas",
+  "gates.lead":
+    "Las gates vinculadas a este proyecto y las que hereda. Una gate se ejecuta en un hook y puede rechazar la operación — el rechazo aparece en la línea de tiempo de actividad.",
+  "gates.column.gate": "Gate",
+  "gates.column.hook": "Hook",
+  "gates.column.scope": "Vinculada en",
+  "gates.column.enabled": "Estado",
+  "gates.enabled": "Aplicando",
+  "gates.disabled": "Apagada",
+  "gates.empty": "Aquí no se aplica ninguna gate",
+  "gates.emptyBody": "Nada intercepta las operaciones de este proyecto.",
+  "gates.config": "Configuración",
+
+  "events.title": "Eventos",
+  "events.lead":
+    "El flujo de la bandeja de salida. Un evento es lo que consumen otros sistemas; el registro de auditoría que tiene al lado es lo que lee una persona.",
+  "events.column.seq": "N.º",
+  "events.column.type": "Tipo",
+  "events.column.resource": "Recurso",
+  "events.column.payload": "Carga",
+  "events.empty": "Todavía no hay eventos",
 };
