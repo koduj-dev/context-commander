@@ -108,6 +108,7 @@ export function Tokens() {
             columns={[
               { key: "type", label: t("tokens.column.type") },
               { key: "state" },
+              { key: "created", label: t("tokens.column.created"), align: "r" },
               { key: "used", label: t("tokens.column.lastUsed"), align: "r" },
               { key: "expires", label: t("tokens.column.expires"), align: "r" },
               { key: "actions", align: "r" },
@@ -136,6 +137,9 @@ export function Tokens() {
                           ? t("tokens.expired")
                           : t("tokens.active")}
                     </Badge>
+                  </td>
+                  <td className="r">
+                    <span className="dim">{f.date(c.created_at)}</span>
                   </td>
                   <td className="r">
                     <span className="dim">

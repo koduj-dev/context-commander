@@ -168,6 +168,23 @@ const mockupPages = (await readdir(join(repo, "docs", "mockups"))).filter(
 );
 notes.push(`screens: ${pages.length} built, ${mockupPages.length} designed in the mockups`);
 
+// Kit components no screen renders. Reported, not failed: a component can
+// legitimately sit ahead of the screen that will use it. But a dead one is
+// also how a second way of doing something survives — the formatting
+// component that ignored the reader's preferences lived here unnoticed
+// because nothing rendered it.
+const kit = await readFile(join(SRC, "ui", "index.tsx"), "utf8");
+const kitComponents = [...kit.matchAll(/^export function (\w+)/gm)].map((m) => m[1]);
+const screens = [];
+for await (const file of walk(SRC)) {
+  if (!file.endsWith(join("ui", "index.tsx"))) screens.push(file);
+}
+const screenSource = (await Promise.all(screens.map((f) => readFile(f, "utf8")))).join("");
+const unrendered = kitComponents.filter((n) => !screenSource.includes("<" + n));
+if (unrendered.length) {
+  notes.push(`${unrendered.length} kit component(s) no screen renders: ${unrendered.join(", ")}`);
+}
+
 if (failures.length) {
   console.error("\n✗ design sync\n");
   for (const f of failures) console.error("  " + f + "\n");

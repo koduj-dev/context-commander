@@ -107,6 +107,7 @@ export function Registry() {
           <DataTable
             columns={[
               { key: "skill", label: t("skills.column.skill") },
+              { key: "author", label: t("registry.column.author") },
               { key: "scope", label: t("registry.livesAt") },
               { key: "latest", label: t("registry.column.latest"), align: "r" },
               { key: "trust", label: t("skills.column.trust"), align: "r" },
@@ -123,6 +124,9 @@ export function Registry() {
                       </Mono>
                     }
                   />
+                </td>
+                <td>
+                  <span className="sec">{s.author ?? t("common.unknown")}</span>
                 </td>
                 <td>
                   <Scope kind={s.scope}>{scopeLabel(t, s.scope)}</Scope>

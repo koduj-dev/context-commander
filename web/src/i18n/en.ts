@@ -27,7 +27,6 @@ export const en = {
   "nav.workspace": "Workspace",
   "nav.installation": "Installation",
   "nav.preferences": "Preferences",
-  "nav.search": "Search",
   "nav.signOut": "Sign out",
 
   "theme.dark": "Dark",
@@ -47,10 +46,8 @@ export const en = {
   "common.loading": "Loading…",
   "common.retry": "Try again",
   "common.cancel": "Cancel",
-  "common.save": "Save",
   "common.close": "Close",
   "common.loadMore": "Load more",
-  "common.perPage": "{count} per page",
   "common.showingMore": "Showing {count} · more available",
   "common.showingAll": "Showing {count} · complete",
   "common.endOfList": "End of list",
@@ -80,10 +77,7 @@ export const en = {
   "dashboard.title": "Dashboard",
   "dashboard.lead": "What changed, where you were working, and whether anything is waiting on you.",
   "dashboard.waiting": "Waiting on you",
-  "dashboard.recent": "Recent activity",
   "dashboard.yourProjects": "Your projects",
-  "dashboard.clients": "Connected clients",
-  "dashboard.openHandoff": "Open handoff",
   "dashboard.noneWaiting": "Nothing is waiting on you",
   "dashboard.noneWaitingBody": "No open handoffs, no refusals worth a look.",
 
@@ -92,26 +86,14 @@ export const en = {
     "Every project you can act in. The path is how people say it; the UUID is what the system means.",
   "projects.filter": "Filter projects…",
   "projects.column.project": "Project",
-  "projects.column.namespace": "Namespace",
   "projects.column.role": "Your role",
-  "projects.column.members": "Members",
-  "projects.column.activity": "Last activity",
   "projects.count": "{count, plural, one {# project} other {# projects}}",
   "projects.empty": "You are not a member of any project",
   "projects.emptyBody": "A project becomes visible here once someone adds you to it.",
 
-  "project.overview": "Overview",
-  "project.members": "Members",
-  "project.skills": "Skills",
-  "project.policies": "Policies",
-  "project.secrets": "Secrets",
-  "project.activity": "Activity",
-  "project.settings": "Settings",
   "project.identity": "Identity",
   "project.path": "Path",
   "project.uuid": "UUID",
-  "project.yourRole": "You are",
-  "project.created": "Created",
 
   "handoff.current": "Current handoff",
   "handoff.summary": "Summary",
@@ -136,11 +118,8 @@ export const en = {
   "members.lead":
     "Who may act in this project, and as what. A client credential is not a member — the principal behind it is.",
   "members.column.principal": "Principal",
-  "members.column.type": "Type",
   "members.column.role": "Role",
   "members.column.added": "Added",
-  "members.type.user": "User",
-  "members.type.service": "Service principal",
   "members.add": "Add principal",
   "members.count": "{count, plural, one {# member} other {# members}}",
   "members.addHelp":
@@ -167,7 +146,6 @@ export const en = {
     "Everything you can see: skills in your projects, in your organizations, and on the installation shelf. Agents search this same catalogue.",
   "registry.search": "Search skills by name…",
   "registry.column.latest": "Latest",
-  "registry.column.checksum": "Checksum",
   "registry.column.author": "Author",
   "registry.publish": "New skill",
   "registry.publishLead":
@@ -187,7 +165,6 @@ export const en = {
     "The scopes above your projects. An organization is where a skill or a gate is mandated once instead of project by project.",
   "orgs.column.name": "Organization",
   "orgs.column.role": "Your role",
-  "orgs.column.members": "Members",
   "orgs.empty": "You are not in any organization",
   "orgs.emptyBody":
     "Organization membership is keyed by user, so a service principal never has one — that is the correct answer for it, not a refusal.",
@@ -218,7 +195,6 @@ export const en = {
   "activity.column.action": "Action",
   "activity.column.resource": "Resource",
   "activity.column.principal": "Principal",
-  "activity.column.client": "Client",
   "activity.column.result": "Result",
   "activity.result.allow": "Allowed",
   "activity.result.deny": "Denied",
@@ -236,7 +212,6 @@ export const en = {
   "admin.column.user": "User",
   "admin.column.role": "Role",
   "admin.column.granted": "Granted",
-  "admin.column.grantedBy": "Granted by",
   "admin.createUser": "Create user",
   "admin.createUserLead": "A person who can hold a token and be added to projects.",
   "admin.email": "Email",
@@ -261,7 +236,6 @@ export const en = {
   "admin.column.kind": "Kind",
   "admin.column.reason": "Reason",
   "admin.column.capability": "Capability",
-  "admin.column.credential": "Credential",
   "admin.securityEmpty": "Nothing recorded",
   "admin.securityEmptyBody":
     "No refusals, no unknown credentials, nothing to look at. That is the good case.",
@@ -331,7 +305,6 @@ export const en = {
     "The server never sends a formatted string. It sends the value; the interface reads it.",
 
   "dashboard.noProjects": "You are not in any project yet",
-  "dashboard.activityHere": "Activity shows up once there is a project to watch.",
 
   "project.tab.overview": "Overview",
   "project.tab.members": "Members",
@@ -365,13 +338,11 @@ export const en = {
   "context.noHandoffBody": "An agent starting here is told there is nothing to continue.",
   "context.budgetLimit": "Size limit",
   "context.apply": "Reassemble",
-  "context.eventLimit": "Events",
 
   "artifacts.title": "Artifacts",
   "artifacts.lead":
     "The shared store agents read and write. Every write makes a new version; nothing is overwritten in place, so a bad write can be read past rather than recovered from a backup.",
   "artifacts.column.path": "Path",
-  "artifacts.column.type": "Content type",
   "artifacts.column.version": "Version",
   "artifacts.column.size": "Size",
   "artifacts.column.hash": "Content hash",
@@ -389,7 +360,6 @@ export const en = {
   "artifacts.edit": "Edit",
   "artifacts.new": "New artifact",
   "artifacts.save": "Save",
-  "artifacts.saved": "Saved as version {version}",
   "artifacts.delete": "Delete",
   "artifacts.confirmDelete":
     "Delete {path}? Its versions go with it, and anything reading that path starts failing.",
@@ -411,7 +381,6 @@ export const en = {
   "secrets.lead":
     "Names and references only. A value goes in once and never comes back out through this interface — what a project gets is a reference it hands to a gate.",
   "secrets.column.name": "Name",
-  "secrets.column.reference": "Reference",
   "secrets.add": "Add secret",
   "secrets.value": "Value",
   "secrets.delete": "Delete",
@@ -433,7 +402,6 @@ export const en = {
   "gates.disabled": "Off",
   "gates.empty": "No gates apply here",
   "gates.emptyBody": "Nothing is intercepting operations in this project.",
-  "gates.config": "Configuration",
   "gates.bind": "Bind a gate",
   "gates.bindLead":
     "Only gates the server actually registered can be bound; a binding naming an unregistered gate fails the whole operation rather than being ignored, so this list is what exists.",
@@ -452,7 +420,6 @@ export const en = {
   "orgs.create": "New organization",
   "orgs.createLead": "You become its first OWNER. Projects and skills can then be scoped to it.",
   "orgs.name": "Name",
-  "orgs.created": "Created {name}",
   "orgs.addMember": "Add member",
   "orgs.addMemberLead":
     "By user id, not principal: an organization role is about a person. Nothing in the API lists users, so there is nothing to pick from.",
@@ -476,7 +443,6 @@ export const en = {
 
   "dashboard.waitingLead":
     "Projects where a handoff is open or claimed — work someone left for whoever comes next.",
-  "dashboard.checking": "Checking your projects…",
 
   "history.title": "Conversations",
   "history.lead":
@@ -519,12 +485,8 @@ export const en = {
   "handoff.summaryHelp": "One line. What is this work.",
   "handoff.completedHelp": "What is already done, so it is not done twice.",
   "handoff.nextHelp": "What to do next, concretely enough to start on.",
-  "handoff.created": "Handoff created",
   "handoff.confirmClose":
     "Close this handoff? It stops being the current one and nobody can claim it.",
-  "handoff.openExists": "A handoff is already open here",
-  "handoff.openExistsBody":
-    "Close it before leaving another — two open handoffs make “what should I pick up” ambiguous, which is the question they exist to answer.",
 
   "projects.create": "New project",
   "projects.createLead":
@@ -537,7 +499,6 @@ export const en = {
   "handoff.history": "Earlier handoffs",
   "handoff.column.created": "Created",
   "handoff.column.status": "Status",
-  "handoff.column.summary": "Summary",
 
   "skill.versions": "Versions",
   "skill.versionsLead":

@@ -622,6 +622,21 @@ table.dt td.r, table.dt th.r { text-align: right; }
 a.sidebar-foot { text-decoration: none; color: inherit; }
 a.sidebar-foot:hover { background: var(--cc-surface-2); text-decoration: none; }
 
+/* The first thing a keyboard reader needs and the easiest to forget: a way
+ * past the navigation. Off-screen until focused, then a real, visible
+ * control — a skip link nobody can see they have focused is no skip link. */
+.skip {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 20;
+  background: var(--cc-surface-2);
+  border: 1px solid var(--cc-border-strong);
+  border-radius: 0 0 5px 0;
+  padding: 8px 14px;
+}
+.skip:focus { left: 0; }
+
 /* ---------- solo: a screen with no navigation ----------
  *
  * Sign-in is the only screen that renders without a principal, and it must

@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
-import { useI18n, useT } from "../i18n";
+import { useT } from "../i18n";
 import { ApiError } from "../lib/api";
-import * as timeFns from "../lib/format";
 
 /**
  * The component kit.
@@ -357,17 +356,6 @@ export function Loading() {
   return <div className="empty">{t("common.loading")}</div>;
 }
 
-/** Renders a timestamp the way this reader writes timestamps. */
-export function Time({ iso, relative }: { iso: string; relative?: boolean }) {
-  const { locale } = useI18n();
-  const { dateTime, relativeTime } = timeFns;
-  return (
-    <time dateTime={iso} title={dateTime(iso, locale)}>
-      {relative ? relativeTime(iso, locale) : dateTime(iso, locale)}
-    </time>
-  );
-}
-
 // ---------------------------------------------------------------- layout
 //
 // Layout is a class, never an inline style: these four wrappers are the only
@@ -527,37 +515,6 @@ export function Pref({
 }
 
 // ---------------------------------------------------------------- readouts
-
-export function Feed({ children }: { children: ReactNode }) {
-  return <ul className="feed">{children}</ul>;
-}
-
-export function FeedItem({ when, children }: { when: ReactNode; children: ReactNode }) {
-  return (
-    <li>
-      <span className="when">{when}</span>
-      <span className="what">{children}</span>
-    </li>
-  );
-}
-
-export function StatusRow({
-  name,
-  badge,
-  detail,
-}: {
-  name: ReactNode;
-  badge: ReactNode;
-  detail?: ReactNode;
-}) {
-  return (
-    <div className="status-row">
-      <span className="name">{name}</span>
-      {badge}
-      {detail && <span className="detail">{detail}</span>}
-    </div>
-  );
-}
 
 export function Code({ children }: { children: ReactNode }) {
   return <div className="code mono">{children}</div>;

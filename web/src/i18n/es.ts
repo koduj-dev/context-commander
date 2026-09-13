@@ -19,7 +19,6 @@ export const es: Partial<Record<MessageKey, string>> = {
   "nav.workspace": "Espacio de trabajo",
   "nav.installation": "Instalación",
   "nav.preferences": "Preferencias",
-  "nav.search": "Buscar",
   "nav.signOut": "Cerrar sesión",
 
   "theme.dark": "Oscuro",
@@ -40,10 +39,8 @@ export const es: Partial<Record<MessageKey, string>> = {
   "common.loading": "Cargando…",
   "common.retry": "Reintentar",
   "common.cancel": "Cancelar",
-  "common.save": "Guardar",
   "common.close": "Cerrar",
   "common.loadMore": "Cargar más",
-  "common.perPage": "{count} por página",
   "common.showingMore": "Se muestran {count} · hay más disponibles",
   "common.showingAll": "Se muestran {count} · lista completa",
   "common.endOfList": "Fin de la lista",
@@ -73,40 +70,24 @@ export const es: Partial<Record<MessageKey, string>> = {
   "dashboard.title": "Panel",
   "dashboard.lead": "Qué ha cambiado, dónde estaba trabajando y si algo le está esperando.",
   "dashboard.waiting": "Le está esperando",
-  "dashboard.recent": "Actividad reciente",
   "dashboard.yourProjects": "Sus proyectos",
-  "dashboard.clients": "Clientes conectados",
-  "dashboard.openHandoff": "Traspaso abierto",
   "dashboard.noneWaiting": "Nada le está esperando",
   "dashboard.noneWaitingBody": "Ningún traspaso abierto y ninguna denegación que merezca atención.",
   "dashboard.noProjects": "Todavía no pertenece a ningún proyecto",
-  "dashboard.activityHere": "La actividad aparecerá aquí en cuanto haya un proyecto que observar.",
 
   "projects.title": "Proyectos",
   "projects.lead":
     "Todos los proyectos en los que puede actuar. La ruta es como lo dicen las personas; el UUID es lo que entiende el sistema.",
   "projects.filter": "Filtrar proyectos…",
   "projects.column.project": "Proyecto",
-  "projects.column.namespace": "Espacio de nombres",
   "projects.column.role": "Su rol",
-  "projects.column.members": "Miembros",
-  "projects.column.activity": "Última actividad",
   "projects.count": "{count, plural, one {# proyecto} other {# proyectos}}",
   "projects.empty": "No es miembro de ningún proyecto",
   "projects.emptyBody": "Un proyecto aparece aquí en cuanto alguien le añade a él.",
 
-  "project.overview": "Resumen",
-  "project.members": "Miembros",
-  "project.skills": "Skills",
-  "project.policies": "Políticas",
-  "project.secrets": "Secretos",
-  "project.activity": "Actividad",
-  "project.settings": "Ajustes",
   "project.identity": "Identidad",
   "project.path": "Ruta",
   "project.uuid": "UUID",
-  "project.yourRole": "Usted es",
-  "project.created": "Creado",
   "project.tab.overview": "Resumen",
   "project.tab.members": "Miembros",
   "project.tab.skills": "Skills",
@@ -136,17 +117,13 @@ export const es: Partial<Record<MessageKey, string>> = {
   "handoff.history": "Traspasos anteriores",
   "handoff.column.created": "Creado",
   "handoff.column.status": "Estado",
-  "handoff.column.summary": "Resumen",
 
   "members.title": "Miembros",
   "members.lead":
     "Quién puede actuar en este proyecto y con qué rol. Una credencial de cliente no es un miembro — lo es el principal que hay detrás.",
   "members.column.principal": "Principal",
-  "members.column.type": "Tipo",
   "members.column.role": "Rol",
   "members.column.added": "Añadido",
-  "members.type.user": "Persona usuaria",
-  "members.type.service": "Principal de servicio",
   "members.add": "Añadir un principal",
   "members.count": "{count, plural, one {# miembro} other {# miembros}}",
 
@@ -168,7 +145,6 @@ export const es: Partial<Record<MessageKey, string>> = {
     "Todo lo que puede ver: los skills de sus proyectos, los de sus organizaciones y los del estante de la instalación. Los agentes buscan en este mismo catálogo.",
   "registry.search": "Buscar skills por nombre…",
   "registry.column.latest": "Última",
-  "registry.column.checksum": "Suma de verificación",
   "registry.column.author": "Autoría",
   "registry.publish": "Nuevo skill",
   "registry.results": "{count, plural, one {# resultado} other {# resultados}} para «{query}»",
@@ -196,7 +172,6 @@ export const es: Partial<Record<MessageKey, string>> = {
   "activity.column.action": "Acción",
   "activity.column.resource": "Recurso",
   "activity.column.principal": "Principal",
-  "activity.column.client": "Cliente",
   "activity.column.result": "Resultado",
   "activity.result.allow": "Permitido",
   "activity.result.deny": "Denegado",
@@ -256,7 +231,6 @@ export const es: Partial<Record<MessageKey, string>> = {
     "El ámbito que hay por encima de sus proyectos. En una organización un skill o una gate se imponen una sola vez en lugar de proyecto por proyecto.",
   "orgs.column.name": "Organización",
   "orgs.column.role": "Su rol",
-  "orgs.column.members": "Miembros",
   "orgs.empty": "No pertenece a ninguna organización",
   "orgs.emptyBody":
     "La pertenencia va ligada a la cuenta de una persona, de modo que un principal de servicio nunca tiene ninguna — esa es la respuesta correcta para él, no una denegación.",
@@ -280,7 +254,6 @@ export const es: Partial<Record<MessageKey, string>> = {
   "admin.column.user": "Cuenta",
   "admin.column.role": "Rol",
   "admin.column.granted": "Concedido",
-  "admin.column.grantedBy": "Concedido por",
   "admin.createUser": "Crear una cuenta",
   "admin.createUserLead": "Una persona que puede tener un token y ser añadida a proyectos.",
   "admin.email": "Correo electrónico",
@@ -305,7 +278,6 @@ export const es: Partial<Record<MessageKey, string>> = {
   "admin.column.kind": "Tipo",
   "admin.column.reason": "Motivo",
   "admin.column.capability": "Capacidad",
-  "admin.column.credential": "Credencial",
   "admin.securityEmpty": "No hay nada registrado",
   "admin.securityEmptyBody":
     "Ninguna denegación, ninguna credencial desconocida, nada que mirar. Ese es el caso bueno.",
@@ -340,7 +312,6 @@ export const es: Partial<Record<MessageKey, string>> = {
   "artifacts.lead":
     "El almacén compartido que los agentes leen y escriben. Cada escritura crea una versión nueva; nada se sobrescribe en su sitio, de modo que una mala escritura se deja atrás leyendo la anterior en lugar de recuperarse de una copia de seguridad.",
   "artifacts.column.path": "Ruta",
-  "artifacts.column.type": "Tipo de contenido",
   "artifacts.column.version": "Versión",
   "artifacts.column.size": "Tamaño",
   "artifacts.column.hash": "Hash del contenido",
@@ -358,7 +329,6 @@ export const es: Partial<Record<MessageKey, string>> = {
   "artifacts.edit": "Editar",
   "artifacts.new": "Nuevo artefacto",
   "artifacts.save": "Guardar",
-  "artifacts.saved": "Guardado como versión {version}",
   "artifacts.delete": "Eliminar",
   "artifacts.confirmDelete":
     "¿Eliminar {path}? Sus versiones se van con él, y todo lo que lea esa ruta empezará a fallar.",
@@ -380,7 +350,6 @@ export const es: Partial<Record<MessageKey, string>> = {
   "secrets.lead":
     "Solo nombres y referencias. Un valor entra una vez y nunca vuelve a salir por esta interfaz — lo que un proyecto obtiene es una referencia que entrega a una gate.",
   "secrets.column.name": "Nombre",
-  "secrets.column.reference": "Referencia",
   "secrets.add": "Añadir un secreto",
   "secrets.value": "Valor",
   "secrets.delete": "Eliminar",
@@ -402,7 +371,6 @@ export const es: Partial<Record<MessageKey, string>> = {
   "gates.disabled": "Apagada",
   "gates.empty": "Aquí no se aplica ninguna gate",
   "gates.emptyBody": "Nada intercepta las operaciones de este proyecto.",
-  "gates.config": "Configuración",
 
   "events.title": "Eventos",
   "events.lead":
@@ -444,11 +412,7 @@ export const es: Partial<Record<MessageKey, string>> = {
   "handoff.summaryHelp": "Una línea. De qué va este trabajo.",
   "handoff.completedHelp": "Lo que ya está hecho, para que nadie lo repita.",
   "handoff.nextHelp": "Qué hacer a continuación, con detalle suficiente para empezar.",
-  "handoff.created": "Traspaso creado",
   "handoff.confirmClose": "¿Cerrar este traspaso? Dejará de ser el actual y nadie podrá tomarlo.",
-  "handoff.openExists": "Aquí ya hay un traspaso abierto",
-  "handoff.openExistsBody":
-    "Ciérrelo antes de dejar otro — dos traspasos abiertos vuelven ambigua la pregunta «¿qué recojo?», que es justo la que existen para responder.",
 
   "projects.create": "Nuevo proyecto",
   "projects.createLead":
@@ -482,7 +446,6 @@ export const es: Partial<Record<MessageKey, string>> = {
   "context.noHandoffBody": "A un agente que empiece aquí se le dice que no hay nada que continuar.",
   "context.budgetLimit": "Límite de tamaño",
   "context.apply": "Volver a ensamblar",
-  "context.eventLimit": "Eventos",
 
   "skill.pinLead":
     "Un vínculo fijado es uno por el que este proyecto se decidió y que no quiere que se mueva. Solo puede fijarse un vínculo creado aquí — uno heredado no le pertenece a este proyecto.",
@@ -546,7 +509,6 @@ export const es: Partial<Record<MessageKey, string>> = {
   "orgs.createLead":
     "Usted pasa a ser su primera propietaria o propietario. Después podrán asociarse proyectos y skills a ella.",
   "orgs.name": "Nombre",
-  "orgs.created": "{name} creada",
   "orgs.addMember": "Añadir miembro",
   "orgs.addMemberLead":
     "Por id de cuenta, no de principal: un rol de organización habla de una persona. Nada en la API enumera cuentas, así que no hay nada entre lo que elegir.",
@@ -570,5 +532,4 @@ export const es: Partial<Record<MessageKey, string>> = {
 
   "dashboard.waitingLead":
     "Proyectos con un traspaso abierto o tomado — trabajo que alguien dejó para quien venga después.",
-  "dashboard.checking": "Comprobando sus proyectos…",
 };

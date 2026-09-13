@@ -21,8 +21,20 @@
  * which looks translated and never gets fixed. They are reported instead.
  */
 import { readFileSync, existsSync } from "node:fs";
+import { readFile, readdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+
+/** Every .ts/.tsx under a directory, except the catalogues themselves. */
+async function collectSources(dir) {
+  const out = [];
+  for (const entry of await readdir(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) out.push(...(await collectSources(full)));
+    else if (/\.tsx?$/.test(entry.name) && !full.includes("i18n")) out.push(full);
+  }
+  return out;
+}
 
 const here = dirname(fileURLToPath(import.meta.url));
 const i18nDir = join(here, "..", "src", "i18n");
@@ -135,6 +147,27 @@ for (const locale of locales) {
   notes.push(
     `${locale}: ${en.size - missing.length}/${en.size} translated (${pct}%)` +
       (missing.length ? `, ${missing.length} falling back to English` : ""),
+  );
+}
+
+/**
+ * Keys nobody renders.
+ *
+ * Reported rather than failed: a key can legitimately be built at runtime —
+ * `role.${role}`, `scope.${scope}` — and this cannot see that. But a growing
+ * list here usually means something else: a screen was rebuilt and its old
+ * copy stayed behind, or a feature was written into the catalogue and never
+ * wired up. Both are worth noticing while it is still one or two.
+ */
+const usage = (
+  await Promise.all((await collectSources(join(here, "..", "src"))).map((f) => readFile(f, "utf8")))
+).join("");
+const dynamic = /^(role|scope|trust)\./;
+const unused = [...en.keys()].filter((k) => !dynamic.test(k) && !usage.includes(`"${k}"`));
+if (unused.length) {
+  notes.push(
+    `${unused.length} key(s) defined but never rendered: ${unused.slice(0, 8).join(", ")}` +
+      (unused.length > 8 ? ", …" : ""),
   );
 }
 

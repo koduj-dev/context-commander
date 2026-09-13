@@ -74,6 +74,7 @@ export function ProjectHistory() {
               <DataTable
                 columns={[
                   { key: "c", label: t("history.column.conversation") },
+                  { key: "by", label: t("history.column.by") },
                   { key: "started", label: t("history.column.started"), align: "r" },
                 ]}
               >
@@ -89,6 +90,11 @@ export function ProjectHistory() {
                       >
                         <Mono truncate>{c.id}</Mono>
                       </a>
+                    </td>
+                    <td>
+                      <Mono dim truncate>
+                        {c.created_by_principal}
+                      </Mono>
                     </td>
                     <td className="r">
                       <span className="dim">{f.relative(c.created_at)}</span>
@@ -161,7 +167,10 @@ function Conversation({ id }: { id: string }) {
                   </td>
                   <td>
                     {text === null ? (
-                      <span className="dim">{t("history.notText")}</span>
+                      <Cell
+                        primary={<span className="dim">{t("history.notText")}</span>}
+                        secondary={<span className="dim">{t("history.notTextBody")}</span>}
+                      />
                     ) : (
                       <Code>{text}</Code>
                     )}

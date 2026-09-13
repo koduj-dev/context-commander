@@ -61,6 +61,9 @@ export function Shell() {
 
   return (
     <div className="app">
+      <a className="skip" href="#main">
+        {t("app.skipToContent")}
+      </a>
       <aside className="sidebar">
         <div className="brand">
           <Link to="/">
@@ -116,7 +119,7 @@ export function Shell() {
           )}
         </nav>
 
-        <Link className="sidebar-foot" to="/preferences">
+        <Link className="sidebar-foot" to="/preferences" title={t("nav.preferences")}>
           <div className="avatar" aria-hidden="true">
             {initials(principalName(me) || "?")}
           </div>
@@ -164,7 +167,7 @@ export function Shell() {
             </button>
           </span>
         </div>
-        <main className="page">
+        <main className="page" id="main" tabIndex={-1}>
           <Outlet />
         </main>
       </div>

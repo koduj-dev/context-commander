@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useT } from "../i18n";
+import { useAuth } from "../app/auth";
 import { useFormat } from "../app/prefs";
 import { ApiError, api, type Handoff, type HandoffDetail } from "../lib/api";
 import { useList, useResource } from "../lib/resource";
@@ -155,13 +156,17 @@ function HandoffBody({ handoff, onChanged }: { handoff: HandoffDetail; onChanged
   const t = useT();
   const f = useFormat();
   const { namespace, slug } = useProject();
+  const { me } = useAuth();
+  const [lost, setLost] = useState(false);
 
   async function claim() {
+    setLost(false);
     try {
       await api.claimHandoff(namespace, slug, handoff.id);
-    } catch {
-      // A 409 here is the coordination answer — another client won the race.
-      // Reloading shows who, which is the useful thing to say.
+    } catch (err) {
+      // A 409 here is the coordination answer — another client won the race —
+      // and saying so is more useful than a silently reloaded screen.
+      if (err instanceof ApiError && err.kind === "conflict") setLost(true);
     } finally {
       onChanged();
     }
@@ -198,6 +203,19 @@ function HandoffBody({ handoff, onChanged }: { handoff: HandoffDetail; onChanged
         </div>
       )}
 
+      {handoff.referenced_artifacts && handoff.referenced_artifacts.length > 0 && (
+        <div className="mt">
+          <div className="label-caps">{t("handoff.references")}</div>
+          {handoff.referenced_artifacts.map((id) => (
+            <div key={id}>
+              <Mono dim truncate>
+                {id}
+              </Mono>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="mt row row-sm">
         <span className="dim">{f.relative(handoff.created_at)}</span>
         <span className="spacer" />
@@ -213,12 +231,23 @@ function HandoffBody({ handoff, onChanged }: { handoff: HandoffDetail; onChanged
         )}
       </div>
 
+      {lost && (
+        <div className="mt">
+          <Note tone="warn">
+            <b>{t("handoff.alreadyClaimed")}</b>
+            <div className="mt-sm">{t("handoff.alreadyClaimedBody")}</div>
+          </Note>
+        </div>
+      )}
+
       {handoff.status === "claimed" && (
         <div className="mt">
           <Note tone="warn">
-            {handoff.claimed_by_principal
-              ? t("handoff.claimedBy", { name: handoff.claimed_by_principal })
-              : t("handoff.status.claimed")}
+            {handoff.claimed_by_principal === me?.principal_id
+              ? t("handoff.claimedByYou")
+              : handoff.claimed_by_principal
+                ? t("handoff.claimedBy", { name: handoff.claimed_by_principal })
+                : t("handoff.status.claimed")}
           </Note>
         </div>
       )}

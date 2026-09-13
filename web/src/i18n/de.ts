@@ -23,7 +23,6 @@ export const de: Partial<Record<MessageKey, string>> = {
   "nav.workspace": "Arbeitsbereich",
   "nav.installation": "Installation",
   "nav.preferences": "Einstellungen",
-  "nav.search": "Suchen",
   "nav.signOut": "Abmelden",
 
   "theme.dark": "Dunkel",
@@ -44,10 +43,8 @@ export const de: Partial<Record<MessageKey, string>> = {
   "common.loading": "Wird geladen…",
   "common.retry": "Erneut versuchen",
   "common.cancel": "Abbrechen",
-  "common.save": "Speichern",
   "common.close": "Schließen",
   "common.loadMore": "Mehr laden",
-  "common.perPage": "{count} pro Seite",
   "common.showingMore": "{count} angezeigt · weitere verfügbar",
   "common.showingAll": "{count} angezeigt · vollständig",
   "common.endOfList": "Ende der Liste",
@@ -78,41 +75,25 @@ export const de: Partial<Record<MessageKey, string>> = {
   "dashboard.lead":
     "Was sich geändert hat, woran Sie gearbeitet haben und ob etwas auf Sie wartet.",
   "dashboard.waiting": "Wartet auf Sie",
-  "dashboard.recent": "Letzte Aktivität",
   "dashboard.yourProjects": "Ihre Projekte",
-  "dashboard.clients": "Verbundene Clients",
-  "dashboard.openHandoff": "Offene Übergabe",
   "dashboard.noneWaiting": "Nichts wartet auf Sie",
   "dashboard.noneWaitingBody":
     "Keine offenen Übergaben, keine Ablehnungen, die einen Blick lohnen.",
   "dashboard.noProjects": "Sie sind noch in keinem Projekt",
-  "dashboard.activityHere": "Aktivität erscheint hier, sobald es ein Projekt zu beobachten gibt.",
 
   "projects.title": "Projekte",
   "projects.lead":
     "Alle Projekte, in denen Sie handeln können. Der Pfad ist, wie Menschen darüber sprechen; die UUID ist, was das System meint.",
   "projects.filter": "Projekte filtern…",
   "projects.column.project": "Projekt",
-  "projects.column.namespace": "Namensraum",
   "projects.column.role": "Ihre Rolle",
-  "projects.column.members": "Mitglieder",
-  "projects.column.activity": "Letzte Aktivität",
   "projects.count": "{count, plural, one {# Projekt} other {# Projekte}}",
   "projects.empty": "Sie sind in keinem Projekt Mitglied",
   "projects.emptyBody": "Ein Projekt erscheint hier, sobald jemand Sie hinzufügt.",
 
-  "project.overview": "Überblick",
-  "project.members": "Mitglieder",
-  "project.skills": "Skills",
-  "project.policies": "Richtlinien",
-  "project.secrets": "Geheimnisse",
-  "project.activity": "Aktivität",
-  "project.settings": "Einstellungen",
   "project.identity": "Identität",
   "project.path": "Pfad",
   "project.uuid": "UUID",
-  "project.yourRole": "Sie sind",
-  "project.created": "Erstellt",
   "project.tab.overview": "Überblick",
   "project.tab.members": "Mitglieder",
   "project.tab.skills": "Skills",
@@ -142,17 +123,13 @@ export const de: Partial<Record<MessageKey, string>> = {
   "handoff.history": "Frühere Übergaben",
   "handoff.column.created": "Erstellt",
   "handoff.column.status": "Status",
-  "handoff.column.summary": "Zusammenfassung",
 
   "members.title": "Mitglieder",
   "members.lead":
     "Wer in diesem Projekt handeln darf und in welcher Rolle. Ein Client-Zugangsmerkmal ist kein Mitglied — das Principal dahinter ist es.",
   "members.column.principal": "Principal",
-  "members.column.type": "Typ",
   "members.column.role": "Rolle",
   "members.column.added": "Hinzugefügt",
-  "members.type.user": "Benutzerin oder Benutzer",
-  "members.type.service": "Dienst-Principal",
   "members.add": "Principal hinzufügen",
   "members.count": "{count, plural, one {# Mitglied} other {# Mitglieder}}",
 
@@ -175,7 +152,6 @@ export const de: Partial<Record<MessageKey, string>> = {
     "Alles, was Sie sehen können: Skills in Ihren Projekten, in Ihren Organisationen und im installationsweiten Bestand. Agenten durchsuchen denselben Katalog.",
   "registry.search": "Skills nach Namen suchen…",
   "registry.column.latest": "Neueste",
-  "registry.column.checksum": "Prüfsumme",
   "registry.column.author": "Urheberin oder Urheber",
   "registry.publish": "Neuer Skill",
   "registry.results": "{count, plural, one {# Treffer} other {# Treffer}} für „{query}“",
@@ -203,7 +179,6 @@ export const de: Partial<Record<MessageKey, string>> = {
   "activity.column.action": "Aktion",
   "activity.column.resource": "Ressource",
   "activity.column.principal": "Principal",
-  "activity.column.client": "Client",
   "activity.column.result": "Ergebnis",
   "activity.result.allow": "Erlaubt",
   "activity.result.deny": "Abgelehnt",
@@ -262,7 +237,6 @@ export const de: Partial<Record<MessageKey, string>> = {
     "Die Ebene über Ihren Projekten. In einer Organisation wird ein Skill oder ein Gate einmal vorgeschrieben statt in jedem Projekt einzeln.",
   "orgs.column.name": "Organisation",
   "orgs.column.role": "Ihre Rolle",
-  "orgs.column.members": "Mitglieder",
   "orgs.empty": "Sie gehören zu keiner Organisation",
   "orgs.emptyBody":
     "Die Mitgliedschaft hängt am Benutzerkonto, ein Dienst-Principal hat deshalb nie eine — das ist für ihn die richtige Antwort und keine Ablehnung.",
@@ -286,7 +260,6 @@ export const de: Partial<Record<MessageKey, string>> = {
   "admin.column.user": "Benutzerkonto",
   "admin.column.role": "Rolle",
   "admin.column.granted": "Erteilt",
-  "admin.column.grantedBy": "Erteilt von",
   "admin.createUser": "Benutzerkonto anlegen",
   "admin.createUserLead":
     "Eine Person, die ein Token halten und zu Projekten hinzugefügt werden kann.",
@@ -312,7 +285,6 @@ export const de: Partial<Record<MessageKey, string>> = {
   "admin.column.kind": "Art",
   "admin.column.reason": "Grund",
   "admin.column.capability": "Berechtigung",
-  "admin.column.credential": "Zugangsmerkmal",
   "admin.securityEmpty": "Nichts aufgezeichnet",
   "admin.securityEmptyBody":
     "Keine Ablehnungen, keine unbekannten Zugangsmerkmale, nichts anzusehen. Das ist der gute Fall.",
@@ -348,7 +320,6 @@ export const de: Partial<Record<MessageKey, string>> = {
   "artifacts.lead":
     "Der gemeinsame Speicher, aus dem Agenten lesen und in den sie schreiben. Jeder Schreibvorgang legt eine neue Version an; nichts wird an Ort und Stelle überschrieben, ein schlechter Schreibvorgang lässt sich also überlesen statt aus einem Backup zurückholen.",
   "artifacts.column.path": "Pfad",
-  "artifacts.column.type": "Inhaltstyp",
   "artifacts.column.version": "Version",
   "artifacts.column.size": "Größe",
   "artifacts.column.hash": "Prüfsumme des Inhalts",
@@ -367,7 +338,6 @@ export const de: Partial<Record<MessageKey, string>> = {
   "artifacts.edit": "Bearbeiten",
   "artifacts.new": "Neues Artefakt",
   "artifacts.save": "Speichern",
-  "artifacts.saved": "Als Version {version} gespeichert",
   "artifacts.delete": "Löschen",
   "artifacts.confirmDelete":
     "{path} löschen? Die Versionen gehen mit, und alles, was diesen Pfad liest, beginnt zu scheitern.",
@@ -390,7 +360,6 @@ export const de: Partial<Record<MessageKey, string>> = {
   "secrets.lead":
     "Nur Namen und Verweise. Ein Wert geht einmal hinein und kommt über diese Oberfläche nie wieder heraus — ein Projekt erhält einen Verweis, den es einem Gate übergibt.",
   "secrets.column.name": "Name",
-  "secrets.column.reference": "Verweis",
   "secrets.add": "Geheimnis hinzufügen",
   "secrets.value": "Wert",
   "secrets.delete": "Löschen",
@@ -412,7 +381,6 @@ export const de: Partial<Record<MessageKey, string>> = {
   "gates.disabled": "Aus",
   "gates.empty": "Hier greift kein Gate",
   "gates.emptyBody": "In diesem Projekt greift nichts in Operationen ein.",
-  "gates.config": "Konfiguration",
 
   "events.title": "Ereignisse",
   "events.lead":
@@ -455,12 +423,8 @@ export const de: Partial<Record<MessageKey, string>> = {
   "handoff.summaryHelp": "Eine Zeile. Worum geht es bei dieser Arbeit.",
   "handoff.completedHelp": "Was bereits erledigt ist, damit es niemand zweimal tut.",
   "handoff.nextHelp": "Was als Nächstes zu tun ist, konkret genug zum Anfangen.",
-  "handoff.created": "Übergabe angelegt",
   "handoff.confirmClose":
     "Diese Übergabe abschließen? Sie ist dann nicht mehr die aktuelle und niemand kann sie übernehmen.",
-  "handoff.openExists": "Hier ist bereits eine Übergabe offen",
-  "handoff.openExistsBody":
-    "Schließen Sie sie, bevor Sie eine weitere hinterlassen — zwei offene Übergaben machen die Frage „was soll ich aufgreifen“ mehrdeutig, und genau die sollen sie beantworten.",
 
   "projects.create": "Neues Projekt",
   "projects.createLead":
@@ -495,7 +459,6 @@ export const de: Partial<Record<MessageKey, string>> = {
     "Einem Agenten, der hier anfängt, wird gesagt, dass es nichts fortzusetzen gibt.",
   "context.budgetLimit": "Größengrenze",
   "context.apply": "Neu zusammenstellen",
-  "context.eventLimit": "Ereignisse",
 
   "skill.pinLead":
     "Eine festgesetzte Bindung ist eine, für die sich dieses Projekt entschieden hat und die nicht verschoben werden soll. Nur eine hier entstandene Bindung lässt sich festsetzen — eine geerbte gehört diesem Projekt nicht.",
@@ -559,7 +522,6 @@ export const de: Partial<Record<MessageKey, string>> = {
   "orgs.createLead":
     "Sie werden ihre erste Eigentümerin oder ihr erster Eigentümer. Projekte und Skills lassen sich danach auf sie beziehen.",
   "orgs.name": "Name",
-  "orgs.created": "{name} angelegt",
   "orgs.addMember": "Mitglied hinzufügen",
   "orgs.addMemberLead":
     "Über die Benutzer-ID, nicht die des Principals: eine Organisationsrolle betrifft einen Menschen. Kein Endpunkt der API listet Benutzerkonten auf, es gibt also nichts zur Auswahl.",
@@ -583,5 +545,4 @@ export const de: Partial<Record<MessageKey, string>> = {
 
   "dashboard.waitingLead":
     "Projekte, in denen eine Übergabe offen oder übernommen ist — Arbeit, die jemand für die nächste Person oder den nächsten Agenten hinterlassen hat.",
-  "dashboard.checking": "Ihre Projekte werden geprüft…",
 };
