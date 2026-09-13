@@ -17,7 +17,7 @@
   <a href="index.html">All screens</a>
   <span class="dim">·</span>
   <span>Connections</span>
-  <span class="grow"></span>
+  <span style="flex:1"></span>
   <span class="seg">
     <button type="button" aria-pressed="true" onclick="setTheme('dark',this)">Dark</button>
     <button type="button" aria-pressed="false" onclick="setTheme('light',this)">Light</button>
@@ -60,14 +60,14 @@
   
 </div>
 <div class="grid g-2-1"><div class="stack"><section class="panel"><header><h2>MCP endpoint</h2><span class="sub">Claude Code and Codex CLI</span><div class="right"><button class="btn btn-sm">Issue token</button></div></header><div class="body">
-      <p class="sec lead-out">Any MCP client connects with a bearer token. Two clients are guaranteed and covered by a smoke test; others speak the same protocol.</p>
+      <p class="sec" style="margin:0 0 10px">Any MCP client connects with a bearer token. Two clients are guaranteed and covered by a smoke test; others speak the same protocol.</p>
       <div class="code mono">claude mcp add --transport http context-commander \\\n  http://127.0.0.1:8490/mcp \\\n  --header "Authorization: Bearer $CC_TOKEN"</div>
       <div class="mt"><div class="code mono">[mcp_servers.context_commander]\nurl = "http://127.0.0.1:8490/mcp"\nbearer_token_env_var = "CC_TOKEN"</div></div></div></section><section class="panel"><header><h2>Repositories</h2></header><div class="body">
       <div class="empty">
         <b>No repositories bound</b>
         Integrations are not implemented yet. When they are, a repository binds as project metadata and its credential is a <span class="mono">secret://</span> reference.
       </div></div><footer><span class="dim">Shown as unavailable rather than as a form that would fail.</span></footer></section></div><div class="stack stack-start"><section class="panel"><header><h2>Clients seen here</h2></header><div class="body tight"><table class="dt"><thead><tr><th>Client</th><th>Acting as</th><th class="r">Last</th></tr></thead><tbody><tr><td>Claude Code</td><td>Filip Majerík</td><td class="r"><span class="dim">2m</span></td></tr><tr><td>Codex CLI</td><td>Filip Majerík</td><td class="r"><span class="dim">14m</span></td></tr><tr><td><span class="mono">ci-agent</span></td><td><span class="mono">nightly-review-agent</span></td><td class="r"><span class="dim">6h</span></td></tr></tbody></table></div></section><section class="panel"><header><h2>Skill delivery</h2></header><div class="body">
-      <p class="sec lead-out">The server never writes to a client's disk.</p>
+      <p class="sec" style="margin:0 0 10px">The server never writes to a client's disk.</p>
       <div class="code mono">$ ccd sync-skills --project \\\n    filip/es-migration</div></div><footer><span class="dim">Only changed versions download.</span></footer></section></div></div>
 
     </div>

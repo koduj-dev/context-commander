@@ -17,7 +17,7 @@
   <a href="index.html">All screens</a>
   <span class="dim">·</span>
   <span>Foundations</span>
-  <span class="grow"></span>
+  <span style="flex:1"></span>
   <span class="seg">
     <button type="button" aria-pressed="true" onclick="setTheme('dark',this)">Dark</button>
     <button type="button" aria-pressed="false" onclick="setTheme('light',this)">Light</button>
@@ -106,12 +106,12 @@
       <p style="margin:0 0 12px;color:var(--cc-text-secondary);font-size:12.5px">Lead paragraph · 12.5 · secondary. One or two lines saying what the screen answers.</p>
       <div style="font-size:13px;margin-bottom:4px">Body · 13 · primary text</div>
       <div class="sub-line">Secondary line · 11.5 · muted, under a value</div>
-      <div class="label-caps mt-sm">Caption · 11 · uppercase</div>
+      <div class="label-caps" style="margin-top:10px">Caption · 11 · uppercase</div>
       <div class="mono">Identifier · 12 · be53de32-7597-495a-ba7c</div>
     </div>
     <p class="spec-note">Inter throughout. Identifiers, paths, hashes, actions and counts are monospace with tabular figures — a column of IDs that shimmers is unreadable.</p></div></section><section class="panel"><header><h2>Buttons</h2></header><div class="body">
     <div class="specimen">
-      <div class="row wrap">
+      <div class="row" style="flex-wrap:wrap">
         <button class="btn btn-primary">Primary action</button>
         <button class="btn">Secondary</button>
         <button class="btn btn-danger btn-sm">Revoke</button>
@@ -131,6 +131,10 @@
   </div></div><footer>Status never rides on colour alone — these survive greyscale and colour blindness.</footer></section></div>
 
 <div class="mt"><div class="grid g2"><section class="panel"><header><h2>Data table</h2><span class="sub">The workhorse</span></header><div class="body tight"><table class="dt"><thead><tr><th>Action</th><th>Principal</th><th>Client</th><th class="r">Result</th></tr></thead><tbody><tr><td><span class="mono">handoff.claimed</span></td><td>Filip Majerík</td><td><span class="sec">Codex CLI</span></td><td class="r"><span class="badge b-ok"><span class="dot"></span>allow</span></td></tr><tr><td><span class="mono">artifact.write</span></td><td>Petr Novák</td><td><span class="sec">Claude Code</span></td><td class="r"><span class="badge b-danger"><span class="dot"></span>deny</span></td></tr></tbody></table></div><footer>Sticky header, hover row, right-aligned numerics and status.</footer></section><section class="panel"><header><h2>Activity feed</h2><span class="sub">When the sequence matters more than the columns</span></header><div class="body tight"><ul class="feed"><li><span class="when">09:41</span><span class="what"><span class="mono">handoff.closed</span> <span class="dim">by Filip via Codex CLI</span></span></li><li><span class="when">09:12</span><span class="what"><span class="mono">artifact.write</span> <span class="dim">refused — READER</span> <span class="badge b-danger"><span class="dot"></span>deny</span></span></li></ul></div></section></div></div>
+
+<div class="mt"><section class="panel"><header><h2>Pagination</h2><span class="sub">Cursor, not page numbers</span></header><div class="body">
+  <div class="specimen"><div class="pager"><span class="count">Showing <span class="num">50</span> rows · more available</span><span class="spacer"></span><select aria-label="Page size"><option>25 per page</option><option selected>50 per page</option><option>100 per page</option><option>250 per page</option></select><button class="btn btn-sm">Load more</button></div></div>
+  <div class="specimen"><div class="pager"><span class="count">Showing <span class="num">12</span> credentials · complete</span><span class="spacer"></span><select aria-label="Page size"><option>25 per page</option><option selected>50 per page</option><option>100 per page</option><option>250 per page</option></select><span class="dim">end of list</span></div></div></div><footer>Every growing list here is keyset-paginated: the server returns an opaque cursor meaning “continue from here” and does not know how many pages exist — counting them would mean scanning rows nobody asked for. A 1 · 2 · 3 … 47 control would be a promise the API cannot keep.</footer></section></div>
 
 <div class="mt"><div class="grid g3"><section class="panel"><header><h2>Definition list</h2><span class="sub">Identity blocks</span></header><div class="body"><dl class="defs"><dt>Path</dt><dd><span class="mono">filip/es-migration</span></dd><dt>UUID</dt><dd><span class="mono">be53de32-7597-495a-ba7c-2ed8546315b1</span></dd><dt>You are</dt><dd><span class="badge b-active"><span class="dot"></span>OWNER</span></dd></dl></div></section><section class="panel"><header><h2>Metrics</h2><span class="sub">Counts that answer a question</span></header><div class="body"><div class="grid g2"><div class="kpi"><span class="v">12</span><span class="k">refusals / 24h</span></div><div class="kpi"><span class="v">2.4<span class="unit"> GB</span></span><span class="k">stored</span></div></div>
     <div class="mt"><div><div class="label-caps">Project storage</div></div><div class="meter"><i style="width:9%"></i></div></div></div></section><section class="panel"><header><h2>Notes</h2><span class="sub">Inline, never a toast</span></header><div class="body"><div class="note">Neutral context a reader needs before acting.</div>

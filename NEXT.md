@@ -212,6 +212,23 @@ on the planned move to a public repo:
 
 ## 📦 Backlog
 
+- **Project templates.** Raised by the maintainer while reviewing the UI
+  mockups, and not in any earlier scope. The shape that would fit what
+  already exists: a template is a **named bundle of bindings**, not a
+  project copy — a set of skill bindings, a set of gate bindings, and
+  optionally a few conventional artifacts under `context/`. Creating a
+  project from one applies those bindings at creation; it copies no
+  handoffs, no history and no content, because those belong to the work,
+  not to the shape of the project.
+  - Fits the grain: everything in the bundle already has a scope vocabulary
+    and an install operation. A template is mostly a list of things to call
+    on behalf of the creator, plus authorization — you may only template
+    what you may already bind.
+  - The trap to avoid: a template that *forks* an existing project's
+    content. That is a copy with no provenance, and it is how two projects
+    start silently diverging from a shared artifact nobody owns.
+  - Not mocked. The mockups deliberately show nothing the backend cannot
+    do, and a template screen would be the largest promise on the board.
 - **[security] Per-IP rate limiting needs a trusted-proxy configuration.**
   `internal/ratelimit` limits per credential and bounds authentications in
   flight, which is everything that can be done correctly today. Per-IP

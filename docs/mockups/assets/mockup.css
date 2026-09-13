@@ -242,6 +242,10 @@ a:hover { text-decoration: underline; }
 .panel > header .right { margin-left: auto; display: flex; gap: 7px; align-items: center; }
 .panel .body { padding: 14px; }
 .panel .body.tight { padding: 0; }
+/* Vertical rhythm between whatever a body happens to contain. Adjacent
+ * block margins collapse, so an element that already carries a bottom
+ * margin does not end up with twice the gap. */
+.panel .body > * + * { margin-top: 10px; }
 .panel > footer {
   padding: 8px 14px; border-top: 1px solid var(--cc-border);
   font-size: 12px; color: var(--cc-text-muted);
@@ -322,6 +326,25 @@ table.dt td.r, table.dt th.r { text-align: right; }
 .scope.organization::before { background: color-mix(in srgb, var(--cc-accent-secondary-visual) 55%, var(--cc-border-strong)); }
 .scope.project::before { background: var(--cc-accent-primary-visual); }
 
+/* ---------- pagination ----------
+ * Deliberately "load more" and not 1 · 2 · 3 … 47. Every growing list in
+ * this system is keyset-paginated: the server hands back an opaque cursor
+ * meaning "continue from here" and has no idea how many pages exist, because
+ * counting them would mean scanning rows nobody asked for. A page-number
+ * control would be a promise the API cannot keep. */
+.pager { display: flex; align-items: center; gap: 10px; width: 100%; }
+.pager .count { color: var(--cc-text-muted); }
+.pager .spacer { flex: 1; }
+.pager select {
+  background: var(--cc-surface-2);
+  border: 1px solid var(--cc-border);
+  border-radius: 5px;
+  color: var(--cc-text-secondary);
+  font: inherit;
+  font-size: 12px;
+  padding: 3px 6px;
+}
+
 /* ---------- misc ---------- */
 
 .kpi { display: flex; flex-direction: column; gap: 2px; }
@@ -355,8 +378,11 @@ table.dt td.r, table.dt th.r { text-align: right; }
   border: 1px solid var(--cc-border);
   border-radius: 5px;
   padding: 10px 12px;
-  overflow-x: auto;
-  white-space: pre;
+  /* Wrap, do not scroll sideways. A line that runs off the edge of a panel
+   * is a line nobody reads, and these are short enough that wrapping costs
+   * nothing — the multi-line commands already carry explicit continuations. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
   color: var(--cc-text-secondary);
 }
 

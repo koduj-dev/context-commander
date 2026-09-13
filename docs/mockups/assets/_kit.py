@@ -126,6 +126,26 @@ def feed(items):
         lis.append(f'<li><span class="when">{when}</span><span class="what">{what}</span>{t}</li>')
     return f'<ul class="feed">{"".join(lis)}</ul>'
 
+def pager(shown, more=True, unit="rows", page_size=50):
+    """The footer of any growing list.
+
+    There is no page count and no page numbers on purpose — the API is
+    cursor-based and cannot tell you how many pages exist without counting
+    rows nobody asked for. "Showing N, more available" is the honest form of
+    the same information.
+    """
+    opts = "".join(
+        f'<option{" selected" if n == page_size else ""}>{n} per page</option>'
+        for n in (25, 50, 100, 250))
+    right = (f'{btn("Load more", small=True)}' if more
+             else '<span class="dim">end of list</span>')
+    tail = "more available" if more else "complete"
+    return (f'<div class="pager"><span class="count">Showing '
+            f'<span class="num">{shown}</span> {unit} · {tail}</span>'
+            f'<span class="spacer"></span>'
+            f'<select aria-label="Page size">{opts}</select>{right}</div>')
+
+
 def grid(children, cols="g2", extra=""):
     cls = f"grid {cols}" + (" " + extra if extra else "")
     return f'<div class="{cls}">{"".join(children)}</div>'

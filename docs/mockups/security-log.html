@@ -128,9 +128,10 @@
       </tbody>
     </table>
   </div>
-  <footer><span class="dim">Reasons are fixed strings. No request bodies, no tokens, no project content — this page is readable by every installation admin.</span></footer>
+  <footer><div class="pager"><span class="count">Showing <span class="num">5</span> events · more available</span><span class="spacer"></span><select aria-label="Page size"><option>25 per page</option><option selected>50 per page</option><option>100 per page</option><option>250 per page</option></select><button class="btn btn-sm">Load more</button></div></footer>
 </section>
 
+<div class="note mt">Reasons are fixed strings. No request bodies, no tokens, no project content — this page is readable by every installation admin.</div>
 <div class="note info mt">
   Recording can be turned off with <span class="mono">ccd serve --security-log=false</span>. It is all-or-nothing on purpose: a half-recorded security timeline reads as a complete one. The server warns at startup when it runs without it.
 </div>
