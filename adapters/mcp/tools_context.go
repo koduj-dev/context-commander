@@ -51,7 +51,6 @@ type contextHandoffResult struct {
 	CompletedWork       string   `json:"completed_work"`
 	NextActions         string   `json:"next_actions"`
 	ReferencedArtifacts []string `json:"referenced_artifacts,omitempty"`
-	ReferencedTasks     []string `json:"referenced_tasks,omitempty"`
 }
 
 type contextArtifactResult struct {
@@ -116,7 +115,6 @@ func toContextPackResult(p contextpack.Pack, thisClientID uuid.UUID) contextPack
 			CreatedAt: p.Handoff.CreatedAt.Format(rfc3339),
 			Summary:   p.Handoff.Summary, CompletedWork: p.Handoff.CompletedWork, NextActions: p.Handoff.NextActions,
 			ReferencedArtifacts: formatUUIDs(p.Handoff.ReferencedArtifacts),
-			ReferencedTasks:     formatUUIDs(p.Handoff.ReferencedTasks),
 		}
 		if p.Handoff.ClaimedAt != nil {
 			h.ClaimedAt = p.Handoff.ClaimedAt.Format(rfc3339)

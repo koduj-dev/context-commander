@@ -77,7 +77,6 @@ type handoffDetailResult struct {
 	CompletedWork       string   `json:"completed_work"`
 	NextActions         string   `json:"next_actions"`
 	ReferencedArtifacts []string `json:"referenced_artifacts,omitempty"`
-	ReferencedTasks     []string `json:"referenced_tasks,omitempty"`
 }
 
 func registerHandoffTools(server *sdkmcp.Server, deps Deps, principalID, clientID uuid.UUID) {
@@ -101,7 +100,6 @@ func registerHandoffTools(server *sdkmcp.Server, deps Deps, principalID, clientI
 		CompletedWork       string   `json:"completed_work" jsonschema:"what has been completed"`
 		NextActions         string   `json:"next_actions" jsonschema:"what the next agent should do"`
 		ReferencedArtifacts []string `json:"referenced_artifacts,omitempty" jsonschema:"artifact IDs relevant to this handoff"`
-		ReferencedTasks     []string `json:"referenced_tasks,omitempty" jsonschema:"task IDs relevant to this handoff"`
 	}
 	sdkmcp.AddTool(server, &sdkmcp.Tool{
 		Name: "handoff.create",
@@ -124,16 +122,11 @@ func registerHandoffTools(server *sdkmcp.Server, deps Deps, principalID, clientI
 		if err != nil {
 			return nil, handoffResult{}, err
 		}
-		referencedTasks, err := parseUUIDs(args.ReferencedTasks)
-		if err != nil {
-			return nil, handoffResult{}, err
-		}
 		h, err := deps.Handoffs.Create(ctx, principalID, &clientID, projectID, sourceSessionID, handoffs.Body{
 			Summary:             args.Summary,
 			CompletedWork:       args.CompletedWork,
 			NextActions:         args.NextActions,
 			ReferencedArtifacts: referencedArtifacts,
-			ReferencedTasks:     referencedTasks,
 		})
 		if err != nil {
 			return nil, handoffResult{}, err
@@ -167,7 +160,6 @@ func registerHandoffTools(server *sdkmcp.Server, deps Deps, principalID, clientI
 			CompletedWork:       body.CompletedWork,
 			NextActions:         body.NextActions,
 			ReferencedArtifacts: formatUUIDs(body.ReferencedArtifacts),
-			ReferencedTasks:     formatUUIDs(body.ReferencedTasks),
 		}, nil
 	})
 
@@ -231,7 +223,6 @@ func registerHandoffTools(server *sdkmcp.Server, deps Deps, principalID, clientI
 			CompletedWork:       body.CompletedWork,
 			NextActions:         body.NextActions,
 			ReferencedArtifacts: formatUUIDs(body.ReferencedArtifacts),
-			ReferencedTasks:     formatUUIDs(body.ReferencedTasks),
 		}, nil
 	})
 

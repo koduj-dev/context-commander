@@ -186,7 +186,6 @@ export interface HandoffDetail extends Handoff {
   completed_work: string;
   next_actions: string;
   referenced_artifacts?: string[];
-  referenced_tasks?: string[];
 }
 
 export interface Conversation {
@@ -365,7 +364,6 @@ export const api = {
       completed_work: string;
       next_actions: string;
       referenced_artifacts?: string[];
-      referenced_tasks?: string[];
     },
   ) => req<HandoffDetail>("POST", `/v1/projects/${namespace}/${slug}/handoffs/`, body),
 

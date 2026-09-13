@@ -713,10 +713,17 @@ Handoff
 ├── completed_work
 ├── next_actions
 ├── referenced_artifacts
-├── referenced_tasks
 ├── created_at
 └── status
 ```
+
+**No `referenced_tasks`.** An earlier draft of this list carried one, and it
+had leaked into the domain type, both adapters and the context pack without
+anything ever populating it. v1 has no Task domain (§3 non-goals), so the
+field was removed before the API stabilised rather than carried forever.
+Handoffs written before the removal keep the key inside their encrypted
+body; `encoding/json` drops unknown fields on read, so nothing had to be
+migrated.
 
 A Markdown rendering may still be useful for human readability.
 

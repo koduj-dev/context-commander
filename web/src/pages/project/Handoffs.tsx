@@ -26,7 +26,6 @@ export default function Handoffs({ namespace, slug, role }: { namespace: string;
   const [completedWork, setCompletedWork] = useState("");
   const [nextActions, setNextActions] = useState("");
   const [referencedArtifacts, setReferencedArtifacts] = useState("");
-  const [referencedTasks, setReferencedTasks] = useState("");
 
   // statusFilter is a dep, not something the form refreshes by hand: the
   // cursor is a position within one filter's ordering, so changing the filter
@@ -65,14 +64,12 @@ export default function Handoffs({ namespace, slug, role }: { namespace: string;
         completed_work: completedWork.trim(),
         next_actions: nextActions.trim(),
         referenced_artifacts: splitIds(referencedArtifacts),
-        referenced_tasks: splitIds(referencedTasks),
       });
       setSourceSessionId("");
       setSummary("");
       setCompletedWork("");
       setNextActions("");
       setReferencedArtifacts("");
-      setReferencedTasks("");
       await refresh();
       await open(created.id);
     } catch (err) {
@@ -162,12 +159,6 @@ export default function Handoffs({ namespace, slug, role }: { namespace: string;
               placeholder="referenced artifact ids (comma-separated)"
               className="rounded border border-cc-border bg-cc-surface-2 px-2 py-1.5 text-sm text-cc-text outline-none focus:border-cc-border-strong"
             />
-            <input
-              value={referencedTasks}
-              onChange={(e) => setReferencedTasks(e.target.value)}
-              placeholder="referenced task ids (comma-separated)"
-              className="rounded border border-cc-border bg-cc-surface-2 px-2 py-1.5 text-sm text-cc-text outline-none focus:border-cc-border-strong"
-            />
             <button
               type="submit"
               disabled={!summary.trim() || !completedWork.trim() || !nextActions.trim()}
@@ -212,16 +203,6 @@ export default function Handoffs({ namespace, slug, role }: { namespace: string;
                 <h4 className="mb-1 text-xs font-medium uppercase tracking-wide text-cc-text-muted">Referenced artifacts</h4>
                 <ul className="space-y-0.5 font-mono text-xs text-cc-text-secondary">
                   {detail.referenced_artifacts.map((id) => (
-                    <li key={id}>{id}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {detail.referenced_tasks && detail.referenced_tasks.length > 0 && (
-              <div>
-                <h4 className="mb-1 text-xs font-medium uppercase tracking-wide text-cc-text-muted">Referenced tasks</h4>
-                <ul className="space-y-0.5 font-mono text-xs text-cc-text-secondary">
-                  {detail.referenced_tasks.map((id) => (
                     <li key={id}>{id}</li>
                   ))}
                 </ul>

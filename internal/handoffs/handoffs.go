@@ -69,13 +69,20 @@ type Handoff struct {
 
 // Body is CONTENT PAYLOAD (docs/adr/0011) — marshaled to JSON and encrypted
 // as one blob via crypto.Provider, ResourceType "handoff". Referenced
-// artifacts/tasks are informational IDs, not enforced foreign keys — the
-// cookbook does not specify FK integrity for them, and a handoff outliving
-// the artifact/task it names is a normal, expected occurrence.
+// artifacts are informational IDs, not enforced foreign keys — the cookbook
+// does not specify FK integrity for them, and a handoff outliving the
+// artifact it names is a normal, expected occurrence.
+//
+// There is deliberately no ReferencedTasks: v1 has no Task domain, and the
+// field was a placeholder from an older draft that had leaked into the
+// domain, both adapters and the context pack without anything ever
+// populating it. Removed before the API stabilised rather than carried
+// forever. Rows written before the removal keep the key in their encrypted
+// JSON; encoding/json drops unknown fields on read, so no migration is
+// needed and no data is lost that anyone was using.
 type Body struct {
 	Summary             string      `json:"summary"`
 	CompletedWork       string      `json:"completed_work"`
 	NextActions         string      `json:"next_actions"`
 	ReferencedArtifacts []uuid.UUID `json:"referenced_artifacts,omitempty"`
-	ReferencedTasks     []uuid.UUID `json:"referenced_tasks,omitempty"`
 }

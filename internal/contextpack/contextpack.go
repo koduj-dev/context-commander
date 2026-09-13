@@ -147,7 +147,6 @@ type HandoffSection struct {
 	CompletedWork       string      `json:"completed_work"`
 	NextActions         string      `json:"next_actions"`
 	ReferencedArtifacts []uuid.UUID `json:"referenced_artifacts,omitempty"`
-	ReferencedTasks     []uuid.UUID `json:"referenced_tasks,omitempty"`
 }
 
 type ArtifactSection struct {

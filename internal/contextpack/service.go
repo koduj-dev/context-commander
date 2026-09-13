@@ -246,7 +246,7 @@ func (s *Service) fillHandoff(ctx context.Context, principalID, projectID uuid.U
 		ID: h.ID, Status: h.Status, CreatedAt: h.CreatedAt, ClaimedAt: h.ClaimedAt,
 		ClaimedByPrincipal: h.ClaimedByPrincipal, ClaimedByClient: h.ClaimedByClient,
 		Summary: body.Summary, CompletedWork: body.CompletedWork, NextActions: body.NextActions,
-		ReferencedArtifacts: body.ReferencedArtifacts, ReferencedTasks: body.ReferencedTasks,
+		ReferencedArtifacts: body.ReferencedArtifacts,
 	}
 	return body.ReferencedArtifacts
 }

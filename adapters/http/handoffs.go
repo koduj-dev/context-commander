@@ -36,7 +36,6 @@ type handoffDetailResponse struct {
 	CompletedWork       string      `json:"completed_work"`
 	NextActions         string      `json:"next_actions"`
 	ReferencedArtifacts []uuid.UUID `json:"referenced_artifacts,omitempty"`
-	ReferencedTasks     []uuid.UUID `json:"referenced_tasks,omitempty"`
 }
 
 func toHandoffResponse(h handoffs.Handoff) handoffResponse {
@@ -63,7 +62,6 @@ type createHandoffRequest struct {
 	CompletedWork       string      `json:"completed_work"`
 	NextActions         string      `json:"next_actions"`
 	ReferencedArtifacts []uuid.UUID `json:"referenced_artifacts,omitempty"`
-	ReferencedTasks     []uuid.UUID `json:"referenced_tasks,omitempty"`
 }
 
 func (d Deps) createHandoff(w http.ResponseWriter, r *http.Request) {
@@ -82,7 +80,6 @@ func (d Deps) createHandoff(w http.ResponseWriter, r *http.Request) {
 		CompletedWork:       req.CompletedWork,
 		NextActions:         req.NextActions,
 		ReferencedArtifacts: req.ReferencedArtifacts,
-		ReferencedTasks:     req.ReferencedTasks,
 	})
 	if err != nil {
 		writeDomainError(w, err)
@@ -112,7 +109,6 @@ func (d Deps) getHandoff(w http.ResponseWriter, r *http.Request) {
 		CompletedWork:       body.CompletedWork,
 		NextActions:         body.NextActions,
 		ReferencedArtifacts: body.ReferencedArtifacts,
-		ReferencedTasks:     body.ReferencedTasks,
 	})
 }
 
@@ -207,6 +203,5 @@ func (d Deps) getCurrentHandoff(w http.ResponseWriter, r *http.Request) {
 		CompletedWork:       body.CompletedWork,
 		NextActions:         body.NextActions,
 		ReferencedArtifacts: body.ReferencedArtifacts,
-		ReferencedTasks:     body.ReferencedTasks,
 	})
 }
