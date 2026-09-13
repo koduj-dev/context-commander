@@ -2,8 +2,7 @@
 // `npm run build`) into the ccd binary — see adapters/cli/serve.go's `serve`
 // command, which mounts DistFS() as the HTTP server's SPA fallback unless
 // --dev is set. A placeholder dist/index.html is committed so `go build`
-// never depends on Node having run first (same reasoning as
-// docker-commander's web/embed.go).
+// never depends on Node having run first.
 package web
 
 import (

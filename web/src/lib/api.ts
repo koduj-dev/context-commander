@@ -1,139 +1,218 @@
-// Thin typed wrapper over fetch. Auth is a bearer PAT (lib/auth.ts), sent as
-// Authorization: Bearer <token> on every request — there is no session
-// cookie to rely on (docs/adr/0009: CC has no login backend, only PATs).
-import { clearToken, getToken } from "./auth";
+/**
+ * The one place that talks to the server.
+ *
+ * Two rules hold everywhere below.
+ *
+ * A failure keeps its shape. The server distinguishes "you may not",
+ * "it is not there", "someone changed it first" and "you are going too fast",
+ * and each calls for a different thing from the reader — so they arrive here
+ * as distinct kinds rather than collapsing into one `Error("request failed")`.
+ * Rendering a 403 as an empty list, which is the easiest mistake in this
+ * layer, tells someone their project is empty when it is in fact not theirs.
+ *
+ * Nothing is invented. If the backend cannot do a thing, this file has no
+ * function for it — a stub that resolves optimistically would move the lie
+ * from the API into the UI, where it is harder to find.
+ */
+
+export type ApiErrorKind =
+  | "unauthorized"
+  | "forbidden"
+  | "not_found"
+  | "conflict"
+  | "rate_limited"
+  | "unavailable"
+  | "server"
+  | "network";
 
 export class ApiError extends Error {
-  status: number;
-  code: string;
-  constructor(status: number, code: string, message: string) {
+  readonly kind: ApiErrorKind;
+  readonly status: number;
+  readonly code: string;
+
+  constructor(kind: ApiErrorKind, status: number, code: string, message: string) {
     super(message);
+    this.name = "ApiError";
+    this.kind = kind;
     this.status = status;
     this.code = code;
   }
 }
 
-async function req<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const token = getToken();
-  const headers: Record<string, string> = {};
-  if (token) headers.Authorization = `Bearer ${token}`;
-  let payload: BodyInit | undefined;
-  if (body !== undefined) {
-    if (typeof body === "string") {
-      payload = body;
-    } else {
-      headers["Content-Type"] = "application/json";
-      payload = JSON.stringify(body);
-    }
+function kindFor(status: number, code: string): ApiErrorKind {
+  switch (status) {
+    case 401:
+      return "unauthorized";
+    case 403:
+      return "forbidden";
+    case 404:
+      return "not_found";
+    case 409:
+      // Both an optimistic-concurrency conflict and "another client claimed
+      // this first" land here. The code distinguishes them for callers that
+      // care; both mean "re-read before you act", which is why they share a
+      // kind.
+      return "conflict";
+    case 429:
+      return "rate_limited";
+    case 503:
+      return "unavailable";
+    default:
+      return code === "overloaded" ? "unavailable" : "server";
   }
-
-  const resp = await fetch(path, { method, headers, body: payload });
-
-  if (resp.status === 401) {
-    clearToken();
-  }
-
-  if (!resp.ok) {
-    let code = "unknown";
-    let message = `request failed with status ${resp.status}`;
-    try {
-      const errBody = (await resp.json()) as { error?: { code?: string; message?: string } };
-      if (errBody.error) {
-        code = errBody.error.code ?? code;
-        message = errBody.error.message ?? message;
-      }
-    } catch {
-      // non-JSON error body — keep the generic message
-    }
-    throw new ApiError(resp.status, code, message);
-  }
-
-  if (resp.status === 204) return undefined as T;
-  const contentType = resp.headers.get("Content-Type") ?? "";
-  if (contentType.includes("application/json")) {
-    return (await resp.json()) as T;
-  }
-  return (await resp.text()) as unknown as T;
 }
 
-export interface Me {
+const TOKEN_KEY = "cc.token";
+
+export function storedToken(): string | null {
+  try {
+    return localStorage.getItem(TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function storeToken(token: string | null) {
+  try {
+    if (token === null) localStorage.removeItem(TOKEN_KEY);
+    else localStorage.setItem(TOKEN_KEY, token);
+  } catch {
+    // A browser with storage blocked can still use the app for one session.
+  }
+}
+
+type Options = {
+  method?: string;
+  body?: unknown;
+  signal?: AbortSignal;
+  /** Sent as a bearer token; defaults to the stored one. */
+  token?: string;
+};
+
+export async function request<T>(path: string, opts: Options = {}): Promise<T> {
+  const token = opts.token ?? storedToken();
+  const headers: Record<string, string> = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  if (opts.body !== undefined) headers["Content-Type"] = "application/json";
+
+  let res: Response;
+  try {
+    res = await fetch(`/v1${path}`, {
+      method: opts.method ?? "GET",
+      headers,
+      body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
+      signal: opts.signal,
+    });
+  } catch (cause) {
+    if (cause instanceof DOMException && cause.name === "AbortError") throw cause;
+    throw new ApiError("network", 0, "network", "could not reach the server");
+  }
+
+  if (res.status === 204) return undefined as T;
+
+  const text = await res.text();
+  if (!res.ok) {
+    let code = "";
+    let message = res.statusText;
+    try {
+      const parsed = JSON.parse(text) as { error?: { code?: string; message?: string } };
+      code = parsed.error?.code ?? "";
+      message = parsed.error?.message ?? message;
+    } catch {
+      // Some endpoints (the MCP mount, a proxy in front) answer in plain
+      // text. The status still carries the meaning.
+    }
+    throw new ApiError(kindFor(res.status, code), res.status, code, message);
+  }
+
+  return text ? (JSON.parse(text) as T) : (undefined as T);
+}
+
+/** The `{items, next_cursor}` envelope every growing list returns. */
+export type Page<T> = { items: T[]; next_cursor?: string };
+
+export function withQuery(path: string, params: Record<string, string | number | undefined>) {
+  const q = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined && v !== "") q.set(k, String(v));
+  }
+  const s = q.toString();
+  return s ? `${path}?${s}` : path;
+}
+
+// ---------------------------------------------------------------- resources
+//
+// Shapes below mirror what the adapters actually return. Where a field is
+// optional here it is optional there — `claimed_at` is absent until someone
+// claims, and pretending otherwise would put a zero date on every screen.
+
+export type Me = {
   principal_id: string;
-  kind: "user" | "service";
+  email: string;
+  display_name: string;
+  is_installation_admin: boolean;
+};
+
+export type ProjectSummary = {
+  project: { id: string; namespace: string; slug: string; name: string; visibility: string };
+  role: string;
+};
+
+export type Project = {
+  id: string;
+  namespace: string;
+  slug: string;
+  name: string;
+  visibility: string;
+};
+
+export type Handoff = {
+  id: string;
+  status: "open" | "claimed" | "closed";
+  created_at: string;
+  claimed_at?: string;
+  claimed_by_principal?: string;
+  claimed_by_client?: string;
+  closed_at?: string;
+  summary?: string;
+  completed_work?: string;
+  next_actions?: string;
+  referenced_artifacts?: string[];
+};
+
+export type Member = {
+  principal_id: string;
+  role: string;
+  created_at: string;
   email?: string;
   display_name?: string;
-  name?: string;
-  is_installation_admin: boolean;
-}
+};
 
-export interface MyProject {
-  namespace: string;
-  slug: string;
-  name: string;
-  visibility: string;
-  role: string;
-}
-
-export interface MyOrganization {
+export type SkillBinding = {
   id: string;
-  name: string;
-  role: string;
-}
-
-export interface Project {
-  id: string;
-  namespace: string;
-  slug: string;
-  name: string;
-  visibility: string;
-}
-
-export interface Artifact {
-  logical_path: string;
-  content_type: string;
-  current_version: number;
-}
-
-export interface ArtifactVersion {
-  version: number;
-  content_hash: string;
-  size_bytes: number;
-}
-
-export interface SecretRef {
-  name: string;
-  reference: string;
-}
-
-export interface GateBinding {
-  id: string;
-  scope: string;
-  scope_ref?: string;
-  gate_name: string;
-  hook: string;
-  config?: string;
-}
-
-export interface SkillVersion {
-  id: string;
-  skill_id: string;
-  version: number;
-  checksum: string;
-  declared_capabilities: string[];
-  trust_status: string;
-}
-
-export interface SkillBinding {
-  id: string;
-  scope: string;
+  scope: "installation" | "organization" | "project";
   scope_ref?: string;
   skill_id: string;
   skill_version_id: string;
   pinned: boolean;
   managed: boolean;
   overridable: boolean;
-}
+};
 
-export interface AuditRecord {
+export type CatalogEntry = {
+  skill_id: string;
+  name: string;
+  author?: string;
+  origin?: string;
+  scope: "installation" | "organization" | "project";
+  scope_ref?: string;
+  latest_version_id: string;
+  latest_version: number;
+  latest_checksum: string;
+  trust_status: string;
+};
+
+export type AuditRecord = {
   id: number;
   timestamp: string;
   action: string;
@@ -142,280 +221,42 @@ export interface AuditRecord {
   result: string;
   principal_id?: string;
   actor_email?: string;
-}
+};
 
-export interface Membership {
-  organization_id?: string;
-  user_id?: string;
-  role: string;
-}
-
-export interface Member {
-  principal_id: string;
-  role: string;
-  created_at: string;
-  email?: string;
-  display_name?: string;
-}
-
-export interface IssuedToken {
-  token: string;
-  credential_id: string;
-  client_type: string;
-  expires_at?: string;
-}
-
-export interface Credential {
+export type Credential = {
   id: string;
   client_type: string;
   created_at: string;
   last_used_at?: string;
   expires_at?: string;
   revoked_at?: string;
-}
-
-export interface Handoff {
-  id: string;
-  source_session_id?: string;
-  status: string;
-  created_at: string;
-}
-
-export interface HandoffDetail extends Handoff {
-  summary: string;
-  completed_work: string;
-  next_actions: string;
-  referenced_artifacts?: string[];
-}
-
-export interface Conversation {
-  id: string;
-  created_at: string;
-}
-
-export interface ExternalSession {
-  id: string;
-  conversation_id: string;
-  provider: string;
-  client: string;
-  provider_session_id: string;
-  parent_external_session_id?: string;
-  relation: string;
-  started_at: string;
-}
-
-export interface HistoryObject {
-  id: string;
-  external_session_id: string;
-  type: string;
-  derived_from?: string;
-  content_hash: string;
-  content: string; // base64-encoded plaintext — decrypted server-side, not re-encoded for transport encoding reasons
-  created_at: string;
-}
-
-export interface LineageEdge {
-  from_id: string;
-  to_id: string;
-  kind: string;
-}
-
-export interface ProjectEvent {
-  seq: number;
-  event_id: string;
-  type: string;
-  resource_type: string;
-  resource_id?: string;
-  payload_kind: string;
-}
-
-export interface InstallationUser {
-  id: string;
-  email: string;
-  display_name: string;
-  created_at: string;
-}
-
-export interface ServicePrincipal {
-  id: string;
-  name: string;
-  description?: string;
-  created_at: string;
-}
-
-export interface InstallationAdmin {
-  user_id: string;
-  role: string;
-  granted_by?: string;
-  granted_at: string;
-}
-
-// Page is the envelope every paginated list endpoint returns. next_cursor is
-// absent on the last page, which is how a caller knows to stop offering
-// "Load more" — never by checking whether a page came back full.
-export type Page<T> = { items: T[]; next_cursor?: string };
-
-// PageOpts is what a caller passes to ask for one page. The cursor is opaque
-// — echo back next_cursor, never construct one.
-export type PageOpts = { limit?: number; cursor?: string };
-
-function pageParams(opts: PageOpts, params = new URLSearchParams()): URLSearchParams {
-  if (opts.limit) params.set("limit", String(opts.limit));
-  if (opts.cursor) params.set("cursor", opts.cursor);
-  return params;
-}
-
-function withQuery(path: string, params: URLSearchParams): string {
-  const qs = params.toString();
-  return qs ? `${path}?${qs}` : path;
-}
+};
 
 export const api = {
-  me: () => req<Me>("GET", "/v1/me"),
-  myProjects: () => req<MyProject[]>("GET", "/v1/me/projects"),
-  myOrganizations: () => req<MyOrganization[]>("GET", "/v1/me/organizations"),
+  // Takes options so sign-in can probe a token before storing it — a bad
+  // token must not be left in storage for the next reload to retry.
+  me: (opts?: { token?: string }) => request<Me>("/me", opts),
+  myProjects: () => request<ProjectSummary[]>("/me/projects"),
+  tokens: () => request<Credential[]>("/me/tokens"),
+  revokeToken: (id: string) => request<void>(`/me/tokens/${id}`, { method: "DELETE" }),
 
-  issueToken: (clientType: string, expiresInSeconds?: number) =>
-    req<IssuedToken>("POST", "/v1/me/tokens", { client_type: clientType, expires_in_seconds: expiresInSeconds }),
-  listTokens: () => req<Credential[]>("GET", "/v1/me/tokens"),
-  revokeToken: (id: string) => req<void>("DELETE", `/v1/me/tokens/${id}`),
+  project: (ns: string, slug: string) => request<Project>(`/projects/${ns}/${slug}`),
+  members: (ns: string, slug: string) => request<Page<Member>>(`/projects/${ns}/${slug}/members`),
 
-  createProject: (project: string, name: string) =>
-    req<Project>("POST", "/v1/projects", { project, name }),
-  getProject: (namespace: string, slug: string) =>
-    req<Project>("GET", `/v1/projects/${namespace}/${slug}/`),
-  addMember: (namespace: string, slug: string, principalId: string, role: string) =>
-    req<void>("POST", `/v1/projects/${namespace}/${slug}/members`, { principal_id: principalId, role }),
-  listMembers: (namespace: string, slug: string) =>
-    req<Member[]>("GET", `/v1/projects/${namespace}/${slug}/members`),
+  currentHandoff: (ns: string, slug: string) =>
+    request<Handoff>(`/projects/${ns}/${slug}/handoffs/current`),
+  handoffs: (ns: string, slug: string, cursor?: string, limit?: number) =>
+    request<Page<Handoff>>(withQuery(`/projects/${ns}/${slug}/handoffs`, { cursor, limit })),
+  claimHandoff: (ns: string, slug: string, id: string) =>
+    request<Handoff>(`/projects/${ns}/${slug}/handoffs/${id}/claim`, { method: "POST" }),
+  closeHandoff: (ns: string, slug: string, id: string) =>
+    request<Handoff>(`/projects/${ns}/${slug}/handoffs/${id}/close`, { method: "POST" }),
 
-  listArtifacts: (namespace: string, slug: string, opts: PageOpts = {}) =>
-    req<Page<Artifact>>("GET", withQuery(`/v1/projects/${namespace}/${slug}/artifacts`, pageParams(opts))),
-  artifactHistory: (namespace: string, slug: string, path: string) =>
-    req<ArtifactVersion[]>("GET", `/v1/projects/${namespace}/${slug}/artifacts/history?path=${encodeURIComponent(path)}`),
-  readArtifact: (namespace: string, slug: string, path: string) =>
-    req<string>("GET", `/v1/projects/${namespace}/${slug}/artifacts/content?path=${encodeURIComponent(path)}`),
+  effectiveSkills: (ns: string, slug: string) =>
+    request<SkillBinding[]>(`/projects/${ns}/${slug}/skills/effective`),
+  searchSkills: (query?: string, cursor?: string, limit?: number) =>
+    request<Page<CatalogEntry>>(withQuery("/skills", { q: query, cursor, limit })),
 
-  listSecrets: (namespace: string, slug: string, opts: PageOpts = {}) =>
-    req<Page<SecretRef>>("GET", withQuery(`/v1/projects/${namespace}/${slug}/secrets`, pageParams(opts))),
-  createSecret: (namespace: string, slug: string, name: string, value: string) =>
-    req<SecretRef>("POST", `/v1/projects/${namespace}/${slug}/secrets`, { name, value }),
-  deleteSecret: (namespace: string, slug: string, name: string) =>
-    req<void>("DELETE", `/v1/projects/${namespace}/${slug}/secrets/${encodeURIComponent(name)}`),
-
-  listEffectiveSkills: (namespace: string, slug: string) =>
-    req<SkillBinding[]>("GET", `/v1/projects/${namespace}/${slug}/skills/effective`),
-  publishSkill: (
-    namespace: string,
-    slug: string,
-    body: { skill_id?: string; name: string; author: string; origin: string; content: string; declared_capabilities: string[] },
-  ) => req<SkillVersion>("POST", `/v1/projects/${namespace}/${slug}/skills`, body),
-  installSkill: (
-    namespace: string,
-    slug: string,
-    body: { scope: string; scope_ref?: string; skill_id: string; skill_version_id: string; managed: boolean; overridable: boolean },
-  ) => req<SkillBinding>("POST", `/v1/projects/${namespace}/${slug}/skills/install`, body),
-  overrideSkill: (
-    namespace: string,
-    slug: string,
-    body: { skill_id: string; skill_version_id: string; managed: boolean; overridable: boolean },
-  ) => req<SkillBinding>("POST", `/v1/projects/${namespace}/${slug}/skills/override`, body),
-  pinSkillBinding: (namespace: string, slug: string, bindingId: string) =>
-    req<void>("POST", `/v1/projects/${namespace}/${slug}/skills/pin`, { binding_id: bindingId }),
-  unpinSkillBinding: (namespace: string, slug: string, bindingId: string) =>
-    req<void>("POST", `/v1/projects/${namespace}/${slug}/skills/unpin`, { binding_id: bindingId }),
-
-  listGateBindings: (namespace: string, slug: string) =>
-    req<GateBinding[]>("GET", `/v1/projects/${namespace}/${slug}/gates/bindings`),
-  bindGate: (
-    namespace: string,
-    slug: string,
-    body: { scope: string; scope_ref?: string; gate_name: string; hook: string; config: unknown },
-  ) => req<GateBinding>("POST", `/v1/projects/${namespace}/${slug}/gates/bindings`, body),
-  unbindGate: (namespace: string, slug: string, id: string) =>
-    req<void>("DELETE", `/v1/projects/${namespace}/${slug}/gates/bindings?id=${encodeURIComponent(id)}`),
-
-  queryAudit: (
-    namespace: string,
-    slug: string,
-    opts: PageOpts & { action?: string; resource_type?: string; since?: string; until?: string } = {},
-  ) => {
-    const params = new URLSearchParams();
-    if (opts.action) params.set("action", opts.action);
-    if (opts.resource_type) params.set("resource_type", opts.resource_type);
-    if (opts.since) params.set("since", opts.since);
-    if (opts.until) params.set("until", opts.until);
-    return req<Page<AuditRecord>>("GET", withQuery(`/v1/projects/${namespace}/${slug}/audit`, pageParams(opts, params)));
-  },
-
-  listHandoffs: (namespace: string, slug: string, status?: string, opts: PageOpts = {}) => {
-    const params = new URLSearchParams();
-    if (status) params.set("status", status);
-    return req<Page<Handoff>>("GET", withQuery(`/v1/projects/${namespace}/${slug}/handoffs/`, pageParams(opts, params)));
-  },
-  getHandoff: (namespace: string, slug: string, id: string) =>
-    req<HandoffDetail>("GET", `/v1/projects/${namespace}/${slug}/handoffs/${id}`),
-  createHandoff: (
-    namespace: string,
-    slug: string,
-    body: {
-      source_session_id?: string;
-      summary: string;
-      completed_work: string;
-      next_actions: string;
-      referenced_artifacts?: string[];
-    },
-  ) => req<HandoffDetail>("POST", `/v1/projects/${namespace}/${slug}/handoffs/`, body),
-
-  // No "list conversations" endpoint exists server-side (only create + operate
-  // on a known id) — same "no browse endpoint yet" shape as Skills' install
-  // form, so the UI creates or is given an id directly.
-  createConversation: (namespace: string, slug: string) =>
-    req<Conversation>("POST", `/v1/projects/${namespace}/${slug}/conversations/`),
-  createExternalSession: (
-    namespace: string,
-    slug: string,
-    conversationId: string,
-    body: { provider: string; client: string; provider_session_id: string; parent_external_session_id?: string; relation: string },
-  ) => req<ExternalSession>("POST", `/v1/projects/${namespace}/${slug}/conversations/${conversationId}/sessions`, body),
-  appendHistoryObject: (
-    namespace: string,
-    slug: string,
-    conversationId: string,
-    body: { external_session_id: string; type: string; derived_from?: string; content: string },
-  ) => req<HistoryObject>("POST", `/v1/projects/${namespace}/${slug}/conversations/${conversationId}/objects`, body),
-  listHistoryObjects: (namespace: string, slug: string, conversationId: string, opts: PageOpts = {}) =>
-    req<Page<HistoryObject>>(
-      "GET",
-      withQuery(`/v1/projects/${namespace}/${slug}/conversations/${conversationId}/objects`, pageParams(opts)),
-    ),
-  getLineage: (namespace: string, slug: string, conversationId: string) =>
-    req<LineageEdge[]>("GET", `/v1/projects/${namespace}/${slug}/conversations/${conversationId}/lineage`),
-
-  // Events run oldest-first while audit runs newest-first, but both use the
-  // same opaque cursor — the direction is the server's business, not the
-  // caller's.
-  listEvents: (namespace: string, slug: string, opts: PageOpts = {}) =>
-    req<Page<ProjectEvent>>("GET", withQuery(`/v1/projects/${namespace}/${slug}/events`, pageParams(opts))),
-
-  // Installation-admin endpoints (docs/adr/0017) — every call here is
-  // gated server-side on the caller actually being an installation admin;
-  // there is no client-side gate beyond hiding the nav entry when
-  // Me.is_installation_admin is false.
-  createInstallationUser: (email: string, displayName: string) =>
-    req<InstallationUser>("POST", "/v1/installation/users", { email, display_name: displayName }),
-  createServicePrincipal: (name: string, description?: string) =>
-    req<ServicePrincipal>("POST", "/v1/installation/service-principals", { name, description }),
-  issueCredentialFor: (principalId: string, clientType: string, expiresInSeconds?: number) =>
-    req<IssuedToken>("POST", `/v1/installation/principals/${principalId}/tokens`, {
-      client_type: clientType,
-      expires_in_seconds: expiresInSeconds,
-    }),
-  listCredentialsFor: (principalId: string) => req<Credential[]>("GET", `/v1/installation/principals/${principalId}/tokens`),
-  revokeCredentialFor: (credentialId: string) => req<void>("DELETE", `/v1/installation/tokens/${credentialId}`),
-  listInstallationAdmins: () => req<InstallationAdmin[]>("GET", "/v1/installation/admins"),
-
-  createOrganization: (name: string) => req<MyOrganization>("POST", "/v1/organizations", { name }),
-  addOrganizationMember: (orgId: string, userId: string, role: string) =>
-    req<Membership>("POST", `/v1/organizations/${orgId}/members`, { user_id: userId, role }),
+  audit: (ns: string, slug: string, cursor?: string, limit?: number) =>
+    request<Page<AuditRecord>>(withQuery(`/projects/${ns}/${slug}/audit`, { cursor, limit })),
 };

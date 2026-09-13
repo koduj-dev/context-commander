@@ -35,6 +35,35 @@ jobs:
         with:
           version: latest
 
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      # `npm test` is the whole gate: design sync against docs/mockups,
+      # translation integrity against the English source, then the unit
+      # tests. See .claude/skills/ui-design/SKILL.md.
+      - run: npm test
+      - run: npm run build
+      # web/dist is committed so `go build ./cmd/ccd` needs no Node. If a
+      # fresh build differs from what was committed, the binary would ship a
+      # UI nobody reviewed.
+      - name: Check committed web/dist is up to date
+        run: |
+          if ! git diff --quiet -- dist; then
+            echo "web/dist is stale — run 'make ui' and commit the result"
+            git diff --stat -- dist
+            exit 1
+          fi
+
   test:
     runs-on: ubuntu-latest
     steps:

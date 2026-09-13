@@ -1,0 +1,584 @@
+/* Context Commander — application stylesheet.
+ *
+ * The design system, ported from docs/mockups/assets/mockup.css. Colours come
+ * from the brand's own token file (public/brand/ui-colors.css, copied by
+ * scripts/sync-brand.mjs and loaded before this one), so there is not a
+ * single hex value below: change a brand token and the app follows.
+ *
+ * scripts/check-design-sync.mjs enforces that this file and the mockups stay
+ * in step. Two files describing one design will otherwise drift apart one
+ * small fix at a time until neither can be trusted.
+ *
+ * Two habits this file exists to keep:
+ *
+ *  - No component styles itself. If a screen needs a look this file does not
+ *    have, it gets a name here rather than a style attribute there. That is
+ *    what stops twenty screens becoming twenty designs.
+ *
+ *  - Everything is measured against the longer language. German runs roughly
+ *    30% past English and this layout is dense, so nothing is pinned to a
+ *    width that only fits the source language: table headings wrap rather
+ *    than clip, badge rows wrap, labels grow past their minimum.
+ */
+
+/* Context Commander — mockup stylesheet.
+ *
+ * Every colour here comes from ../../brand/tokens/ui-colors.css, imported
+ * above this file. Nothing is hardcoded: if a token changes, these screens
+ * change with it, which is the only way a mockup stays honest about the
+ * brand it claims to follow.
+ *
+ * Density is deliberate. This is an operator's control plane, not a
+ * marketing page — a row should carry a fact, not whitespace. */
+
+* { box-sizing: border-box; }
+
+html { color-scheme: dark light; }
+
+body {
+  margin: 0;
+  font-family: Inter, "Inter var", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 1.45;
+  background: var(--cc-bg);
+  color: var(--cc-text);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Identifiers, hashes, paths and counts. Tabular figures so columns of
+ * numbers line up instead of shimmering. */
+.mono {
+  font-family: "SF Mono", "JetBrains Mono", "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+}
+.num { font-variant-numeric: tabular-nums; }
+
+a { color: var(--cc-accent-primary); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+:focus-visible {
+  outline: 2px solid var(--cc-focus-ring);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+/* ---------- shell ---------- */
+
+:root { --topbar-h: 48px; }
+
+.app {
+  display: grid;
+  grid-template-columns: 232px 1fr;
+  min-height: 100vh;
+}
+
+.sidebar {
+  background: var(--cc-surface-1);
+  border-right: 1px solid var(--cc-border);
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+
+.brand {
+  padding: 18px 16px 14px;
+  border-bottom: 1px solid var(--cc-border);
+}
+/* The lockup fills the rail's width rather than being pinned to an
+ * arbitrary height. The horizontal SVG is 1024×360, so at the rail's inner
+ * width it lands at its natural proportions with the padding below acting
+ * as the clear space the brand manual asks for — a fixed 26px height was me
+ * guessing, and guessing smaller than the mark wants. */
+.brand img { display: block; width: 100%; height: auto; }
+
+.nav { padding: 12px 8px; overflow-y: auto; flex: 1; }
+.nav-label {
+  padding: 12px 8px 6px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cc-text-muted);
+}
+.nav a {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 8px;
+  border-radius: 5px;
+  color: var(--cc-text-secondary);
+  font-size: 13px;
+  text-decoration: none;
+}
+.nav a:hover { background: var(--cc-surface-2); color: var(--cc-text); text-decoration: none; }
+/* Pink marks the thing you are looking at — "active/current context" is
+ * the one meaning the brand assigns it. A 2px rail, not a filled block:
+ * large saturated areas are explicitly against the brand rules. */
+.nav a.active {
+  background: var(--cc-surface-3);
+  color: var(--cc-text);
+  box-shadow: inset 2px 0 0 var(--cc-accent-primary-visual);
+}
+/* Sized globally, not only inside the nav: an inline SVG with no width
+ * fills whatever box it lands in, which is how the topbar's search icon
+ * ended up the size of a building. */
+.ico { width: 15px; height: 15px; flex: none; }
+.nav a span:not(.count) { min-width: 0; overflow-wrap: anywhere; }
+.nav a .ico { opacity: .75; }
+.nav a.active .ico { opacity: 1; }
+.nav .count { margin-left: auto; font-size: 11px; color: var(--cc-text-muted); }
+
+.sidebar-foot {
+  border-top: 1px solid var(--cc-border);
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.avatar {
+  width: 26px; height: 26px; flex: none;
+  border-radius: 50%;
+  background: var(--cc-surface-3);
+  border: 1px solid var(--cc-border-strong);
+  display: grid; place-items: center;
+  font-size: 10.5px; font-weight: 600; color: var(--cc-text-secondary);
+}
+.sidebar-foot .who { min-width: 0; }
+.sidebar-foot .who b { display: block; font-weight: 500; font-size: 12.5px; }
+.sidebar-foot .who span { display: block; font-size: 11px; color: var(--cc-text-muted); }
+
+.main { min-width: 0; display: flex; flex-direction: column; }
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 22px;
+  height: 48px;
+  border-bottom: 1px solid var(--cc-border);
+  background: var(--cc-bg);
+  position: sticky; top: 0; z-index: 5;
+  min-height: var(--topbar-h);
+}
+.crumbs { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--cc-text-muted); }
+.crumbs .sep { opacity: .5; }
+.crumbs b { color: var(--cc-text); font-weight: 500; }
+.topbar .spacer { flex: 1; }
+
+.search {
+  display: flex; align-items: center; gap: 7px;
+  background: var(--cc-surface-2);
+  border: 1px solid var(--cc-border);
+  border-radius: 5px;
+  padding: 4px 9px;
+  width: 260px;
+  color: var(--cc-text-muted);
+  font-size: 12.5px;
+}
+.search kbd {
+  margin-left: auto;
+  font-family: inherit; font-size: 10.5px;
+  border: 1px solid var(--cc-border-strong);
+  border-radius: 3px; padding: 0 4px;
+  color: var(--cc-text-muted);
+}
+
+/* No max-width. This is an operator's console on whatever monitor they
+ * have — capping it at 1320px left a QHD screen 40% empty while the tables
+ * that most want the room were the ones being squeezed. Prose that genuinely
+ * needs a measure caps itself (see .page-head p); tables, status rows and
+ * metrics all read better wide. */
+.page { padding: 22px; width: 100%; }
+
+.page-head { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 18px; }
+.page-head h1 { margin: 0 0 3px; font-size: 19px; font-weight: 600; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+.page-head p { margin: 0; color: var(--cc-text-secondary); font-size: 12.5px; max-width: 62ch; }
+.page-head .actions { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ---------- controls ---------- */
+
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid var(--cc-border-strong);
+  background: var(--cc-surface-2);
+  color: var(--cc-text);
+  border-radius: 5px;
+  padding: 5px 11px;
+  font: inherit; font-size: 12.5px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn:hover { background: var(--cc-surface-3); }
+.btn-primary {
+  background: var(--cc-accent-primary-visual);
+  border-color: var(--cc-accent-primary-visual);
+  color: var(--cc-void);
+  font-weight: 600;
+}
+.btn-primary:hover { background: var(--cc-accent-primary-visual); filter: brightness(1.08); }
+.btn-danger { color: var(--cc-danger); border-color: var(--cc-border-strong); }
+.btn-sm { padding: 3px 8px; font-size: 12px; }
+.btn[disabled] { opacity: .45; cursor: not-allowed; }
+
+.seg { display: inline-flex; border: 1px solid var(--cc-border); border-radius: 5px; overflow: hidden; }
+.seg button {
+  border: 0; background: var(--cc-surface-1); color: var(--cc-text-secondary);
+  font: inherit; font-size: 12.5px; padding: 4px 11px; cursor: pointer;
+}
+.seg button + button { border-left: 1px solid var(--cc-border); }
+.seg button[aria-pressed="true"] { background: var(--cc-surface-3); color: var(--cc-text); }
+
+.field {
+  background: var(--cc-surface-2);
+  border: 1px solid var(--cc-border);
+  border-radius: 5px;
+  padding: 5px 9px;
+  color: var(--cc-text);
+  font: inherit; font-size: 12.5px;
+  width: 100%;
+}
+.field::placeholder { color: var(--cc-text-muted); }
+
+/* ---------- panels ---------- */
+
+.grid { display: grid; gap: 14px; }
+.g2 { grid-template-columns: 1fr 1fr; }
+.g3 { grid-template-columns: repeat(3, 1fr); }
+.g4 { grid-template-columns: repeat(4, 1fr); }
+.g-2-1 { grid-template-columns: 2fr 1fr; }
+
+.panel {
+  background: var(--cc-surface-1);
+  border: 1px solid var(--cc-border);
+  border-radius: 7px;
+  overflow: hidden;
+}
+.panel > header {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--cc-border);
+}
+.panel > header h2 { margin: 0; font-size: 13px; font-weight: 600; }
+.panel > header .sub { font-size: 11.5px; color: var(--cc-text-muted); }
+.panel > header .right { margin-left: auto; display: flex; gap: 7px; align-items: center; }
+.panel .body { padding: 14px; }
+.panel .body.tight { padding: 0; }
+/* Vertical rhythm between whatever a body happens to contain. Adjacent
+ * block margins collapse, so an element that already carries a bottom
+ * margin does not end up with twice the gap. */
+.panel .body > * + * { margin-top: 10px; }
+.panel > footer {
+  padding: 8px 14px; border-top: 1px solid var(--cc-border);
+  font-size: 12px; color: var(--cc-text-muted);
+  display: flex; align-items: center; gap: 10px;
+}
+
+/* ---------- definition rows ---------- */
+
+.defs { display: grid; grid-template-columns: minmax(0, max-content) 1fr; gap: 7px 18px; align-items: baseline; }
+.defs dt { color: var(--cc-text-muted); font-size: 12px; overflow-wrap: anywhere; }
+.defs dd { margin: 0; }
+
+/* ---------- tables ---------- */
+
+/* border-collapse: separate. The header rule is drawn as an inset shadow on
+ * the cell rather than a collapsed border, so it belongs to the header and
+ * cannot be lost to the row below it. */
+table.dt { width: 100%; border-collapse: separate; border-spacing: 0; }
+table.dt th {
+  text-align: left;
+  font-size: 10.5px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase;
+  color: var(--cc-text-muted);
+  padding: 8px 14px;
+  /* Deliberately NOT nowrap. A German column heading is routinely half
+   * again as long as its English original; forcing one line either blows
+   * the table out of the panel or truncates the word that names the
+   * column. Two lines of heading costs one row of height, once. */
+  background: var(--cc-surface-1);
+  /* An inset shadow rather than border-bottom: with border-collapse the
+   * two would fight over the same pixel row and one of them loses. */
+  box-shadow: inset 0 -1px 0 var(--cc-border);
+}
+table.dt td {
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--cc-border);
+  vertical-align: middle;
+  background: var(--cc-surface-1);
+}
+table.dt tbody tr:hover td { background: var(--cc-surface-2); }
+/* Sideways scrolling is applied only where it is needed — see the narrow
+ * breakpoint. `overflow-x: auto` with `overflow-y: visible` is not a thing
+ * CSS honours: setting one axis forces the other to `auto` too, creating a
+ * scroll container nobody asked for. */
+table.dt tbody tr:last-child td { border-bottom: 0; }
+table.dt td.r, table.dt th.r { text-align: right; }
+.dim { color: var(--cc-text-muted); }
+.sec { color: var(--cc-text-secondary); }
+.truncate { max-width: 34ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; vertical-align: bottom; }
+
+/* ---------- badges ----------
+ * Status never rides on colour alone: every badge carries a glyph and a
+ * word, so it survives greyscale and colour blindness. */
+
+.badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  border: 1px solid var(--cc-border-strong);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 11px;
+  font-weight: 500;
+  /* A badge does not break mid-word, but a row of them must be free to
+   * wrap — "nicht überschreibbar" is not going to fit where "not
+   * overridable" did. */
+  white-space: nowrap;
+  max-width: 100%;
+  color: var(--cc-text-secondary);
+  background: var(--cc-surface-2);
+}
+.badge .dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; flex: none; }
+.b-ok      { color: var(--cc-success); border-color: color-mix(in srgb, var(--cc-success) 40%, transparent); }
+.b-warn    { color: var(--cc-warning); border-color: color-mix(in srgb, var(--cc-warning) 40%, transparent); }
+.b-danger  { color: var(--cc-danger);  border-color: color-mix(in srgb, var(--cc-danger) 45%, transparent); }
+.b-info    { color: var(--cc-info);    border-color: color-mix(in srgb, var(--cc-info) 40%, transparent); }
+/* Pink = active/current context. Violet = shared/relay/inherited. That
+ * distinction is the brand's one semantic rule and it is kept everywhere. */
+.b-active  { color: var(--cc-accent-primary); border-color: color-mix(in srgb, var(--cc-accent-primary) 45%, transparent); }
+.b-shared  { color: var(--cc-accent-secondary); border-color: color-mix(in srgb, var(--cc-accent-secondary) 50%, transparent); }
+
+/* ---------- scope rail ----------
+ * Where a thing lives: installation / organization / project. Violet for
+ * inherited scopes, pink for the project you are in. */
+.scope { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--cc-text-secondary); }
+.scope::before { content: ""; width: 3px; height: 12px; border-radius: 2px; background: var(--cc-border-strong); }
+.scope.installation::before { background: var(--cc-accent-secondary-visual); }
+.scope.organization::before { background: color-mix(in srgb, var(--cc-accent-secondary-visual) 55%, var(--cc-border-strong)); }
+.scope.project::before { background: var(--cc-accent-primary-visual); }
+
+/* ---------- pagination ----------
+ * Deliberately "load more" and not 1 · 2 · 3 … 47. Every growing list in
+ * this system is keyset-paginated: the server hands back an opaque cursor
+ * meaning "continue from here" and has no idea how many pages exist, because
+ * counting them would mean scanning rows nobody asked for. A page-number
+ * control would be a promise the API cannot keep. */
+.pager { display: flex; align-items: center; gap: 10px; width: 100%; }
+.pager .count { color: var(--cc-text-muted); }
+.pager .spacer { flex: 1; }
+.pager select {
+  background: var(--cc-surface-2);
+  border: 1px solid var(--cc-border);
+  border-radius: 5px;
+  color: var(--cc-text-secondary);
+  font: inherit;
+  font-size: 12px;
+  padding: 3px 6px;
+}
+
+/* ---------- misc ---------- */
+
+.kpi { display: flex; flex-direction: column; gap: 2px; }
+.kpi .v { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.kpi .k { font-size: 11.5px; color: var(--cc-text-muted); }
+
+.feed { list-style: none; margin: 0; padding: 0; }
+.feed li { display: flex; gap: 11px; padding: 9px 14px; border-bottom: 1px solid var(--cc-border); align-items: baseline; }
+.feed li:last-child { border-bottom: 0; }
+.feed .when { color: var(--cc-text-muted); font-size: 11.5px; min-width: 62px; flex: 0 0 auto; }
+.feed .what { flex: 1; min-width: 0; }
+
+.empty { padding: 28px 14px; text-align: center; color: var(--cc-text-muted); }
+.empty b { display: block; color: var(--cc-text-secondary); font-weight: 500; margin-bottom: 3px; }
+
+.note {
+  border-left: 2px solid var(--cc-border-strong);
+  padding: 8px 12px;
+  background: var(--cc-surface-2);
+  border-radius: 0 5px 5px 0;
+  color: var(--cc-text-secondary);
+  font-size: 12.5px;
+}
+.note.warn { border-left-color: var(--cc-warning); }
+.note.danger { border-left-color: var(--cc-danger); }
+.note.info { border-left-color: var(--cc-info); }
+.note b { color: var(--cc-text); font-weight: 600; }
+
+.code {
+  background: var(--cc-surface-2);
+  border: 1px solid var(--cc-border);
+  border-radius: 5px;
+  padding: 10px 12px;
+  /* Wrap, do not scroll sideways. A line that runs off the edge of a panel
+   * is a line nobody reads, and these are short enough that wrapping costs
+   * nothing — the multi-line commands already carry explicit continuations. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--cc-text-secondary);
+}
+
+.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--cc-border); margin-bottom: 16px; }
+.tabs a {
+  padding: 7px 12px; font-size: 12.5px; color: var(--cc-text-secondary);
+  border-bottom: 2px solid transparent; text-decoration: none;
+}
+.tabs a:hover { color: var(--cc-text); text-decoration: none; }
+.tabs a.active { color: var(--cc-text); border-bottom-color: var(--cc-accent-primary-visual); }
+
+@media (max-width: 1180px) {
+  .app { grid-template-columns: 200px 1fr; }
+  .g3, .g4 { grid-template-columns: 1fr 1fr; }
+  .g-2-1 { grid-template-columns: 1fr; }
+  .search { width: 180px; }
+}
+
+@media (max-width: 900px) {
+  /* The sidebar stops being a column and becomes a strip: still the same
+   * items in the same order, still the same active marker, just laid out
+   * along the top. Collapsing it into a hamburger would hide the one thing
+   * that must stay obvious — which scope you are in. */
+  .app { grid-template-columns: 1fr; }
+  .sidebar {
+    position: static;
+    height: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--cc-border);
+  }
+  .brand { padding: 12px 14px; border-bottom: 0; }
+  .brand img { width: auto; height: 26px; }
+  .nav {
+    display: flex;
+    gap: 2px;
+    padding: 0 10px 8px;
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+  .nav-label { display: none; }
+  .nav a { white-space: nowrap; }
+  .nav a.active { box-shadow: inset 0 -2px 0 var(--cc-accent-primary-visual); border-radius: 5px 5px 0 0; }
+  .nav .count { margin-left: 4px; }
+  .sidebar-foot { border-top: 1px solid var(--cc-border); }
+
+  .g2, .g3, .g-2-1 { grid-template-columns: 1fr; }
+  .g4 { grid-template-columns: 1fr 1fr; }
+  .page { padding: 16px; }
+  .search { display: none; }
+  /* Now the container may scroll — there is no sticky header left to break
+   * and a squeezed security log is harder to read than a scrolled one. */
+  .panel .body.tight { overflow-x: auto; }
+}
+
+@media (max-width: 640px) {
+  .page { padding: 12px; }
+  .page-head { flex-wrap: wrap; }
+  .page-head .actions { margin-left: 0; width: 100%; }
+  .panel > header { flex-wrap: wrap; }
+  .panel > header .right { margin-left: 0; width: 100%; }
+  .defs { grid-template-columns: 1fr; gap: 2px 0; }
+  .defs dd { margin-bottom: 7px; }
+    .seg button { padding: 4px 8px; }
+  .kpi .v { font-size: 19px; }
+}
+
+/* ---------- layout utilities ----------
+ * These exist so a page never needs an inline style. Every inline style is a
+ * small private decision, and a hundred of them is what turns a kit back
+ * into a pile of one-off pages. If a layout need recurs, it earns a name
+ * here rather than a style attribute there. */
+
+.stack { display: grid; gap: 14px; }
+.stack-sm { display: grid; gap: 9px; }
+.stack-start { align-content: start; }
+.row { display: flex; align-items: center; gap: 10px; }
+.row-sm { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.grow { flex: 1; min-width: 0; }
+.wrap { flex-wrap: wrap; }
+.mt { margin-top: 14px; }
+.mb { margin-bottom: 14px; }
+.mt-sm { margin-top: 10px; }
+.mb-sm { margin-bottom: 10px; }
+.lead-out { margin: 0 0 10px; }
+.tail { margin: 10px 0 0; }
+.inline-badge { margin-left: 4px; }
+.nowrap { white-space: nowrap; }
+.strong { font-weight: 600; }
+.v-warn { color: var(--cc-warning); }
+.unit { font-size: 13px; font-weight: 500; }
+
+/* The small uppercase caption above a value inside a panel body.
+ *
+ * text-transform: uppercase is a language-dependent operation — German ß
+ * becomes SS and changes the word's length, Turkish dotless ı does not map
+ * the way Latin does. It is used here only on short fixed captions the
+ * product controls, never on user or domain content. */
+.label-caps {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: var(--cc-text-muted);
+  margin-bottom: 3px;
+}
+
+/* Secondary line under a table cell's primary value — a description, an
+ * email, a type. One class instead of a per-page font-size guess. */
+.sub-line { font-size: 11.5px; color: var(--cc-text-muted); }
+
+/* Usage meter. Violet, because storage is shared/inherited state rather
+ * than the thing you are currently looking at. */
+.meter { height: 5px; border-radius: 3px; background: var(--cc-surface-3); overflow: hidden; }
+.meter > i { display: block; height: 100%; background: var(--cc-accent-secondary-visual); }
+.meter.warn > i { background: var(--cc-warning); }
+.meter.danger > i { background: var(--cc-danger); }
+
+/* A document preview: rendered markdown, a skill body, a handoff note. */
+.doc { border: 1px solid var(--cc-border); border-radius: 6px; padding: 16px; background: var(--cc-bg); }
+.doc h3 { margin: 0 0 8px; font-size: 15px; }
+.doc p { margin: 0 0 10px; color: var(--cc-text-secondary); }
+.doc ol, .doc ul { margin: 0; padding-left: 18px; color: var(--cc-text-secondary); line-height: 1.7; }
+
+/* Theme-swapped logo. The toggle flips `hidden` on these two, so the lockup
+ * always matches the ground it sits on — the brand ships both and neither is
+ * a recolour of the other. The [hidden] rule is explicit because a bare
+ * `display:block` silently beats the browser's own [hidden] handling, which
+ * is how both lockups once rendered at the same time. */
+.logo-dark, .logo-light { display: block; }
+.logo-dark[hidden], .logo-light[hidden] { display: none; }
+
+/* ---------- component status ----------
+ * A row per moving part, with the fact that matters next to it. Not a
+ * dashboard of gauges: an operator wants "is the outbox draining" answered
+ * in words, not inferred from a needle. */
+.status-row { display: flex; align-items: center; gap: 10px; padding: 9px 14px; border-bottom: 1px solid var(--cc-border); }
+.status-row:last-child { border-bottom: 0; }
+.status-row { flex-wrap: wrap; }
+/* min-width, not width, and allowed to grow past it: the label column was
+ * measured against English and every other language is longer. */
+.status-row .name { flex: 0 1 auto; min-width: 120px; font-weight: 500; }
+.status-row .detail { color: var(--cc-text-muted); font-size: 12px; flex: 1; min-width: 0; }
+
+/* ---------- preference rows ----------
+ * A setting, its control, and what it actually produces. The preview is not
+ * decoration: "DD-MM-YYYY" is an abstraction and "13-09-2026" is the thing
+ * the person will read every day. */
+.pref { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 240px) minmax(0, 200px); gap: 12px; align-items: center; padding: 11px 14px; border-bottom: 1px solid var(--cc-border); }
+.pref:last-child { border-bottom: 0; }
+.pref .what b { display: block; font-weight: 500; }
+.pref .what span { display: block; font-size: 11.5px; color: var(--cc-text-muted); }
+.pref .preview { text-align: right; color: var(--cc-text-secondary); }
+.pref .preview .was { display: block; font-size: 11px; color: var(--cc-text-muted); text-decoration: line-through; }
+/* Label, control, preview — but only while all three genuinely fit. In a
+ * half-width column they do not, and a preview squeezed to four characters
+ * defeats the point of showing one. */
+@media (max-width: 1500px) {
+  .pref { grid-template-columns: minmax(0, 1fr) minmax(0, 200px); }
+  .pref .preview { grid-column: 2; text-align: right; }
+}
+@media (max-width: 760px) {
+  .pref { grid-template-columns: 1fr; gap: 7px; }
+  .pref .preview { grid-column: auto; text-align: left; }
+}
+/* The user block is the way into personal settings — the one place in this
+ * layout that is about the reader rather than the installation. */
+a.sidebar-foot { text-decoration: none; color: inherit; }
+a.sidebar-foot:hover { background: var(--cc-surface-2); text-decoration: none; }
+

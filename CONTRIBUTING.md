@@ -110,6 +110,24 @@ to guard against is not proof of anything.
   to either — mutable state that legitimately changes (crypto wrapping, skill installation/pinning)
   lives in a separate table on purpose.
 
+## Working on the interface
+
+The design system lives in two files that must agree:
+[`docs/mockups/assets/mockup.css`](docs/mockups/assets/mockup.css) is where a
+component is decided, and `web/src/styles/app.css` is the same system in the
+application. `npm test` in `web/` fails when they drift — it also checks that
+no colour is spelled as a hex literal outside the brand tokens, that no
+component styles itself inline, and that every translation still matches the
+English source.
+
+Read [`.claude/skills/ui-design/SKILL.md`](.claude/skills/ui-design/SKILL.md)
+before touching a stylesheet, a screen or a mockup. It carries the rules and
+the reasons: colour comes only from `docs/brand`, English is the origin
+language, sentences are never assembled from fragments, dates and byte sizes
+are formatted from raw values rather than sent as strings, lists page by
+cursor and never by page number, and the interface never offers a control for
+something the backend cannot do.
+
 ## Before a structural change
 
 Read [`docs/CURRENT-ARCHITECTURE.md`](docs/CURRENT-ARCHITECTURE.md) first. It

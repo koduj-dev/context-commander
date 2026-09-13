@@ -562,17 +562,6 @@ table.dt td.r, table.dt th.r { text-align: right; }
 .logo-dark, .logo-light { display: block; }
 .logo-dark[hidden], .logo-light[hidden] { display: none; }
 
-/* ---------- foundations page only ---------- */
-.swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 10px; }
-.sw { border: 1px solid var(--cc-border); border-radius: 6px; overflow: hidden; }
-.sw .chip { height: 46px; }
-.sw .meta { padding: 7px 9px; }
-.sw .meta b { display: block; font-size: 12px; font-weight: 500; }
-.sw .meta span { display: block; font-size: 11px; color: var(--cc-text-muted); }
-.specimen { border: 1px solid var(--cc-border); border-radius: 6px; padding: 14px; background: var(--cc-bg); }
-.specimen + .specimen { margin-top: 10px; }
-.spec-note { font-size: 12px; color: var(--cc-text-secondary); margin: 8px 0 0; }
-
 /* ---------- component status ----------
  * A row per moving part, with the fact that matters next to it. Not a
  * dashboard of gauges: an operator wants "is the outbox draining" answered
@@ -610,3 +599,19 @@ table.dt td.r, table.dt th.r { text-align: right; }
  * layout that is about the reader rather than the installation. */
 a.sidebar-foot { text-decoration: none; color: inherit; }
 a.sidebar-foot:hover { background: var(--cc-surface-2); text-decoration: none; }
+
+/* ---------- foundations page only ----------
+ *
+ * Everything BELOW this line documents the kit rather than being part of it,
+ * and is not ported into the application (see web/scripts/check-design-sync.mjs,
+ * which treats this marker as the boundary). Keep it last: a component added
+ * after it would be silently dropped from the app. */
+.swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 10px; }
+.sw { border: 1px solid var(--cc-border); border-radius: 6px; overflow: hidden; }
+.sw .chip { height: 46px; }
+.sw .meta { padding: 7px 9px; }
+.sw .meta b { display: block; font-size: 12px; font-weight: 500; }
+.sw .meta span { display: block; font-size: 11px; color: var(--cc-text-muted); }
+.specimen { border: 1px solid var(--cc-border); border-radius: 6px; padding: 14px; background: var(--cc-bg); }
+.specimen + .specimen { margin-top: 10px; }
+.spec-note { font-size: 12px; color: var(--cc-text-secondary); margin: 8px 0 0; }

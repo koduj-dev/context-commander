@@ -1,0 +1,54 @@
+/* Context Commander UI semantic tokens */
+
+:root {
+  --cc-context-pink: #FF2D8D;
+  --cc-relay-violet: #7A35F5;
+  --cc-void: #0B0B12;
+  --cc-paper: #FFFFFF;
+
+  --cc-bg: #FFFFFF;
+  --cc-surface-1: #F7F6FA;
+  --cc-surface-2: #F0EEF4;
+  --cc-surface-3: #E9E6EF;
+  --cc-border: #DDD9E5;
+  --cc-border-strong: #C3BECD;
+
+  --cc-text: #111118;
+  --cc-text-secondary: #4A4652;
+  --cc-text-muted: #77727F;
+
+  --cc-accent-primary: #D91473;
+  --cc-accent-primary-visual: #FF2D8D;
+  --cc-accent-secondary: #5F27D6;
+  --cc-accent-secondary-visual: #7A35F5;
+  --cc-focus-ring: #7A35F5;
+
+  --cc-success: #18794E;
+  --cc-warning: #9A6700;
+  --cc-danger: #C93C49;
+  --cc-info: #126EAA;
+}
+
+[data-theme="dark"] {
+  --cc-bg: #0B0B12;
+  --cc-surface-1: #14141D;
+  --cc-surface-2: #1B1B26;
+  --cc-surface-3: #242431;
+  --cc-border: #2F2E3A;
+  --cc-border-strong: #444150;
+
+  --cc-text: #F8F7FB;
+  --cc-text-secondary: #C3C0CB;
+  --cc-text-muted: #8D8997;
+
+  --cc-accent-primary: #FF2D8D;
+  --cc-accent-primary-visual: #FF2D8D;
+  --cc-accent-secondary: #7A35F5;
+  --cc-accent-secondary-visual: #7A35F5;
+  --cc-focus-ring: #B79AFF;
+
+  --cc-success: #45D483;
+  --cc-warning: #FFC857;
+  --cc-danger: #FF5D6C;
+  --cc-info: #52B7FF;
+}

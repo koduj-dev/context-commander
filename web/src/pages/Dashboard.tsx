@@ -1,148 +1,105 @@
-import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
-import { api, ApiError, type MyOrganization, type MyProject } from "../lib/api";
-import EmptyState from "../components/EmptyState";
+import { useT } from "../i18n";
+import { useAuth } from "../app/auth";
+import { useFormat } from "../app/prefs";
+import { api } from "../lib/api";
+import { roleLabel } from "../lib/labels";
+import { useResource } from "../lib/resource";
+import {
+  Badge,
+  Cell,
+  DataTable,
+  EmptyState,
+  ErrorState,
+  Grid,
+  Loading,
+  Mono,
+  Note,
+  PageHead,
+  Panel,
+  Stack,
+} from "../ui";
 
-export default function Dashboard() {
-  const [projects, setProjects] = useState<MyProject[] | null>(null);
-  const [orgs, setOrgs] = useState<MyOrganization[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+/**
+ * The landing screen.
+ *
+ * Deliberately thin. Everything a real dashboard would show — open handoffs
+ * across projects, recent refusals, storage — needs an endpoint that spans
+ * projects, and none exists: `/me/projects` is the only cross-project read
+ * the server has. So this shows what can actually be answered and says
+ * nothing about the rest, rather than rendering panels full of plausible
+ * numbers (see .claude/skills/ui-design: never fake a backend capability).
+ */
+export function Dashboard() {
+  const t = useT();
+  const f = useFormat();
+  const { me } = useAuth();
+  const { data, error, loading, reload } = useResource(() => api.myProjects(), []);
 
-  const [newProjectPath, setNewProjectPath] = useState("");
-  const [newProjectName, setNewProjectName] = useState("");
-  const [newOrgName, setNewOrgName] = useState("");
-
-  async function refresh() {
-    try {
-      const [p, o] = await Promise.all([api.myProjects(), api.myOrganizations()]);
-      setProjects(p);
-      setOrgs(o);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "failed to load dashboard");
-    }
-  }
-
-  useEffect(() => {
-    void refresh();
-  }, []);
-
-  async function onCreateProject(e: FormEvent) {
-    e.preventDefault();
-    setError(null);
-    try {
-      await api.createProject(newProjectPath.trim(), newProjectName.trim());
-      setNewProjectPath("");
-      setNewProjectName("");
-      await refresh();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "failed to create project");
-    }
-  }
-
-  async function onCreateOrganization(e: FormEvent) {
-    e.preventDefault();
-    setError(null);
-    try {
-      await api.createOrganization(newOrgName.trim());
-      setNewOrgName("");
-      await refresh();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "failed to create organization");
-    }
-  }
+  const projects = data ?? [];
 
   return (
-    <div className="mx-auto max-w-3xl space-y-10">
-      {error && <p className="rounded border border-cc-danger/40 bg-cc-surface-1 px-3 py-2 text-sm text-cc-danger">{error}</p>}
+    <>
+      <PageHead
+        title={t("dashboard.title")}
+        lead={t("dashboard.lead")}
+        actions={<span className="dim">{t("auth.signedInAs", { name: me?.display_name ?? "" })}</span>}
+      />
 
-      <section>
-        <h2 className="mb-3 text-lg font-semibold text-cc-text">Projects</h2>
-        <ul className="mb-4 divide-y divide-cc-border rounded border border-cc-border">
-          {projects === null && (
-            <li>
-              <EmptyState message="Loading…" />
-            </li>
-          )}
-          {projects?.length === 0 && (
-            <li>
-              <EmptyState message="No projects yet." />
-            </li>
-          )}
-          {projects?.map((p) => (
-            <li key={`${p.namespace}/${p.slug}`}>
-              <Link
-                to={`/projects/${p.namespace}/${p.slug}`}
-                className="flex items-center justify-between px-3 py-2 text-sm hover:bg-cc-surface-2"
+      <Grid cols="2-1">
+        <Stack>
+          <Panel title={t("dashboard.yourProjects")} sub={t("projects.count", { count: projects.length })} tight>
+            {loading ? (
+              <Loading />
+            ) : error ? (
+              <ErrorState error={error} onRetry={reload} />
+            ) : projects.length === 0 ? (
+              <EmptyState title={t("dashboard.noProjects")} body={t("projects.emptyBody")} />
+            ) : (
+              <DataTable
+                columns={[
+                  { key: "p", label: t("projects.column.project") },
+                  { key: "r", label: t("projects.column.role") },
+                ]}
               >
-                <span>
-                  {p.namespace}/{p.slug} <span className="text-cc-text-muted">— {p.name}</span>
-                </span>
-                <span className="text-xs text-cc-text-muted">{p.role}</span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-        <form onSubmit={onCreateProject} className="flex gap-2">
-          <input
-            value={newProjectPath}
-            onChange={(e) => setNewProjectPath(e.target.value)}
-            placeholder="namespace/slug"
-            className="flex-1 rounded border border-cc-border bg-cc-surface-2 px-2 py-1.5 text-sm text-cc-text outline-none focus:border-cc-border-strong"
-          />
-          <input
-            value={newProjectName}
-            onChange={(e) => setNewProjectName(e.target.value)}
-            placeholder="Name"
-            className="flex-1 rounded border border-cc-border bg-cc-surface-2 px-2 py-1.5 text-sm text-cc-text outline-none focus:border-cc-border-strong"
-          />
-          <button
-            type="submit"
-            disabled={!newProjectPath.trim() || !newProjectName.trim()}
-            className="rounded bg-cc-accent-primary px-3 py-1.5 text-sm font-medium text-cc-void disabled:opacity-50"
-          >
-            Create
-          </button>
-        </form>
-      </section>
+                {projects.map((p) => (
+                  <tr key={p.project.id}>
+                    <td>
+                      <Cell
+                        primary={
+                          <Link to={`/p/${p.project.namespace}/${p.project.slug}`}>{p.project.name}</Link>
+                        }
+                        secondary={
+                          <Mono dim>{`${p.project.namespace}/${p.project.slug}`}</Mono>
+                        }
+                      />
+                    </td>
+                    <td>
+                      <Badge tone={p.role === "OWNER" ? "active" : "neutral"}>{roleLabel(t, p.role)}</Badge>
+                    </td>
+                  </tr>
+                ))}
+              </DataTable>
+            )}
+          </Panel>
+        </Stack>
 
-      <section>
-        <h2 className="mb-3 text-lg font-semibold text-cc-text">Organizations</h2>
-        <ul className="mb-4 divide-y divide-cc-border rounded border border-cc-border">
-          {orgs === null && (
-            <li>
-              <EmptyState message="Loading…" />
-            </li>
-          )}
-          {orgs?.length === 0 && (
-            <li>
-              <EmptyState message="No organizations yet." />
-            </li>
-          )}
-          {orgs?.map((o) => (
-            <li key={o.id}>
-              <Link to={`/organizations/${o.id}`} className="flex items-center justify-between px-3 py-2 text-sm hover:bg-cc-surface-2">
-                <span>{o.name}</span>
-                <span className="text-xs text-cc-text-muted">{o.role}</span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-        <form onSubmit={onCreateOrganization} className="flex gap-2">
-          <input
-            value={newOrgName}
-            onChange={(e) => setNewOrgName(e.target.value)}
-            placeholder="Organization name"
-            className="flex-1 rounded border border-cc-border bg-cc-surface-2 px-2 py-1.5 text-sm text-cc-text outline-none focus:border-cc-border-strong"
-          />
-          <button
-            type="submit"
-            disabled={!newOrgName.trim()}
-            className="rounded bg-cc-accent-primary px-3 py-1.5 text-sm font-medium text-cc-void disabled:opacity-50"
-          >
-            Create
-          </button>
-        </form>
-      </section>
-    </div>
+        <Stack top>
+          <Panel title={t("dashboard.recent")}>
+            {/* An honest placeholder. There is no cross-project activity
+                endpoint; per-project activity is on the project's own tab. */}
+            <EmptyState title={t("dashboard.activityHere")} />
+            <Note tone="info">{t("project.notBuilt.artifacts")}</Note>
+          </Panel>
+
+          <Panel title={t("prefs.title")} sub={f.locale}>
+            <p className="sec lead-out">{t("prefs.lead")}</p>
+            <Link className="btn btn-sm" to="/preferences">
+              {t("nav.preferences")}
+            </Link>
+          </Panel>
+        </Stack>
+      </Grid>
+    </>
   );
 }

@@ -1,19 +1,28 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
-import { AuthProvider } from "./auth/AuthContext";
-import { ThemeProvider } from "./theme/ThemeContext";
-import App from "./App";
-import "./index.css";
+import { App } from "./App";
+import { I18nProvider } from "./i18n";
+import { AuthProvider } from "./app/auth";
+import { PrefsProvider } from "./app/prefs";
+import { ThemeProvider } from "./app/theme";
+import "./styles/app.css";
 
-createRoot(document.getElementById("root")!).render(
+const root = document.getElementById("root");
+if (!root) throw new Error("#root is missing from index.html");
+
+createRoot(root).render(
   <StrictMode>
-    <BrowserRouter>
-      <ThemeProvider>
-        <AuthProvider>
-          <App />
-        </AuthProvider>
-      </ThemeProvider>
-    </BrowserRouter>
+    <I18nProvider>
+      <PrefsProvider>
+        <ThemeProvider>
+          <AuthProvider>
+            <BrowserRouter>
+              <App />
+            </BrowserRouter>
+          </AuthProvider>
+        </ThemeProvider>
+      </PrefsProvider>
+    </I18nProvider>
   </StrictMode>,
 );

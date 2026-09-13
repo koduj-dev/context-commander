@@ -1,7 +1,10 @@
 node_modules/
-tsconfig.tsbuildinfo
+*.tsbuildinfo
 
-# web/dist (the built SPA) is committed on purpose, same as
-# docker-commander's web/.gitignore — so `go build ./cmd/ccd` always
-# produces a binary with a working UI without requiring Node to be
-# installed. `make ui` overwrites it with a fresh build.
+# Generated from docs/brand by scripts/sync-brand.mjs — the brand package is
+# the single source of truth and these are copies, so they are not committed.
+public/brand/
+
+# web/dist (the built SPA) IS committed on purpose: `go build ./cmd/ccd` must
+# produce a binary with a working UI without requiring Node. `make ui`
+# overwrites it with a fresh build.
