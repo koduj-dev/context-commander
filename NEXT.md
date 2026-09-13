@@ -212,23 +212,26 @@ on the planned move to a public repo:
 
 ## 📦 Backlog
 
-- **Project templates.** Raised by the maintainer while reviewing the UI
-  mockups, and not in any earlier scope. The shape that would fit what
-  already exists: a template is a **named bundle of bindings**, not a
-  project copy — a set of skill bindings, a set of gate bindings, and
-  optionally a few conventional artifacts under `context/`. Creating a
-  project from one applies those bindings at creation; it copies no
-  handoffs, no history and no content, because those belong to the work,
-  not to the shape of the project.
-  - Fits the grain: everything in the bundle already has a scope vocabulary
-    and an install operation. A template is mostly a list of things to call
-    on behalf of the creator, plus authorization — you may only template
-    what you may already bind.
-  - The trap to avoid: a template that *forks* an existing project's
-    content. That is a copy with no provenance, and it is how two projects
-    start silently diverging from a shared artifact nobody owns.
-  - Not mocked. The mockups deliberately show nothing the backend cannot
-    do, and a template screen would be the largest promise on the board.
+- **Project templates.** Decided with the maintainer 2026-09-13: a template
+  is a **snapshot of a project** — its skill bindings, its gate bindings and
+  its `context/` notes — captured by a button on an existing project, and
+  applied when a new project is created from it. Deliberately not a
+  template *editor*: you shape a real project until it is right, then save
+  what it became.
+  - Two operations, no third: **save this project as a template**, and
+    **create a project from a template**. No forking a project into another
+    project, and no separate authoring surface to maintain.
+  - What a template must carry: the bindings (which already have a scope
+    vocabulary and an install operation, so applying one is mostly a list of
+    calls made on the creator's behalf, with the same authorization — you
+    may only template what you may already bind) and a copy of the
+    `context/` artifacts. What it must NOT carry: handoffs, history,
+    conversations, secrets or events. Those belong to the work that
+    happened, not to the shape of a project.
+  - **The copy needs provenance.** An artifact that arrives in a new project
+    with no record of where it came from is how two projects start quietly
+    diverging from the same text with nobody owning either. Record the
+    template and its version on what it creates.
 - **[security] Per-IP rate limiting needs a trusted-proxy configuration.**
   `internal/ratelimit` limits per credential and bounds authentications in
   flight, which is everything that can be done correctly today. Per-IP
@@ -249,6 +252,23 @@ on the planned move to a public repo:
   session of anyone who opens it. It needs a separate origin (or a sandboxed
   iframe with a strict CSP and no credentials), which is a deployment
   decision as much as a code one. Worth doing; not worth doing casually.
+- **The UI has to speak more than English.** Required by the maintainer
+  2026-09-13: at minimum English, German and Spanish, built so an unknown
+  language can be added later without reworking screens — Czech being the
+  obvious near-term one.
+  - Externalise every string from the first commit of the rework. Retrofitting
+    i18n is a rewrite; doing it from the start is a discipline.
+  - Format dates, times and numbers through the locale, never by
+    concatenation. "12 Sep 2026" is an English sentence, not a date.
+  - **German is roughly 30% longer than English, and this design is dense.**
+    That is the real cost: fixed-width labels, single-line badges and tight
+    table headers are exactly what breaks first. The mockup kit has been
+    hardened against it (nothing is pinned to a width that only fits
+    English), and any new component must pass the same bar — see
+    `docs/mockups/foundations.html`.
+  - Keep the door open for scripts that are not Latin and for right-to-left,
+    without building for them now: no text baked into images, no layout that
+    depends on a string's length, no icon carrying meaning alone.
 - **[security] Keep RLS honest as tables are added.** Every table with a
   policy now has a test that fails when the policy is removed — `artifacts`,
   `artifact_versions`, `handoffs`, `conversations`, `secret_values`,

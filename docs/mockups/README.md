@@ -38,6 +38,22 @@ page.
 - **No invented events.** Activity screens show only action names the server
   actually emits.
 
+One screen breaks that rule on purpose and says so: `templates.html` shows a
+flow that is decided but not implemented, and carries a banner to that effect.
+
+## Languages
+
+The UI has to speak English, German and Spanish at minimum, and be ready for
+one nobody has picked yet. That is a design constraint, not a translation
+task: German runs roughly 30% longer than English and these screens are
+dense, so components are measured against the longer language. Table headings
+wrap instead of clipping, badge rows wrap, status labels grow past their
+minimum, and nothing is pinned to a width that only fits English.
+
+`foundations.html` renders the same components in English and German side by
+side. If the German column breaks, the component is wrong — not the
+translation.
+
 ## Regenerating
 
 ```bash

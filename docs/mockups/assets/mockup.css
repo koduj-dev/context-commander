@@ -103,6 +103,7 @@ a:hover { text-decoration: underline; }
  * fills whatever box it lands in, which is how the topbar's search icon
  * ended up the size of a building. */
 .ico { width: 15px; height: 15px; flex: none; }
+.nav a span:not(.count) { min-width: 0; overflow-wrap: anywhere; }
 .nav a .ico { opacity: .75; }
 .nav a.active .ico { opacity: 1; }
 .nav .count { margin-left: auto; font-size: 11px; color: var(--cc-text-muted); }
@@ -170,9 +171,9 @@ a:hover { text-decoration: underline; }
 .page { padding: 22px; width: 100%; }
 
 .page-head { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 18px; }
-.page-head h1 { margin: 0 0 3px; font-size: 19px; font-weight: 600; letter-spacing: -0.01em; }
+.page-head h1 { margin: 0 0 3px; font-size: 19px; font-weight: 600; letter-spacing: -0.01em; overflow-wrap: anywhere; }
 .page-head p { margin: 0; color: var(--cc-text-secondary); font-size: 12.5px; max-width: 62ch; }
-.page-head .actions { margin-left: auto; display: flex; gap: 8px; flex: none; }
+.page-head .actions { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
 
 /* ---------- controls ---------- */
 
@@ -233,7 +234,7 @@ a:hover { text-decoration: underline; }
   overflow: hidden;
 }
 .panel > header {
-  display: flex; align-items: center; gap: 10px;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
   padding: 10px 14px;
   border-bottom: 1px solid var(--cc-border);
 }
@@ -254,8 +255,8 @@ a:hover { text-decoration: underline; }
 
 /* ---------- definition rows ---------- */
 
-.defs { display: grid; grid-template-columns: max-content 1fr; gap: 7px 18px; align-items: baseline; }
-.defs dt { color: var(--cc-text-muted); font-size: 12px; }
+.defs { display: grid; grid-template-columns: minmax(0, max-content) 1fr; gap: 7px 18px; align-items: baseline; }
+.defs dt { color: var(--cc-text-muted); font-size: 12px; overflow-wrap: anywhere; }
 .defs dd { margin: 0; }
 
 /* ---------- tables ---------- */
@@ -269,7 +270,10 @@ table.dt th {
   font-size: 10.5px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase;
   color: var(--cc-text-muted);
   padding: 8px 14px;
-  white-space: nowrap;
+  /* Deliberately NOT nowrap. A German column heading is routinely half
+   * again as long as its English original; forcing one line either blows
+   * the table out of the panel or truncates the word that names the
+   * column. Two lines of heading costs one row of height, once. */
   background: var(--cc-surface-1);
   /* An inset shadow rather than border-bottom: with border-collapse the
    * two would fight over the same pixel row and one of them loses. */
@@ -303,7 +307,11 @@ table.dt td.r, table.dt th.r { text-align: right; }
   padding: 1px 6px;
   font-size: 11px;
   font-weight: 500;
+  /* A badge does not break mid-word, but a row of them must be free to
+   * wrap — "nicht überschreibbar" is not going to fit where "not
+   * overridable" did. */
   white-space: nowrap;
+  max-width: 100%;
   color: var(--cc-text-secondary);
   background: var(--cc-surface-2);
 }
@@ -354,7 +362,7 @@ table.dt td.r, table.dt th.r { text-align: right; }
 .feed { list-style: none; margin: 0; padding: 0; }
 .feed li { display: flex; gap: 11px; padding: 9px 14px; border-bottom: 1px solid var(--cc-border); align-items: baseline; }
 .feed li:last-child { border-bottom: 0; }
-.feed .when { color: var(--cc-text-muted); font-size: 11.5px; white-space: nowrap; min-width: 62px; }
+.feed .when { color: var(--cc-text-muted); font-size: 11.5px; min-width: 62px; flex: 0 0 auto; }
 .feed .what { flex: 1; min-width: 0; }
 
 .empty { padding: 28px 14px; text-align: center; color: var(--cc-text-muted); }
@@ -515,7 +523,12 @@ table.dt td.r, table.dt th.r { text-align: right; }
 .v-warn { color: var(--cc-warning); }
 .unit { font-size: 13px; font-weight: 500; }
 
-/* The small uppercase caption above a value inside a panel body. */
+/* The small uppercase caption above a value inside a panel body.
+ *
+ * text-transform: uppercase is a language-dependent operation — German ß
+ * becomes SS and changes the word's length, Turkish dotless ı does not map
+ * the way Latin does. It is used here only on short fixed captions the
+ * product controls, never on user or domain content. */
 .label-caps {
   font-size: 11px;
   text-transform: uppercase;
@@ -566,5 +579,8 @@ table.dt td.r, table.dt th.r { text-align: right; }
  * in words, not inferred from a needle. */
 .status-row { display: flex; align-items: center; gap: 10px; padding: 9px 14px; border-bottom: 1px solid var(--cc-border); }
 .status-row:last-child { border-bottom: 0; }
-.status-row .name { min-width: 140px; font-weight: 500; }
+.status-row { flex-wrap: wrap; }
+/* min-width, not width, and allowed to grow past it: the label column was
+ * measured against English and every other language is longer. */
+.status-row .name { flex: 0 1 auto; min-width: 120px; font-weight: 500; }
 .status-row .detail { color: var(--cc-text-muted); font-size: 12px; flex: 1; min-width: 0; }

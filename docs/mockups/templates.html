@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Templates · Context Commander</title>
+<link rel="icon" href="../brand/svg/cc-favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../brand/tokens/ui-colors.css">
+<link rel="stylesheet" href="assets/mockup.css">
+</head>
+<body>
+<div class="mockbar">
+  <span class="tag">Mockup</span>
+  <a href="index.html">All screens</a>
+  <span class="dim">·</span>
+  <span>Templates</span>
+  <span style="flex:1"></span>
+  <span class="seg">
+    <button type="button" aria-pressed="true" onclick="setTheme('dark',this)">Dark</button>
+    <button type="button" aria-pressed="false" onclick="setTheme('light',this)">Light</button>
+  </span>
+</div>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <img class="logo-dark" src="../brand/svg/cc-logo-horizontal-on-dark.svg" alt="Context Commander">
+      <img class="logo-light" src="../brand/svg/cc-logo-horizontal-on-light.svg" alt="Context Commander" hidden>
+    </div>
+    <nav class="nav">
+        <div class="nav-label">Workspace</div>
+        <a href="dashboard.html"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 9 4l6 5.5M4.5 8.5V15h9V8.5"/></svg><span>Dashboard</span></a>
+        <a href="projects.html" class="active"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5.5h5l1.2 1.5H16V14H2zM2 5.5V3.5h4l1 1.5"/></svg><span>Projects</span><span class="count num">7</span></a>
+        <a href="organizations.html"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 15V4.5h5V15M11 15V7.5h4V15M2 15h14M5 7h1M5 9.5h1M13 10h1"/></svg><span>Organizations</span><span class="count num">1</span></a>
+        <a href="registry.html"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3.5h8l2 2.5v9H4zM6 7h6M6 9.5h6M6 12h4"/></svg><span>Skill Registry</span><span class="count num">14</span></a>
+        <div class="nav-label">Installation</div>
+        <a href="administration.html"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2.5 3.5 5v4.2c0 3 2.3 5.2 5.5 6.3 3.2-1.1 5.5-3.3 5.5-6.3V5z M6.8 9l1.6 1.6L11.6 7"/></svg><span>Administration</span></a>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="avatar">FM</div>
+      <div class="who">
+        <b>Filip Majerík</b>
+        <span>Installation admin</span>
+      </div>
+    </div>
+  </aside>
+  <div class="main">
+    <div class="topbar">
+      <div class="crumbs"><b>Templates</b></div>
+      <div class="spacer"></div>
+      <div class="search"><svg class="ico" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="5"/><path d="m12 12 3 3"/></svg><span>Search</span><kbd>⌘K</kbd></div>
+    </div>
+    <div class="page ">
+      
+      
+<div class="page-head">
+  <div><h1>Templates</h1><p>A template is a snapshot of a project that was shaped the way you want new ones to start: its skill bindings, its policies and its context notes. Not a fork — no handoffs, no history, no secrets travel with it.</p></div>
+  <div class="actions"><button class="btn btn-primary">New project from template</button></div>
+</div>
+
+<div class="note warn"><b>Proposed, not built.</b> Every other screen here shows only what the server can already do. This one shows a flow that is decided but not implemented, so nothing in it is wired.</div>
+
+<div class="mt"><section class="panel"><header><h2>4 templates</h2></header><div class="body tight"><table class="dt"><thead><tr><th>Template</th><th>From</th><th>Contains</th><th class="r">Used</th><th class="r">Updated</th><th class="r"></th></tr></thead><tbody><tr><td>Elasticsearch migration<div class="sub-line">how es-migration was set up once it worked</div></td><td><span class="mono">filip/es-migration</span></td><td>3 skills · 2 policies · 4 notes</td><td class="r"><span class="num">2</span></td><td class="r"><span class="dim">12 Sep</span></td><td class="r"><button class="btn btn-sm">Create project</button></td></tr><tr><td>Service rewrite<div class="sub-line">the shape acme uses for a rewrite</div></td><td><span class="mono">acme/billing-rewrite</span></td><td>5 skills · 3 policies · 7 notes</td><td class="r"><span class="num">3</span></td><td class="r"><span class="dim">08 Sep</span></td><td class="r"><button class="btn btn-sm">Create project</button></td></tr><tr><td>Research spike<div class="sub-line">light: review skill and a notes convention</div></td><td><span class="mono">filip/es-migration</span></td><td>1 skill · 1 policy · 2 notes</td><td class="r"><span class="num">6</span></td><td class="r"><span class="dim">01 Sep</span></td><td class="r"><button class="btn btn-sm">Create project</button></td></tr><tr><td>Compliance baseline<div class="sub-line">mandated policies, nothing else</div></td><td><span class="mono">acme/platform</span></td><td>2 skills · 4 policies</td><td class="r"><span class="num">4</span></td><td class="r"><span class="dim">28 Aug</span></td><td class="r"><button class="btn btn-sm">Create project</button></td></tr></tbody></table></div><footer><div class="pager"><span class="count">Showing <span class="num">4</span> templates · complete</span><span class="spacer"></span><select aria-label="Page size"><option selected>25 per page</option><option>50 per page</option><option>100 per page</option><option>250 per page</option></select><span class="dim">end of list</span></div></footer></section></div>
+
+<div class="mt"><div class="grid g2"><section class="panel"><header><h2>What a template carries</h2></header><div class="body">
+    <div class="stack-sm">
+      <div><div><div class="label-caps">Copied</div><span class="sec">Skill bindings · gate bindings · artifacts under <span class="mono">context/</span></span></div></div>
+      <div><div><div class="label-caps">Never copied</div><span class="sec">Handoffs · conversations and history · secrets · events · audit</span></div></div>
+    </div>
+    <div class="note">Those belong to the work that happened, not to the shape of a project. A template that dragged a handoff into a new project would be handing someone else's unfinished task to a stranger.</div></div></section><section class="panel"><header><h2>Two operations, no third</h2></header><div class="body">
+    <div class="stack-sm">
+      <div class="row"><span class="grow"><b class="strong">Save this project as a template</b><div class="sub-line">A button on the project, once it is shaped the way you want.</div></span><a class="btn btn-sm" href="project-settings.html">On Settings</a></div>
+      <div class="row"><span class="grow"><b class="strong">Create a project from a template</b><div class="sub-line">Applies the bindings on your behalf, with your authorization.</div></span><button class="btn btn-sm">Here</button></div>
+    </div>
+    <div class="note info">No template editor. You shape a real project until it is right, then save what it became — an authoring surface for templates would be a second thing to keep correct.</div></div></section></div></div>
+
+<div class="mt"><section class="panel"><header><h2>Provenance</h2></header><div class="body">
+  <p class="sec lead-out">A project created from a template records which template and which version it came from, and so does every artifact copied in.</p>
+  <div class="code mono">project.created  from_template: "Elasticsearch migration" v3\ncontext/overview.md  copied_from_template: v3</div>
+  <div class="note warn">An artifact that arrives with no record of where it came from is how two projects quietly diverge from the same text with nobody owning either.</div></div></section></div>
+
+    </div>
+  </div>
+</div>
+<script>
+function setTheme(t, el) {
+  document.documentElement.setAttribute('data-theme', t);
+  el.parentNode.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === el)));
+  document.querySelector('.logo-dark').hidden = (t === 'light');
+  document.querySelector('.logo-light').hidden = (t !== 'light');
+}
+</script>
+</body>
+</html>
