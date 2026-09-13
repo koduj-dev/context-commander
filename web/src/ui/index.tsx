@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useT } from "../i18n";
 import { ApiError } from "../lib/api";
 
@@ -62,6 +62,50 @@ export function Mono({
 }) {
   return (
     <span className={`mono${truncate ? " truncate" : ""}${dim ? " dim" : ""}`}>{children}</span>
+  );
+}
+
+/**
+ * A value with a way to take it.
+ *
+ * This product asks people to paste UUIDs — adding a member, looking up
+ * credentials, adding someone to an organization — because nothing in the
+ * API lists principals. Until that changes, selecting a truncated identifier
+ * by hand is the most common thing anyone does in this interface, and it is
+ * the thing most likely to go wrong silently.
+ *
+ * Falls back to doing nothing visible rather than throwing: the clipboard is
+ * unavailable over plain HTTP in some browsers, which is exactly how a
+ * self-hosted instance is often reached first.
+ */
+export function Copyable({ value, children }: { value: string; children?: ReactNode }) {
+  const t = useT();
+  const [copied, setCopied] = useState(false);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // No clipboard permission, or an insecure origin. The value is still
+      // on screen and selectable.
+    }
+  }
+
+  return (
+    <span className="copy">
+      {children ?? <Mono truncate>{value}</Mono>}
+      <button
+        type="button"
+        onClick={() => void copy()}
+        data-copied={copied ? "true" : undefined}
+        title={copied ? t("common.copied") : t("common.copy")}
+        aria-label={copied ? t("common.copied") : t("common.copy")}
+      >
+        {copied ? "✓" : "⧉"}
+      </button>
+    </span>
   );
 }
 

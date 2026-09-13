@@ -28,6 +28,13 @@ export const en = {
   "nav.installation": "Installation",
   "nav.preferences": "Preferences",
   "nav.signOut": "Sign out",
+  "find.open": "Search",
+  "find.placeholder": "Jump to a project, a skill, a screen…",
+  "find.project": "Project",
+  "find.skill": "Skill",
+  "find.screen": "Screen",
+  "find.nothing": "Nothing matches that",
+  "find.hint": "Type to search. ↑↓ to move, Enter to go, Esc to close.",
 
   "theme.dark": "Dark",
   "theme.light": "Light",
@@ -55,6 +62,8 @@ export const en = {
   "common.never": "Never",
   "common.unknown": "Unknown",
   "common.you": "You",
+  "common.copy": "Copy",
+  "common.copied": "Copied",
 
   "error.forbidden.title": "You do not have access to this",
   "error.forbidden.body":
@@ -70,6 +79,13 @@ export const en = {
   "error.rateLimited.body":
     "This credential is making requests too quickly. Wait a moment and retry.",
   "error.generic.title": "Something went wrong",
+  "error.crashed.title": "This screen stopped working",
+  "error.crashed.body":
+    "Something in the interface failed while drawing this page. Nothing you were looking at was changed on the server. Reloading usually clears it; if it does not, the detail below is what to report.",
+  "error.crashed.reload": "Reload",
+  "error.notFoundPage.title": "No such page",
+  "error.notFoundPage.body": "That address does not match anything in this interface.",
+  "error.backToDashboard": "Go to the dashboard",
 
   "empty.noResults": "Nothing matches that",
   "empty.noResultsBody": "Try a different search, or clear the filters.",

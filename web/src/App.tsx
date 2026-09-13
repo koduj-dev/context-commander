@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Route, Routes } from "react-router-dom";
 import { Shell } from "./app/Shell";
 import { useAuth } from "./app/auth";
 import { Loading } from "./ui";
@@ -27,6 +27,7 @@ import {
   AdminSecurityLog,
 } from "./pages/Administration";
 import { Preferences } from "./pages/Preferences";
+import { NotFound } from "./pages/NotFound";
 
 /**
  * Routes.
@@ -80,9 +81,9 @@ export function App() {
         </Route>
         <Route path="tokens" element={<Tokens />} />
         <Route path="preferences" element={<Preferences />} />
-        {/* An unknown path is not an error worth a screen of its own here —
-            the dashboard is always a valid place to be. */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        {/* Said out loud rather than redirected: a silent bounce to the
+            dashboard makes a stale link look like it worked. */}
+        <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>
   );

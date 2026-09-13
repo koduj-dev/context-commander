@@ -545,4 +545,23 @@ export const de: Partial<Record<MessageKey, string>> = {
 
   "dashboard.waitingLead":
     "Projekte, in denen eine Übergabe offen oder übernommen ist — Arbeit, die jemand für die nächste Person oder den nächsten Agenten hinterlassen hat.",
+
+  "find.open": "Suchen",
+  "find.placeholder": "Zu einem Projekt, einem Skill, einem Bildschirm springen…",
+  "find.project": "Projekt",
+  "find.skill": "Skill",
+  "find.screen": "Bildschirm",
+  "find.nothing": "Dazu passt nichts",
+  "find.hint": "Tippen zum Suchen. ↑↓ bewegt, Enter springt, Esc schließt.",
+
+  "common.copy": "Kopieren",
+  "common.copied": "Kopiert",
+
+  "error.crashed.title": "Dieser Bildschirm funktioniert nicht mehr",
+  "error.crashed.body":
+    "Beim Zeichnen dieser Seite ist in der Oberfläche etwas fehlgeschlagen. An dem, was Sie angesehen haben, wurde auf dem Server nichts geändert. Neu laden behebt es meistens; wenn nicht, ist die Angabe unten das, was Sie melden sollten.",
+  "error.crashed.reload": "Neu laden",
+  "error.notFoundPage.title": "Diese Seite gibt es nicht",
+  "error.notFoundPage.body": "Diese Adresse passt zu nichts in dieser Oberfläche.",
+  "error.backToDashboard": "Zur Übersicht",
 };

@@ -8,6 +8,7 @@ import {
   Badge,
   Btn,
   Cell,
+  Copyable,
   Code,
   DataTable,
   EmptyState,
@@ -85,7 +86,9 @@ export function Tokens() {
         <div className="mb">
           <Panel title={t("tokens.justIssued")}>
             {/* Shown once and never again — only the hash is stored. */}
-            <Code>{issued.token}</Code>
+            <Copyable value={issued.token}>
+              <Code>{issued.token}</Code>
+            </Copyable>
             <div className="mt">
               <Note tone="warn">{t("tokens.justIssuedBody")}</Note>
             </div>

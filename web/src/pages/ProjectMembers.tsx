@@ -9,6 +9,7 @@ import {
   Badge,
   Btn,
   Cell,
+  Copyable,
   DataTable,
   EmptyState,
   ErrorState,
@@ -83,11 +84,7 @@ export function ProjectMembers() {
                         )}
                       </>
                     }
-                    secondary={
-                      <Mono dim truncate>
-                        {m.principal_id}
-                      </Mono>
-                    }
+                    secondary={<Copyable value={m.principal_id} />}
                   />
                 </td>
                 <td>

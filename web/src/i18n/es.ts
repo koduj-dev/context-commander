@@ -532,4 +532,23 @@ export const es: Partial<Record<MessageKey, string>> = {
 
   "dashboard.waitingLead":
     "Proyectos con un traspaso abierto o tomado — trabajo que alguien dejó para quien venga después.",
+
+  "find.open": "Buscar",
+  "find.placeholder": "Ir a un proyecto, un skill, una pantalla…",
+  "find.project": "Proyecto",
+  "find.skill": "Skill",
+  "find.screen": "Pantalla",
+  "find.nothing": "Nada coincide con eso",
+  "find.hint": "Escriba para buscar. ↑↓ se mueve, Intro va, Esc cierra.",
+
+  "common.copy": "Copiar",
+  "common.copied": "Copiado",
+
+  "error.crashed.title": "Esta pantalla ha dejado de funcionar",
+  "error.crashed.body":
+    "Algo de la interfaz ha fallado al dibujar esta página. Nada de lo que estaba viendo se ha cambiado en el servidor. Recargar suele bastar; si no, el detalle de abajo es lo que conviene reportar.",
+  "error.crashed.reload": "Recargar",
+  "error.notFoundPage.title": "No existe esa página",
+  "error.notFoundPage.body": "Esa dirección no corresponde a nada de esta interfaz.",
+  "error.backToDashboard": "Ir al panel",
 };

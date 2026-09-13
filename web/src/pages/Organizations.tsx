@@ -8,6 +8,7 @@ import { useList, useResource } from "../lib/resource";
 import {
   Badge,
   Btn,
+  Copyable,
   DataTable,
   EmptyState,
   ErrorState,
@@ -97,9 +98,7 @@ export function Organizations() {
                         {o.name}
                       </a>
                       <div className="sub-line">
-                        <Mono dim truncate>
-                          {o.id}
-                        </Mono>
+                        <Copyable value={o.id} />
                       </div>
                     </td>
                     <td className="r">
@@ -162,7 +161,7 @@ function OrganizationMembers({ id, name, role }: { id: string; name: string; rol
             {members.map((m) => (
               <tr key={m.user_id}>
                 <td>
-                  <Mono truncate>{m.user_id}</Mono>
+                  <Copyable value={m.user_id} />
                 </td>
                 <td>
                   <Badge tone={m.role === "OWNER" ? "active" : "neutral"}>

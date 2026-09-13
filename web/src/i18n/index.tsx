@@ -1,4 +1,12 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import { en, type MessageKey } from "./en";
 
 /**
@@ -104,6 +112,20 @@ function initialLocale(): Locale {
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>(initialLocale);
   const [catalog, setCatalog] = useState<Catalog>(en);
+
+  // The initial locale comes from storage or the browser, and the document
+  // has to say so too: a page whose `lang` disagrees with its text is
+  // pronounced wrong by a screen reader and hyphenated wrong by the browser.
+  // Setting it only inside setLocale left a reader who had already chosen
+  // German with a document claiming to be English until they chose again —
+  // and with English text, since the catalogue was never loaded either.
+  useEffect(() => {
+    document.documentElement.lang = locale;
+    if (locale !== "en") void loaders[locale]().then(setCatalog);
+    // Once, for whatever locale the app started in; setLocale keeps the
+    // document and the catalogue in step from then on.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const setLocale = useCallback((next: Locale) => {
     void loaders[next]().then((loaded) => {

@@ -1,8 +1,10 @@
 import { NavLink, Outlet, Link } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { useI18n, useT } from "../i18n";
 import { principalName } from "../lib/api";
 import { useAuth } from "./auth";
-import { useCrumbsValue } from "./crumbs";
+import { useCrumbsValue, useDocumentTitle } from "./crumbs";
+import { QuickFind } from "./QuickFind";
 import { useTheme } from "./theme";
 
 /**
@@ -58,6 +60,22 @@ export function Shell() {
   const { theme, setTheme } = useTheme();
   const { me } = useAuth();
   const crumbs = useCrumbsValue();
+  useDocumentTitle(t("app.name"));
+  const [finding, setFinding] = useState(false);
+
+  // ⌘K / Ctrl-K, the shortcut every console of this shape uses. Bound on the
+  // document rather than on a field, because the point is to reach it from
+  // anywhere without tabbing to the search box first.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setFinding(true);
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
 
   return (
     <div className="app">
@@ -142,6 +160,21 @@ export function Shell() {
             {crumbs && <b>{crumbs.current}</b>}
           </div>
           <div className="spacer" />
+          <button className="search" type="button" onClick={() => setFinding(true)}>
+            <svg
+              className="ico"
+              viewBox="0 0 18 18"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.4"
+              aria-hidden="true"
+            >
+              <circle cx="8" cy="8" r="5" />
+              <path d="m12 12 3 3" />
+            </svg>
+            <span>{t("find.open")}</span>
+            <kbd>⌘K</kbd>
+          </button>
           <span className="seg" role="group" aria-label={t("prefs.language")}>
             {(["en", "de", "es"] as const).map((l) => (
               <button
@@ -170,6 +203,8 @@ export function Shell() {
         <main className="page" id="main" tabIndex={-1}>
           <Outlet />
         </main>
+
+        {finding && <QuickFind onClose={() => setFinding(false)} />}
       </div>
     </div>
   );

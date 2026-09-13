@@ -153,7 +153,10 @@ a:hover { text-decoration: underline; }
   padding: 4px 9px;
   width: 260px;
   color: var(--cc-text-muted);
+  font: inherit;
   font-size: 12.5px;
+  cursor: pointer;
+  text-align: left;
 }
 .search kbd {
   margin-left: auto;
@@ -621,6 +624,90 @@ table.dt td.r, table.dt th.r { text-align: right; }
  * layout that is about the reader rather than the installation. */
 a.sidebar-foot { text-decoration: none; color: inherit; }
 a.sidebar-foot:hover { background: var(--cc-surface-2); text-decoration: none; }
+
+/* Quick find. An overlay rather than a page because it is a way of getting
+ * somewhere, not somewhere to be — it must never take over the address bar
+ * or the back button.
+ *
+ * The backdrop is deliberately dark rather than blurred: this sits over
+ * dense tables, and a blur turns them into noise the eye keeps trying to
+ * resolve. */
+.palette-back {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: color-mix(in srgb, var(--cc-bg) 72%, transparent);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 12vh 16px 16px;
+}
+.palette {
+  width: 100%;
+  max-width: 560px;
+  background: var(--cc-surface-1);
+  border: 1px solid var(--cc-border-strong);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 18px 48px color-mix(in srgb, var(--cc-bg) 70%, transparent);
+}
+.palette > input {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--cc-border);
+  background: none;
+  color: var(--cc-text);
+  font: inherit;
+  font-size: 14px;
+  padding: 13px 15px;
+}
+.palette > input:focus { outline: none; }
+.palette-list { max-height: 46vh; overflow-y: auto; }
+.palette-list button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  border: 0;
+  background: none;
+  color: var(--cc-text);
+  font: inherit;
+  text-align: left;
+  padding: 8px 15px;
+  cursor: pointer;
+}
+.palette-list button[aria-selected="true"] { background: var(--cc-surface-2); }
+.palette-list button .kind {
+  margin-left: auto;
+  color: var(--cc-text-muted);
+  font-size: 11px;
+}
+.palette-empty { padding: 14px 15px; color: var(--cc-text-muted); }
+
+/* A value plus the button that copies it. The button is quiet until the row
+ * is hovered or it is focused — a copy affordance on every identifier in a
+ * dense table would out-shout the data it belongs to. */
+.copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+}
+.copy > button {
+  border: 0;
+  background: none;
+  color: var(--cc-text-muted);
+  cursor: pointer;
+  padding: 0 2px;
+  font: inherit;
+  font-size: 11px;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+tr:hover .copy > button,
+.copy:hover > button,
+.copy > button:focus-visible { opacity: 1; }
+.copy > button[data-copied="true"] { color: var(--cc-success); opacity: 1; }
 
 /* The first thing a keyboard reader needs and the easiest to forget: a way
  * past the navigation. Off-screen until focused, then a real, visible

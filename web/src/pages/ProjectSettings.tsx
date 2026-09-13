@@ -1,5 +1,5 @@
 import { useT } from "../i18n";
-import { Code, Def, Defs, Grid, Mono, Note, PageHead, Panel, Stack } from "../ui";
+import { Code, Copyable, Def, Defs, Grid, Mono, Note, PageHead, Panel, Stack } from "../ui";
 import { useProject } from "./ProjectLayout";
 
 /**
@@ -61,7 +61,7 @@ export function ProjectSettings() {
                 <Mono>{`${namespace}/${slug}`}</Mono>
               </Def>
               <Def term={t("project.uuid")}>
-                <Mono truncate>{project.id}</Mono>
+                <Copyable value={project.id} />
               </Def>
               <Def term={t("settings.visibility")}>{project.visibility}</Def>
             </Defs>

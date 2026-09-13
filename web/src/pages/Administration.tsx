@@ -10,6 +10,7 @@ import {
   Badge,
   Btn,
   Cell,
+  Copyable,
   DataTable,
   EmptyState,
   ErrorState,
@@ -90,7 +91,7 @@ export function AdminOverview() {
                   <tr key={a.user_id}>
                     <td>
                       <Cell
-                        primary={<Mono truncate>{a.user_id}</Mono>}
+                        primary={<Copyable value={a.user_id} />}
                         secondary={
                           a.granted_by && (
                             <Mono dim truncate>
@@ -231,7 +232,7 @@ function CreateUser() {
       {created && (
         <div className="mt">
           <Note tone="info">
-            {t("admin.created", { name: "" })} <Mono>{created}</Mono>
+            {t("admin.created", { name: "" })} <Copyable value={created} />
           </Note>
         </div>
       )}
@@ -293,7 +294,7 @@ function CreateServicePrincipal() {
       {created && (
         <div className="mt">
           <Note tone="info">
-            {t("admin.created", { name: "" })} <Mono>{created}</Mono>
+            {t("admin.created", { name: "" })} <Copyable value={created} />
           </Note>
         </div>
       )}

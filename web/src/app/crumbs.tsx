@@ -31,6 +31,22 @@ export function CrumbsProvider({ children }: { children: ReactNode }) {
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
+/**
+ * The browser tab, from the same trail.
+ *
+ * A console people keep several tabs of is unusable when every tab reads
+ * "Context Commander" — and the back button's history list is the same
+ * string repeated. The crumbs already name the screen, so this reuses them
+ * rather than asking every page to remember a second title.
+ */
+export function useDocumentTitle(appName: string) {
+  const trail = useCrumbsValue();
+  useEffect(() => {
+    const here = typeof trail?.current === "string" ? trail.current : undefined;
+    document.title = here ? `${here} · ${appName}` : appName;
+  }, [trail, appName]);
+}
+
 /** What the shell draws. Null while no screen has published a trail. */
 export function useCrumbsValue(): Trail {
   return useContext(Ctx)?.trail ?? null;
