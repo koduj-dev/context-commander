@@ -171,6 +171,7 @@ function ArtifactDetail({ path }: { path: string }) {
   );
 
   const versions = history.data ?? [];
+  const latest = stat.data?.current_version;
   const renderable = stat.data ? isText(stat.data.content_type) : false;
 
   return (
@@ -189,11 +190,16 @@ function ArtifactDetail({ path }: { path: string }) {
             ]}
           >
             {versions.map((v) => (
-              <tr key={v.version} className={v.version === (version ?? versions[0]?.version) ? "active" : ""}>
+              // Highlighted against the version actually on screen, not
+              // against the first row: history comes back oldest-first while
+              // a versionless read returns the newest, so anything derived
+              // from the row order marks the wrong one.
+              <tr key={v.version} className={v.version === content.data?.version ? "active" : ""}>
                 <td>
                   <Btn small onClick={() => setVersion(v.version)}>
                     v{v.version}
                   </Btn>
+                  {v.version === latest && <span className="inline-badge">{t("artifacts.latest")}</span>}
                 </td>
                 <td className="r">
                   <span className="num">{f.bytes(v.size_bytes)}</span>
