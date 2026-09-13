@@ -54,6 +54,7 @@ export function ProjectLayout() {
     <ProjectCtx.Provider value={{ project: data, namespace, slug }}>
       <Tabs label={data.name}>
         {tab(base, t("project.tab.overview"), true)}
+        {tab(`${base}/context`, t("context.title"))}
         {tab(`${base}/artifacts`, t("artifacts.title"))}
         {tab(`${base}/skills`, t("project.tab.skills"))}
         {tab(`${base}/policies`, t("gates.title"))}

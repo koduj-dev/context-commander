@@ -9,6 +9,7 @@ import { ProjectLayout } from "./pages/ProjectLayout";
 import { ProjectOverview } from "./pages/ProjectOverview";
 import { ProjectMembers } from "./pages/ProjectMembers";
 import { ProjectArtifacts } from "./pages/ProjectArtifacts";
+import { ProjectContext } from "./pages/ProjectContext";
 import { ProjectSecrets } from "./pages/ProjectSecrets";
 import { ProjectPolicies } from "./pages/ProjectPolicies";
 import { ProjectSkills } from "./pages/ProjectSkills";
@@ -57,6 +58,7 @@ export function App() {
         <Route path="projects" element={<Projects />} />
         <Route path="p/:namespace/:slug" element={<ProjectLayout />}>
           <Route index element={<ProjectOverview />} />
+          <Route path="context" element={<ProjectContext />} />
           <Route path="artifacts" element={<ProjectArtifacts />} />
           <Route path="skills" element={<ProjectSkills />} />
           <Route path="policies" element={<ProjectPolicies />} />

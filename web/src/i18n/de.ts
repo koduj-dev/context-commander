@@ -450,4 +450,31 @@ export const de: Partial<Record<MessageKey, string>> = {
   "projects.pathHelp": "namensraum/kurzname",
   "projects.name": "Anzeigename",
   "projects.created": "{path} angelegt",
+
+  "context.title": "Kontext",
+  "context.lead":
+    "Genau das, was ein Agent bekommt, wenn er hier anfängt — dieselbe zusammengestellte Sicht, die MCP zurückgibt, nur für Menschen dargestellt. Wenn ein Agent sich seltsam verhält, ist das die erste Stelle zum Nachsehen.",
+  "context.role": "Handelt als",
+  "context.capabilities": "Darf",
+  "context.assembled": "Zusammengestellt",
+  "context.budget": "Budget",
+  "context.budgetUsed": "{used} von {limit}",
+  "context.budgetLead":
+    "Ein Paket hat eine Größengrenze, und was nicht hineinpasst, wird benannt statt abgeschnitten. Ein Agent, der „es gibt nichts weiter“ nicht von „es gab mehr und Sie haben es nicht bekommen“ unterscheiden kann, handelt zuversichtlich auf einem halben Bild.",
+  "context.truncated": "Weggelassen",
+  "context.nothingTruncated": "Es wurde nichts weggelassen",
+  "context.nothingTruncatedBody": "Alles, was dieses Projekt enthält, passte in das Budget.",
+  "context.column.what": "Was",
+  "context.column.ref": "Welches",
+  "context.column.why": "Warum",
+  "context.included": "Enthalten",
+  "context.artifacts": "{count, plural, one {# Artefakt} other {# Artefakte}}",
+  "context.skills": "{count, plural, one {# Skill} other {# Skills}}",
+  "context.recentEvents": "Letzte Ereignisse",
+  "context.noHandoff": "Keine Übergabe im Paket",
+  "context.noHandoffBody":
+    "Einem Agenten, der hier anfängt, wird gesagt, dass es nichts fortzusetzen gibt.",
+  "context.budgetLimit": "Größengrenze",
+  "context.apply": "Neu zusammenstellen",
+  "context.eventLimit": "Ereignisse",
 };

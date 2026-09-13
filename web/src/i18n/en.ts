@@ -331,6 +331,32 @@ export const en = {
   "project.notBuilt.artifacts":
     "Artifacts, notes, policies and secrets have screens in the mockups but no read path in the API yet.",
 
+  "context.title": "Context",
+  "context.lead":
+    "Exactly what an agent is handed when it starts here — the same assembled view MCP returns, rendered for a person. If an agent is behaving oddly, this is the first place to look.",
+  "context.role": "Acting as",
+  "context.capabilities": "Can",
+  "context.assembled": "Assembled",
+  "context.budget": "Budget",
+  "context.budgetUsed": "{used} of {limit}",
+  "context.budgetLead":
+    "A pack has a size limit, and what does not fit is named rather than cut. An agent that cannot tell “there is nothing else” from “there was more and you did not get it” will act confidently on half a picture.",
+  "context.truncated": "Left out",
+  "context.nothingTruncated": "Nothing was left out",
+  "context.nothingTruncatedBody": "Everything this project holds fitted inside the budget.",
+  "context.column.what": "What",
+  "context.column.ref": "Which one",
+  "context.column.why": "Why",
+  "context.included": "Included",
+  "context.artifacts": "{count, plural, one {# artifact} other {# artifacts}}",
+  "context.skills": "{count, plural, one {# skill} other {# skills}}",
+  "context.recentEvents": "Recent events",
+  "context.noHandoff": "No handoff in the pack",
+  "context.noHandoffBody": "An agent starting here is told there is nothing to continue.",
+  "context.budgetLimit": "Size limit",
+  "context.apply": "Reassemble",
+  "context.eventLimit": "Events",
+
   "artifacts.title": "Artifacts",
   "artifacts.lead":
     "The shared store agents read and write. Every write makes a new version; nothing is overwritten in place, so a bad write can be read past rather than recovered from a backup.",

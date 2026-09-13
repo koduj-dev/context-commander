@@ -252,6 +252,58 @@ export type HandoffDetail = Handoff & {
   referenced_artifacts?: string[];
 };
 
+/**
+ * The aggregated bootstrap read model — what an agent is handed when it
+ * starts on a project.
+ *
+ * The server's own read model is the wire format here: the Go type carries
+ * the JSON tags and the adapter writes it straight out, so a second shape
+ * mirroring it field for field would only be a place for the two to drift.
+ */
+export type ContextPack = {
+  project: { id: string; path: string; name: string };
+  role: string;
+  capabilities: string[];
+  handoff?: {
+    id: string;
+    status: string;
+    created_at: string;
+    claimed_at?: string;
+    summary: string;
+    completed_work: string;
+    next_actions: string;
+  };
+  artifacts: {
+    logical_path: string;
+    version: number;
+    content_hash: string;
+    size_bytes: number;
+    updated_at: string;
+    content: string;
+  }[];
+  skills: {
+    binding_id: string;
+    skill_id: string;
+    skill_version_id: string;
+    name: string;
+    version: number;
+    scope: string;
+    trust_status: string;
+    content: string;
+  }[];
+  events: {
+    recent: { type: string; resource_type: string; resource_id?: string }[];
+    next_cursor?: string;
+  };
+  /** What the pack cost, and — the point of it — what it left out. */
+  budget: {
+    limit_bytes: number;
+    used_bytes: number;
+    truncated: { kind: string; ref: string; size_bytes?: number; reason: string }[];
+  };
+  assembled_at: string;
+};
+
 export type Artifact = {
   logical_path: string;
   content_type: string;
@@ -446,6 +498,14 @@ export const api = {
       method: "POST",
       body: { principal_id: principalID, role },
     }),
+
+  contextPack: (ns: string, slug: string, opts: { budget?: number; eventLimit?: number } = {}) =>
+    request<ContextPack>(
+      withQuery(`${project(ns, slug)}/context`, {
+        budget: opts.budget,
+        event_limit: opts.eventLimit,
+      }),
+    ),
 
   artifacts: (ns: string, slug: string, cursor?: string, limit?: number) =>
     request<Page<Artifact>>(withQuery(`${project(ns, slug)}/artifacts`, { cursor, limit })),
