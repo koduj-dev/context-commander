@@ -10,6 +10,7 @@ import (
 
 	"github.com/koduj-dev/context-commander/internal/audit"
 	"github.com/koduj-dev/context-commander/internal/db"
+	"github.com/koduj-dev/context-commander/internal/paging"
 )
 
 // ErrForbidden is returned when a caller lacks the requested Capability on
@@ -187,4 +188,31 @@ func (s *Service) ListMembers(ctx context.Context, principalID, callerUserID, or
 		return nil, fmt.Errorf("organizations: list members: %w", err)
 	}
 	return out, nil
+}
+
+// QueryAudit returns the organization's audit trail, most recent first.
+//
+// Gated on CapOrgAuditRead, which RoleMember does NOT hold — the same line
+// auth.CapAuditRead draws for projects, and for the same reason: the trail
+// says who did what to whom, which is more sensitive than the membership it
+// records. A plain member can see who is in the organization
+// (ListMembers/CapOrgRead); who added or removed them is for whoever runs
+// it.
+func (s *Service) QueryAudit(
+	ctx context.Context, principalID, callerUserID, organizationID uuid.UUID, opts audit.QueryOptions,
+) (paging.Page[audit.Record], error) {
+	if err := s.checkCapability(ctx, principalID, callerUserID, organizationID, CapOrgAuditRead); err != nil {
+		return paging.Page[audit.Record]{}, err
+	}
+
+	var page paging.Page[audit.Record]
+	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+		var err error
+		page, err = audit.QueryByOrganization(ctx, tx, organizationID, opts)
+		return err
+	})
+	if err != nil {
+		return paging.Page[audit.Record]{}, fmt.Errorf("organizations: query audit: %w", err)
+	}
+	return page, nil
 }

@@ -31,6 +31,14 @@ link definition at the bottom of the file.
     id you already had, and nothing could enumerate them — so the web UI's
     Conversations tab told people to paste an id, and a project's existing
     conversations were undiscoverable.
+  - **`GET /v1/organizations/{id}/audit`** — the organization's own trail,
+    now that there is something in it. Gated on a new `CapOrgAuditRead`
+    which `RoleMember` does **not** hold: seeing who is in an organization
+    and seeing who put them there are different questions, and the second is
+    the more sensitive one. That is the same line `auth.CapAuditRead`
+    already draws for projects, where it is withheld from
+    CONTRIBUTOR/READER. On a one-person installation the distinction costs
+    nothing — the only member is an OWNER.
   - **`GET /v1/organizations/{id}/members`** —
     `organizations.Store.ListMembers`/`Service.ListMembers`, the counterpart
     projects had and organizations did not. Gated on `CapOrgRead`, which

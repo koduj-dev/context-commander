@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/koduj-dev/context-commander/internal/audit"
 	"github.com/koduj-dev/context-commander/internal/db"
 	"github.com/koduj-dev/context-commander/internal/dbtest"
 	"github.com/koduj-dev/context-commander/internal/organizations"
@@ -351,5 +352,70 @@ func TestListMembersReturnsEveryMember(t *testing.T) {
 	// A non-member may not.
 	if _, err := f.svc.ListMembers(f.ctx, outsider.principalID, outsider.userID, org.ID); !errors.Is(err, organizations.ErrForbidden) {
 		t.Fatalf("ListMembers as a non-member = %v, want ErrForbidden", err)
+	}
+}
+
+// TestQueryAuditIsWithheldFromPlainMembers is the line this endpoint exists
+// to draw. Seeing who is IN an organization and seeing who PUT them there
+// are different questions: the first is CapOrgRead, which every role holds,
+// the second is CapOrgAuditRead, which RoleMember does not — mirroring
+// auth.CapAuditRead for projects, and for the same stated reason (the trail
+// reveals who did what to whom).
+//
+// On a one-person installation the distinction costs nothing: the only
+// member is an OWNER and sees everything.
+func TestQueryAuditIsWithheldFromPlainMembers(t *testing.T) {
+	f := newFixture(t)
+
+	owner := f.newUser("owner-audit-read@example.test")
+	admin := f.newUser("admin-audit-read@example.test")
+	member := f.newUser("member-audit-read@example.test")
+	outsider := f.newUser("outsider-audit-read@example.test")
+
+	org, err := f.svc.Create(f.ctx, owner.principalID, owner.userID, "Acme")
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if _, err := f.svc.AddMember(f.ctx, owner.principalID, owner.userID, org.ID, admin.userID, organizations.RoleAdmin); err != nil {
+		t.Fatalf("AddMember admin: %v", err)
+	}
+	if _, err := f.svc.AddMember(f.ctx, owner.principalID, owner.userID, org.ID, member.userID, organizations.RoleMember); err != nil {
+		t.Fatalf("AddMember member: %v", err)
+	}
+
+	// OWNER sees the trail, and it actually contains the membership changes.
+	page, err := f.svc.QueryAudit(f.ctx, owner.principalID, owner.userID, org.ID, audit.QueryOptions{})
+	if err != nil {
+		t.Fatalf("QueryAudit as OWNER: %v", err)
+	}
+	if len(page.Items) != 2 {
+		t.Fatalf("audit records = %d, want the two member additions: %+v", len(page.Items), page.Items)
+	}
+	for _, rec := range page.Items {
+		if rec.Action != "organization.member.add" {
+			t.Fatalf("unexpected action %q in the organization trail", rec.Action)
+		}
+		if rec.OrganizationID == nil || *rec.OrganizationID != org.ID {
+			t.Fatalf("record is not scoped to this organization: %+v", rec)
+		}
+		if rec.ProjectID != nil {
+			t.Fatalf("an organization record also carries a project id: %+v", rec)
+		}
+	}
+
+	// ADMIN too — running the organization includes seeing who changed it.
+	if _, err := f.svc.QueryAudit(f.ctx, admin.principalID, admin.userID, org.ID, audit.QueryOptions{}); err != nil {
+		t.Fatalf("QueryAudit as ADMIN: %v", err)
+	}
+
+	// A plain MEMBER may list the members but not read the trail.
+	if _, err := f.svc.ListMembers(f.ctx, member.principalID, member.userID, org.ID); err != nil {
+		t.Fatalf("ListMembers as MEMBER: %v", err)
+	}
+	if _, err := f.svc.QueryAudit(f.ctx, member.principalID, member.userID, org.ID, audit.QueryOptions{}); !errors.Is(err, organizations.ErrForbidden) {
+		t.Fatalf("QueryAudit as plain MEMBER = %v, want ErrForbidden", err)
+	}
+	if _, err := f.svc.QueryAudit(f.ctx, outsider.principalID, outsider.userID, org.ID, audit.QueryOptions{}); !errors.Is(err, organizations.ErrForbidden) {
+		t.Fatalf("QueryAudit as non-member = %v, want ErrForbidden", err)
 	}
 }

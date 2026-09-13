@@ -82,20 +82,35 @@ type QueryOptions struct {
 	Paging       paging.Options
 }
 
-// Query returns audit_log rows for projectID, most recent first. Every
-// caller-facing entry point (adapters, future internal/audit.Service) must
-// scope this by project — there is no unscoped "query everything" here,
-// matching the same project-first shape as every other domain's List.
+// Query returns audit_log rows for projectID, most recent first.
 func Query(ctx context.Context, tx pgx.Tx, projectID uuid.UUID, opts QueryOptions) (paging.Page[Record], error) {
+	return queryScoped(ctx, tx, "project_id", projectID, opts)
+}
+
+// QueryByOrganization is the same, for rows recorded against an
+// organization (migrations/000023) — organization membership changes, and
+// whatever later joins them. Separate from Query rather than an optional
+// filter on it: a row belongs to exactly one scope, and a single function
+// taking "either a project or an organization" would let a caller pass
+// neither.
+func QueryByOrganization(ctx context.Context, tx pgx.Tx, organizationID uuid.UUID, opts QueryOptions) (paging.Page[Record], error) {
+	return queryScoped(ctx, tx, "organization_id", organizationID, opts)
+}
+
+// queryScoped is the shared implementation. scopeColumn is a constant from
+// the two callers above, never anything a client supplied — there is no
+// unscoped "query everything" entry point here, matching the scope-first
+// shape of every other domain's List.
+func queryScoped(ctx context.Context, tx pgx.Tx, scopeColumn string, scopeID uuid.UUID, opts QueryOptions) (paging.Page[Record], error) {
 	beforeID, hasCursor, err := opts.Paging.DecodeSeq()
 	if err != nil {
 		return paging.Page[Record]{}, err
 	}
 	limit := opts.Paging.ClampedLimit()
 
-	query := `SELECT id, ts, project_id, principal_id, client_id, action, resource_type, resource_id, result, request_id, event_id
-		FROM audit_log WHERE project_id = $1`
-	args := []any{projectID}
+	query := `SELECT id, ts, project_id, organization_id, principal_id, client_id, action, resource_type, resource_id, result, request_id, event_id
+		FROM audit_log WHERE ` + scopeColumn + ` = $1`
+	args := []any{scopeID}
 
 	if opts.Action != "" {
 		args = append(args, opts.Action)
@@ -136,7 +151,7 @@ func Query(ctx context.Context, tx pgx.Tx, projectID uuid.UUID, opts QueryOption
 	out := make([]Record, 0, limit)
 	for rows.Next() {
 		var r Record
-		if err := rows.Scan(&r.ID, &r.Timestamp, &r.ProjectID, &r.PrincipalID, &r.ClientID,
+		if err := rows.Scan(&r.ID, &r.Timestamp, &r.ProjectID, &r.OrganizationID, &r.PrincipalID, &r.ClientID,
 			&r.Action, &r.ResourceType, &r.ResourceID, &r.Result, &r.RequestID, &r.EventID); err != nil {
 			return paging.Page[Record]{}, fmt.Errorf("audit: scan: %w", err)
 		}
