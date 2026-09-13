@@ -595,9 +595,16 @@ table.dt td.r, table.dt th.r { text-align: right; }
 .pref .what span { display: block; font-size: 11.5px; color: var(--cc-text-muted); }
 .pref .preview { text-align: right; color: var(--cc-text-secondary); }
 .pref .preview .was { display: block; font-size: 11px; color: var(--cc-text-muted); text-decoration: line-through; }
-@media (max-width: 900px) {
+/* Label, control, preview — but only while all three genuinely fit. In a
+ * half-width column they do not, and a preview squeezed to four characters
+ * defeats the point of showing one. */
+@media (max-width: 1500px) {
+  .pref { grid-template-columns: minmax(0, 1fr) minmax(0, 200px); }
+  .pref .preview { grid-column: 2; text-align: right; }
+}
+@media (max-width: 760px) {
   .pref { grid-template-columns: 1fr; gap: 7px; }
-  .pref .preview { text-align: left; }
+  .pref .preview { grid-column: auto; text-align: left; }
 }
 /* The user block is the way into personal settings — the one place in this
  * layout that is about the reader rather than the installation. */

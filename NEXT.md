@@ -167,10 +167,18 @@ what exists. Phases 1–3 of it shipped (design system, Handoffs/Conversations/
 Events tabs, Administration page — see `CHANGELOG.md`). Deliberately parked
 behind Phase 1 above, per "no web UI before the CLI/MCP core loop is proven":
 
-> **The web UI is being reworked end to end** (maintainer, 2026-09-13), so
-> the items below are inputs to that rework rather than patches to apply to
-> what exists. Wiring two buttons into a UI that is about to be replaced is
-> work thrown away twice.
+> **The web UI is a green-field rebuild** (maintainer, 2026-09-13). Not a
+> rework of what exists — the existing `web/` is discarded whole and the new
+> one starts from nothing: nothing adapted, nothing migrated, nothing
+> rewritten in place. Two things are settled before the first commit: the
+> component kit and screens in `docs/mockups/` are the design, and
+> **internationalisation is built in from that first commit** (English,
+> German, Spanish, and ready for one nobody has picked yet) — retrofitting it
+> later is a second rewrite.
+>
+> The items below are inputs to that rebuild, not patches to apply to what
+> exists — wiring two buttons into a UI that is about to be deleted is work
+> thrown away twice.
 >
 > What the rework inherits, all of it server-side and already shipped:
 > handoff claim/close and a "current handoff" query; `skill.get`, a
@@ -282,11 +290,15 @@ on the planned move to a public repo:
     which one a person reads is their call, not the product's.
   - Needs a home in the schema — a preferences row per user — and an endpoint
     to read and write it. Nothing like it exists today.
-  - **The rule this imposes on every endpoint:** the server returns values,
-    never formatted strings. RFC3339 timestamps and integer byte counts, not
-    `"2.4 GB"` or `"13 Sep 2026"` — a server that formats has made the choice
-    on the user's behalf, in a language it guessed and a timezone it does not
-    know. The current API already does this; it must keep doing it.
+  - **Localization is a UI concern and stops at the UI.** What leaves over
+    HTTP and MCP stays in one standard machine format — RFC3339 timestamps,
+    integer byte counts, canonical enum values — because its reader is a
+    model, not a person, and it does not need to be pretty. A server that
+    returned `"2.4 GB"` or `"13 Sep 2026"` would have made a presentation
+    choice on the user's behalf, in a language it guessed and a timezone it
+    does not know, and would have made the payload harder for a model to
+    parse at the same time. The current API already does this; it must keep
+    doing it, and no localization work may leak into it.
   - Mocked in `docs/mockups/preferences.html`.
 - **[security] Keep RLS honest as tables are added.** Every table with a
   policy now has a test that fails when the policy is removed — `artifacts`,
