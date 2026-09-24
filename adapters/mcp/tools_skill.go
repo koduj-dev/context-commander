@@ -363,6 +363,37 @@ func registerSkillTools(server *sdkmcp.Server, deps Deps, principalID, clientID 
 		return nil, paged(out, page.NextCursor), nil
 	})
 
+	type infoArgs struct {
+		SkillID string `json:"skill_id" jsonschema:"skill UUID — from skill.list_effective, skill.search, or an install"`
+	}
+	sdkmcp.AddTool(server, &sdkmcp.Tool{
+		Name: "skill.info",
+		Description: "Look up one skill by id: its name, who published it, where it lives, and its newest " +
+			"version. Use it when you already HAVE an id — skill.list_effective returns bindings that name a " +
+			"skill_id and nothing else, so this is what turns one into something you can talk about. Searching " +
+			"for it by name instead is a scan, and it finds nothing once the name falls past the page you asked " +
+			"for.",
+	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, args infoArgs) (*sdkmcp.CallToolResult, catalogEntryResult, error) {
+		skillID, err := uuid.Parse(args.SkillID)
+		if err != nil {
+			return nil, catalogEntryResult{}, err
+		}
+		e, err := deps.Skills.Get(ctx, principalID, skillID)
+		if err != nil {
+			return nil, catalogEntryResult{}, err
+		}
+		out := catalogEntryResult{
+			SkillID: e.SkillID.String(), Name: e.Name, Author: e.Author, Origin: e.Origin,
+			Scope:           string(e.Scope),
+			LatestVersionID: e.LatestVersionID.String(), LatestVersion: e.LatestVersion,
+			LatestChecksum: e.LatestChecksum, TrustStatus: e.TrustStatus,
+		}
+		if e.ScopeRef != nil {
+			out.ScopeRef = e.ScopeRef.String()
+		}
+		return nil, out, nil
+	})
+
 	type versionsArgs struct {
 		SkillID string `json:"skill_id" jsonschema:"skill UUID from skill.search"`
 		Limit   int    `json:"limit,omitempty"`

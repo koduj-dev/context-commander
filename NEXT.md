@@ -221,12 +221,20 @@ the screen rather than showing a control that would fail.
   names. Organization member lists join the user row, so they return a person
   rather than a UUID. MCP has the same two reads plus `me`, `project.list`,
   `organization.list` and `organization.list_members`.
-- [ ] **No `GET /skills/{id}`.** The skill detail screen finds its own name
-  and scope by reading a version, because there is no read of the skill
-  itself.
-- [ ] **No cross-project reads.** The dashboard answers "waiting on you" with
-  one request per project. Bounded by membership and acceptable at this size,
-  but it is the shape that will not hold at a hundred projects.
+- [x] ~~No `GET /skills/{id}`.~~ Closed 2026-09-24: `skills.Service.Get`,
+  `GET /v1/skills/{skillID}` and MCP `skill.info`. Every reader holding a
+  skill id had to page the catalogue and match, which is a scan standing in
+  for a lookup and returns nothing once the match falls past the requested
+  page.
+- [x] ~~No cross-project reads.~~ Server half closed 2026-09-24:
+  `handoffs.Service.ListWaiting`, `GET /v1/me/handoffs` and MCP
+  `handoff.waiting` answer "is anything waiting on me" in one request, one
+  row per project, each carrying the project path and the summary. RLS scopes
+  the rows and `RoleCan(role, CapHandoffRead)` filters them — today every
+  project role holds that capability, which is exactly why the filter is
+  written down rather than left implied.
+  - [ ] The dashboard still asks per project. Switching it over is a small
+    interface change, left for the next pass through the UI.
 - [ ] **Service principal names are not unique** while user emails are
   (`migrations/000001`). Two agents may share a name, which makes a name a
   poor thing to identify one by. Recorded in

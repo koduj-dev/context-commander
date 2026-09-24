@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -13,6 +15,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/auth"
 	"github.com/koduj-dev/context-commander/internal/db"
 	"github.com/koduj-dev/context-commander/internal/events"
+	"github.com/koduj-dev/context-commander/internal/projects"
 )
 
 // selectColumns is the plaintext-safe column list every handoff read shares.
@@ -21,6 +24,21 @@ import (
 // exactly that way when the list was duplicated per query.
 const selectColumns = `id, project_id, created_by_principal, created_by_client, source_session_id, status, created_at,
 	        claimed_at, claimed_by_principal, claimed_by_client, closed_at, closed_by_principal, closed_by_client`
+
+// prefixedSelectColumns is selectColumns qualified with the handoffs alias,
+// for the joined reads. Derived rather than written twice: the comment above
+// exists because these two lists drifted before.
+var prefixedSelectColumns = "h." + strings.ReplaceAll(
+	strings.Join(strings.Fields(selectColumns), " "), ", ", ", h.")
+
+// scanHandoffWith reads selectColumns plus the extra columns a joined query
+// appends, in that order.
+func scanHandoffWith(row pgx.Row, h *Handoff, extra ...any) error {
+	dest := []any{&h.ID, &h.ProjectID, &h.CreatedByPrincipal, &h.CreatedByClient, &h.SourceSessionID,
+		&h.Status, &h.CreatedAt, &h.ClaimedAt, &h.ClaimedByPrincipal, &h.ClaimedByClient,
+		&h.ClosedAt, &h.ClosedByPrincipal, &h.ClosedByClient}
+	return row.Scan(append(dest, extra...)...)
+}
 
 // scanHandoff reads selectColumns off one row, in that exact order.
 func scanHandoff(row pgx.Row, h *Handoff) error {
@@ -167,4 +185,76 @@ func (s *Service) Current(ctx context.Context, principalID, projectID uuid.UUID)
 		return Handoff{}, err
 	}
 	return h, nil
+}
+
+// Waiting is one project with work left in it: the handoff, plus enough of
+// the project to name it. The path is carried because the answer is
+// worthless without it — "there is an open handoff in 3f2a…" sends the
+// reader to look up which project that is.
+type Waiting struct {
+	Handoff
+	ProjectPath string
+	Role        string
+}
+
+// ListWaiting returns the newest open or claimed handoff in every project
+// the caller is a member of.
+//
+// It exists because the question "is anything waiting on me" had no answer
+// on this server: the only way to ask was Current, once per project, which
+// is one request per membership and a shape that stops working long before
+// it stops being tempting.
+//
+// Two things scope the result, and both are deliberate:
+//
+//   - RLS on handoffs (cc_has_project_access) removes rows for projects the
+//     caller is not in. That is the database's decision and is not restated
+//     here, matching every other read in this package.
+//   - RoleCan(role, CapHandoffRead) removes rows the caller's role does not
+//     permit. Today every project role holds that capability, so this filter
+//     changes nothing — which is exactly why it is here rather than left
+//     implied. A role that loses it later must not start leaking through a
+//     query that only ever asked the database "are you a member".
+func (s *Service) ListWaiting(ctx context.Context, principalID uuid.UUID) ([]Waiting, error) {
+	var out []Waiting
+	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+		// DISTINCT ON collapses to one row per project — the newest handoff
+		// still in play, which is the same row Current returns for that
+		// project. A project with three open handoffs is one line here, not
+		// three.
+		rows, err := tx.Query(ctx,
+			`SELECT DISTINCT ON (h.project_id) `+prefixedSelectColumns+`,
+			        n.slug || '/' || p.slug, pm.role
+			 FROM handoffs h
+			 JOIN projects p ON p.id = h.project_id
+			 JOIN namespaces n ON n.id = p.namespace_id
+			 JOIN project_members pm ON pm.project_id = h.project_id AND pm.principal_id = $1
+			 WHERE h.status IN ('open', 'claimed')
+			 ORDER BY h.project_id, h.created_at DESC, h.id DESC`,
+			principalID,
+		)
+		if err != nil {
+			return fmt.Errorf("handoffs: list waiting: %w", err)
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var w Waiting
+			if err := scanHandoffWith(rows, &w.Handoff, &w.ProjectPath, &w.Role); err != nil {
+				return fmt.Errorf("handoffs: scan waiting: %w", err)
+			}
+			if !auth.RoleCan(projects.Role(w.Role), auth.CapHandoffRead) {
+				continue
+			}
+			out = append(out, w)
+		}
+		return rows.Err()
+	})
+	if err != nil {
+		return nil, err
+	}
+	// Newest first across projects, so the answer reads as "what changed
+	// most recently" rather than in project-id order, which means nothing to
+	// anyone.
+	slices.SortFunc(out, func(a, b Waiting) int { return b.CreatedAt.Compare(a.CreatedAt) })
+	return out, nil
 }

@@ -268,6 +268,32 @@ func (d Deps) searchSkills(w http.ResponseWriter, r *http.Request) {
 	writeList(w, out, page.NextCursor)
 }
 
+// getSkill reads one catalog entry. Mounted at /skills/{skillID} rather
+// than under a project because a skill's visibility is decided by its own
+// scope, not by a project in the path (docs/adr/0018) — the same reasoning
+// searchSkills and getSkillVersion already follow.
+func (d Deps) getSkill(w http.ResponseWriter, r *http.Request) {
+	skillID, err := uuid.Parse(chi.URLParam(r, "skillID"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", "skillID must be a UUID")
+		return
+	}
+
+	principalID := principalIDFrom(r.Context())
+
+	e, err := d.Skills.Get(r.Context(), principalID, skillID)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, catalogEntryResponse{
+		SkillID: e.SkillID.String(), Name: e.Name, Author: e.Author, Origin: e.Origin,
+		Scope: string(e.Scope), ScopeRef: e.ScopeRef,
+		LatestVersionID: e.LatestVersionID.String(), LatestVersion: e.LatestVersion,
+		LatestChecksum: e.LatestChecksum, TrustStatus: e.TrustStatus,
+	})
+}
+
 func (d Deps) listSkillVersions(w http.ResponseWriter, r *http.Request) {
 	skillID, err := uuid.Parse(chi.URLParam(r, "skillID"))
 	if err != nil {

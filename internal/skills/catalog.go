@@ -278,3 +278,46 @@ func sortByNameThenID(entries []CatalogEntry) {
 		return strings.Compare(a.SkillID.String(), b.SkillID.String())
 	})
 }
+
+// Get returns one catalog entry by skill id.
+//
+// It exists because every reader of a single skill had to search for it:
+// there is no read of a Skill row anywhere else, so a client holding an id —
+// from a binding, from an install, from a link someone pasted — could learn
+// the skill's name and scope only by paging the catalogue and matching. That
+// is a scan to answer a lookup, and it silently returns nothing once the
+// name it is matching on falls past the page it asked for.
+//
+// Visibility is RLS's decision, the same as Search: a skill the caller may
+// not see is ErrNotFound rather than a refusal, because "it exists but not
+// for you" and "it does not exist" must look identical from outside
+// (docs/adr/0018).
+//
+// A skill with no published version reads as not found, matching Search's
+// omission of the same rows and for the same reason — an entry naming a
+// version that cannot be downloaded is worse than no entry.
+func (s *Service) Get(ctx context.Context, principalID, skillID uuid.UUID) (CatalogEntry, error) {
+	var e CatalogEntry
+	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+		err := tx.QueryRow(ctx,
+			`SELECT s.id, s.name, COALESCE(s.author, ''), COALESCE(s.origin, ''), s.scope, s.scope_ref,
+			        v.id, v.version, v.checksum, v.trust_status
+			 FROM skills s JOIN skill_versions v ON v.skill_id = s.id
+			 WHERE s.id = $1
+			 ORDER BY v.version DESC LIMIT 1`,
+			skillID,
+		).Scan(&e.SkillID, &e.Name, &e.Author, &e.Origin, &e.Scope, &e.ScopeRef,
+			&e.LatestVersionID, &e.LatestVersion, &e.LatestChecksum, &e.TrustStatus)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrNotFound
+		}
+		if err != nil {
+			return fmt.Errorf("skills: get: %w", err)
+		}
+		return nil
+	})
+	if err != nil {
+		return CatalogEntry{}, err
+	}
+	return e, nil
+}

@@ -2,6 +2,7 @@ package http
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -158,6 +159,55 @@ func (d Deps) listMyOrganizations(w http.ResponseWriter, r *http.Request) {
 	out := make([]myOrganizationResponse, len(memberships))
 	for i, m := range memberships {
 		out[i] = myOrganizationResponse{ID: m.Organization.ID.String(), Name: m.Organization.Name, Role: string(m.Role)}
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+type waitingResponse struct {
+	Project   string `json:"project"`
+	Role      string `json:"role"`
+	ID        string `json:"id"`
+	Status    string `json:"status"`
+	CreatedAt string `json:"created_at"`
+	ClaimedAt string `json:"claimed_at,omitempty"`
+	Summary   string `json:"summary"`
+}
+
+// listWaiting answers "is anything waiting on me" in one request.
+//
+// Before it, the only way to ask was handoffs/current once per project,
+// which the web UI did — acceptable while membership is small and the wrong
+// shape regardless. The project path travels with each row because the
+// answer is useless without it.
+//
+// The body is included, unlike the per-project handoff list. A handoff
+// summary is the whole point of the question: "something is waiting in
+// acme/platform" without saying what sends the reader on another round
+// trip, and the row count here is bounded by how many projects have work in
+// them, not by how much the system holds. A project whose body cannot be
+// decrypted is still listed, with an empty summary — a key problem in one
+// project must not hide the other projects' work.
+func (d Deps) listWaiting(w http.ResponseWriter, r *http.Request) {
+	principalID := principalIDFrom(r.Context())
+
+	waiting, err := d.Handoffs.ListWaiting(r.Context(), principalID)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	out := make([]waitingResponse, len(waiting))
+	for i, h := range waiting {
+		out[i] = waitingResponse{
+			Project: h.ProjectPath, Role: h.Role, ID: h.ID.String(),
+			Status: h.Status, CreatedAt: h.CreatedAt.Format(time.RFC3339),
+		}
+		if h.ClaimedAt != nil {
+			out[i].ClaimedAt = h.ClaimedAt.Format(time.RFC3339)
+		}
+		if _, body, err := d.Handoffs.Get(r.Context(), principalID, h.ProjectID, h.ID); err == nil {
+			out[i].Summary = body.Summary
+		}
 	}
 	writeJSON(w, http.StatusOK, out)
 }

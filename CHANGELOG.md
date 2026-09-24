@@ -12,6 +12,29 @@ link definition at the bottom of the file.
 
 ### Added
 
+- **`GET /v1/skills/{skillID}`**, MCP `skill.info` — reading one skill by id.
+  Every caller holding an id (a binding from `skill.list_effective`, an
+  install, a link someone pasted) could learn the skill's name and scope only
+  by paging the catalogue and matching. That is a scan standing in for a
+  lookup, and it quietly returns nothing once the match falls past the page
+  asked for. Visibility stays RLS's decision, so a skill the caller may not
+  see is not found rather than refused — "it exists but not for you" leaks
+  that it exists (docs/adr/0018).
+
+- **`GET /v1/me/handoffs`**, MCP `handoff.waiting` — "is anything waiting on
+  me", across every project, in one request. The only way to ask was
+  `handoffs/current` once per membership, which is the shape that stops
+  working long before it stops being tempting. One row per project — the same
+  handoff `Current` returns for it — carrying the project path and the
+  summary, because "there is work in 3f2a…" sends the reader off to find out
+  which project that is.
+  - Scoped twice on purpose: RLS removes projects the caller is not in, and
+    `RoleCan(role, CapHandoffRead)` removes rows their role does not permit.
+    Every project role holds that capability today, so the second filter
+    changes nothing — which is why it is written down rather than left
+    implied. A role that loses it later must not start leaking through a
+    query that only ever asked the database "are you a member".
+
 - **A web interface, rebuilt from nothing.** The previous `web/` was deleted
   whole rather than reworked — nothing adapted, nothing migrated — because
   the thing it needed most was a decision made before the first line:

@@ -267,6 +267,51 @@ func registerHandoffTools(server *sdkmcp.Server, deps Deps, principalID, clientI
 		}
 		return nil, toHandoffResult(h, clientID), nil
 	})
+
+	// handoff.waiting is the cross-project read this surface lacked. Every
+	// other handoff tool takes a project, so an agent could ask "what is
+	// waiting in acme/platform" but never "what is waiting anywhere" —
+	// which is the question it actually has on its first turn.
+	sdkmcp.AddTool(server, &sdkmcp.Tool{
+		Name: "handoff.waiting",
+		Description: "The newest open or claimed handoff in every project you are a member of, newest first. " +
+			"Start here to find work left for you without naming a project — each row carries the project path " +
+			"the other handoff tools take, and the summary, so you can judge relevance before fetching anything.",
+	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, _ struct{}) (*sdkmcp.CallToolResult, []waitingResult, error) {
+		waiting, err := deps.Handoffs.ListWaiting(ctx, principalID)
+		if err != nil {
+			return nil, nil, err
+		}
+		out := make([]waitingResult, len(waiting))
+		for i, h := range waiting {
+			out[i] = waitingResult{
+				Project: h.ProjectPath, Role: h.Role, ID: h.ID.String(),
+				Status: h.Status, CreatedAt: h.CreatedAt.Format(time.RFC3339),
+			}
+			if h.ClaimedAt != nil {
+				out[i].ClaimedAt = h.ClaimedAt.Format(time.RFC3339)
+			}
+			// A project whose body will not decrypt is still listed, with an
+			// empty summary: one project's key problem must not hide the
+			// others' work.
+			if _, body, err := deps.Handoffs.Get(ctx, principalID, h.ProjectID, h.ID); err == nil {
+				out[i].Summary = body.Summary
+			}
+		}
+		return nil, out, nil
+	})
+}
+
+// waitingResult names the project the way every other handoff tool takes it,
+// so the obvious next call needs no assembly by the caller.
+type waitingResult struct {
+	Project   string `json:"project" jsonschema:"\"namespace/slug\" — pass this to handoff.current, handoff.claim and the rest"`
+	Role      string `json:"role" jsonschema:"your role in that project, which decides whether you may claim"`
+	ID        string `json:"id"`
+	Status    string `json:"status" jsonschema:"open (nobody has taken it) or claimed (someone has)"`
+	CreatedAt string `json:"created_at"`
+	ClaimedAt string `json:"claimed_at,omitempty"`
+	Summary   string `json:"summary"`
 }
 
 // resolveHandoffTarget resolves the project path and parses the handoff ID —

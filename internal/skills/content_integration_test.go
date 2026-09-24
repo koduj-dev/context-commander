@@ -424,3 +424,79 @@ func TestPublishToInstallationRequiresAdmin(t *testing.T) {
 		t.Fatalf("Publish to installation without admin = %v, want ErrForbidden", err)
 	}
 }
+
+// Get answers the lookup that Search could only answer by scanning.
+//
+// Every caller holding a skill id — a binding from ListEffective, an install,
+// a link someone pasted — had to page the catalogue and match by id to learn
+// the skill's name. That is a scan standing in for a lookup, and it returns
+// nothing at all once the match falls past the page the caller asked for.
+func TestGetResolvesOneSkillById(t *testing.T) {
+	f := newFixture(t)
+
+	published, err := f.svc.Publish(f.ctx, f.principalID, f.userID, skills.ScopeProject, &f.projectID, nil,
+		"code-review", "acme", "local", []byte("review instructions"), nil)
+	if err != nil {
+		t.Fatalf("Publish: %v", err)
+	}
+
+	entry, err := f.svc.Get(f.ctx, f.principalID, published.SkillID)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if entry.Name != "code-review" || entry.Author != "acme" {
+		t.Errorf("Get: got name=%q author=%q", entry.Name, entry.Author)
+	}
+	if entry.Scope != skills.ScopeProject || entry.ScopeRef == nil || *entry.ScopeRef != f.projectID {
+		t.Errorf("Get: got scope=%v ref=%v, want project %s", entry.Scope, entry.ScopeRef, f.projectID)
+	}
+	if entry.LatestVersionID != published.ID || entry.LatestChecksum != published.Checksum {
+		t.Errorf("Get: points at version %s/%s, want %s/%s",
+			entry.LatestVersionID, entry.LatestChecksum, published.ID, published.Checksum)
+	}
+}
+
+// Get points at the newest version, like the catalogue it belongs to — a
+// lookup that answered with v1 forever would be worse than no lookup.
+func TestGetPointsAtTheNewestVersion(t *testing.T) {
+	f := newFixture(t)
+
+	first, err := f.svc.Publish(f.ctx, f.principalID, f.userID, skills.ScopeProject, &f.projectID, nil,
+		"runbook", "acme", "local", []byte("v1"), nil)
+	if err != nil {
+		t.Fatalf("Publish v1: %v", err)
+	}
+	second, err := f.svc.Publish(f.ctx, f.principalID, f.userID, skills.ScopeProject, &f.projectID,
+		&first.SkillID, "runbook", "acme", "local", []byte("v2"), nil)
+	if err != nil {
+		t.Fatalf("Publish v2: %v", err)
+	}
+
+	entry, err := f.svc.Get(f.ctx, f.principalID, first.SkillID)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if entry.LatestVersion != 2 || entry.LatestVersionID != second.ID {
+		t.Errorf("Get: got v%d/%s, want v2/%s", entry.LatestVersion, entry.LatestVersionID, second.ID)
+	}
+}
+
+// A skill the caller may not see reads as absent, not as a refusal: "it
+// exists but not for you" leaks that it exists (docs/adr/0018). RLS makes
+// that decision, so this is the test that proves the new read did not route
+// around it.
+func TestGetHidesWhatTheCallerCannotSee(t *testing.T) {
+	f := newFixture(t)
+
+	published, err := f.svc.Publish(f.ctx, f.principalID, f.userID, skills.ScopeProject, &f.projectID, nil,
+		"private-runbook", "acme", "local", []byte("secret instructions"), nil)
+	if err != nil {
+		t.Fatalf("Publish: %v", err)
+	}
+
+	outsider, _ := seedOutsider(t, f)
+	_, err = f.svc.Get(f.ctx, outsider, published.SkillID)
+	if !errors.Is(err, skills.ErrNotFound) {
+		t.Fatalf("Get as outsider: got %v, want ErrNotFound", err)
+	}
+}

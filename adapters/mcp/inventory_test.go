@@ -38,6 +38,7 @@ var expectedTools = []string{
 	"handoff.current",
 	"handoff.get",
 	"handoff.list",
+	"handoff.waiting",
 	"history.append_object",
 	"history.create_conversation",
 	"history.create_external_session",
@@ -69,6 +70,7 @@ var expectedTools = []string{
 	// that to any MCP-connected agent is a decision nobody has made. It
 	// stays reachable only from adapters/cli. See tools_secret.go.
 	"skill.get",
+	"skill.info",
 	"skill.install",
 	"skill.list_effective",
 	"skill.override",

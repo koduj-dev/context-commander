@@ -93,6 +93,7 @@ func NewHandler(deps Deps) http.Handler {
 
 		r.Get("/me", deps.getMe)
 		r.Get("/me/projects", deps.listMyProjects)
+		r.Get("/me/handoffs", deps.listWaiting)
 		r.Get("/me/organizations", deps.listMyOrganizations)
 		r.Post("/me/tokens", deps.issueToken)
 		r.Get("/me/tokens", deps.listTokens)
@@ -111,6 +112,7 @@ func NewHandler(deps Deps) http.Handler {
 			// Registered before "/{skillID}/...": chi prefers static
 			// segments, so "versions" is not read as a skill id.
 			r.Get("/versions/{skillVersionID}", deps.getSkillVersion)
+			r.Get("/{skillID}", deps.getSkill)
 			r.Get("/{skillID}/versions", deps.listSkillVersions)
 		})
 
