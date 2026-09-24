@@ -12,6 +12,105 @@ link definition at the bottom of the file.
 
 ### Added
 
+- **A web interface, rebuilt from nothing.** The previous `web/` was deleted
+  whole rather than reworked — nothing adapted, nothing migrated — because
+  the thing it needed most was a decision made before the first line:
+  internationalisation is in from that first commit, not retrofitted later.
+  React 19 and Vite, no CSS framework, no i18n library.
+  - **What it covers.** Sign-in; a dashboard that answers "is anything
+    waiting on you"; projects, with creation; and per project the context
+    pack, artifacts, skills, policies, secrets, members, conversations,
+    activity and settings. Plus the skill registry with publishing and a
+    per-skill detail, organizations, administration and personal access
+    tokens.
+  - **The Context tab is the one worth naming.** It renders the same
+    assembled pack MCP returns, including the budget report — what did not
+    fit is named, with its size and the reason, rather than silently
+    dropped. The limit can be changed and the pack reassembled, so "what
+    would an agent see with a smaller budget" is answered by the server
+    instead of guessed at in the browser. This is NEXT.md Phase 2's
+    "why does this context pack contain exactly these items?".
+  - **Artifacts are editable, and a save names the version it started
+    from.** A write that lands after someone else's is refused rather than
+    applied, and the screen says what that means: their work still exists,
+    yours is not lost, it has to be merged. Rendering that refusal as a
+    generic failure was the easy mistake and the expensive one.
+  - **Per-reader localisation, separate from language.** Date order, 12/24
+    hour, time zone, UTC alongside, GB versus GiB — each with a live
+    preview of what it produces. Everything formats from raw values through
+    `Intl`; the server keeps sending RFC3339 and integer bytes, because its
+    other reader is a model and does not need it pretty.
+  - **English is the source language**, with German and Spanish complete.
+    `npm run i18n:check` fails on a dropped or invented placeholder, an
+    orphaned key, and a plural with no `other` form; it reports keys nothing
+    renders rather than failing, since a key can legitimately be built at
+    runtime.
+  - **The design system is checked, not trusted.**
+    `web/scripts/check-design-sync.mjs` fails when a component exists in
+    `docs/mockups/assets/mockup.css` and not in the app, when either
+    stylesheet contains a hex colour (colour comes from `docs/brand`), when
+    a screen uses a class nothing defines, or when a component styles itself
+    inline. Two files describing one design will drift; this is the thing
+    that notices.
+  - **What it deliberately does not offer**, because the API has no write
+    for it: removing a project member, changing a role, renaming or deleting
+    a project, changing visibility, revoking installation admin. Each says
+    so on the screen rather than showing a control that would fail.
+
+- **An identity directory — `GET /v1/installation/users` and
+  `/v1/installation/service-principals`.** Creating a user and a service
+  principal was already possible; enumerating them was not. Every surface
+  that needed to name a person could therefore only ask for a UUID the
+  caller had no way to obtain, which was the single largest usability defect
+  in the product and a server gap rather than an interface one. Both are
+  paginated and admin-gated on `CapAdminRead` — who exists on an
+  installation is not something every credential should enumerate.
+  - **Each row carries both ids.** `id` is what an organization membership
+    names; `principal_id` is what a project membership, a token and an audit
+    row name (docs/adr/0006). They are different ids for one identity and
+    confusing them produces a foreign-key error no reader can act on, so
+    they travel together rather than leaving each caller to resolve the
+    second.
+  - **`GET /v1/organizations/{id}/members` now joins the user row**, so it
+    answers with a person. A list of UUIDs answers "who is in this
+    organization" with "I am not going to tell you".
+
+- **The MCP reads an agent needs to orient itself.** `me`, `project.list`,
+  `organization.list`, `organization.list_members`,
+  `installation.list_users` and `installation.list_service_principals`. An
+  agent holding a token could act on a project only if something had told it
+  the project's path out of band — every tool took a `namespace/slug` and
+  nothing produced one, which is exactly the situation a shared context
+  layer exists to prevent. `me` answers who the token acts as and whether
+  the `installation.*` tools will answer at all, so a client can offer an
+  operation instead of discovering a refusal.
+  - **The tool inventory is asserted**
+    (`adapters/mcp/inventory_test.go`). "Is this surface complete" was
+    otherwise a question about nine files: a domain could gain an operation
+    over HTTP and never get a tool, and nothing noticed. A second test
+    requires every tool to describe itself, since a model picks a tool by
+    its description — it immediately caught `gate.unbind` with a description
+    too short to choose by. The list also records that `secret.resolve` is
+    absent on purpose: it returns plaintext, and that stays reachable only
+    from `adapters/cli`.
+
+- **Documentation that says what is actually true.**
+  - `docs/CURRENT-ARCHITECTURE.md` — the precedence rules between the
+    architecture documents, the ADRs and the code; the decisions that are
+    settled and should not be re-opened; and a register of places where the
+    documents and the repository differ on purpose. The rule it exists to
+    state: absence from an architecture document is not a reason to delete
+    implemented behaviour.
+  - `docs/AGENT-GUIDE.md` — how to operate Context Commander, written for
+    an agent. Deliberately not a tool reference: the MCP registry already
+    describes each method, and duplicating it produces two descriptions that
+    disagree.
+  - `docs/mockups/` — the component kit and the screens the design was
+    agreed on, generated from one shell and one kit rather than written page
+    by page, over the real brand tokens and with no hex value of their own.
+  - `.claude/skills/ui-design/SKILL.md` — how the interface is built and
+    what to watch for, referenced from CONTRIBUTING.md.
+
 - **The cheap gaps from the backlog, cleared in one pass.**
   - **Membership changes are audited.** Neither `members.Service.Add` nor
     `organizations.Service.AddMember` wrote an audit row, though granting a
@@ -493,6 +592,19 @@ link definition at the bottom of the file.
     would change which binding wins) and the member lists (bounded sets).
 
 ### Fixed
+
+- **Creating a user with an address someone already had answered 500.**
+  `users.email` is UNIQUE, and the constraint violation travelled to the
+  adapter as an unclassified error, so an operator who simply created the
+  same person twice was told their installation had failed. It is now
+  `identity.ErrAlreadyExists` and a 409 saying which field clashed —
+  "internal error" tells an operator something is broken, while "a user with
+  this email address already exists" tells them what to do next.
+  `internal/identity/duplicate_integration_test.go` holds the behaviour, and
+  records the asymmetry it exposed: `service_principals.name` carries no
+  UNIQUE constraint, so two agents may share a name today. Adding one needs
+  a migration and a decision about existing rows, so it is written down
+  rather than changed quietly.
 
 - **A project could never adopt a newer version of a skill.**
   `skill_bindings` had no uniqueness on `(scope, scope_ref, skill_id)`, so

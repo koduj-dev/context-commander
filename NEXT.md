@@ -115,7 +115,12 @@ Only after the core loop is proven:
 - [ ] Compaction/summarization as a derived history object, never overwriting
       the source (cookbook §10.3 already decided this shape).
 - [ ] Subscriptions, or reliable cursor polling, for changes during a session.
-- [ ] Diagnostics: "why does this context pack contain exactly these items?"
+- [x] ~~Diagnostics: "why does this context pack contain exactly these
+      items?"~~ Closed 2026-09-14: the interface's Context tab renders the
+      assembled pack with its budget report — what was left out, how big it
+      was and why — and can reassemble it under a different limit. The
+      server half (`BudgetReport`/`TruncationNote`) shipped with
+      `context.bootstrap`; this is the surface that makes it readable.
 - [ ] Project export/import for backup and migration.
 
 Add vector search only if measurement shows metadata and text search are
