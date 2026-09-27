@@ -20,6 +20,7 @@ import { Registry } from "./pages/Registry";
 import { SkillDetail } from "./pages/SkillDetail";
 import { Organizations } from "./pages/Organizations";
 import { Tokens } from "./pages/Tokens";
+import { AdminUsage } from "./pages/AdminUsage";
 import {
   Administration,
   AdminIdentities,
@@ -77,6 +78,7 @@ export function App() {
         <Route path="administration" element={<Administration />}>
           <Route index element={<AdminOverview />} />
           <Route path="identities" element={<AdminIdentities />} />
+          <Route path="usage" element={<AdminUsage />} />
           <Route path="security" element={<AdminSecurityLog />} />
         </Route>
         <Route path="tokens" element={<Tokens />} />

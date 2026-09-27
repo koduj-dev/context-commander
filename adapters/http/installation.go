@@ -290,3 +290,98 @@ func (d Deps) listServicePrincipals(w http.ResponseWriter, r *http.Request) {
 	}
 	writeList(w, out, page.NextCursor)
 }
+
+// statsResponse groups the counts the way a reader asks about them, rather
+// than as one flat list of two dozen numbers: "how big is this", "who uses
+// it", "what is it doing". A flat object would be the same data and a worse
+// answer.
+type statsResponse struct {
+	Scale struct {
+		Projects      int64 `json:"projects"`
+		Organizations int64 `json:"organizations"`
+		Users         int64 `json:"users"`
+		Agents        int64 `json:"service_principals"`
+	} `json:"scale"`
+
+	Content struct {
+		Artifacts        int64 `json:"artifacts"`
+		ArtifactVersions int64 `json:"artifact_versions"`
+		// The logical size of every version written, not disk usage — the
+		// database cannot see the object store.
+		StoredBytes    int64 `json:"stored_bytes"`
+		Secrets        int64 `json:"secrets"`
+		Conversations  int64 `json:"conversations"`
+		HistoryObjects int64 `json:"history_objects"`
+	} `json:"content"`
+
+	Coordination struct {
+		HandoffsOpen    int64 `json:"handoffs_open"`
+		HandoffsClaimed int64 `json:"handoffs_claimed"`
+		HandoffsClosed  int64 `json:"handoffs_closed"`
+		Skills          int64 `json:"skills"`
+		SkillVersions   int64 `json:"skill_versions"`
+		SkillBindings   int64 `json:"skill_bindings"`
+		GateBindings    int64 `json:"gate_bindings"`
+	} `json:"coordination"`
+
+	Activity struct {
+		Events         int64   `json:"events"`
+		AuditRecords   int64   `json:"audit_records"`
+		SecurityEvents int64   `json:"security_events"`
+		NewestActivity *string `json:"newest_activity,omitempty"`
+		OldestProject  *string `json:"oldest_project,omitempty"`
+	} `json:"activity"`
+
+	Credentials struct {
+		Active  int64 `json:"active"`
+		Revoked int64 `json:"revoked"`
+		Expired int64 `json:"expired"`
+		// The number that answers "is this used" rather than "what is
+		// stored".
+		UsedLast7Days int64 `json:"used_last_7_days"`
+	} `json:"credentials"`
+}
+
+func (d Deps) getInstallationStats(w http.ResponseWriter, r *http.Request) {
+	principalID := principalIDFrom(r.Context())
+	callerUserID, err := resolveCallerUserID(r, d.Pool, principalID)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	st, err := d.Installation.Stats(r.Context(), principalID, callerUserID)
+	if err != nil {
+		writeDomainError(w, err)
+		return
+	}
+
+	var out statsResponse
+	out.Scale.Projects, out.Scale.Organizations = st.Projects, st.Organizations
+	out.Scale.Users, out.Scale.Agents = st.Users, st.ServicePrincipals
+
+	out.Content.Artifacts, out.Content.ArtifactVersions = st.Artifacts, st.ArtifactVersions
+	out.Content.StoredBytes, out.Content.Secrets = st.StoredBytes, st.Secrets
+	out.Content.Conversations, out.Content.HistoryObjects = st.Conversations, st.HistoryObjects
+
+	out.Coordination.HandoffsOpen, out.Coordination.HandoffsClaimed = st.HandoffsOpen, st.HandoffsClaimed
+	out.Coordination.HandoffsClosed = st.HandoffsClosed
+	out.Coordination.Skills, out.Coordination.SkillVersions = st.Skills, st.SkillVersions
+	out.Coordination.SkillBindings, out.Coordination.GateBindings = st.SkillBindings, st.GateBindings
+
+	out.Activity.Events, out.Activity.AuditRecords = st.Events, st.AuditRecords
+	out.Activity.SecurityEvents = st.SecurityEvents
+	if st.NewestActivity != nil {
+		v := st.NewestActivity.Format(time.RFC3339)
+		out.Activity.NewestActivity = &v
+	}
+	if st.OldestProject != nil {
+		v := st.OldestProject.Format(time.RFC3339)
+		out.Activity.OldestProject = &v
+	}
+
+	out.Credentials.Active, out.Credentials.Revoked = st.CredentialsActive, st.CredentialsRevoked
+	out.Credentials.Expired, out.Credentials.UsedLast7Days = st.CredentialsExpired, st.ActiveLast7Days
+
+	writeJSON(w, http.StatusOK, out)
+}

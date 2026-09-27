@@ -16,8 +16,12 @@ const out = join(here, "..", "public", "brand");
 // Only what the app actually renders. Copying the whole package would ship
 // the print manual and every unused lockup to every browser.
 const WANTED = [
+  // The horizontal lockup fills the navigation rail; the stacked one is what
+  // the brand package ships for a centred block, which is what sign-in is.
   "svg/cc-logo-horizontal-on-dark.svg",
   "svg/cc-logo-horizontal-on-light.svg",
+  "svg/cc-logo-stacked-on-dark.svg",
+  "svg/cc-logo-stacked-on-light.svg",
   "svg/cc-favicon.svg",
   "tokens/ui-colors.css",
 ];

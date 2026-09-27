@@ -71,15 +71,17 @@ export function SignIn() {
       <main className="page">
         <div className="solo-card">
           <div className="brand">
+            {/* The stacked lockup, not the horizontal one: this is a centred
+                block, which is the shape the brand package ships stacked for. */}
             <img
               className="logo-dark"
-              src="/brand/cc-logo-horizontal-on-dark.svg"
+              src="/brand/cc-logo-stacked-on-dark.svg"
               alt={t("app.name")}
               hidden={theme === "light"}
             />
             <img
               className="logo-light"
-              src="/brand/cc-logo-horizontal-on-light.svg"
+              src="/brand/cc-logo-stacked-on-light.svg"
               alt={t("app.name")}
               hidden={theme !== "light"}
             />

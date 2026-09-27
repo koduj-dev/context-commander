@@ -225,6 +225,51 @@ export const en = {
     "The installation itself: who administers it, who was refused, and the identities everything else hangs off.",
   "admin.tab.overview": "Overview",
   "admin.tab.identities": "Identities",
+  "admin.tab.usage": "Usage",
+  "admin.usage": "Usage",
+  "admin.usageLead":
+    "How much this installation is actually used, and how much it holds. Counts only — an installation admin administers the installation and does not read its content, so there is nothing here that names a project, a path or a person.",
+  "admin.usage.content": "What it holds",
+  "admin.usage.coordination": "Coordination",
+  "admin.usage.activity": "Activity",
+  "admin.usage.credentials": "Credentials",
+  // The leading noun sits OUTSIDE the plural block on purpose: a word
+  // immediately after `{` followed by a comma is indistinguishable from a
+  // placeholder — to a real ICU parser and to i18n:check, which caught it.
+  "admin.usage.inOrganizations":
+    "projects, in {count, plural, one {# organization} other {# organizations}}",
+  "admin.usage.andAgents": "people, and {count, plural, one {# agent} other {# agents}}",
+  "admin.usage.acrossArtifacts": "across {count, plural, one {# artifact} other {# artifacts}}",
+  "admin.usage.ofIssued": "credentials used, of {count, plural, one {# issued} other {# issued}}",
+  "admin.usage.artifacts": "Artifacts",
+  "admin.usage.versions": "Versions",
+  "admin.usage.stored": "Stored",
+  "admin.usage.storedHelp":
+    "The size of every artifact version ever written. Not disk usage — the database cannot see the object store, and a figure labelled “disk” that came from SQL would be a guess.",
+  "admin.usage.secrets": "Secrets",
+  "admin.usage.conversations": "Conversations",
+  "admin.usage.historyObjects": "Recorded objects",
+  "admin.usage.handoffsOpen": "Open",
+  "admin.usage.handoffsClaimed": "Claimed",
+  "admin.usage.handoffsClosed": "Closed",
+  "admin.usage.handoffs": "Handoffs",
+  "admin.usage.skills": "Skills",
+  "admin.usage.skillVersions": "Skill versions",
+  "admin.usage.skillBindings": "Skill bindings",
+  "admin.usage.gateBindings": "Gate bindings",
+  "admin.usage.events": "Events",
+  "admin.usage.auditRecords": "Audit records",
+  "admin.usage.securityEvents": "Security events",
+  "admin.usage.newestActivity": "Last activity",
+  "admin.usage.oldestProject": "First project",
+  "admin.usage.active": "Active",
+  "admin.usage.revoked": "Revoked",
+  "admin.usage.expired": "Expired",
+  "admin.usage.usedRecentlyHelp":
+    "The one figure that answers “is this used” rather than “what is stored”. A credential that has not made a request in a week is either finished or forgotten.",
+  "admin.usage.quiet": "Nothing has happened yet",
+  "admin.usage.quietBody":
+    "No events recorded. An installation with projects but no events is one nothing has written to.",
   "admin.tab.security": "Security log",
   "admin.admins": "Installation admins",
   "admin.adminsLead":

@@ -48,6 +48,7 @@ export function Administration() {
       <Tabs label={t("admin.title")}>
         {tab("/administration", t("admin.tab.overview"), true)}
         {tab("/administration/identities", t("admin.tab.identities"))}
+        {tab("/administration/usage", t("admin.tab.usage"))}
         {tab("/administration/security", t("admin.tab.security"))}
       </Tabs>
       <Outlet />

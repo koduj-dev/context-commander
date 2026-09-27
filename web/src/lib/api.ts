@@ -503,6 +503,45 @@ export type ServicePrincipal = {
   principal_id?: string;
 };
 
+/**
+ * What the installation holds, in cardinalities.
+ *
+ * Counts and one byte total, never a row-level value. That is what makes it
+ * available at all: an installation admin is not a member of every project
+ * and cannot read project content, so a field naming a path or a summary
+ * would widen that boundary rather than report on it
+ * (migrations/000024).
+ */
+export type InstallationStats = {
+  scale: { projects: number; organizations: number; users: number; service_principals: number };
+  content: {
+    artifacts: number;
+    artifact_versions: number;
+    /** Logical size of every version written — not disk usage. */
+    stored_bytes: number;
+    secrets: number;
+    conversations: number;
+    history_objects: number;
+  };
+  coordination: {
+    handoffs_open: number;
+    handoffs_claimed: number;
+    handoffs_closed: number;
+    skills: number;
+    skill_versions: number;
+    skill_bindings: number;
+    gate_bindings: number;
+  };
+  activity: {
+    events: number;
+    audit_records: number;
+    security_events: number;
+    newest_activity?: string;
+    oldest_project?: string;
+  };
+  credentials: { active: number; revoked: number; expired: number; used_last_7_days: number };
+};
+
 export type InstallationAdmin = {
   user_id: string;
   role: string;
@@ -731,6 +770,7 @@ export const api = {
     request<Page<AuditRecord>>(withQuery(`/organizations/${id}/audit`, { cursor, limit })),
 
   installationAdmins: () => request<InstallationAdmin[]>("/installation/admins"),
+  installationStats: () => request<InstallationStats>("/installation/stats"),
   // The directory. Installation-admin only, which is why every screen that
   // uses it falls back to a plain id field when the caller is not one.
   users: (cursor?: string, limit?: number) =>

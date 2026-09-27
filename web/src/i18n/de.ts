@@ -597,4 +597,48 @@ export const de: Partial<Record<MessageKey, string>> = {
   "admin.noTokens": "Keine Token ausgestellt",
   "admin.confirmRevokeFor":
     "Dieses Zugangsmerkmal widerrufen? Was immer es verwendet, hört sofort auf zu funktionieren — bei einem laufenden Agenten mitten in der Arbeit.",
+
+  "admin.tab.usage": "Nutzung",
+  "admin.usage": "Nutzung",
+  "admin.usageLead":
+    "Wie stark diese Installation tatsächlich genutzt wird und was sie enthält. Nur Anzahlen — wer die Installation administriert, verwaltet sie und liest nicht ihre Inhalte, hier steht also nichts, was ein Projekt, einen Pfad oder eine Person benennt.",
+  "admin.usage.content": "Was sie enthält",
+  "admin.usage.coordination": "Koordination",
+  "admin.usage.activity": "Aktivität",
+  "admin.usage.credentials": "Zugangsmerkmale",
+  "admin.usage.inOrganizations":
+    "Projekte, in {count, plural, one {# Organisation} other {# Organisationen}}",
+  "admin.usage.andAgents": "Personen, und {count, plural, one {# Agent} other {# Agenten}}",
+  "admin.usage.acrossArtifacts": "über {count, plural, one {# Artefakt} other {# Artefakte}}",
+  "admin.usage.ofIssued":
+    "Zugangsmerkmale verwendet, von {count, plural, one {# ausgestellten} other {# ausgestellten}}",
+  "admin.usage.artifacts": "Artefakte",
+  "admin.usage.versions": "Versionen",
+  "admin.usage.stored": "Gespeichert",
+  "admin.usage.storedHelp":
+    "Die Größe jeder jemals geschriebenen Artefaktversion. Nicht der Plattenverbrauch — die Datenbank sieht den Objektspeicher nicht, und eine mit „Platte“ beschriftete Zahl aus SQL wäre geraten.",
+  "admin.usage.secrets": "Geheimnisse",
+  "admin.usage.conversations": "Unterhaltungen",
+  "admin.usage.historyObjects": "Aufgezeichnete Objekte",
+  "admin.usage.handoffsOpen": "Offen",
+  "admin.usage.handoffsClaimed": "Übernommen",
+  "admin.usage.handoffsClosed": "Abgeschlossen",
+  "admin.usage.handoffs": "Übergaben",
+  "admin.usage.skills": "Skills",
+  "admin.usage.skillVersions": "Skill-Versionen",
+  "admin.usage.skillBindings": "Skill-Bindungen",
+  "admin.usage.gateBindings": "Gate-Bindungen",
+  "admin.usage.events": "Ereignisse",
+  "admin.usage.auditRecords": "Audit-Einträge",
+  "admin.usage.securityEvents": "Sicherheitsereignisse",
+  "admin.usage.newestActivity": "Letzte Aktivität",
+  "admin.usage.oldestProject": "Erstes Projekt",
+  "admin.usage.active": "Aktiv",
+  "admin.usage.revoked": "Widerrufen",
+  "admin.usage.expired": "Abgelaufen",
+  "admin.usage.usedRecentlyHelp":
+    "Die eine Zahl, die „wird das genutzt“ beantwortet und nicht „was liegt hier“. Ein Zugangsmerkmal, das eine Woche lang keine Anfrage gestellt hat, ist entweder fertig oder vergessen.",
+  "admin.usage.quiet": "Es ist noch nichts passiert",
+  "admin.usage.quietBody":
+    "Keine Ereignisse aufgezeichnet. Eine Installation mit Projekten, aber ohne Ereignisse ist eine, in die nichts geschrieben wurde.",
 };

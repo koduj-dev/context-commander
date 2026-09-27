@@ -583,4 +583,48 @@ export const es: Partial<Record<MessageKey, string>> = {
   "admin.noTokens": "No se ha emitido ningún token",
   "admin.confirmRevokeFor":
     "¿Revocar esta credencial? Lo que la esté usando dejará de funcionar de inmediato, y si es un agente en marcha fallará a mitad de su tarea.",
+
+  "admin.tab.usage": "Uso",
+  "admin.usage": "Uso",
+  "admin.usageLead":
+    "Cuánto se usa realmente esta instalación y cuánto contiene. Solo recuentos — quien administra la instalación la administra y no lee su contenido, así que aquí no hay nada que nombre un proyecto, una ruta ni a una persona.",
+  "admin.usage.content": "Qué contiene",
+  "admin.usage.coordination": "Coordinación",
+  "admin.usage.activity": "Actividad",
+  "admin.usage.credentials": "Credenciales",
+  "admin.usage.inOrganizations":
+    "proyectos, en {count, plural, one {# organización} other {# organizaciones}}",
+  "admin.usage.andAgents": "personas, y {count, plural, one {# agente} other {# agentes}}",
+  "admin.usage.acrossArtifacts": "en {count, plural, one {# artefacto} other {# artefactos}}",
+  "admin.usage.ofIssued":
+    "credenciales usadas, de {count, plural, one {# emitida} other {# emitidas}}",
+  "admin.usage.artifacts": "Artefactos",
+  "admin.usage.versions": "Versiones",
+  "admin.usage.stored": "Almacenado",
+  "admin.usage.storedHelp":
+    "El tamaño de todas las versiones de artefacto escritas alguna vez. No es el uso de disco — la base de datos no ve el almacén de objetos, y una cifra etiquetada «disco» que saliera de SQL sería una conjetura.",
+  "admin.usage.secrets": "Secretos",
+  "admin.usage.conversations": "Conversaciones",
+  "admin.usage.historyObjects": "Objetos registrados",
+  "admin.usage.handoffsOpen": "Abiertos",
+  "admin.usage.handoffsClaimed": "Tomados",
+  "admin.usage.handoffsClosed": "Cerrados",
+  "admin.usage.handoffs": "Traspasos",
+  "admin.usage.skills": "Skills",
+  "admin.usage.skillVersions": "Versiones de skill",
+  "admin.usage.skillBindings": "Vínculos de skill",
+  "admin.usage.gateBindings": "Vínculos de gate",
+  "admin.usage.events": "Eventos",
+  "admin.usage.auditRecords": "Registros de auditoría",
+  "admin.usage.securityEvents": "Eventos de seguridad",
+  "admin.usage.newestActivity": "Última actividad",
+  "admin.usage.oldestProject": "Primer proyecto",
+  "admin.usage.active": "Activas",
+  "admin.usage.revoked": "Revocadas",
+  "admin.usage.expired": "Caducadas",
+  "admin.usage.usedRecentlyHelp":
+    "La única cifra que responde «¿se usa esto?» en lugar de «¿qué hay guardado?». Una credencial que no ha hecho ninguna petición en una semana está terminada u olvidada.",
+  "admin.usage.quiet": "Todavía no ha pasado nada",
+  "admin.usage.quietBody":
+    "No se ha registrado ningún evento. Una instalación con proyectos pero sin eventos es una en la que nada ha escrito.",
 };

@@ -773,8 +773,17 @@ tr:hover .copy > button,
   padding: 32px 22px 64px;
 }
 .solo .solo-card { width: 100%; max-width: 420px; }
-.solo .solo-card .brand { padding: 0; border: 0; margin-bottom: 18px; justify-content: center; }
-.solo .solo-card .brand img { height: 30px; }
+.solo .solo-card .brand { padding: 0; border: 0; margin-bottom: 26px; justify-content: center; }
+/* The stacked lockup, at a size that reads as the product's front door rather
+ * than as a favicon that wandered in. The brand manual's own floor is 48px for
+ * a lockup — below that it asks for the simplified favicon variant — and 30px
+ * was under it. Height only: the SVG carries its own 1024:760 ratio and
+ * setting both axes is how a lockup gets stretched, which the manual forbids. */
+.solo .solo-card .brand img { height: 120px; width: auto; }
+/* A short viewport is the one case where 120px costs more than it gives. */
+@media (max-height: 640px) {
+  .solo .solo-card .brand img { height: 72px; }
+}
 
 /* Below this the card is the page: a max-width that exceeds the viewport is
  * the same mistake as a fixed one. */

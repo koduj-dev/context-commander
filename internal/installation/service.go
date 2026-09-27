@@ -247,3 +247,86 @@ func (s *Service) ListServicePrincipals(ctx context.Context, principalID, caller
 	}
 	return page, nil
 }
+
+// Stats is what an installation holds, in cardinalities.
+//
+// Counts and one byte total, never a row-level value — see
+// migrations/000024. The distinction matters because it is what lets an
+// operator have this at all: an installation admin is not a member of every
+// project and cannot read project content, so anything here that named a
+// path, a summary or an email would be a widening of that boundary rather
+// than a report about it.
+type Stats struct {
+	Projects          int64
+	Organizations     int64
+	Users             int64
+	ServicePrincipals int64
+
+	Artifacts        int64
+	ArtifactVersions int64
+	// StoredBytes is the logical size of every artifact version ever
+	// written. Not disk usage: the database cannot see the object store, and
+	// a number labelled "disk" that came from SQL would be a guess.
+	StoredBytes int64
+
+	Skills        int64
+	SkillVersions int64
+	SkillBindings int64
+
+	HandoffsOpen    int64
+	HandoffsClaimed int64
+	HandoffsClosed  int64
+
+	Conversations  int64
+	HistoryObjects int64
+
+	Events         int64
+	AuditRecords   int64
+	SecurityEvents int64
+	Secrets        int64
+	GateBindings   int64
+
+	CredentialsActive  int64
+	CredentialsRevoked int64
+	CredentialsExpired int64
+	// ActiveLast7Days is the number that answers "is this used" rather than
+	// "what is stored": credentials that made a request in the last week.
+	ActiveLast7Days int64
+
+	OldestProject  *time.Time
+	NewestActivity *time.Time
+}
+
+// Stats reports installation-wide usage.
+//
+// Gated on CapAdminRead, the same capability that governs every other
+// installation-wide read here. The counting itself happens in
+// cc_installation_stats(), a SECURITY DEFINER function, because almost
+// everything worth counting sits behind RLS and this caller is deliberately
+// not a member of every project — counting through their own view would
+// report "the installation holds 2 artifacts" when the truth is "you can see
+// 2", which is worse than reporting nothing.
+func (s *Service) Stats(ctx context.Context, principalID, callerUserID uuid.UUID) (Stats, error) {
+	if err := s.checkCapability(ctx, principalID, callerUserID, CapAdminRead); err != nil {
+		return Stats{}, err
+	}
+
+	var st Stats
+	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `SELECT * FROM cc_installation_stats()`).Scan(
+			&st.Projects, &st.Organizations, &st.Users, &st.ServicePrincipals,
+			&st.Artifacts, &st.ArtifactVersions, &st.StoredBytes,
+			&st.Skills, &st.SkillVersions, &st.SkillBindings,
+			&st.HandoffsOpen, &st.HandoffsClaimed, &st.HandoffsClosed,
+			&st.Conversations, &st.HistoryObjects,
+			&st.Events, &st.AuditRecords, &st.SecurityEvents, &st.Secrets, &st.GateBindings,
+			&st.CredentialsActive, &st.CredentialsRevoked, &st.CredentialsExpired,
+			&st.ActiveLast7Days,
+			&st.OldestProject, &st.NewestActivity,
+		)
+	})
+	if err != nil {
+		return Stats{}, fmt.Errorf("installation: stats: %w", err)
+	}
+	return st, nil
+}
