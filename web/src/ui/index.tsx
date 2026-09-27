@@ -1,4 +1,5 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { copyToClipboard } from "../lib/clipboard";
 import { useT } from "../i18n";
 import { ApiError } from "../lib/api";
@@ -505,6 +506,25 @@ export function TextArea({
   );
 }
 
+/**
+ * A select, built rather than borrowed.
+ *
+ * The native `<select>` cannot be styled past its border: the open list is
+ * drawn by the operating system, in its font and its colours, which on a dark
+ * console is the one element that announces it does not belong. So this is a
+ * real listbox — and being real means carrying the keyboard behaviour the
+ * native control gave away for free, which is the part that gets skipped:
+ * Arrow keys move, Home/End jump, Enter and Space choose, Escape closes and
+ * returns focus, Tab and a click elsewhere close without choosing.
+ *
+ * The open list is portalled to `body` and positioned fixed. `.panel` sets
+ * `overflow: hidden` for its rounded corners, so a popup in the normal flow
+ * is clipped by the card it sits in — which only shows up once a select is
+ * near the bottom of a panel, and most of them are.
+ *
+ * The API is unchanged from the native version it replaced, so all eleven
+ * screens using it got this without being touched.
+ */
 export function SelectField<T extends string>({
   value,
   onChange,
@@ -516,19 +536,171 @@ export function SelectField<T extends string>({
   options: { value: T; label: string }[];
   label: string;
 }) {
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
+  const [rect, setRect] = useState<DOMRect | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  const selectedIndex = Math.max(
+    0,
+    options.findIndex((o) => o.value === value),
+  );
+  const current = options[selectedIndex];
+
+  const show = () => {
+    // Measured when opening, not at render: the trigger moves when the page
+    // scrolls or a panel above it grows.
+    setRect(triggerRef.current?.getBoundingClientRect() ?? null);
+    setActive(selectedIndex);
+    setOpen(true);
+  };
+
+  const hide = (restoreFocus = true) => {
+    setOpen(false);
+    if (restoreFocus) triggerRef.current?.focus();
+  };
+
+  const choose = (index: number) => {
+    const option = options[index];
+    if (option) onChange(option.value);
+    hide();
+  };
+
+  // Anything that moves the trigger invalidates the measured position, and a
+  // list floating away from its own control is worse than a closed one.
+  useEffect(() => {
+    if (!open) return;
+    const close = () => {
+      setOpen(false);
+    };
+    window.addEventListener("resize", close);
+    window.addEventListener("scroll", close, true);
+    return () => {
+      window.removeEventListener("resize", close);
+      window.removeEventListener("scroll", close, true);
+    };
+  }, [open]);
+
+  // A click anywhere else closes without choosing — what the native control
+  // does, and what everyone expects of anything that looks like one.
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (menuRef.current?.contains(target) || triggerRef.current?.contains(target)) return;
+      setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
+
+  const onKey = (e: React.KeyboardEvent) => {
+    if (!open) {
+      if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        show();
+      }
+      return;
+    }
+    switch (e.key) {
+      case "Escape":
+        e.preventDefault();
+        hide();
+        break;
+      case "ArrowDown":
+        e.preventDefault();
+        setActive((i) => Math.min(i + 1, options.length - 1));
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        setActive((i) => Math.max(i - 1, 0));
+        break;
+      case "Home":
+        e.preventDefault();
+        setActive(0);
+        break;
+      case "End":
+        e.preventDefault();
+        setActive(options.length - 1);
+        break;
+      case "Enter":
+      case " ":
+        e.preventDefault();
+        choose(active);
+        break;
+      case "Tab":
+        // Deliberately not prevented: Tab should move on. Leaving the list
+        // open behind the focus ring is how a popup gets orphaned.
+        setOpen(false);
+        break;
+    }
+  };
+
+  const listId = `sel-${label.replace(/\W+/g, "-").toLowerCase()}`;
+
   return (
-    <select
-      className="field"
-      value={value}
-      aria-label={label}
-      onChange={(e) => onChange(e.target.value as T)}
-    >
-      {options.map((o) => (
-        <option key={o.value} value={o.value}>
-          {o.label}
-        </option>
-      ))}
-    </select>
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        className="field sel"
+        role="combobox"
+        aria-label={label}
+        aria-expanded={open}
+        aria-controls={listId}
+        aria-activedescendant={open ? `${listId}-${active}` : undefined}
+        onClick={() => (open ? hide(false) : show())}
+        onKeyDown={onKey}
+      >
+        <span>{current?.label ?? ""}</span>
+        <svg
+          className="ico"
+          viewBox="0 0 18 18"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          aria-hidden="true"
+        >
+          <path d="m5 7.5 4 4 4-4" />
+        </svg>
+      </button>
+
+      {open &&
+        rect &&
+        createPortal(
+          <div
+            ref={menuRef}
+            id={listId}
+            className="sel-menu"
+            role="listbox"
+            aria-label={label}
+            style={{
+              left: rect.left,
+              top: rect.bottom + 4,
+              minWidth: rect.width,
+              maxHeight: Math.max(160, window.innerHeight - rect.bottom - 24),
+            }}
+          >
+            {options.map((o, i) => (
+              <button
+                key={o.value}
+                id={`${listId}-${i}`}
+                type="button"
+                role="option"
+                aria-selected={o.value === value}
+                data-active={i === active ? "true" : undefined}
+                onMouseEnter={() => setActive(i)}
+                onClick={() => choose(i)}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>,
+          document.body,
+        )}
+    </>
   );
 }
 

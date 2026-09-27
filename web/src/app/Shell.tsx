@@ -1,11 +1,12 @@
 import { NavLink, Outlet, Link } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { useI18n, useT } from "../i18n";
+import { LOCALES, LOCALE_NAMES, useI18n, useT } from "../i18n";
 import { principalName } from "../lib/api";
 import { useAuth } from "./auth";
 import { useCrumbsValue, useDocumentTitle } from "./crumbs";
 import { QuickFind } from "./QuickFind";
 import { modifierLabel } from "../lib/platform";
+import { SelectField } from "../ui";
 import { useTheme } from "./theme";
 
 /**
@@ -176,17 +177,21 @@ export function Shell() {
             <span>{t("find.open")}</span>
             <kbd>{modifierLabel("K")}</kbd>
           </button>
-          <span className="seg" role="group" aria-label={t("prefs.language")}>
-            {(["en", "de", "es"] as const).map((l) => (
-              <button
-                key={l}
-                type="button"
-                aria-pressed={l === locale}
-                onClick={() => setLocale(l)}
-              >
-                {l.toUpperCase()}
-              </button>
-            ))}
+          {/* The kit's own control, so the language list looks like the rest
+              of the product rather than like the operating system — and so
+              every screen with a select gained the same thing at once. Driven
+              by LOCALES, never by a list written out here: the hardcoded one
+              kept showing three languages after six existed, which is a bug
+              no type checker can see. Each language is named in itself, since
+              someone who cannot read the current interface cannot find their
+              own language in a list written in it. */}
+          <span className="lang">
+            <SelectField
+              label={t("prefs.language")}
+              value={locale}
+              onChange={setLocale}
+              options={LOCALES.map((l) => ({ value: l, label: LOCALE_NAMES[l] }))}
+            />
           </span>
           <span className="seg" role="group" aria-label={t("theme.label")}>
             <button type="button" aria-pressed={theme === "dark"} onClick={() => setTheme("dark")}>

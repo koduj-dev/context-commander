@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { LOCALES, LOCALE_NAMES, useI18n, useT } from "../i18n";
 import { useAuth } from "../app/auth";
 import { useTheme } from "../app/theme";
-import { Btn, Code, Note, Panel, TextField } from "../ui";
+import { Btn, Code, Note, Panel, SelectField, TextField } from "../ui";
 
 /**
  * The only screen that renders without a principal.
@@ -45,18 +45,16 @@ export function SignIn() {
     <div className="solo">
       <div className="topbar">
         <div className="spacer" />
-        <span className="seg" role="group" aria-label={t("prefs.language")}>
-          {LOCALES.map((l) => (
-            <button
-              key={l}
-              type="button"
-              aria-pressed={l === locale}
-              onClick={() => setLocale(l)}
-              title={LOCALE_NAMES[l]}
-            >
-              {l.toUpperCase()}
-            </button>
-          ))}
+        {/* The same control as the shell's, and it matters most here: this is
+            the screen someone lands on, and a language they cannot read is the
+            one thing they must be able to change before anything else works. */}
+        <span className="lang">
+          <SelectField
+            label={t("prefs.language")}
+            value={locale}
+            onChange={setLocale}
+            options={LOCALES.map((l) => ({ value: l, label: LOCALE_NAMES[l] }))}
+          />
         </span>
         <span className="seg" role="group" aria-label={t("theme.label")}>
           <button type="button" aria-pressed={theme === "dark"} onClick={() => setTheme("dark")}>

@@ -55,7 +55,31 @@ const MOCKUP_ONLY = new Set([
 ]);
 
 /** Inline styles that are data rather than styling, and why. */
-const INLINE_STYLE_ALLOWED = new Map([["Meter", "the fill width IS the value being displayed"]]);
+const INLINE_STYLE_ALLOWED = new Map([
+  ["Meter", "the fill width IS the value being displayed"],
+  ["SelectField", "a popup's position IS the trigger's position, and no class can know it"],
+]);
+
+/**
+ * Which component an offset in a file belongs to.
+ *
+ * Attributed to the nearest preceding function declaration rather than to the
+ * file, because the previous version granted the allowance per FILE: one
+ * `function Meter(` in src/ui/index.tsx exempted every inline style anywhere
+ * in it, which is the file with the most components in the project. The
+ * exemption has to name the component it is about or it is not an exemption.
+ */
+function componentAt(src, index) {
+  let name = null;
+  // Anchored to the start of a line, so a helper declared INSIDE a component
+  // — `function onKeyDown(...)`, indented — does not become the thing the
+  // exemption is granted to.
+  for (const m of src.matchAll(/^(?:export\s+)?function\s+(\w+)\s*[(<]/gm)) {
+    if (m.index > index) break;
+    name = m[1];
+  }
+  return name;
+}
 
 const failures = [];
 const notes = [];
@@ -124,13 +148,8 @@ for await (const file of walk(SRC)) {
   }
 
   for (const m of src.matchAll(/style=\{\{/g)) {
-    void m;
-    const component = rel
-      .split("/")
-      .pop()
-      .replace(/\.tsx?$/, "");
-    const allowedFor = [...INLINE_STYLE_ALLOWED.keys()].some((k) => src.includes(`function ${k}(`));
-    if (!allowedFor) inlineStyles.push(rel);
+    const component = componentAt(src, m.index) ?? "(top level)";
+    if (!INLINE_STYLE_ALLOWED.has(component)) inlineStyles.push(`${rel} → ${component}`);
   }
 }
 

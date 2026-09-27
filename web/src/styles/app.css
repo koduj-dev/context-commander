@@ -423,6 +423,92 @@ textarea.field {
   tab-size: 2;
 }
 
+/* A select that sits in the top strip rather than in a form. `.field` is
+ * width:100% by design, which is right inside a form row and wrong in a flex
+ * strip, where it would eat everything beside it. Applied to the wrapper so
+ * the kit's control needs no variant of its own. */
+.lang > .sel {
+  width: auto;
+  max-width: 11rem;
+}
+
+/* ---------- select ----------
+ *
+ * A real listbox, not the platform control. The native `<select>` cannot be
+ * styled past its border on any engine — the open list is drawn by the OS, in
+ * the OS's font and colours, which on a dark console is the one element that
+ * announces it does not belong.
+ *
+ * The open list is rendered into `body` and positioned fixed, deliberately:
+ * `.panel` sets `overflow: hidden` for its rounded corners, so a popup in the
+ * normal flow is clipped by the card containing it. Portalling sidesteps that
+ * and every z-index question with it.
+ *
+ * `.field` styling is shared with the trigger so a select and a text input
+ * next to each other are the same height and the same weight. */
+.sel {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: space-between;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12.5px;
+}
+.sel > .ico {
+  flex: none;
+  opacity: 0.7;
+}
+.sel[aria-expanded="true"] {
+  border-color: var(--cc-border-strong);
+}
+.sel > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sel-menu {
+  position: fixed;
+  z-index: 40;
+  background: var(--cc-surface-1);
+  border: 1px solid var(--cc-border-strong);
+  border-radius: 6px;
+  padding: 4px;
+  overflow-y: auto;
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--cc-bg) 70%, transparent);
+}
+.sel-menu > button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--cc-text);
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  padding: 6px 9px;
+  cursor: pointer;
+}
+/* The row under the keyboard cursor, which is not the same thing as the
+ * chosen one: arrowing through a list must show where you are without
+ * claiming you have picked it. */
+.sel-menu > button[data-active="true"] {
+  background: var(--cc-surface-2);
+}
+.sel-menu > button[aria-selected="true"] {
+  color: var(--cc-accent-primary);
+}
+.sel-menu > button[aria-selected="true"]::after {
+  content: "✓";
+  margin-left: auto;
+  font-size: 11px;
+}
+
 /* ---------- panels ---------- */
 
 .grid {
