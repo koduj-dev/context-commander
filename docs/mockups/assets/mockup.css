@@ -14,7 +14,7 @@ html { color-scheme: dark light; }
 
 body {
   margin: 0;
-  font-family: Inter, "Inter var", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  font-family: Inter, "Inter var", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   font-size: 13px;
   line-height: 1.45;
   background: var(--cc-bg);
@@ -806,3 +806,34 @@ tr:hover .copy > button,
 .specimen { border: 1px solid var(--cc-border); border-radius: 6px; padding: 14px; background: var(--cc-bg); }
 .specimen + .specimen { margin-top: 10px; }
 .spec-note { font-size: 12px; color: var(--cc-text-secondary); margin: 8px 0 0; }
+
+/* ---------- Chinese ----------
+ *
+ * Three things Latin typography gets away with and CJK does not.
+ *
+ * Negative tracking is drawn for Latin letterforms; applied to Han characters
+ * it closes gaps that carry meaning, so it is unset rather than reduced.
+ *
+ * A tighter line-height is readable in Latin because ascenders and descenders
+ * create the gaps; Han characters fill their box, so the same value reads as a
+ * solid block.
+ *
+ * `overflow-wrap: anywhere` is how Latin long strings are tamed, and it is
+ * already correct for Chinese — but `strict` line breaking is what stops a
+ * line from beginning with a closing bracket or a full stop, which is the
+ * mistake a reader actually notices. */
+:root:lang(zh-CN) {
+  line-height: 1.7;
+  line-break: strict;
+}
+:lang(zh-CN) h1,
+:lang(zh-CN) h2,
+:lang(zh-CN) .kpi .v {
+  letter-spacing: normal;
+}
+/* `ch` is the width of a "0", which in a CJK face is about half a Han
+ * character — a 34ch clamp cuts Chinese at roughly 17 characters, well before
+ * anything it was sized for. Widened in `em`, which tracks the glyph. */
+:lang(zh-CN) .truncate {
+  max-width: 22em;
+}

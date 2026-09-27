@@ -142,8 +142,8 @@
     <div class="mt"><div class="note info">This is not implemented in the backend yet.</div></div></div></section></div></div>
 
 <div class="mt"><section class="panel"><header><h2>Text expansion</h2><span class="sub">The kit is measured in the longer language</span></header><div class="body">
-  <p class="sec lead-out">German runs roughly 30% longer than English and this layout is dense, so the components are measured against the longer language, not the shorter one. The same markup, twice — if the right column breaks, the component is wrong, not the translation.</p>
-  <div class="grid g2">
+  <p class="sec lead-out">Measured across the whole catalogue, German runs 126% of English and is the longest of the six; Chinese runs 44% and is the shortest. Both ends matter: a component that only fits English breaks on the left of the two comparisons, and one whose spacing was tuned for long Latin text reads as empty on the right. The same markup, three times — if a column breaks, the component is wrong, not the translation.</p>
+  <div class="grid g3">
     <div class="specimen">
       <div class="label-caps">English</div>
       <div class="row-sm"><span class="badge b-warn"><span class="dot"></span>not overridable</span><span class="badge b-ok"><span class="dot"></span>signed</span><span class="badge"><span class="dot"></span>managed</span></div>
@@ -154,7 +154,12 @@
       <div class="row-sm"><span class="badge b-warn"><span class="dot"></span>nicht überschreibbar</span><span class="badge b-ok"><span class="dot"></span>signiert</span><span class="badge"><span class="dot"></span>verwaltet</span></div>
       <div class="status-row"><span class="name">Objektspeicher</span><span class="badge b-ok"><span class="dot"></span>fehlerfrei</span><span class="detail">Dateisystem · 2,4 GB · letzter Schreibvorgang vor 2 Minuten</span></div>
     </div>
-  </div></div><footer>Nothing is pinned to a width that only fits English: table headings wrap instead of clipping, badge rows wrap, the status label grows past its minimum, and numbers and dates go through the locale rather than being concatenated — 2.4 GB and 2,4 GB are the same value.</footer></section></div>
+    <div class="specimen" lang="zh-CN">
+      <div class="label-caps">简体中文</div>
+      <div class="row-sm"><span class="badge b-warn"><span class="dot"></span>不可覆盖</span><span class="badge b-ok"><span class="dot"></span>已签名</span><span class="badge"><span class="dot"></span>受管</span></div>
+      <div class="status-row"><span class="name">对象存储</span><span class="badge b-ok"><span class="dot"></span>正常</span><span class="detail">文件系统 · 2.4 GB · 2 分钟前写入</span></div>
+    </div>
+  </div></div><footer>Nothing is pinned to a width that only fits English: table headings wrap instead of clipping, badge rows wrap, the status label grows past its minimum, and numbers and dates go through the locale rather than being concatenated — 2.4 GB and 2,4 GB are the same value. The Chinese column is also where the font stack is visible: Inter carries no Han glyphs, so if that column renders in a different face from its neighbours the platform fallback list is wrong.</footer></section></div>
 
 <div class="mt"><section class="panel"><header><h2>Rules this kit enforces</h2></header><div class="body">
   <div class="stack-sm">

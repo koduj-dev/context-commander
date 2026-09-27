@@ -18,6 +18,13 @@ app; the check prints how many exist in each place so the difference is
 visible rather than forgotten. See
 [`.claude/skills/ui-design/SKILL.md`](../../.claude/skills/ui-design/SKILL.md).
 
+## Languages
+
+Six: English (the source), German, Spanish, French, Polish and Simplified
+Chinese. `foundations.html` shows the kit in English, German and Chinese
+together — the longest and the shortest of the six, which is where a component
+breaks in one direction or looks empty in the other.
+
 ## Read this first
 
 [`foundations.html`](foundations.html) is the base. Tokens, type scale,

@@ -94,10 +94,64 @@ function plurals(message) {
   return out;
 }
 
+/**
+ * The glossary, read as source.
+ *
+ * Parsed rather than imported for the same reason the catalogues are: this
+ * script runs on plain node with no build step, and `src/` importing itself
+ * through a bundler would make the check depend on the thing it checks.
+ */
+function readGlossary(file) {
+  const src = readFileSync(file, "utf8");
+  const out = [];
+  // One object literal per term: en, an optional forms map, a note.
+  for (const block of src.split(/\n  \{\n/).slice(1)) {
+    const en = /en:\s*"([^"]+)"/.exec(block);
+    if (!en) continue;
+    const forms = {};
+    const formsBlock = /forms:\s*\{([^}]*)\}/s.exec(block);
+    if (formsBlock) {
+      for (const m of formsBlock[1].matchAll(/"?([\w-]+)"?\s*:\s*"([^"]+)"/g)) {
+        forms[m[1]] = m[2];
+      }
+    }
+    out.push({ en: en[1], forms });
+  }
+  if (out.length === 0) throw new Error(`no glossary terms parsed from ${file}`);
+  return out;
+}
+
+/**
+ * The product name is a proper noun, not vocabulary.
+ *
+ * "Context Commander" stays in English in every catalogue, which would
+ * otherwise trip the `context` rule in every language that translates the
+ * word — so it is removed from both sides before anything is matched.
+ */
+const PRODUCT_NAME = /context commander/gi;
+
+/**
+ * A term "appears" if it occurs anywhere, case-insensitively.
+ *
+ * A plain substring, with no word boundary, and that is deliberate. German
+ * compounds ("Zugriffstoken"), Polish and Czech inflect ("tokenu"), and both
+ * bury the term inside a longer word — a boundary-anchored match rejected
+ * translations that used the term perfectly well, which is the expensive kind
+ * of wrong: it teaches whoever hits it to weaken the rule.
+ *
+ * What this check is actually for is catching a term that was REPLACED, and a
+ * substring catches that. The cost is that "contextual" satisfies "context",
+ * which is a false pass on a translation that did use the word.
+ */
+function mentions(text, term) {
+  return text.replace(PRODUCT_NAME, "").toLowerCase().includes(term.toLowerCase());
+}
+
 const errors = [];
 const notes = [];
 
 const en = readCatalog(join(i18nDir, "en.ts"));
+const glossary = readGlossary(join(i18nDir, "glossary.ts"));
 
 for (const [, forms] of [...en].flatMap(([k, v]) => plurals(v).map((p) => [k, p[1]]))) {
   // English itself has to be well-formed, or every locale inherits the bug
@@ -105,7 +159,7 @@ for (const [, forms] of [...en].flatMap(([k, v]) => plurals(v).map((p) => [k, p[
   if (!forms.has("other")) errors.push(`en: a plural block has no \`other\` form`);
 }
 
-const locales = ["de", "es"];
+const locales = ["de", "es", "fr", "pl", "zh-CN"];
 for (const locale of locales) {
   const file = join(i18nDir, `${locale}.ts`);
   if (!existsSync(file)) {
@@ -130,6 +184,21 @@ for (const locale of locales) {
     }
     for (const p of got) {
       if (!want.has(p)) errors.push(`${locale}: "${key}" invents a {${p}} placeholder`);
+    }
+
+    // Established vocabulary must survive translation. The field already has
+    // words for these things, and a translator reaching for a
+    // native-sounding alternative breaks the connection between what the
+    // interface says and what the tools are called.
+    for (const term of glossary) {
+      if (!mentions(source, term.en)) continue;
+      const want = term.forms?.[locale] ?? term.en;
+      if (!mentions(translated, want)) {
+        errors.push(
+          `${locale}: "${key}" mentions "${term.en}" but the translation does not use ` +
+            `"${want}" — see src/i18n/glossary.ts`,
+        );
+      }
     }
 
     for (const [selector, forms] of plurals(translated)) {

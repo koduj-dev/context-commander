@@ -41,6 +41,12 @@ html {
 
 body {
   margin: 0;
+  /* Inter first, then the platform's own CJK face. Deliberately NOT a CJK
+   * webfont: a subsetted Simplified Chinese face is megabytes, and every
+   * machine that reads Chinese already ships one that renders it better than
+   * a fallback we picked. Inter carries no CJK glyphs at all, so without
+   * these names the browser substitutes per-glyph and the result is Latin
+   * text in one face beside Chinese text in whatever it found. */
   font-family:
     Inter,
     "Inter var",
@@ -48,6 +54,11 @@ body {
     BlinkMacSystemFont,
     "Segoe UI",
     system-ui,
+    "PingFang SC",
+    "Hiragino Sans GB",
+    "Microsoft YaHei",
+    "Noto Sans CJK SC",
+    "Source Han Sans SC",
     sans-serif;
   font-size: 13px;
   line-height: 1.45;
@@ -59,8 +70,12 @@ body {
 /* Identifiers, hashes, paths and counts. Tabular figures so columns of
  * numbers line up instead of shimmering. */
 .mono {
+  /* The CJK faces are here too, at the end: a monospaced identifier is
+   * Latin, but a path or a skill name may not be, and a missing glyph in a
+   * mono run is the one place a substitution is impossible to miss. */
   font-family:
-    "SF Mono", "JetBrains Mono", "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+    "SF Mono", "JetBrains Mono", "IBM Plex Mono", ui-monospace, Menlo, Consolas, "PingFang SC",
+    "Microsoft YaHei", "Noto Sans CJK SC", monospace;
   font-variant-numeric: tabular-nums;
   font-size: 12px;
 }
@@ -1362,4 +1377,35 @@ tr:hover .copy > button,
     justify-content: flex-start;
     padding-top: 24px;
   }
+}
+
+/* ---------- Chinese ----------
+ *
+ * Three things Latin typography gets away with and CJK does not.
+ *
+ * Negative tracking is drawn for Latin letterforms; applied to Han characters
+ * it closes gaps that carry meaning, so it is unset rather than reduced.
+ *
+ * A tighter line-height is readable in Latin because ascenders and descenders
+ * create the gaps; Han characters fill their box, so the same value reads as a
+ * solid block.
+ *
+ * `overflow-wrap: anywhere` is how Latin long strings are tamed, and it is
+ * already correct for Chinese — but `strict` line breaking is what stops a
+ * line from beginning with a closing bracket or a full stop, which is the
+ * mistake a reader actually notices. */
+:root:lang(zh-CN) {
+  line-height: 1.7;
+  line-break: strict;
+}
+:lang(zh-CN) h1,
+:lang(zh-CN) h2,
+:lang(zh-CN) .kpi .v {
+  letter-spacing: normal;
+}
+/* `ch` is the width of a "0", which in a CJK face is about half a Han
+ * character — a 34ch clamp cuts Chinese at roughly 17 characters, well before
+ * anything it was sized for. Widened in `em`, which tracks the glyph. */
+:lang(zh-CN) .truncate {
+  max-width: 22em;
 }

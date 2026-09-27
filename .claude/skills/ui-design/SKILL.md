@@ -82,23 +82,43 @@ rewrite.
 - **English is the source.** Add keys to `web/src/i18n/en.ts` first;
   `MessageKey` is derived from it, so a key with no English original is a
   compile error rather than a string reading `prefs.timeZone` in production.
+  Six locales: English, German, Spanish, French, Polish, Simplified Chinese.
+- **Established vocabulary is not translated** — `web/src/i18n/glossary.ts`
+  lists the terms and the form each language must use, and `i18n:check`
+  enforces it. Someone searching their own documentation for "prompt" will not
+  find "Eingabeaufforderung", and an operator reading about "Fähigkeiten" has
+  no way to connect them to the `skill.*` tools. The glossary form is the
+  shortest stem that survives inflection, because Polish turns "agent" into
+  "agenci".
 - **Never assemble a sentence from fragments.** Word order is not universal
   and fragments cannot be reordered. One key, one whole sentence, with
   `{braces}` for variables.
-- **Anything countable goes through a plural form**, not "(s)". Czech has
-  three plural forms and Polish four; `Intl.PluralRules` knows them.
+- **Anything countable goes through a plural form**, not "(s)". Polish has
+  four (`one`/`few`/`many`/`other`) and Chinese has one (`other`);
+  `Intl.PluralRules` knows them and the catalogues are written for what each
+  language actually has. Never put a word immediately after `{` inside a
+  plural body — `{projects, in # organization}` is indistinguishable from a
+  placeholder, to a real ICU parser and to the check.
 - **Dates, times, numbers and byte sizes are not strings.** They are formatted
   from raw values in `lib/format.ts`. The server sends RFC3339 and integer
   bytes precisely so this layer can decide — 2.4 GB and 2.24 GiB are the same
   2,400,000,000 bytes and which one a reader sees is theirs to choose.
 - **Localisation stops at the UI.** What leaves over HTTP and MCP stays in one
   machine format. Its reader is a model, not a person.
-- **Measure the layout in the longer language.** German runs roughly 30% past
-  English and these screens are dense. Nothing may be pinned to a width that
-  only fits English: table headings wrap rather than clip, badge rows wrap,
-  labels grow past their minimum. `docs/mockups/foundations.html` renders the
-  same components in both languages side by side — if the German column
-  breaks, the component is wrong, not the translation.
+- **Measure the layout at both extremes.** Measured across the catalogue,
+  German runs 126% of English and is the longest; Chinese runs 44% and is the
+  shortest. Nothing may be pinned to a width that only fits English — table
+  headings wrap rather than clip, badge rows wrap, labels grow past their
+  minimum — and nothing may depend on text being long enough to fill it.
+  `docs/mockups/foundations.html` renders the same components in English,
+  German and Chinese side by side; if a column breaks, the component is wrong,
+  not the translation.
+- **Chinese needs more than a catalogue.** Inter carries no Han glyphs, so the
+  platform CJK faces are named at the end of the font stack in both
+  stylesheets — deliberately not a webfont, which would be megabytes. And
+  Latin typography has to be undone under `:lang(zh-CN)`: negative tracking
+  closes gaps that carry meaning, a tight line-height reads as a solid block,
+  and a `ch`-based truncation width cuts Chinese at half its intended length.
 
 ## Changing the design
 

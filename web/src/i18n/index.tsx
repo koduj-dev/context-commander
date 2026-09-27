@@ -24,13 +24,20 @@ import { en, type MessageKey } from "./en";
  * in production reading "prefs.timeZone".
  */
 
-export const LOCALES = ["en", "de", "es"] as const;
+export const LOCALES = ["en", "de", "es", "fr", "pl", "zh-CN"] as const;
 export type Locale = (typeof LOCALES)[number];
 
+/**
+ * Each language named in itself. A reader who cannot read the current
+ * interface cannot find their own language in a list written in it.
+ */
 export const LOCALE_NAMES: Record<Locale, string> = {
   en: "English",
   de: "Deutsch",
   es: "Español",
+  fr: "Français",
+  pl: "Polski",
+  "zh-CN": "简体中文",
 };
 
 type Catalog = Partial<Record<MessageKey, string>>;
@@ -41,6 +48,10 @@ const loaders: Record<Locale, () => Promise<Catalog>> = {
   en: async () => en,
   de: async () => (await import("./de")).de,
   es: async () => (await import("./es")).es,
+  fr: async () => (await import("./fr")).fr,
+  pl: async () => (await import("./pl")).pl,
+  // The export cannot be named for its tag — `zh-CN` is not an identifier.
+  "zh-CN": async () => (await import("./zh-CN")).zhCN,
 };
 
 export type Values = Record<string, string | number>;
@@ -102,9 +113,20 @@ function initialLocale(): Locale {
   } catch {
     // A browser with storage disabled still gets a working UI.
   }
-  for (const pref of navigator.languages ?? []) {
-    const base = pref.split("-")[0];
-    if (base && (LOCALES as readonly string[]).includes(base)) return base as Locale;
+  // Matched in two passes, because a supported locale may carry a region and
+  // a browser preference may too, and the two need not agree. `zh-CN` is the
+  // catalogue; a browser asking for `zh`, `zh-Hans` or `zh-SG` wants it.
+  // Comparing only full tags would have sent every one of those to English.
+  const prefs = navigator.languages ?? [];
+  for (const pref of prefs) {
+    const exact = LOCALES.find((l) => l.toLowerCase() === pref.toLowerCase());
+    if (exact) return exact;
+  }
+  for (const pref of prefs) {
+    const base = pref.split("-")[0]?.toLowerCase();
+    if (!base) continue;
+    const byLanguage = LOCALES.find((l) => l.split("-")[0]!.toLowerCase() === base);
+    if (byLanguage) return byLanguage;
   }
   return "en";
 }
