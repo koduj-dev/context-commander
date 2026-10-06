@@ -48,6 +48,31 @@ displayed — and those are listed explicitly in the sync check with a reason.
 One inline style is a private decision; a hundred is how a kit turns back into
 a pile of pages.
 
+**A class existing in both stylesheets is not the same as it working.** The
+sync check compares whether a component is *defined* in both places; it cannot
+see geometry. The sign-in lockup sat against the card's left edge for a week
+because `.solo .solo-card .brand` set `justify-content: center` while `.brand`
+is a plain block — and both stylesheets were identically wrong, so the
+comparison had nothing to compare. CSS has no error for a property that does
+not apply: `justify-content` on a block is no warning, no effect, no trace.
+Check 5 now fails on a flex-only property whose box is not flex or grid, and
+modifier classes (`.wrap` beside `.row`) must name their companion in
+`FLEX_MODIFIERS` so the exemption breaks loudly if the companion stops being
+flex.
+
+**Fixing one property can expose a second bug, and it will look like a
+regression.** That lockup was invisible while the image was `width: 100%`:
+filling the card left no room to be off-centre. Sizing it correctly revealed
+the missing centring, which read as "the logo broke again" when it had been
+broken all along. Before concluding a change caused a fault, check whether it
+merely removed what was hiding one.
+
+**An SVG's box is not its artwork.** `cc-logo-stacked-*.svg` carries its own
+clear space inside its viewBox: the drawing fills 74% of the height and 58%
+of the width of 1024×760. `height: 120px` therefore renders a mark about
+89px tall, not 120. When someone asks for a logo "about 120px", establish
+whether they mean the box or what they can see.
+
 **Pink is the context you are in. Violet is context you inherit.** That is the
 brand's one semantic rule, and it holds everywhere: the active nav rail, the
 scope rails on skills, the override badges, the storage meter. Neither colour

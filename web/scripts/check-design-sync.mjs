@@ -21,6 +21,13 @@
  *      is a private decision; a hundred is how a kit turns back into a pile
  *      of pages. (The handful that are genuinely data — a meter's width —
  *      are listed as exceptions below and must stay tiny.)
+ *   5. No rule sets a flex-only property on something that is not a flex or
+ *      grid container. `justify-content` on a block is the quietest failure
+ *      in CSS: no error, no warning, no effect. It left the sign-in lockup
+ *      against the card's left edge, and check 1 waved it through because the
+ *      class existed in BOTH stylesheets — identically wrong in each.
+ *      Existence is not geometry, and this is the part of geometry that can
+ *      be checked without rendering anything.
  *
  * What it deliberately does NOT enforce: that every screen in the app has a
  * matching page in docs/mockups. The mockups were how the design was agreed
@@ -58,6 +65,33 @@ const MOCKUP_ONLY = new Set([
 const INLINE_STYLE_ALLOWED = new Map([
   ["Meter", "the fill width IS the value being displayed"],
   ["SelectField", "a popup's position IS the trigger's position, and no class can know it"],
+]);
+
+/** Properties that do nothing at all unless the box is a flex or grid container. */
+const FLEX_ONLY = [
+  "justify-content",
+  "align-items",
+  "align-content",
+  "flex-direction",
+  "flex-wrap",
+  "place-items",
+  "place-content",
+];
+const FLEX_DISPLAY = new Set(["flex", "grid", "inline-flex", "inline-grid"]);
+
+/**
+ * Modifier classes that carry a flex-only property but never appear alone:
+ * the element they sit on takes its display from the class beside them, so
+ * the property is live even though their own rule never declares one.
+ *
+ * Each names its companion rather than just switching the check off, and the
+ * companion's display is then verified below. A blanket exemption would go
+ * stale the day `.row` stopped being flex, and would do it silently — which
+ * is the exact failure this check exists to catch.
+ */
+const FLEX_MODIFIERS = new Map([
+  ["stack-start", "stack"],
+  ["wrap", "row"],
 ]);
 
 /**
@@ -116,6 +150,98 @@ for (const [label, css] of [
       `${label} contains ${hex.length} hard-coded colour(s): ${[...new Set(hex)].join(", ")}\n` +
         `  Colour belongs in docs/brand/tokens/ui-colors.css. A literal here is a second\n` +
         `  brand that will not follow when the first one changes.`,
+    );
+  }
+}
+
+// 5 — a flex-only property on a box that is not a flex or grid container.
+// Numbered last, placed here: it reads only the two stylesheets, so it belongs
+// beside the other CSS checks rather than after the source walk.
+//
+// Declarations are collected per TARGET ELEMENT, keyed by the selector's last
+// compound — `.solo .solo-card .brand` and `.brand` style the same element,
+// so a display declared on either one counts for both. That is how a kit
+// layers a variant on a base and it must not be reported as a mistake.
+function flexOnlyNoOps(css) {
+  const stripped = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  // A body of `[^{}]*` cannot span a nested block, so an `@media` wrapper
+  // never matches as a rule of its own while the rules inside it do — which
+  // is what we want: a media query is exactly where a layout gets rewritten.
+  const rules = [...stripped.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((m) => ({
+    selector: m[1].trim(),
+    body: m[2],
+  }));
+
+  // The element a selector targets: its last compound, minus any state or
+  // pseudo-element suffix, so `.sel-menu .opt:hover` keys on `opt`.
+  const target = (selector) => {
+    const last =
+      selector
+        .split(/\s+|\s*[>+~]\s*/)
+        .filter(Boolean)
+        .pop() ?? "";
+    const m = /\.(-?[A-Za-z_][\w-]*)/.exec(last.split(":")[0]);
+    return m ? m[1] : null;
+  };
+
+  const displays = new Map();
+  for (const { selector, body } of rules) {
+    const d = /(?:^|;)\s*display\s*:\s*([\w-]+)/.exec(body);
+    if (!d) continue;
+    for (const one of selector.split(",")) {
+      const key = target(one);
+      if (key) displays.set(key, (displays.get(key) ?? new Set()).add(d[1]));
+    }
+  }
+
+  const offenders = [];
+  for (const { selector, body } of rules) {
+    const props = FLEX_ONLY.filter((prop) => new RegExp(`(^|;)\\s*${prop}\\s*:`).test(body));
+    if (!props.length) continue;
+
+    for (const one of selector.split(",")) {
+      const key = target(one);
+      if (!key) continue;
+
+      const own = new Set(displays.get(key) ?? []);
+      const companion = FLEX_MODIFIERS.get(key);
+      if (companion) for (const v of displays.get(companion) ?? []) own.add(v);
+
+      if ([...own].some((v) => FLEX_DISPLAY.has(v))) continue;
+      offenders.push({
+        selector: one.trim(),
+        props,
+        // A named companion that turned out not to be flex is worth saying
+        // out loud: the exemption is the thing that broke, not the rule.
+        companion:
+          companion && !FLEX_DISPLAY.has([...(displays.get(companion) ?? [])][0])
+            ? companion
+            : null,
+      });
+    }
+  }
+  return offenders;
+}
+
+for (const [label, css] of [
+  ["docs/mockups/assets/mockup.css", mockupCss],
+  ["web/src/styles/app.css", appCss],
+]) {
+  const offenders = flexOnlyNoOps(css);
+  if (offenders.length) {
+    failures.push(
+      `${label} sets a flex-only property on ${offenders.length} box(es) that are not flex or grid:\n` +
+        offenders
+          .map(
+            (o) =>
+              `    ${o.selector}  — ${o.props.join(", ")}` +
+              (o.companion
+                ? `  (declared a modifier of .${o.companion}, which is no longer flex)`
+                : ""),
+          )
+          .join("\n") +
+        `\n  Add the display the property needs, or drop the property. If the class is a\n` +
+        `  modifier applied beside another, add it to FLEX_MODIFIERS with its companion.`,
     );
   }
 }

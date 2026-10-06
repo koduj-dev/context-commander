@@ -850,7 +850,7 @@ tr:hover .copy > button,
   padding: 32px 22px 64px;
 }
 .solo .solo-card { width: 100%; max-width: 420px; }
-.solo .solo-card .brand { padding: 0; border: 0; margin-bottom: 26px; justify-content: center; }
+.solo .solo-card .brand { display: flex; padding: 0; border: 0; margin-bottom: 26px; justify-content: center; }
 /* The stacked lockup, at a size that reads as the product's front door rather
  * than as a favicon that wandered in. The brand manual's own floor is 48px for
  * a lockup — below that it asks for the simplified favicon variant — and 30px

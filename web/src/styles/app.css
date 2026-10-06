@@ -1435,6 +1435,11 @@ tr:hover .copy > button,
   max-width: 420px;
 }
 .solo .solo-card .brand {
+  /* `.brand` is a plain block in the sidebar, so `justify-content` here was a
+   * silent no-op and the lockup sat against the card's left edge. It only
+   * became visible when the image stopped being `width: 100%` — a rule that
+   * had been hiding the missing centring by leaving no room to be off-centre. */
+  display: flex;
   padding: 0;
   border: 0;
   margin-bottom: 26px;
