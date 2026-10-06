@@ -108,7 +108,7 @@ func (d Deps) listTokens(w http.ResponseWriter, r *http.Request) {
 	var creds []identity.ClientCredential
 	err := db.WithPrincipal(r.Context(), d.Pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
 		var err error
-		creds, err = identity.NewStore().ListCredentialsForPrincipal(r.Context(), tx, principalID)
+		creds, err = identity.NewStore().ListTokensForPrincipal(r.Context(), tx, principalID)
 		return err
 	})
 	if err != nil {

@@ -86,11 +86,17 @@ func (s *Store) GetUser(ctx context.Context, tx pgx.Tx, id uuid.UUID) (User, err
 // GetUserByEmail looks up a User by email — used wherever an operator
 // names a user by email rather than id (e.g. `ccd installation
 // grant-admin`, mirroring `ccd token create --user <email>`'s existing
-// convention).
+// convention), and by the password sign-in path.
+//
+// Case-insensitive, matching the functional unique index added in
+// migrations/000025: an email address's domain is case-insensitive by RFC and
+// its local part is case-sensitive in theory and never in practice, so an
+// exact match here would mean someone who capitalises their own address
+// cannot sign in. The index guarantees at most one row can match.
 func (s *Store) GetUserByEmail(ctx context.Context, tx pgx.Tx, email string) (User, error) {
 	var u User
 	err := tx.QueryRow(ctx,
-		`SELECT id, email, display_name, created_at FROM users WHERE email = $1`, email,
+		`SELECT id, email, display_name, created_at FROM users WHERE lower(email) = lower($1)`, email,
 	).Scan(&u.ID, &u.Email, &u.DisplayName, &u.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return User{}, ErrNotFound
@@ -459,4 +465,205 @@ func (s *Store) ListServicePrincipals(ctx context.Context, tx pgx.Tx, opts pagin
 		next = paging.EncodeTimeUUID(last.CreatedAt, last.ID)
 	}
 	return paging.Page[DirectoryAgent]{Items: page, NextCursor: next}, nil
+}
+
+// SessionClientType marks a client_credentials row as a browser session
+// rather than a personal access token (docs/adr/0019). The two share the
+// table, the token format and every verification and revocation path; this
+// value is the only thing that distinguishes them, and exactly two readers
+// interpret it — the token screen, which must not list sessions, and the
+// session screen, which must not list tokens.
+const SessionClientType = "session"
+
+// ListTokensForPrincipal lists personal access tokens: every credential
+// EXCEPT browser sessions. A session is not something a person manages by
+// hand, and showing one on the token screen would invite them to revoke the
+// credential they are currently using, from the screen that needs it.
+func (s *Store) ListTokensForPrincipal(ctx context.Context, tx pgx.Tx, principalID uuid.UUID) ([]ClientCredential, error) {
+	return s.listCredentials(ctx, tx,
+		`WHERE principal_id = $1 AND client_type <> $2`, principalID, SessionClientType)
+}
+
+// ListSessionsForPrincipal lists only browser sessions, so a person can see
+// where they are signed in and end a session they do not recognise.
+func (s *Store) ListSessionsForPrincipal(ctx context.Context, tx pgx.Tx, principalID uuid.UUID) ([]ClientCredential, error) {
+	return s.listCredentials(ctx, tx,
+		`WHERE principal_id = $1 AND client_type = $2`, principalID, SessionClientType)
+}
+
+func (s *Store) listCredentials(ctx context.Context, tx pgx.Tx, where string, args ...any) ([]ClientCredential, error) {
+	rows, err := tx.Query(ctx,
+		`SELECT id, principal_id, client_type, token_hash, created_at, last_used_at, expires_at, revoked_at
+		 FROM client_credentials `+where+` ORDER BY created_at DESC`, args...)
+	if err != nil {
+		return nil, fmt.Errorf("identity: list credentials: %w", err)
+	}
+	defer rows.Close()
+
+	var out []ClientCredential
+	for rows.Next() {
+		var c ClientCredential
+		if err := rows.Scan(&c.ID, &c.PrincipalID, &c.ClientType, &c.TokenHash,
+			&c.CreatedAt, &c.LastUsedAt, &c.ExpiresAt, &c.RevokedAt); err != nil {
+			return nil, fmt.Errorf("identity: list credentials: scan: %w", err)
+		}
+		out = append(out, c)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("identity: list credentials: %w", err)
+	}
+	return out, nil
+}
+
+// ---------------------------------------------------------------------------
+// Local passwords — docs/adr/0019
+// ---------------------------------------------------------------------------
+
+// SetPassword stores a PHC hash, replacing any previous one. An upsert
+// rather than an insert: setting a password and changing a password are the
+// same operation to everything above this layer, and splitting them would
+// only create a way to get "already exists" from a screen whose user is
+// holding the new password.
+func (s *Store) SetPassword(ctx context.Context, tx pgx.Tx, userID uuid.UUID, passwordHash string) error {
+	_, err := tx.Exec(ctx,
+		`INSERT INTO user_passwords (user_id, password_hash, algorithm, updated_at)
+		 VALUES ($1, $2, 'argon2id', now())
+		 ON CONFLICT (user_id) DO UPDATE
+		   SET password_hash = EXCLUDED.password_hash,
+		       algorithm     = EXCLUDED.algorithm,
+		       updated_at    = now()`,
+		userID, passwordHash,
+	)
+	if err != nil {
+		return fmt.Errorf("identity: set password: %w", err)
+	}
+	return nil
+}
+
+// GetPasswordHash returns the stored PHC string, or ErrNoLocalPassword when
+// the user has none — a directory-managed account, or one created before a
+// password was ever set. Separated from "wrong password" here because the
+// caller needs to know whether to spend the decoy verification; it must not
+// be separated in anything the caller then says out loud.
+func (s *Store) GetPasswordHash(ctx context.Context, tx pgx.Tx, userID uuid.UUID) (string, error) {
+	var hash string
+	err := tx.QueryRow(ctx, `SELECT password_hash FROM user_passwords WHERE user_id = $1`, userID).Scan(&hash)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", ErrNoLocalPassword
+	}
+	if err != nil {
+		return "", fmt.Errorf("identity: get password: %w", err)
+	}
+	return hash, nil
+}
+
+// DeletePassword withdraws local login from an account, leaving any directory
+// identity intact. Idempotent: no row is the end state being asked for.
+func (s *Store) DeletePassword(ctx context.Context, tx pgx.Tx, userID uuid.UUID) error {
+	if _, err := tx.Exec(ctx, `DELETE FROM user_passwords WHERE user_id = $1`, userID); err != nil {
+		return fmt.Errorf("identity: delete password: %w", err)
+	}
+	return nil
+}
+
+// HasAnyUser answers whether this installation has been set up at all. It is
+// the one question the first-run endpoint may answer to an unauthenticated
+// caller, and it is a count rather than a list on purpose — "is there anyone"
+// is one bit, and an instance with no users has nothing to protect yet.
+func (s *Store) HasAnyUser(ctx context.Context, tx pgx.Tx) (bool, error) {
+	var exists bool
+	if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM users)`).Scan(&exists); err != nil {
+		return false, fmt.Errorf("identity: has any user: %w", err)
+	}
+	return exists, nil
+}
+
+// ---------------------------------------------------------------------------
+// Directory identity — docs/adr/0019
+// ---------------------------------------------------------------------------
+
+// UserForDirectoryIdentity resolves a directory's own stable subject to a
+// local user, or ErrNotFound when this subject has never signed in here.
+// Keyed on the subject and never on the email: an email is a label a person
+// can change and an administrator can reassign, and keying on it is how one
+// person inherits another's projects.
+func (s *Store) UserForDirectoryIdentity(ctx context.Context, tx pgx.Tx, provider, subject string) (uuid.UUID, error) {
+	var userID uuid.UUID
+	err := tx.QueryRow(ctx,
+		`SELECT user_id FROM user_identities WHERE provider = $1 AND subject = $2`,
+		provider, subject,
+	).Scan(&userID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return uuid.Nil, ErrNotFound
+	}
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("identity: user for directory identity: %w", err)
+	}
+	return userID, nil
+}
+
+// LinkDirectoryIdentity records that a directory subject is this local user.
+// A conflict is ErrAlreadyExists rather than a silent re-point: a subject
+// that already maps somewhere else means two people are being treated as one,
+// and quietly moving the mapping would hand one of them the other's access.
+func (s *Store) LinkDirectoryIdentity(ctx context.Context, tx pgx.Tx, provider, subject string, userID uuid.UUID) error {
+	_, err := tx.Exec(ctx,
+		`INSERT INTO user_identities (provider, subject, user_id) VALUES ($1, $2, $3)`,
+		provider, subject, userID,
+	)
+	if isUniqueViolation(err) {
+		return ErrAlreadyExists
+	}
+	if err != nil {
+		return fmt.Errorf("identity: link directory identity: %w", err)
+	}
+	return nil
+}
+
+// DirectoryIdentitiesForUser names the directories an account is linked to —
+// what the account screen shows, and what tells an admin why someone can sign
+// in when no local password exists.
+func (s *Store) DirectoryIdentitiesForUser(ctx context.Context, tx pgx.Tx, userID uuid.UUID) ([]string, error) {
+	rows, err := tx.Query(ctx,
+		`SELECT provider FROM user_identities WHERE user_id = $1 ORDER BY provider`, userID)
+	if err != nil {
+		return nil, fmt.Errorf("identity: directory identities: %w", err)
+	}
+	defer rows.Close()
+
+	var out []string
+	for rows.Next() {
+		var p string
+		if err := rows.Scan(&p); err != nil {
+			return nil, fmt.Errorf("identity: directory identities: scan: %w", err)
+		}
+		out = append(out, p)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("identity: directory identities: %w", err)
+	}
+	return out, nil
+}
+
+// PrincipalForUser resolves a user to the principal that acts for them.
+// Every authentication path needs it: a password or a directory proves who a
+// person is, and everything downstream — RLS, capabilities, audit — is keyed
+// on the principal, never on the user (docs/adr/0004).
+//
+// A user with no principal row is ErrNotFound rather than a created one: the
+// pairing is made once, at user creation, and inventing a second principal
+// here would silently split one person's memberships across two identities.
+func (s *Store) PrincipalForUser(ctx context.Context, tx pgx.Tx, userID uuid.UUID) (Principal, error) {
+	var p Principal
+	err := tx.QueryRow(ctx,
+		`SELECT id, kind, user_id, service_principal_id, created_at
+		 FROM principals WHERE user_id = $1`, userID,
+	).Scan(&p.ID, &p.Kind, &p.UserID, &p.ServicePrincipalID, &p.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Principal{}, ErrNotFound
+	}
+	if err != nil {
+		return Principal{}, fmt.Errorf("identity: principal for user: %w", err)
+	}
+	return p, nil
 }

@@ -180,6 +180,9 @@ func (s *Service) ListCredentialsFor(ctx context.Context, principalID, callerUse
 	var creds []identity.ClientCredential
 	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
 		var err error
+		// Unfiltered on purpose, unlike the token screen: this is the admin's
+		// credential view, and browser sessions are exactly what an incident
+		// asks about (docs/adr/0019).
 		creds, err = s.identity.ListCredentialsForPrincipal(ctx, tx, targetPrincipalID)
 		return err
 	})
