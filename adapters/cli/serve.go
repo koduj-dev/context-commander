@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/spf13/cobra"
 
 	cchttp "github.com/koduj-dev/context-commander/adapters/http"
@@ -24,6 +25,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/crypto"
 	"github.com/koduj-dev/context-commander/internal/db"
 	"github.com/koduj-dev/context-commander/internal/events"
+	"github.com/koduj-dev/context-commander/internal/firstrun"
 	"github.com/koduj-dev/context-commander/internal/gates"
 	"github.com/koduj-dev/context-commander/internal/handoffs"
 	"github.com/koduj-dev/context-commander/internal/history"
@@ -191,11 +193,40 @@ func newServeCmd() *cobra.Command {
 			perCredential, _ := cmd.Flags().GetFloat64("rate-limit-per-credential")
 			burst, _ := cmd.Flags().GetInt("rate-limit-burst")
 			maxAuth, _ := cmd.Flags().GetInt("max-concurrent-auth")
+			signInsPerMinute, _ := cmd.Flags().GetFloat64("rate-limit-signin-per-minute")
+			signInBurst, _ := cmd.Flags().GetInt("rate-limit-signin-burst")
+			maxHash, _ := cmd.Flags().GetInt("max-concurrent-password-hash")
 			limiter := ratelimit.New(ratelimit.Limits{
 				PerCredential:     perCredential,
 				Burst:             burst,
 				MaxConcurrentAuth: maxAuth,
+				// Expressed per minute on the flag because that is how a
+				// human reasons about login attempts, and converted here
+				// because that is how a token bucket is configured.
+				PerSignIn:                 signInsPerMinute / 60,
+				SignInBurst:               signInBurst,
+				MaxConcurrentPasswordHash: maxHash,
 			})
+
+			// First run: when the installation has no users at all, mint a
+			// one-time setup code so the first administrator can be created
+			// in the browser instead of through a shell on this host
+			// (docs/adr/0019). Held in memory only, so a restart replaces it.
+			var firstRunCode *firstrun.Code
+			hasUser, err := hasAnyUser(cmd.Context(), pool)
+			if err != nil {
+				return err
+			}
+			if !hasUser {
+				if firstRunCode, err = firstrun.NewCode(); err != nil {
+					return err
+				}
+				// Deliberately on the logger every deployment watches rather
+				// than written to a file: reading this is the one thing the
+				// code asks of whoever is allowed to claim the instance.
+				slog.Warn("this installation has no users yet — open the web UI and use this one-time setup code to create the first administrator",
+					"setup_code", firstRunCode.String())
+			}
 
 			dev, _ := cmd.Flags().GetBool("dev")
 			var webFS fs.FS
@@ -226,7 +257,14 @@ func newServeCmd() *cobra.Command {
 				Skills: skillsSvc, Gates: gatesAdmin, Secrets: secretsSvc,
 				Installation: installationSvc, ContextPack: contextSvc,
 				Security: securityRec, Limiter: limiter, SecurityEvents: securitySvc,
-				WebFS: webFS,
+				FirstRun: firstRunCode,
+				// The cookie is Secure whenever the transport is: TLS here,
+				// or a reverse proxy in front of a loopback bind. Only an
+				// explicit --insecure-allow-cleartext turns it off, because
+				// a Secure cookie over plain HTTP is dropped without a word
+				// and sign-in would look like it worked.
+				SessionCookieSecure: !insecure,
+				WebFS:               webFS,
 			}))
 
 			server := &http.Server{
@@ -280,9 +318,31 @@ func newServeCmd() *cobra.Command {
 		"sustained requests per second allowed per credential (0 disables) — deliberately per credential, not per IP: "+
 			"X-Forwarded-For is not trusted, so behind a reverse proxy every caller would share one bucket")
 	cmd.Flags().Int("rate-limit-burst", 200, "how far above the sustained per-credential rate a short spike may go")
+	cmd.Flags().Float64("rate-limit-signin-per-minute", 5,
+		"sustained password sign-in attempts per minute allowed for one email address (0 disables) — the per-credential limit cannot see these, since a failed guess belongs to no credential")
+	cmd.Flags().Int("rate-limit-signin-burst", 5, "how many sign-in attempts for one address may arrive together")
+	cmd.Flags().Int("max-concurrent-password-hash", 4,
+		"maximum argon2id verifications in flight (0 disables) — each holds 64 MiB, so this bounds the memory an unauthenticated caller can reserve")
 	cmd.Flags().Int("max-concurrent-auth", 64,
 		"maximum authentication attempts in flight at once (0 disables) — bounds the database work an "+
 			"unauthenticated caller can trigger")
 	databaseURLFlag(cmd)
 	return cmd
+}
+
+// hasAnyUser answers whether this installation has been set up, for deciding
+// whether to mint a first-run setup code. Asked once at startup rather than
+// per request: the answer only ever goes from false to true, and the HTTP
+// endpoint re-checks it anyway before creating anything.
+func hasAnyUser(ctx context.Context, pool *db.Pool) (bool, error) {
+	var hasUser bool
+	err := db.WithoutPrincipal(ctx, pool, func(tx pgx.Tx) error {
+		var err error
+		hasUser, err = identity.NewStore().HasAnyUser(ctx, tx)
+		return err
+	})
+	if err != nil {
+		return false, fmt.Errorf("serve: check for users: %w", err)
+	}
+	return hasUser, nil
 }

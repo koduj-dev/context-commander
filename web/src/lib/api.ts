@@ -62,24 +62,30 @@ function kindFor(status: number, code: string): ApiErrorKind {
   }
 }
 
-const TOKEN_KEY = "cc.token";
+/**
+ * The header that makes cookie authentication safe (docs/adr/0019).
+ *
+ * A cross-site <form> cannot set a custom header, and a cross-origin fetch
+ * that tries is stopped by the preflight — no CORS middleware answers one,
+ * because the SPA is served from the same origin as the API by the same
+ * binary. The server refuses any cookie-authenticated request without it, so
+ * it is sent on every request rather than remembered per call site.
+ */
+const CSRF_HEADER = "X-Requested-With";
+const CSRF_VALUE = "cc-web";
 
-export function storedToken(): string | null {
-  try {
-    return localStorage.getItem(TOKEN_KEY);
-  } catch {
-    return null;
-  }
-}
-
-export function storeToken(token: string | null) {
-  try {
-    if (token === null) localStorage.removeItem(TOKEN_KEY);
-    else localStorage.setItem(TOKEN_KEY, token);
-  } catch {
-    // A browser with storage blocked can still use the app for one session.
-  }
-}
+/**
+ * There is no token in browser storage, and that is the point.
+ *
+ * The session lives in an HttpOnly cookie the page cannot read, so an XSS in
+ * this SPA cannot lift a credential out of it. What this module used to do —
+ * keep the pasted PAT in localStorage and attach it to every request — meant
+ * one injection handed over a long-lived and often non-expiring token, with
+ * nothing to tell its owner it had happened.
+ *
+ * A PAT is still a way to sign IN: it is posted once to /v1/auth/token,
+ * exchanged for a session, and never stored here.
+ */
 
 type Options = {
   method?: string;
@@ -91,12 +97,10 @@ type Options = {
    */
   rawBody?: string;
   signal?: AbortSignal;
-  /** Sent as a bearer token; defaults to the stored one. */
-  token?: string;
 };
 
 /**
- * One request, with the token attached and failures classified.
+ * One request, with the session cookie attached and failures classified.
  *
  * Returns the raw Response so callers that are not reading JSON — artifact
  * content is application/octet-stream with its version in a header — get the
@@ -104,15 +108,17 @@ type Options = {
  * instead of reaching for `fetch` themselves.
  */
 export async function raw(path: string, opts: Options = {}): Promise<Response> {
-  const token = opts.token ?? storedToken();
-  const headers: Record<string, string> = {};
-  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const headers: Record<string, string> = { [CSRF_HEADER]: CSRF_VALUE };
   if (opts.body !== undefined) headers["Content-Type"] = "application/json";
 
   let res: Response;
   try {
     res = await fetch(`/v1${path}`, {
       method: opts.method ?? "GET",
+      // Explicit rather than relying on the default: this is the only thing
+      // carrying the caller's identity, and a default is a thing that gets
+      // changed by someone who does not know that.
+      credentials: "same-origin",
       headers,
       body: opts.rawBody ?? (opts.body === undefined ? undefined : JSON.stringify(opts.body)),
       signal: opts.signal,
@@ -143,15 +149,17 @@ async function toApiError(res: Response): Promise<ApiError> {
 }
 
 export async function request<T>(path: string, opts: Options = {}): Promise<T> {
-  const token = opts.token ?? storedToken();
-  const headers: Record<string, string> = {};
-  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const headers: Record<string, string> = { [CSRF_HEADER]: CSRF_VALUE };
   if (opts.body !== undefined) headers["Content-Type"] = "application/json";
 
   let res: Response;
   try {
     res = await fetch(`/v1${path}`, {
       method: opts.method ?? "GET",
+      // Explicit rather than relying on the default: this is the only thing
+      // carrying the caller's identity, and a default is a thing that gets
+      // changed by someone who does not know that.
+      credentials: "same-origin",
       headers,
       body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
       signal: opts.signal,
@@ -193,6 +201,30 @@ export function withQuery(path: string, params: Record<string, string | number |
 // than how much data the system holds — how many projects a person was added
 // to, how many roles a project has.
 
+/**
+ * A way to sign in that this installation actually offers.
+ *
+ * A list rather than a set of booleans because directory providers append to
+ * it: each configured one arrives with its own id and display name. The
+ * sign-in screen renders exactly what is here, which is the UI's standing
+ * rule — never offer a control for a capability the backend lacks — applied
+ * to the one screen that was breaking it.
+ */
+export type AuthMethod = {
+  kind: "password" | "token" | "ldap" | "oidc";
+  id?: string;
+  label?: string;
+};
+
+export type Session = {
+  id: string;
+  created_at: string;
+  last_used_at: string | null;
+  expires_at: string | null;
+  /** The session making this request, so the screen can say "this browser". */
+  current: boolean;
+};
+
 export type Me = {
   principal_id: string;
   kind: "user" | "service";
@@ -202,6 +234,14 @@ export type Me = {
   /** Set for a service principal instead of email/display_name. */
   name?: string;
   is_installation_admin: boolean;
+  /**
+   * Whether this account can sign in with a password.
+   *
+   * It separates two states that look identical in a form: changing a
+   * password, which must ask for the current one, and setting a first one,
+   * which cannot ask for something that does not exist.
+   */
+  has_password: boolean;
 };
 
 /** What to call a principal on screen, whichever kind it is. */
@@ -553,9 +593,37 @@ const project = (ns: string, slug: string) =>
   `/projects/${encodeURIComponent(ns)}/${encodeURIComponent(slug)}`;
 
 export const api = {
-  // Takes options so sign-in can probe a token before storing it — a bad
-  // token must not be left in storage for the next reload to retry.
-  me: (opts?: { token?: string }) => request<Me>("/me", opts),
+  // ---- authentication (docs/adr/0019) ------------------------------------
+  //
+  // Every one of these but `me` is reachable without a credential, because
+  // the screen that calls them is the screen someone has before they have
+  // one.
+  authMethods: () => request<{ methods: AuthMethod[] }>("/auth/methods"),
+  setupStatus: () => request<{ needs_setup: boolean }>("/setup/status"),
+  completeSetup: (code: string, email: string, displayName: string, password: string) =>
+    request<{ expires_at: string }>("/setup", {
+      method: "POST",
+      body: { code, email, display_name: displayName, password },
+    }),
+  signInWithPassword: (email: string, password: string) =>
+    request<{ expires_at: string }>("/auth/password", {
+      method: "POST",
+      body: { email, password },
+    }),
+  // The PAT is sent once and forgotten; what comes back is a session cookie.
+  signInWithToken: (token: string) =>
+    request<{ expires_at: string }>("/auth/token", { method: "POST", body: { token } }),
+  signOut: () => request<void>("/auth/session", { method: "DELETE" }),
+
+  changePassword: (currentPassword: string, newPassword: string) =>
+    request<void>("/me/password", {
+      method: "PUT",
+      body: { current_password: currentPassword, new_password: newPassword },
+    }),
+  sessions: () => request<Session[]>("/me/sessions"),
+  revokeSession: (id: string) => request<void>(`/me/sessions/${id}`, { method: "DELETE" }),
+
+  me: () => request<Me>("/me"),
   myProjects: () => request<MyProject[]>("/me/projects"),
   myOrganizations: () => request<MyOrganization[]>("/me/organizations"),
 

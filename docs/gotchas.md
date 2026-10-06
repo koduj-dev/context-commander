@@ -87,3 +87,56 @@ key hierarchy has no installation-level key to anchor it to). A project-scoped
 skill is therefore only as private as the database itself. Anything that must
 be confidential belongs in `internal/secrets`, which is project-key encrypted
 and RLS-scoped — never in a skill package.
+
+## Two kinds of credential in one table
+
+A browser session and a personal access token are the same row shape
+(`client_credentials`, `docs/adr/0019`). That is deliberate — one verification
+path, one revocation story — and it has exactly one consequence worth
+remembering: **`client_type` is the only thing telling them apart, and two
+readers must disagree about which rows they want.**
+
+- `ListTokensForPrincipal` excludes sessions. The token screen must not offer
+  someone the credential they are currently signed in with, from the screen
+  that needs it.
+- `ListSessionsForPrincipal` returns only sessions.
+- `ListCredentialsForPrincipal` is unfiltered and is the **admin** view. A
+  session is exactly what an incident asks about, so filtering it there would
+  hide the thing being investigated.
+
+A new reader of this table has to pick one of the three on purpose. There is
+no safe default.
+
+## The password hash is also a denial-of-service vector
+
+argon2id is slow and memory-hungry **because** that is what protects a leaked
+hash, and the live server pays the same cost per attempt. At
+`--max-concurrent-auth`'s default of 64, with 64 MiB per verification, an
+unauthenticated caller could reserve 4 GiB by starting sign-ins.
+
+So password verifications have their own, much smaller ceiling
+(`--max-concurrent-password-hash`, default 4) and are refused with a retry
+rather than queued — queueing holds the request open without reducing the
+memory in flight, which is the thing being bounded. If the cost parameters in
+`internal/identity/password.go` are ever raised, this ceiling has to come down
+with them.
+
+The related trap: **the per-credential rate limiter cannot see a brute-force
+attempt at all.** A credential id is what a caller receives *after* signing
+in, so every failed guess belongs to no credential and passes straight
+through. `AllowSignIn` is keyed on the identifier that was typed, lowercased
+and trimmed — key it on anything resolved from the database and an address
+with no account gets a different allowance from one with an account, which
+turns the limiter itself into an account-enumeration oracle.
+
+## `pkill -f` matches the shell that runs it
+
+`pkill -f "bin/ccd serve"` kills the current shell too: the pattern appears in
+that shell's own command line, so it matches itself. It has happened twice in
+this project, the second time with `pkill -f "addr 127.0.0.1:12002"`. Use
+`pkill -x ccd`, or find the pid with `pgrep -ax` and kill that.
+
+And before killing the dev instance at all, read `.cc-dev/README.md` — it
+holds the exact command to start it again, including the environment the
+process needs. That file exists because the instance was once killed without
+it.

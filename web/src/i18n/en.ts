@@ -41,14 +41,60 @@ export const en = {
   "theme.label": "Theme",
 
   "auth.title": "Sign in",
-  "auth.lead": "Paste a personal access token. Create one with {command}.",
-  "auth.token": "Access token",
   "auth.submit": "Sign in",
-  "auth.failed": "That token was not accepted.",
   "auth.signedInAs": "Signed in as {name}",
-  "auth.sameToken": "The same token a CLI or an MCP client uses. There is no separate web session.",
   "auth.indistinct":
-    "A token that has been revoked and one that never existed read the same here. Saying which is which would tell whoever is holding a stolen token that half their guess was right.",
+    "A wrong password, an address with no account, and an account with no password all read the same here. Saying which is which would tell whoever is guessing that half their guess was right.",
+
+  "auth.withPassword": "Email and password",
+  "auth.withToken": "Access token",
+  "auth.email": "Email",
+  "auth.password": "Password",
+  "auth.failed": "Incorrect email or password.",
+  "auth.tokenLabel": "Access token",
+  "auth.tokenLead":
+    "A personal access token from {command}. It is exchanged for a session and not stored in this browser.",
+  "auth.tokenFailed": "That token was not accepted.",
+  "auth.rateLimited": "Too many attempts. Wait a moment and try again.",
+
+  "setup.title": "Create the first administrator",
+  "setup.lead":
+    "This installation has no users yet. The server printed a one-time setup code to its log when it started — paste it here.",
+  "setup.code": "Setup code",
+  "setup.email": "Email",
+  "setup.name": "Display name",
+  "setup.password": "Password",
+  "setup.passwordHint": "At least {min} characters. Length is the only rule.",
+  "setup.submit": "Create administrator",
+  "setup.codeFailed":
+    "That setup code is not valid. The current one is in the server's log; restarting the server prints a new one.",
+  "setup.alreadyDone": "This installation already has users. Sign in instead.",
+  "setup.whereIsTheCode":
+    "The code exists only in the running server's memory and only while there are no users, so it never reaches a backup and cannot be read out of the database.",
+
+  "account.password": "Password",
+  "account.passwordLead":
+    "Used to sign in to this interface. Agents and the CLI use access tokens instead, which are managed separately.",
+  "account.currentPassword": "Current password",
+  "account.newPassword": "New password",
+  "account.confirmPassword": "Repeat new password",
+  "account.setPassword": "Set password",
+  "account.changePassword": "Change password",
+  "account.passwordSet": "Password changed.",
+  "account.passwordMismatch": "The two new passwords do not match.",
+  "account.currentWrong": "The current password is not correct.",
+  "account.noPasswordYet":
+    "This account has no password yet. You are signed in with an access token, which is proof enough to set one.",
+
+  "account.sessions": "Sessions",
+  "account.sessionsLead":
+    "Where this account is signed in. Ending a session makes its cookie stop working immediately, on whatever machine holds it.",
+  "account.sessionCurrent": "This browser",
+  "account.sessionStarted": "Started",
+  "account.sessionLastUsed": "Last used",
+  "account.sessionExpires": "Expires",
+  "account.endSession": "End session",
+  "account.noSessions": "No active sessions.",
 
   "common.loading": "Loading…",
   "common.retry": "Try again",

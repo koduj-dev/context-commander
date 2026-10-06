@@ -143,13 +143,29 @@ Only on top of a core loop people actually use:
       exploited vulnerabilities applied from 2026-09-11; full application is
       2027-12-11.
 - [ ] Org-level credential management, policy, audit export.
-- [ ] **SSO/OIDC (and LDAP) — and the UI assumes it.** The deployment the
-      maintainer describes is: a company installs this, hands out access
-      authorized through OAuth/LDAP, and agents connect over MCP. What
-      exists is Personal Access Tokens and nothing else — the web UI's sign
-      in is "paste a PAT". The UI rework should keep its auth surface
-      swappable rather than build a PAT-shaped login it will have to
-      unpick, but the gap is real and it is here, not in the UI.
+- [ ] **Directory sign-in: LDAP and OIDC.** The deployment the maintainer
+      describes is: a company installs this, hands out access authorized
+      through OAuth/LDAP, and agents connect over MCP.
+      [ADR 0019](docs/adr/0019-browser-authentication-and-directory-identity.md)
+      decides the whole shape and the local half is built — argon2id
+      passwords, browser sessions as `client_credentials` rows, first-run
+      setup through the browser, and `GET /v1/auth/methods` so the sign-in
+      screen renders what the server actually offers. What remains is the
+      two directory backends, and they are deliberately the same shape:
+      authenticate, resolve `user_identities(provider, subject)`, provision
+      on first success, then issue a session exactly as a password login
+      does. Everything after the identity is established is already shared
+      code.
+      - OIDC: authorization code + PKCE with discovery. No SAML — a second
+        protocol whose security-critical core is XML signature verification,
+        for deployments this product does not have yet.
+      - Group-to-role mapping is a separate decision. A directory proves who
+        someone is, not what they may do; authorization stays in project and
+        organization membership and `installation_admins`.
+      - Not yet built on the local half either: an administrator setting an
+        initial password for a user they create. Today that user signs in
+        with a token and sets their own, or an operator runs
+        `ccd user set-password`.
 - [ ] **Storage quotas per user/organization.** Raised by the maintainer
       while scoping the UI: an organization deployment will want a ceiling
       on what accumulates, and nothing measures or limits anything today —

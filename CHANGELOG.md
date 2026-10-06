@@ -12,6 +12,71 @@ link definition at the bottom of the file.
 
 ### Added
 
+- **Signing in to the web interface without a shell on the server.** A fresh
+  installation could not be opened: the only sign-in was "paste a PAT", and
+  the only way to get a PAT was `ccd token create` on the machine running the
+  server. The documented first step of a self-hosted product was therefore
+  "get a shell on the host" — the front door locked from the inside.
+  [ADR 0019](docs/adr/0019-browser-authentication-and-directory-identity.md)
+  decides the whole shape; this is its local half.
+  - **First run happens in the browser.** When `users` is empty, `ccd serve`
+    mints a one-time setup code, holds it **in memory only** and prints it to
+    its log; `POST /v1/setup` spends it once to create the first user, its
+    principal, its password and its installation-admin grant in one
+    transaction, and signs them in. In memory rather than in a table because
+    a code in the database survives a restart, appears in every backup and
+    outlives its purpose. What it assumes, said plainly: whoever can read the
+    log of a freshly installed instance is already trusted with it.
+  - **A browser session is a `client_credentials` row**, `client_type =
+    'session'` with an expiry. It is generated, verified, revoked and
+    rate-limited by the code that already does all four for PATs — no second
+    verification path, and no second place for an "is this still valid" bug
+    to live. `GET /v1/me/sessions` shows where an account is signed in and
+    ending one makes its cookie stop working immediately, wherever it is.
+  - **The token lives in an HttpOnly cookie, and the browser stores nothing.**
+    The UI used to keep the pasted PAT in `localStorage` and attach it to
+    every request, so one XSS lifted a long-lived and often non-expiring
+    credential whose owner had no way to notice. A PAT is now a way to sign
+    *in*: posted once to `/v1/auth/token`, exchanged for a 12-hour session,
+    and forgotten. CSRF is closed by requiring `X-Requested-With: cc-web` on
+    any cookie-authenticated request — a header a cross-site form cannot set
+    and a cross-origin fetch cannot get past the preflight, since the SPA is
+    served from the same origin as the API by the same binary.
+  - **Passwords are argon2id** (m=64 MiB, t=3, p=4) in PHC format, so the
+    cost parameters travel with the hash and raising them later is a re-hash
+    on next login rather than a migration. `VerifyPassword` computes with the
+    parameters recorded in the *stored* hash, not the package constants, or
+    raising the cost would lock every existing user out. The opposite choice
+    from PATs' SHA-256, and both are right: a 256-bit random secret does not
+    need a slow hash, and a human-chosen password needs nothing else.
+  - **Two new limits, because the old ones could not see this.** A failed
+    guess belongs to no credential, so the per-credential bucket never sees a
+    brute-force attempt: sign-ins are limited per identifier, case- and
+    whitespace-insensitively, so trying `ALICE@` is not a fresh allowance.
+    And argon2id's 64 MiB per verification is itself an amplifier — 64
+    concurrent attempts would reserve 4 GiB — so verifications in flight are
+    bounded separately and much lower (`--max-concurrent-password-hash`,
+    default 4).
+  - **Every sign-in failure reads the same and costs the same.** No such
+    email, no local password, wrong password and a user with no principal all
+    return one error, and the paths with no stored hash still spend a
+    verification against a decoy. Without that the response time answers "is
+    there an account here?" to anyone who asks.
+  - **`GET /v1/auth/methods`** tells the sign-in screen what the server
+    offers, so it renders those and nothing else. That is the UI's standing
+    rule — never offer a control for a capability the backend lacks — applied
+    to the one screen that was breaking it by explaining a CLI command.
+  - **`ccd user set-password`** is the way back in when nobody can sign in:
+    the setup code only exists while there are no users, so once there is one
+    and that password is lost, this command and direct SQL are the only
+    remaining doors. The password is read from stdin, never a flag, because
+    an argument lands in shell history and in every `ps`.
+  - Email is now matched case-insensitively (`migrations/000025` adds a
+    unique index on `lower(email)`). It had always been exact-match, which
+    was invisible while only an operator typed an address and is a defect on
+    a login form: someone whose row says `filip@…` and who types `Filip@…`
+    was told their credentials were wrong, and no correct password helped.
+
 - **`GET /v1/skills/{skillID}`**, MCP `skill.info` — reading one skill by id.
   Every caller holding an id (a binding from `skill.list_effective`, an
   install, a link someone pasted) could learn the skill's name and scope only

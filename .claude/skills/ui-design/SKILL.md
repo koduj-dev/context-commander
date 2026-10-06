@@ -88,6 +88,19 @@ screen that promises member removal, secret rotation or SSO is a bill the
 implementation has to pay. `docs/CURRENT-ARCHITECTURE.md` §4 lists what does
 not exist.
 
+Where a capability is *configurable* rather than simply absent, ask the server
+instead of hard-coding either answer: the sign-in screen renders exactly what
+`GET /v1/auth/methods` returns, so an installation with no local passwords
+shows no password form and one with a directory shows it the day it is
+configured. A screen that decides this for itself is a screen that will be
+wrong for somebody's deployment.
+
+**A list duplicated from a constant is invisible to every check.** The
+language switcher was written out by hand as three locales while `LOCALES` had
+six: catalogues complete, checks green, code compiled, three languages simply
+missing from the interface. Derive the list, and test it by rendering the
+control and counting — `src/app/locales.dom.test.tsx`.
+
 **A refusal is not an empty list.** 403 renders as "you do not have access",
 404 as "not found", 409 as "this changed while you were reading it — re-read,
 merge, retry". Rendering a refusal as an empty table tells someone their

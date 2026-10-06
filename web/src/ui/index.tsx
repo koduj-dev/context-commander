@@ -459,21 +459,35 @@ export function TextField({
   label,
   type = "text",
   grow,
+  autoComplete,
+  id,
 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
   label: string;
-  type?: "text" | "password" | "search";
+  type?: "text" | "password" | "search" | "email";
   grow?: boolean;
+  /**
+   * The browser's autofill hint. Worth exposing rather than guessing from
+   * `type`: a password manager needs to know whether a password field is the
+   * one being entered ("current-password") or the one being chosen
+   * ("new-password"), and both are type="password". Without it, a manager
+   * offers to fill a "choose a new password" box with the old one.
+   */
+  autoComplete?: string;
+  /** Set when a visible <label> points here instead of the aria-label. */
+  id?: string;
 }) {
   return (
     <input
       className={grow ? "field grow" : "field"}
+      id={id}
       type={type}
       value={value}
       aria-label={label}
       placeholder={placeholder}
+      autoComplete={autoComplete}
       onChange={(e) => onChange(e.target.value)}
     />
   );

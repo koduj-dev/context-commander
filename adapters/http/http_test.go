@@ -67,6 +67,14 @@ func boolPtr(b bool) *bool { return &b }
 
 func newFixtureWith(t *testing.T, recordSecurity *bool, limits ratelimit.Limits) *fixture {
 	t.Helper()
+	return newFixtureWithDeps(t, recordSecurity, limits, nil)
+}
+
+// newFixtureWithDeps is newFixtureWith plus a last chance to set a Deps field
+// the other constructors have no reason to know about — the first-run setup
+// code, for instance, which only the authentication tests care about.
+func newFixtureWithDeps(t *testing.T, recordSecurity *bool, limits ratelimit.Limits, adjust func(*cchttp.Deps)) *fixture {
+	t.Helper()
 	dsns := dbtest.New(t)
 	ctx := context.Background()
 
@@ -119,15 +127,18 @@ func newFixtureWith(t *testing.T, recordSecurity *bool, limits ratelimit.Limits)
 	}
 	securitySvc := security.NewService(appPool, installationStore)
 
-	handler := cchttp.NewHandler(cchttp.Deps{
+	deps := cchttp.Deps{
 		Pool: appPool, Projects: projStore, Members: members.NewService(appPool, projStore, authz), Authz: authz, Artifacts: artifactsSvc,
 		Events: eventsSvc, Organizations: orgSvc, Audit: auditSvc,
 		Handoffs: handoffsSvc, History: historySvc,
 		Skills: skillsSvc, Gates: gatesAdmin, Secrets: secretsSvc,
 		Installation: installationSvc, ContextPack: contextSvc,
 		Security: securityRec, Limiter: ratelimit.New(limits), SecurityEvents: securitySvc,
-	})
-	server := httptest.NewServer(handler)
+	}
+	if adjust != nil {
+		adjust(&deps)
+	}
+	server := httptest.NewServer(cchttp.NewHandler(deps))
 	t.Cleanup(server.Close)
 
 	return &fixture{t: t, server: server, ownerPool: ownerPool}

@@ -115,3 +115,79 @@ func TestConcurrentUseIsRaceFree(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+func TestAllowSignInIsPerIdentifier(t *testing.T) {
+	l := ratelimit.New(ratelimit.Limits{PerSignIn: 0.0001, SignInBurst: 2})
+
+	if !l.AllowSignIn("alice@example.test") || !l.AllowSignIn("alice@example.test") {
+		t.Fatal("the first two attempts within the burst were refused")
+	}
+	if l.AllowSignIn("alice@example.test") {
+		t.Error("a third attempt was allowed past a burst of 2")
+	}
+	// One identifier exhausting its allowance must not lock out another, or
+	// anyone could lock any colleague out by guessing at their address.
+	if !l.AllowSignIn("bob@example.test") {
+		t.Error("a different identifier was refused because of alice's attempts")
+	}
+}
+
+func TestAllowSignInIgnoresCaseAndSurroundingSpace(t *testing.T) {
+	// Otherwise the limit is bypassed by typing the same address differently,
+	// which is the first thing a brute-force script would do.
+	l := ratelimit.New(ratelimit.Limits{PerSignIn: 0.0001, SignInBurst: 1})
+	if !l.AllowSignIn("alice@example.test") {
+		t.Fatal("the first attempt was refused")
+	}
+	for _, variant := range []string{"ALICE@example.test", " alice@example.test ", "Alice@Example.Test"} {
+		if l.AllowSignIn(variant) {
+			t.Errorf("%q was treated as a different identifier", variant)
+		}
+	}
+}
+
+func TestAllowSignInDisabledByZero(t *testing.T) {
+	l := ratelimit.New(ratelimit.Limits{})
+	for i := 0; i < 50; i++ {
+		if !l.AllowSignIn("alice@example.test") {
+			t.Fatalf("attempt %d refused although sign-in limiting is disabled", i)
+		}
+	}
+}
+
+func TestAcquirePasswordHashBoundsConcurrency(t *testing.T) {
+	// The memory bound that keeps argon2id's cost from being an amplifier
+	// pointed at the live server.
+	l := ratelimit.New(ratelimit.Limits{MaxConcurrentPasswordHash: 2})
+
+	first, ok := l.AcquirePasswordHash()
+	if !ok {
+		t.Fatal("the first verification was refused")
+	}
+	second, ok := l.AcquirePasswordHash()
+	if !ok {
+		t.Fatal("the second verification was refused")
+	}
+	if _, ok := l.AcquirePasswordHash(); ok {
+		t.Error("a third concurrent verification was admitted past a ceiling of 2")
+	}
+
+	first()
+	third, ok := l.AcquirePasswordHash()
+	if !ok {
+		t.Error("a slot did not become available after one was released")
+	}
+	second()
+	third()
+}
+
+func TestAcquirePasswordHashDisabledByZero(t *testing.T) {
+	l := ratelimit.New(ratelimit.Limits{})
+	for i := 0; i < 100; i++ {
+		release, ok := l.AcquirePasswordHash()
+		if !ok {
+			t.Fatalf("acquire %d refused although the gate is disabled", i)
+		}
+		defer release()
+	}
+}

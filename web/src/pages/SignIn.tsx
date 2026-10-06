@@ -1,125 +1,141 @@
 import { useState, type FormEvent } from "react";
-import { LOCALES, LOCALE_NAMES, useI18n, useT } from "../i18n";
+import { useT } from "../i18n";
 import { useAuth } from "../app/auth";
-import { useTheme } from "../app/theme";
-import { Btn, Code, Note, Panel, SelectField, TextField } from "../ui";
+import { Solo } from "../app/Solo";
+import { Btn, Code, Note, Panel, Seg, TextField } from "../ui";
+import { ApiError } from "../lib/api";
 
 /**
- * The only screen that renders without a principal.
+ * Sign in.
  *
- * It uses the `solo` layout rather than the app shell. `app` is a two-column
- * grid whose first track is the 232px sidebar, so a page with no sidebar in
- * it lands in that track and arrives squeezed to the width of navigation that
- * is not there — see docs/mockups/signin.html.
+ * Which methods appear is the server's decision, not this file's: `methods`
+ * comes from /v1/auth/methods, so an installation without passwords does not
+ * show a password form and this screen stops being the one place in the app
+ * that offers a capability the backend may not have.
  *
- * The language and theme switchers are here too: someone who cannot read the
- * sign-in screen cannot get past it to change the language, which is a
- * circular trap that only appears once the product has a second language.
+ * A token is a sign-in method, not a stored credential. It is posted once,
+ * exchanged for a session cookie, and never kept here — which is why there is
+ * no longer anything in localStorage for an XSS to steal.
  */
 export function SignIn() {
   const t = useT();
-  const { locale, setLocale } = useI18n();
-  const { theme, setTheme } = useTheme();
-  const { signIn } = useAuth();
+  const { methods, signInWithPassword, signInWithToken } = useAuth();
 
+  const hasPassword = methods.length === 0 || methods.some((m) => m.kind === "password");
+  const hasToken = methods.length === 0 || methods.some((m) => m.kind === "token");
+
+  // Password unless the installation only offers tokens. `methods` is empty
+  // when the probe failed, and in that case both are shown rather than
+  // neither: a network blip must not hide the way in.
+  const [mode, setMode] = useState<"password" | "token">(hasPassword ? "password" : "token");
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [token, setToken] = useState("");
   const [busy, setBusy] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    if (!token.trim() || busy) return;
+    if (busy) return;
     setBusy(true);
-    setFailed(false);
+    setFailure(null);
     try {
-      await signIn(token.trim());
-    } catch {
-      // Every failure reads the same on purpose — see auth.indistinct.
-      setFailed(true);
+      if (mode === "password") await signInWithPassword(email.trim(), password);
+      else await signInWithToken(token.trim());
+    } catch (err) {
+      // Rate limiting is the one failure worth distinguishing: it is the
+      // only one where the answer is "wait", and leaving someone to retype a
+      // correct password against a closed door is a cruelty.
+      if (err instanceof ApiError && err.kind === "rate_limited") setFailure(t("auth.rateLimited"));
+      else if (mode === "token") setFailure(t("auth.tokenFailed"));
+      else setFailure(t("auth.failed"));
     } finally {
       setBusy(false);
     }
   }
 
-  return (
-    <div className="solo">
-      <div className="topbar">
-        <div className="spacer" />
-        {/* The same control as the shell's, and it matters most here: this is
-            the screen someone lands on, and a language they cannot read is the
-            one thing they must be able to change before anything else works. */}
-        <span className="lang">
-          <SelectField
-            label={t("prefs.language")}
-            value={locale}
-            onChange={setLocale}
-            options={LOCALES.map((l) => ({ value: l, label: LOCALE_NAMES[l] }))}
-          />
-        </span>
-        <span className="seg" role="group" aria-label={t("theme.label")}>
-          <button type="button" aria-pressed={theme === "dark"} onClick={() => setTheme("dark")}>
-            {t("theme.dark")}
-          </button>
-          <button type="button" aria-pressed={theme === "light"} onClick={() => setTheme("light")}>
-            {t("theme.light")}
-          </button>
-        </span>
-      </div>
+  const canSubmit =
+    mode === "password" ? email.trim() !== "" && password !== "" : token.trim() !== "";
 
-      <main className="page">
-        <div className="solo-card">
-          <div className="brand">
-            {/* The stacked lockup, not the horizontal one: this is a centred
-                block, which is the shape the brand package ships stacked for. */}
-            <img
-              className="logo-dark"
-              src="/brand/cc-logo-stacked-on-dark.svg"
-              alt={t("app.name")}
-              hidden={theme === "light"}
-            />
-            <img
-              className="logo-light"
-              src="/brand/cc-logo-stacked-on-light.svg"
-              alt={t("app.name")}
-              hidden={theme !== "light"}
+  return (
+    <Solo>
+      <Panel title={t("auth.title")}>
+        {hasPassword && hasToken && (
+          <div className="row mb">
+            <Seg
+              label={t("auth.title")}
+              value={mode}
+              onChange={(m) => {
+                setMode(m);
+                setFailure(null);
+              }}
+              options={[
+                { value: "password" as const, label: t("auth.withPassword") },
+                { value: "token" as const, label: t("auth.withToken") },
+              ]}
             />
           </div>
+        )}
 
-          <Panel
-            title={t("auth.title")}
-            footer={<span className="dim">{t("auth.sameToken")}</span>}
-          >
-            <p className="sec lead-out">{t("auth.lead", { command: "ccd token create" })}</p>
-            <Code>ccd token create --name "web ui"</Code>
-
-            <form onSubmit={submit} className="mt">
-              <div className="row row-sm">
-                <TextField
-                  label={t("auth.token")}
-                  type="password"
-                  value={token}
-                  onChange={setToken}
-                  placeholder={t("auth.token")}
-                  grow
-                />
-                <Btn kind="primary" type="submit" disabled={busy || !token.trim()}>
+        {mode === "password" ? (
+          <form onSubmit={submit}>
+            <div className="stack">
+              <TextField
+                label={t("auth.email")}
+                type="email"
+                value={email}
+                onChange={setEmail}
+                autoComplete="username"
+                grow
+              />
+              <TextField
+                label={t("auth.password")}
+                type="password"
+                value={password}
+                onChange={setPassword}
+                autoComplete="current-password"
+                grow
+              />
+              <div className="row">
+                <Btn kind="primary" type="submit" disabled={busy || !canSubmit}>
                   {busy ? t("common.loading") : t("auth.submit")}
                 </Btn>
               </div>
-            </form>
-
-            {failed && (
-              <div className="mt">
-                <Note tone="danger">{t("auth.failed")}</Note>
+            </div>
+          </form>
+        ) : (
+          <form onSubmit={submit}>
+            <p className="sec lead-out">{t("auth.tokenLead", { command: "ccd token create" })}</p>
+            <Code>ccd token create --name "web ui"</Code>
+            <div className="stack mt">
+              <TextField
+                label={t("auth.tokenLabel")}
+                type="password"
+                value={token}
+                onChange={setToken}
+                autoComplete="off"
+                grow
+              />
+              <div className="row">
+                <Btn kind="primary" type="submit" disabled={busy || !canSubmit}>
+                  {busy ? t("common.loading") : t("auth.submit")}
+                </Btn>
               </div>
-            )}
-          </Panel>
+            </div>
+          </form>
+        )}
 
+        {failure && (
           <div className="mt">
-            <Note tone="info">{t("auth.indistinct")}</Note>
+            <Note tone="danger">{failure}</Note>
           </div>
-        </div>
-      </main>
-    </div>
+        )}
+      </Panel>
+
+      <div className="mt">
+        <Note tone="info">{t("auth.indistinct")}</Note>
+      </div>
+    </Solo>
   );
 }

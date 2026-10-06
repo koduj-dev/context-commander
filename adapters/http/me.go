@@ -1,6 +1,7 @@
 package http
 
 import (
+	"errors"
 	"net/http"
 	"time"
 
@@ -18,13 +19,22 @@ type meResponse struct {
 	DisplayName         string `json:"display_name,omitempty"`
 	Name                string `json:"name,omitempty"` // set for a ServicePrincipal instead of email/display_name
 	IsInstallationAdmin bool   `json:"is_installation_admin"`
+	// HasPassword says whether this account can sign in with a password at
+	// all. The interface needs it to tell two states apart that look alike:
+	// changing a password, which must ask for the current one, and setting a
+	// first one, which cannot. Guessing from "signed in with a token" would
+	// be wrong for anyone who has both (docs/adr/0019).
+	//
+	// Whether a password exists is not a secret from its own owner, and this
+	// endpoint only ever describes the caller.
+	HasPassword bool `json:"has_password"`
 }
 
 // getMe resolves the authenticated caller's own identity — the web UI's
 // login flow uses this to validate a pasted PAT and to render "signed in
-// as ...". There is no dedicated session/login endpoint (docs/adr/0009: PAT
-// issuance is CLI-only); this is the read-only counterpart every adapter
-// still needed and none had. IsInstallationAdmin is the web UI's only way
+// as ...". It is also how sign-in is confirmed: the session cookie is set by
+// the server and unreadable in the page, so the only honest check that a
+// credential works is a request that needed one (docs/adr/0019). IsInstallationAdmin is the web UI's only way
 // to decide whether to show the Administration nav entry at all —
 // docs/adr/0017 deliberately has no cheaper way to ask "am I an admin"
 // than this.
@@ -51,6 +61,15 @@ func (d Deps) getMe(w http.ResponseWriter, r *http.Request) {
 			resp.Email = u.Email
 			resp.DisplayName = u.DisplayName
 			callerUserID = p.UserID
+			_, err = identityStore.GetPasswordHash(r.Context(), tx, *p.UserID)
+			switch {
+			case err == nil:
+				resp.HasPassword = true
+			case errors.Is(err, identity.ErrNoLocalPassword):
+				resp.HasPassword = false
+			default:
+				return err
+			}
 		case identity.PrincipalKindService:
 			sp, err := identityStore.GetServicePrincipal(r.Context(), tx, *p.ServicePrincipalID)
 			if err != nil {

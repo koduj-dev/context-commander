@@ -6,14 +6,17 @@
 package cli
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 
 	"github.com/koduj-dev/context-commander/internal/db"
 	"github.com/koduj-dev/context-commander/internal/identity"
@@ -127,8 +130,98 @@ func newUserCmd() *cobra.Command {
 	create.Flags().String("name", "", "display name (required)")
 	databaseURLFlag(create)
 
+	// Why an operator needs this at all: it is the way back in when nobody
+	// can sign in — the first-run setup code only exists while the
+	// installation has no users (docs/adr/0019), so once it has one and that
+	// person's password is lost, this command and direct SQL are the only
+	// remaining doors. Same trust level as `ccd migrate`: it takes a
+	// --database-url and authenticates nobody.
+	setPassword := &cobra.Command{
+		Use:   "set-password",
+		Short: "Set or replace a user's local password",
+		Long: "Set or replace a user's local password.\n\n" +
+			"The password is read from stdin, never from a flag: an argument would be " +
+			"recorded in shell history and visible to every process on the machine in " +
+			"the command line. Type it at the prompt, or pipe it in.",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			email, _ := cmd.Flags().GetString("email")
+			if email == "" {
+				return fmt.Errorf("--email is required")
+			}
+
+			password, err := readPassword(cmd)
+			if err != nil {
+				return err
+			}
+			// Validated before the database is touched, so a password the
+			// server would later refuse does not get as far as a connection.
+			if err := identity.ValidatePassword(password); err != nil {
+				return err
+			}
+			hash, err := identity.HashPassword(password)
+			if err != nil {
+				return err
+			}
+
+			dsn, err := resolveDatabaseURL(cmd)
+			if err != nil {
+				return err
+			}
+			pool, err := db.NewPool(cmd.Context(), dsn)
+			if err != nil {
+				return err
+			}
+			defer pool.Close()
+
+			store := identity.NewStore()
+			err = db.WithoutPrincipal(cmd.Context(), pool, func(tx pgx.Tx) error {
+				u, err := store.GetUserByEmail(cmd.Context(), tx, email)
+				if err != nil {
+					return err
+				}
+				return store.SetPassword(cmd.Context(), tx, u.ID, hash)
+			})
+			if err != nil {
+				return err
+			}
+
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "password set for %s\n", email)
+			return nil
+		},
+	}
+	setPassword.Flags().String("email", "", "user email (required)")
+	databaseURLFlag(setPassword)
+
 	userCmd.AddCommand(create)
+	userCmd.AddCommand(setPassword)
 	return userCmd
+}
+
+// readPassword reads a password from stdin, without echoing it when stdin is
+// a terminal. A piped stdin is read as a single line, so the command works
+// unattended in a provisioning script as well as by hand.
+func readPassword(cmd *cobra.Command) (string, error) {
+	if term.IsTerminal(int(os.Stdin.Fd())) {
+		_, _ = fmt.Fprint(cmd.ErrOrStderr(), "New password: ")
+		raw, err := term.ReadPassword(int(os.Stdin.Fd()))
+		_, _ = fmt.Fprintln(cmd.ErrOrStderr())
+		if err != nil {
+			return "", fmt.Errorf("read password: %w", err)
+		}
+		return string(raw), nil
+	}
+
+	scanner := bufio.NewScanner(os.Stdin)
+	if !scanner.Scan() {
+		if err := scanner.Err(); err != nil {
+			return "", fmt.Errorf("read password from stdin: %w", err)
+		}
+		return "", fmt.Errorf("no password on stdin")
+	}
+	// Only the trailing newline is stripped: a password may legitimately
+	// begin or end with a space, and silently trimming it would set a
+	// password nobody can then type.
+	return strings.TrimRight(scanner.Text(), "\r"), nil
 }
 
 func newTokenCmd() *cobra.Command {

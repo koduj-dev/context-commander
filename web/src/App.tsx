@@ -1,7 +1,10 @@
 import { Route, Routes } from "react-router-dom";
 import { Shell } from "./app/Shell";
 import { useAuth } from "./app/auth";
-import { Loading } from "./ui";
+import { Solo } from "./app/Solo";
+import { useT } from "./i18n";
+import { Btn, Loading, Panel } from "./ui";
+import { FirstRun } from "./pages/FirstRun";
 import { SignIn } from "./pages/SignIn";
 import { Dashboard } from "./pages/Dashboard";
 import { Projects } from "./pages/Projects";
@@ -38,7 +41,8 @@ import { NotFound } from "./pages/NotFound";
  * URL someone pastes into a chat should be readable by whoever receives it.
  */
 export function App() {
-  const { me, loading } = useAuth();
+  const t = useT();
+  const { me, loading, needsSetup, unreachable, retry } = useAuth();
 
   // Nothing renders until the stored token has been checked. Showing the
   // shell first and yanking it away is worse than a moment of nothing — and
@@ -53,7 +57,26 @@ export function App() {
       </div>
     );
   }
-  if (!me) return <SignIn />;
+  // The server could not say who this is. Not a refusal, and so not a login
+  // form: asking for a password that was never the problem would fail again
+  // for a reason the form has no way to explain.
+  if (unreachable) {
+    return (
+      <Solo>
+        <Panel title={t("error.unavailable.title")}>
+          <p className="sec lead-out">{t("error.unavailable.body")}</p>
+          <Btn kind="primary" onClick={retry}>
+            {t("common.retry")}
+          </Btn>
+        </Panel>
+      </Solo>
+    );
+  }
+
+  // A fresh installation has no users, so there is nobody to sign in as yet;
+  // sending someone to a login form would be asking for a credential that
+  // cannot exist (docs/adr/0019).
+  if (!me) return needsSetup ? <FirstRun /> : <SignIn />;
 
   return (
     <Routes>

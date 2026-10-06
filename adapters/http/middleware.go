@@ -24,15 +24,26 @@ func (d Deps) authenticateMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requestID := middleware.GetReqID(r.Context())
 
-		auth := r.Header.Get("Authorization")
-		token, ok := strings.CutPrefix(auth, "Bearer ")
-		if !ok || token == "" {
-			// Not recorded: a request with no bearer header at all is far
-			// more often a health check, a crawler or a browser hitting the
-			// API by accident than an attack, and drowning the security
-			// record in those would make it useless for the cases that
-			// matter.
-			writeError(w, http.StatusUnauthorized, "unauthorized", "missing or malformed Authorization: Bearer <token> header")
+		token, fromCookie, ok := credentialFrom(r)
+		if !ok {
+			// Not recorded: a request with no credential at all is far more
+			// often a health check, a crawler or a browser hitting the API
+			// by accident than an attack, and drowning the security record
+			// in those would make it useless for the cases that matter.
+			writeError(w, http.StatusUnauthorized, "unauthorized",
+				"missing or malformed Authorization: Bearer <token> header, or session cookie")
+			return
+		}
+
+		// A cookie is attached by the browser whoever caused the request, so
+		// a request authenticated by one must prove it came from this app's
+		// own code (docs/adr/0019). A bearer token is never attached on
+		// anyone's behalf and needs no such proof.
+		//
+		// Checked here rather than per handler: a CSRF defence that each
+		// endpoint has to remember to call is a CSRF defence that the next
+		// endpoint will not have.
+		if fromCookie && !requireBrowserRequest(w, r) {
 			return
 		}
 
@@ -114,4 +125,25 @@ func (d Deps) resolveProjectMiddleware(next http.Handler) http.Handler {
 		ctx := context.WithValue(r.Context(), ctxKeyProject, project)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+// credentialFrom finds the caller's token: an Authorization bearer header
+// first, then the session cookie.
+//
+// Bearer wins when both are present. That is the case of an agent or a script
+// calling the API from a browser context that also happens to hold a session,
+// and the explicit header is the more deliberate of the two — a cookie is
+// sent whether or not the caller meant to.
+//
+// fromCookie is returned rather than inferred later, because the CSRF
+// requirement applies to exactly one of these two and getting that backwards
+// either breaks every agent or protects nothing.
+func credentialFrom(r *http.Request) (token string, fromCookie, ok bool) {
+	if bearer, found := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); found && bearer != "" {
+		return bearer, false, true
+	}
+	if c, err := r.Cookie(sessionCookie); err == nil && c.Value != "" {
+		return c.Value, true, true
+	}
+	return "", false, false
 }
