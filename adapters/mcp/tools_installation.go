@@ -278,7 +278,7 @@ func registerDirectoryTools(server *sdkmcp.Server, deps Deps, principalID uuid.U
 
 	sdkmcp.AddTool(server, &sdkmcp.Tool{
 		Name:        "installation.list_service_principals",
-		Description: "List the agents registered on this installation. `principal_id` is what a token is issued for and what a project membership names. Requires installation-admin rights.",
+		Description: "List the agents registered on this installation. `principal_id` is what a token is issued for and what a project membership names; `created_by_email` is who registered the agent, which is provenance and grants it nothing. Requires installation-admin rights.",
 	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, args listArgs) (*sdkmcp.CallToolResult, pagedResult[directoryAgentResult], error) {
 		userID, err := callerUserID(ctx)
 		if err != nil {
@@ -293,7 +293,11 @@ func registerDirectoryTools(server *sdkmcp.Server, deps Deps, principalID uuid.U
 			out[i] = directoryAgentResult{
 				ID: a.ID.String(), PrincipalID: a.PrincipalID.String(),
 				Name: a.Name, Description: a.Description,
-				CreatedAt: a.CreatedAt.Format(time.RFC3339),
+				CreatedAt:      a.CreatedAt.Format(time.RFC3339),
+				CreatedByEmail: a.CreatedByEmail, CreatedByName: a.CreatedByName,
+			}
+			if a.CreatedBy != nil {
+				out[i].CreatedBy = a.CreatedBy.String()
 			}
 		}
 		return nil, paged(out, page.NextCursor), nil
@@ -315,4 +319,10 @@ type directoryAgentResult struct {
 	Name        string `json:"name"`
 	Description string `json:"description,omitempty"`
 	CreatedAt   string `json:"created_at"`
+	// Who registered this agent, resolved to a person (migrations/000026).
+	// Provenance, not authority: the agent's access comes from its own
+	// project memberships (docs/adr/0004). Omitted when nobody is recorded.
+	CreatedBy      string `json:"created_by,omitempty"`
+	CreatedByEmail string `json:"created_by_email,omitempty"`
+	CreatedByName  string `json:"created_by_name,omitempty"`
 }

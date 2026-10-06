@@ -140,3 +140,22 @@ And before killing the dev instance at all, read `.cc-dev/README.md` — it
 holds the exact command to start it again, including the environment the
 process needs. That file exists because the instance was once killed without
 it.
+
+## `ccd migrate` runs the migrations the BINARY holds
+
+Migrations are embedded (`migrations/embed.go`, `go:embed`), so `ccd migrate`
+applies whatever was compiled into the binary that runs it — not what is in
+the working tree. Writing a migration and running `./bin/ccd migrate` without
+rebuilding applies nothing.
+
+And it says nothing: the command prints `migrations applied` whether it
+applied twelve or zero. The symptom is a handler that 500s on a column the
+schema does not have, which is exactly what happened with
+`service_principals.created_by` (migration 000026) — twenty minutes spent
+looking at Go code for a fault that was a missing `go build`.
+
+Rebuild first, or check the column exists:
+
+    go build -o bin/ccd ./cmd/ccd && ./bin/ccd migrate
+    docker exec context-commander-postgres-1 \
+      psql -U cc_owner -d context_commander -c "\d service_principals"

@@ -49,7 +49,7 @@ func (d Deps) issueToken(w http.ResponseWriter, r *http.Request) {
 		expiresAt = &t
 	}
 	if err := identity.ValidateExpiresAt(expiresAt); err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 
@@ -62,7 +62,7 @@ func (d Deps) issueToken(w http.ResponseWriter, r *http.Request) {
 		return err
 	})
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 
@@ -112,7 +112,7 @@ func (d Deps) listTokens(w http.ResponseWriter, r *http.Request) {
 		return err
 	})
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 
@@ -135,7 +135,7 @@ func (d Deps) revokeToken(w http.ResponseWriter, r *http.Request) {
 		return identity.NewStore().RevokeCredential(r.Context(), tx, id, principalID)
 	})
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

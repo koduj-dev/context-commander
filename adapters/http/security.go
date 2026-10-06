@@ -31,7 +31,7 @@ func (d Deps) listSecurityEvents(w http.ResponseWriter, r *http.Request) {
 	principalID := principalIDFrom(r.Context())
 	userID, err := resolveUserID(r.Context(), d.Pool, principalID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal", "internal error")
+		internalError(w, r, err, "could not resolve the caller's user")
 		return
 	}
 
@@ -41,7 +41,7 @@ func (d Deps) listSecurityEvents(w http.ResponseWriter, r *http.Request) {
 	}
 	page, err := d.SecurityEvents.List(r.Context(), principalID, userID, opts)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 

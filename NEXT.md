@@ -251,6 +251,26 @@ the screen rather than showing a control that would fail.
   written down rather than left implied.
   - [ ] The dashboard still asks per project. Switching it over is a small
     interface change, left for the next pass through the UI.
+- [ ] **Agent ownership that means something.** `service_principals` now
+  records `created_by` and the directory shows it (migration 000026), but
+  that is provenance: an immutable note of who registered the agent, granting
+  it nothing. Raised by the maintainer 2026-10-06 as "agents could have an
+  owner listed somewhere, because one has to be created with some
+  authorization from a user", which the column answers. What it does not
+  answer, and what needs a decision before it needs a column:
+  - **Transfer.** When the person who registered an agent leaves, the record
+    becomes a fact about history and nobody is accountable for the agent. An
+    owner that can be reassigned is a different column with a different name.
+  - **Whether ownership may confer access.** Today an agent is its own
+    principal and reaches a project only through its own membership
+    (ADR 0004). Letting it inherit an owner's rights would make every agent
+    as powerful as whoever created it, and would make revoking a person's
+    access insufficient to revoke their agents'. If that is ever wanted it is
+    an ADR, not a migration.
+  - **What an admin actually asks**, which is neither: "what can this agent
+    reach?" That is its project memberships, and nothing lists them for a
+    principal other than the caller — `/me/projects` is self-only.
+
 - [ ] **Service principal names are not unique** while user emails are
   (`migrations/000001`). Two agents may share a name, which makes a name a
   poor thing to identify one by. Recorded in

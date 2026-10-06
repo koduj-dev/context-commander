@@ -270,7 +270,12 @@ export const en = {
   "admin.lead":
     "The installation itself: who administers it, who was refused, and the identities everything else hangs off.",
   "admin.tab.overview": "Overview",
-  "admin.tab.identities": "Identities",
+  "admin.tab.people": "People",
+  "admin.tab.agents": "Agents",
+  "admin.column.registeredBy": "Registered by",
+  "admin.unattributed": "not recorded",
+  "admin.registeredByHelp":
+    "Who created the agent. It is a record of where the agent came from and grants it nothing — an agent reaches a project only through its own membership there.",
   "admin.tab.usage": "Usage",
   "admin.usage": "Usage",
   "admin.usageLead":
@@ -354,8 +359,6 @@ export const en = {
   "admin.issueForLead":
     "A token for this identity, not for you. It is shown once and never again, and whatever holds it acts as this identity.",
   "admin.security": "Security log",
-  "admin.identitiesLead":
-    "The identities everything else hangs off: the people who can hold a token, and the agents that act on their own. Each one can be given a token here, and have one taken away.",
   "admin.securityLead":
     "What the server refused: a token that did not resolve, a capability denied, a caller throttled. Kept apart from project audit on purpose — a refusal is often about a project the caller cannot even see, and the pattern worth catching, one credential probing several projects, is invisible from inside any one of them.",
   "admin.securityNote":

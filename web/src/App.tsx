@@ -26,7 +26,8 @@ import { Tokens } from "./pages/Tokens";
 import { AdminUsage } from "./pages/AdminUsage";
 import {
   Administration,
-  AdminIdentities,
+  AdminPeople,
+  AdminAgents,
   AdminOverview,
   AdminSecurityLog,
 } from "./pages/Administration";
@@ -100,7 +101,8 @@ export function App() {
         <Route path="registry/:skillID" element={<SkillDetail />} />
         <Route path="administration" element={<Administration />}>
           <Route index element={<AdminOverview />} />
-          <Route path="identities" element={<AdminIdentities />} />
+          <Route path="people" element={<AdminPeople />} />
+          <Route path="agents" element={<AdminAgents />} />
           <Route path="usage" element={<AdminUsage />} />
           <Route path="security" element={<AdminSecurityLog />} />
         </Route>

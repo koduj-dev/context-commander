@@ -541,6 +541,18 @@ export type ServicePrincipal = {
   created_at: string;
   /** The principal this agent acts as — see InstallationUser.principal_id. */
   principal_id?: string;
+  /**
+   * Who registered this agent, already resolved to a person.
+   *
+   * Absent when nobody is recorded: an agent registered before the column
+   * existed, or one whose registrar has since been deleted. The screen says
+   * so rather than printing a blank — and it must not say "owner", because
+   * this grants the agent nothing. An agent's access comes from its own
+   * project memberships.
+   */
+  created_by?: string;
+  created_by_email?: string;
+  created_by_name?: string;
 };
 
 /**

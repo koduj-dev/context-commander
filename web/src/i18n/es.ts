@@ -284,7 +284,12 @@ export const es: Partial<Record<MessageKey, string>> = {
   "admin.lead":
     "La instalación en sí: quién la administra, a quién se le ha denegado algo y las identidades de las que cuelga todo lo demás.",
   "admin.tab.overview": "Resumen",
-  "admin.tab.identities": "Identidades",
+  "admin.tab.people": "Personas",
+  "admin.tab.agents": "Agentes",
+  "admin.column.registeredBy": "Registrado por",
+  "admin.unattributed": "sin registrar",
+  "admin.registeredByHelp":
+    "Quién creó el agente. Deja constancia de su procedencia y no le concede nada: un agente llega a un proyecto solo a través de su propia pertenencia a él.",
   "admin.tab.security": "Registro de seguridad",
   "admin.admins": "Administración de la instalación",
   "admin.adminsLead":
@@ -302,8 +307,6 @@ export const es: Partial<Record<MessageKey, string>> = {
   "admin.name": "Nombre",
   "admin.description": "Descripción",
   "admin.security": "Registro de seguridad",
-  "admin.identitiesLead":
-    "Las identidades de las que cuelga todo lo demás: las personas que pueden tener un token y los agentes que actúan por su cuenta. A cada una se le puede dar aquí un token, y quitárselo.",
   "admin.securityLead":
     "Lo que el servidor rechazó: un token que no se resolvió, una capacidad denegada, una llamada limitada. Separado a propósito de la auditoría de proyecto — una denegación trata a menudo de un proyecto que quien la provoca ni siquiera puede ver, y el patrón que de verdad importa, una credencial tanteando varios proyectos, es invisible desde dentro de cualquiera de ellos.",
   "admin.securityNote":

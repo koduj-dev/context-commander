@@ -12,6 +12,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/dbtest"
 	"github.com/koduj-dev/context-commander/internal/identity"
 	"github.com/koduj-dev/context-commander/internal/installation"
+	"github.com/koduj-dev/context-commander/internal/paging"
 )
 
 type fixture struct {
@@ -250,6 +251,88 @@ func TestCreateServicePrincipalAsAdmin(t *testing.T) {
 	if err != nil {
 		t.Fatalf("created service principal has no principal: %v", err)
 	}
+}
+
+func TestServicePrincipalRecordsWhoRegisteredIt(t *testing.T) {
+	// Raised by the maintainer: a directory of agents was a list of names
+	// with no way to ask whose they are. The value was never missing — the
+	// capability check already resolves the calling user — only discarded
+	// (migrations/000026).
+	f := newFixture(t)
+	admin := f.newUser("registrar@example.test")
+	f.grant(admin.userID)
+
+	sp, err := f.svc.CreateServicePrincipal(f.ctx, admin.principalID, admin.userID, "ci-agent", "runs CI")
+	if err != nil {
+		t.Fatalf("CreateServicePrincipal: %v", err)
+	}
+	if sp.CreatedBy == nil || *sp.CreatedBy != admin.userID {
+		t.Errorf("sp.CreatedBy = %v, want %s", sp.CreatedBy, admin.userID)
+	}
+
+	// The listing resolves it to a person in the same query, because the
+	// alternative is one lookup per row.
+	page, err := f.svc.ListServicePrincipals(f.ctx, admin.principalID, admin.userID, paging.Options{})
+	if err != nil {
+		t.Fatalf("ListServicePrincipals: %v", err)
+	}
+	var found *identity.DirectoryAgent
+	for i := range page.Items {
+		if page.Items[i].ID == sp.ID {
+			found = &page.Items[i]
+		}
+	}
+	if found == nil {
+		t.Fatal("the agent just created is not in the directory")
+	}
+	if found.CreatedByEmail != "registrar@example.test" {
+		t.Errorf("CreatedByEmail = %q, want registrar@example.test", found.CreatedByEmail)
+	}
+}
+
+func TestUnattributedAgentStillAppearsInTheDirectory(t *testing.T) {
+	// An agent registered before migrations/000026, or one whose registrar
+	// has since been deleted, must still be listed. The LEFT JOIN is what
+	// makes that true; an inner join would make agents vanish for a reason
+	// that has nothing to do with them.
+	f := newFixture(t)
+	admin := f.newUser("admin@example.test")
+	f.grant(admin.userID)
+
+	var orphanID uuid.UUID
+	err := db.WithoutPrincipal(f.ctx, f.ownerPool, func(tx pgx.Tx) error {
+		sp, err := identity.NewStore().CreateServicePrincipal(f.ctx, tx, "legacy-agent", "", nil)
+		if err != nil {
+			return err
+		}
+		orphanID = sp.ID
+		_, err = identity.NewStore().CreatePrincipalForService(f.ctx, tx, sp.ID)
+		return err
+	})
+	if err != nil {
+		t.Fatalf("seed an unattributed agent: %v", err)
+	}
+
+	page, err := f.svc.ListServicePrincipals(f.ctx, admin.principalID, admin.userID, paging.Options{})
+	if err != nil {
+		t.Fatalf("ListServicePrincipals: %v", err)
+	}
+	for _, a := range page.Items {
+		if a.ID != orphanID {
+			continue
+		}
+		if a.CreatedBy != nil {
+			t.Errorf("CreatedBy = %v, want nil", a.CreatedBy)
+		}
+		// Empty rather than a placeholder: the screen decides how to say
+		// "nobody recorded this", and a fake name here would be a false
+		// statement about a real person.
+		if a.CreatedByEmail != "" {
+			t.Errorf("CreatedByEmail = %q, want empty", a.CreatedByEmail)
+		}
+		return
+	}
+	t.Fatal("an agent with no recorded registrar is missing from the directory")
 }
 
 func TestIssueListRevokeCredentialForOtherPrincipal(t *testing.T) {

@@ -46,7 +46,7 @@ func (d Deps) createInstallationUser(w http.ResponseWriter, r *http.Request) {
 	principalID := principalIDFrom(r.Context())
 	callerUserID, err := resolveCallerUserID(r, d.Pool, principalID)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 
@@ -59,7 +59,7 @@ func (d Deps) createInstallationUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, userResponse{ID: u.ID.String(), Email: u.Email, DisplayName: u.DisplayName, CreatedAt: u.CreatedAt.Format(time.RFC3339)})
@@ -73,6 +73,19 @@ type servicePrincipalResponse struct {
 	// The principal this agent acts as — see userResponse.PrincipalID. It is
 	// what a token is issued for and what a project membership names.
 	PrincipalID string `json:"principal_id,omitempty"`
+
+	// Who registered this agent, already resolved to a person so a reader
+	// is not handed a UUID to go and look up (migrations/000026). Omitted
+	// entirely when nobody is recorded — an agent from before the column
+	// existed is honestly unattributed, and an empty string would invite a
+	// screen to print a blank where a name belongs.
+	//
+	// Provenance, not authority. The agent's access comes from its own
+	// project memberships (docs/adr/0004); this names the person who created
+	// it and nothing more.
+	CreatedBy      string `json:"created_by,omitempty"`
+	CreatedByEmail string `json:"created_by_email,omitempty"`
+	CreatedByName  string `json:"created_by_name,omitempty"`
 }
 
 func (d Deps) createServicePrincipal(w http.ResponseWriter, r *http.Request) {
@@ -88,18 +101,26 @@ func (d Deps) createServicePrincipal(w http.ResponseWriter, r *http.Request) {
 	principalID := principalIDFrom(r.Context())
 	callerUserID, err := resolveCallerUserID(r, d.Pool, principalID)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 
 	sp, err := d.Installation.CreateServicePrincipal(r.Context(), principalID, callerUserID, body.Name, body.Description)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, servicePrincipalResponse{
+	created := servicePrincipalResponse{
 		ID: sp.ID.String(), Name: sp.Name, Description: sp.Description, CreatedAt: sp.CreatedAt.Format(time.RFC3339),
-	})
+	}
+	// The id only, not the email: the caller is the person it names, so
+	// resolving it here would be a lookup to tell them something they
+	// already know. The listing resolves it, because its reader is someone
+	// else.
+	if sp.CreatedBy != nil {
+		created.CreatedBy = sp.CreatedBy.String()
+	}
+	writeJSON(w, http.StatusCreated, created)
 }
 
 type issueCredentialForRequest struct {
@@ -131,20 +152,20 @@ func (d Deps) issueCredentialFor(w http.ResponseWriter, r *http.Request) {
 		expiresAt = &t
 	}
 	if err := identity.ValidateExpiresAt(expiresAt); err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 
 	principalID := principalIDFrom(r.Context())
 	callerUserID, err := resolveCallerUserID(r, d.Pool, principalID)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 
 	token, cred, err := d.Installation.IssueCredentialFor(r.Context(), principalID, callerUserID, targetPrincipalID, req.ClientType, expiresAt)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 	resp := issueTokenResponse{Token: token, CredentialID: cred.ID.String(), ClientType: cred.ClientType}
@@ -165,13 +186,13 @@ func (d Deps) listCredentialsFor(w http.ResponseWriter, r *http.Request) {
 	principalID := principalIDFrom(r.Context())
 	callerUserID, err := resolveCallerUserID(r, d.Pool, principalID)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 
 	creds, err := d.Installation.ListCredentialsFor(r.Context(), principalID, callerUserID, targetPrincipalID)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 	out := make([]credentialResponse, len(creds))
@@ -191,12 +212,12 @@ func (d Deps) revokeCredentialFor(w http.ResponseWriter, r *http.Request) {
 	principalID := principalIDFrom(r.Context())
 	callerUserID, err := resolveCallerUserID(r, d.Pool, principalID)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 
 	if err := d.Installation.RevokeCredentialFor(r.Context(), principalID, callerUserID, credentialID); err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -213,13 +234,13 @@ func (d Deps) listInstallationAdmins(w http.ResponseWriter, r *http.Request) {
 	principalID := principalIDFrom(r.Context())
 	callerUserID, err := resolveCallerUserID(r, d.Pool, principalID)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 
 	admins, err := d.Installation.ListAdmins(r.Context(), principalID, callerUserID)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 	out := make([]installationAdminResponse, len(admins))
@@ -241,7 +262,7 @@ func (d Deps) listInstallationUsers(w http.ResponseWriter, r *http.Request) {
 	principalID := principalIDFrom(r.Context())
 	callerUserID, err := resolveCallerUserID(r, d.Pool, principalID)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 	opts, ok := pagingFrom(w, r)
@@ -251,7 +272,7 @@ func (d Deps) listInstallationUsers(w http.ResponseWriter, r *http.Request) {
 
 	page, err := d.Installation.ListUsers(r.Context(), principalID, callerUserID, opts)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 	out := make([]userResponse, len(page.Items))
@@ -268,7 +289,7 @@ func (d Deps) listServicePrincipals(w http.ResponseWriter, r *http.Request) {
 	principalID := principalIDFrom(r.Context())
 	callerUserID, err := resolveCallerUserID(r, d.Pool, principalID)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 	opts, ok := pagingFrom(w, r)
@@ -278,7 +299,7 @@ func (d Deps) listServicePrincipals(w http.ResponseWriter, r *http.Request) {
 
 	page, err := d.Installation.ListServicePrincipals(r.Context(), principalID, callerUserID, opts)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 	out := make([]servicePrincipalResponse, len(page.Items))
@@ -286,6 +307,10 @@ func (d Deps) listServicePrincipals(w http.ResponseWriter, r *http.Request) {
 		out[i] = servicePrincipalResponse{
 			ID: a.ID.String(), Name: a.Name, Description: a.Description,
 			CreatedAt: a.CreatedAt.Format(time.RFC3339), PrincipalID: a.PrincipalID.String(),
+			CreatedByEmail: a.CreatedByEmail, CreatedByName: a.CreatedByName,
+		}
+		if a.CreatedBy != nil {
+			out[i].CreatedBy = a.CreatedBy.String()
 		}
 	}
 	writeList(w, out, page.NextCursor)
@@ -346,13 +371,13 @@ func (d Deps) getInstallationStats(w http.ResponseWriter, r *http.Request) {
 	principalID := principalIDFrom(r.Context())
 	callerUserID, err := resolveCallerUserID(r, d.Pool, principalID)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 
 	st, err := d.Installation.Stats(r.Context(), principalID, callerUserID)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 

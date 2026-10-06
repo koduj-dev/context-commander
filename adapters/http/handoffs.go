@@ -82,7 +82,7 @@ func (d Deps) createHandoff(w http.ResponseWriter, r *http.Request) {
 		ReferencedArtifacts: req.ReferencedArtifacts,
 	})
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, toHandoffResponse(h))
@@ -100,7 +100,7 @@ func (d Deps) getHandoff(w http.ResponseWriter, r *http.Request) {
 
 	h, body, err := d.Handoffs.Get(r.Context(), principalID, project.ID, handoffID)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, handoffDetailResponse{
@@ -127,7 +127,7 @@ func (d Deps) listHandoffs(w http.ResponseWriter, r *http.Request) {
 	}
 	page, err := d.Handoffs.List(r.Context(), principalID, project.ID, statusFilter, opts)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 	out := make([]handoffResponse, len(page.Items))
@@ -170,7 +170,7 @@ func (d Deps) transitionHandoff(w http.ResponseWriter, r *http.Request, target s
 		h, err = d.Handoffs.Close(r.Context(), principalID, clientID, project.ID, handoffID)
 	}
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, toHandoffResponse(h))
@@ -186,7 +186,7 @@ func (d Deps) getCurrentHandoff(w http.ResponseWriter, r *http.Request) {
 
 	h, err := d.Handoffs.Current(r.Context(), principalID, project.ID)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 	// The body, not just the metadata: a caller asking for the current
@@ -194,7 +194,7 @@ func (d Deps) getCurrentHandoff(w http.ResponseWriter, r *http.Request) {
 	// pointless second call every single time.
 	_, body, err := d.Handoffs.Get(r.Context(), principalID, project.ID, h.ID)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, handoffDetailResponse{

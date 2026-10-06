@@ -118,7 +118,7 @@ func (d Deps) resolveProjectMiddleware(next http.Handler) http.Handler {
 			return err
 		})
 		if err != nil {
-			writeDomainError(w, err)
+			writeDomainError(w, r, err)
 			return
 		}
 

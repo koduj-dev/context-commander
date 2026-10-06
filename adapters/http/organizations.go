@@ -58,13 +58,13 @@ func (d Deps) createOrganization(w http.ResponseWriter, r *http.Request) {
 	principalID := principalIDFrom(r.Context())
 	userID, err := resolveCallerUserID(r, d.Pool, principalID)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 
 	org, err := d.Organizations.Create(r.Context(), principalID, userID, body.Name)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, organizationResponse{ID: org.ID.String(), Name: org.Name, CreatedAt: org.CreatedAt.Format(time.RFC3339)})
@@ -95,13 +95,13 @@ func (d Deps) addOrganizationMember(w http.ResponseWriter, r *http.Request) {
 	principalID := principalIDFrom(r.Context())
 	callerUserID, err := resolveCallerUserID(r, d.Pool, principalID)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 
 	m, err := d.Organizations.AddMember(r.Context(), principalID, callerUserID, orgID, newUserID, organizations.Role(body.Role))
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, membershipResponse{OrganizationID: m.OrganizationID.String(), UserID: m.UserID.String(), Role: string(m.Role)})
@@ -128,13 +128,13 @@ func (d Deps) listOrganizationMembers(w http.ResponseWriter, r *http.Request) {
 	principalID := principalIDFrom(r.Context())
 	callerUserID, err := resolveCallerUserID(r, d.Pool, principalID)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 
 	members, err := d.Organizations.ListMembers(r.Context(), principalID, callerUserID, orgID)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 	out := make([]organizationMemberResponse, len(members))

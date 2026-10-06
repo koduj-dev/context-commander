@@ -79,7 +79,7 @@ func (d Deps) writeAuditPage(w http.ResponseWriter, r *http.Request, principalID
 			return err
 		})
 		if err != nil {
-			writeDomainError(w, err)
+			writeDomainError(w, r, err)
 			return
 		}
 	}
@@ -116,7 +116,7 @@ func (d Deps) queryAudit(w http.ResponseWriter, r *http.Request) {
 
 	page, err := d.Audit.Query(r.Context(), principalID, project.ID, opts)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 	d.writeAuditPage(w, r, principalID, page)
@@ -143,13 +143,13 @@ func (d Deps) queryOrganizationAudit(w http.ResponseWriter, r *http.Request) {
 	principalID := principalIDFrom(r.Context())
 	callerUserID, err := resolveCallerUserID(r, d.Pool, principalID)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 
 	page, err := d.Organizations.QueryAudit(r.Context(), principalID, callerUserID, orgID, opts)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 	d.writeAuditPage(w, r, principalID, page)

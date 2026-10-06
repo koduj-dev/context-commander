@@ -23,7 +23,7 @@ func (d Deps) createConversation(w http.ResponseWriter, r *http.Request) {
 
 	c, err := d.History.CreateConversation(r.Context(), principalID, project.ID)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, conversationResponse{ID: c.ID, CreatedAt: c.CreatedAt.Format(time.RFC3339)})
@@ -66,7 +66,7 @@ func (d Deps) createExternalSession(w http.ResponseWriter, r *http.Request) {
 	es, err := d.History.CreateExternalSession(r.Context(), principalID, project.ID, conversationID,
 		req.Provider, req.Client, req.ProviderSessionID, req.ParentExternalSessionID, req.Relation, time.Now().UTC())
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, externalSessionResponse{
@@ -117,7 +117,7 @@ func (d Deps) appendHistoryObject(w http.ResponseWriter, r *http.Request) {
 	obj, err := d.History.AppendHistoryObject(r.Context(), principalID, project.ID, conversationID,
 		req.ExternalSessionID, req.Type, req.DerivedFrom, []byte(req.Content))
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, historyObjectResponse{
@@ -142,7 +142,7 @@ func (d Deps) listHistoryObjects(w http.ResponseWriter, r *http.Request) {
 	}
 	page, err := d.History.ListHistoryObjects(r.Context(), principalID, project.ID, conversationID, opts)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 	out := make([]historyObjectResponse, len(page.Items))
@@ -173,7 +173,7 @@ func (d Deps) getLineage(w http.ResponseWriter, r *http.Request) {
 
 	edges, err := d.History.GetLineage(r.Context(), principalID, project.ID, conversationID)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 	out := make([]lineageEdgeResponse, len(edges))
@@ -201,7 +201,7 @@ func (d Deps) listConversations(w http.ResponseWriter, r *http.Request) {
 	}
 	page, err := d.History.ListConversations(r.Context(), principalID, project.ID, opts)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 	out := make([]conversationListResponse, len(page.Items))

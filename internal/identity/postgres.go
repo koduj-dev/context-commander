@@ -140,13 +140,18 @@ func (s *Store) GetUsersForPrincipals(ctx context.Context, tx pgx.Tx, principalI
 	return out, nil
 }
 
-func (s *Store) CreateServicePrincipal(ctx context.Context, tx pgx.Tx, name, description string) (ServicePrincipal, error) {
+// createdBy is the user who registered this agent — provenance only, and it
+// grants nothing (migrations/000026). Nil is accepted: `ccd installation
+// create-service-principal` runs as an operator against --database-url with
+// no authenticated user to name, and recording a false one would be worse
+// than recording none.
+func (s *Store) CreateServicePrincipal(ctx context.Context, tx pgx.Tx, name, description string, createdBy *uuid.UUID) (ServicePrincipal, error) {
 	var sp ServicePrincipal
 	err := tx.QueryRow(ctx,
-		`INSERT INTO service_principals (name, description) VALUES ($1, $2)
-		 RETURNING id, name, description, created_at`,
-		name, description,
-	).Scan(&sp.ID, &sp.Name, &sp.Description, &sp.CreatedAt)
+		`INSERT INTO service_principals (name, description, created_by) VALUES ($1, $2, $3)
+		 RETURNING id, name, description, created_at, created_by`,
+		name, description, createdBy,
+	).Scan(&sp.ID, &sp.Name, &sp.Description, &sp.CreatedAt, &sp.CreatedBy)
 	if isUniqueViolation(err) {
 		return ServicePrincipal{}, fmt.Errorf("%w: a service principal with this name", ErrAlreadyExists)
 	}
@@ -370,6 +375,12 @@ type DirectoryUser struct {
 type DirectoryAgent struct {
 	ServicePrincipal
 	PrincipalID uuid.UUID
+	// The registrar, already resolved to a person. Empty when nobody is
+	// recorded — see ListServicePrincipals' LEFT JOIN. A directory that
+	// returned a bare UUID here would be the exact problem the directory was
+	// built to remove.
+	CreatedByEmail string
+	CreatedByName  string
 }
 
 // ListUsers returns one page of users, oldest first.
@@ -433,10 +444,20 @@ func (s *Store) ListServicePrincipals(ctx context.Context, tx pgx.Tx, opts pagin
 	}
 	limit := opts.ClampedLimit()
 
+	// LEFT JOIN, not JOIN: an agent registered before migrations/000026, or
+	// one whose registrar has since been deleted, still has to appear. An
+	// inner join here would make agents vanish from the directory for a
+	// reason that has nothing to do with them.
+	//
+	// The email is resolved in this query rather than by the caller, because
+	// the alternative is one lookup per row — the shape that stops working
+	// long before it stops being tempting.
 	rows, err := tx.Query(ctx,
-		`SELECT sp.id, sp.name, COALESCE(sp.description, ''), sp.created_at, p.id
+		`SELECT sp.id, sp.name, COALESCE(sp.description, ''), sp.created_at, p.id,
+		        sp.created_by, COALESCE(u.email, ''), COALESCE(u.display_name, '')
 		 FROM service_principals sp
 		 JOIN principals p ON p.service_principal_id = sp.id
+		 LEFT JOIN users u ON u.id = sp.created_by
 		 WHERE (NOT $1::bool OR (sp.created_at, sp.id) > ($2::timestamptz, $3::uuid))
 		 ORDER BY sp.created_at ASC, sp.id ASC LIMIT $4`,
 		hasCursor, cursorTime, cursorID, limit+1,
@@ -449,7 +470,8 @@ func (s *Store) ListServicePrincipals(ctx context.Context, tx pgx.Tx, opts pagin
 	out := make([]DirectoryAgent, 0, limit)
 	for rows.Next() {
 		var a DirectoryAgent
-		if err := rows.Scan(&a.ID, &a.Name, &a.Description, &a.CreatedAt, &a.PrincipalID); err != nil {
+		if err := rows.Scan(&a.ID, &a.Name, &a.Description, &a.CreatedAt, &a.PrincipalID,
+			&a.CreatedBy, &a.CreatedByEmail, &a.CreatedByName); err != nil {
 			return paging.Page[DirectoryAgent]{}, fmt.Errorf("identity: scan service principal: %w", err)
 		}
 		out = append(out, a)

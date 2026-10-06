@@ -42,7 +42,7 @@ func (d Deps) listGateBindings(w http.ResponseWriter, r *http.Request) {
 
 	list, err := d.Gates.ListBindings(r.Context(), principalID, project.ID, orgID)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 	out := make([]gateBindingResponse, len(list))
@@ -69,13 +69,13 @@ func (d Deps) bindGate(w http.ResponseWriter, r *http.Request) {
 	principalID := principalIDFrom(r.Context())
 	userID, err := resolveUserID(r.Context(), d.Pool, principalID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal", "internal error")
+		internalError(w, r, err, "could not resolve the caller's user")
 		return
 	}
 
 	b, err := d.Gates.Bind(r.Context(), principalID, userID, project.ID, gates.Scope(body.Scope), body.ScopeRef, body.GateName, body.Hook, body.Config)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, toGateBindingResponse(b))
@@ -93,12 +93,12 @@ func (d Deps) unbindGate(w http.ResponseWriter, r *http.Request) {
 	principalID := principalIDFrom(r.Context())
 	userID, err := resolveUserID(r.Context(), d.Pool, principalID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal", "internal error")
+		internalError(w, r, err, "could not resolve the caller's user")
 		return
 	}
 
 	if err := d.Gates.Unbind(r.Context(), principalID, userID, project.ID, bindingID); err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

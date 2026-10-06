@@ -272,7 +272,12 @@ export const pl: Partial<Record<MessageKey, string>> = {
   "admin.lead":
     "Sama instalacja: kto ją administruje, komu czego odmówiono i tożsamości, na których wisi wszystko pozostałe.",
   "admin.tab.overview": "Przegląd",
-  "admin.tab.identities": "Tożsamości",
+  "admin.tab.people": "Osoby",
+  "admin.tab.agents": "Agenci",
+  "admin.column.registeredBy": "Zarejestrował",
+  "admin.unattributed": "nie zapisano",
+  "admin.registeredByHelp":
+    "Kto utworzył agenta. Jest to zapis jego pochodzenia i nie nadaje mu niczego — agent dociera do projektu wyłącznie przez własne członkostwo w nim.",
   "admin.tab.usage": "Wykorzystanie",
   "admin.usage": "Wykorzystanie",
   "admin.usageLead":
@@ -356,8 +361,6 @@ export const pl: Partial<Record<MessageKey, string>> = {
   "admin.issueForLead":
     "Token dla tej tożsamości, nie dla Ciebie. Pokazuje się raz i nigdy więcej, a kto go trzyma, działa jako ta tożsamość.",
   "admin.security": "Dziennik bezpieczeństwa",
-  "admin.identitiesLead":
-    "Tożsamości, na których wisi wszystko pozostałe: osoby, które mogą trzymać token, i agenci działający samodzielnie. Każdej można tutaj wydać token i każdej go odebrać.",
   "admin.securityLead":
     "Czego serwer odmówił: token, który się nie rozwiązał, odmówione uprawnienie, ograniczony wywołujący. Trzymane osobno od audytu projektu i to celowo — odmowa często dotyczy projektu, którego wywołujący nawet nie widzi, a wzorzec, który naprawdę warto wychwycić, jedno poświadczenie obmacujące kilka projektów, jest niewidoczny z wnętrza któregokolwiek z nich.",
   "admin.securityNote":

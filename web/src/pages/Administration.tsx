@@ -47,7 +47,8 @@ export function Administration() {
     <>
       <Tabs label={t("admin.title")}>
         {tab("/administration", t("admin.tab.overview"), true)}
-        {tab("/administration/identities", t("admin.tab.identities"))}
+        {tab("/administration/people", t("admin.tab.people"))}
+        {tab("/administration/agents", t("admin.tab.agents"))}
         {tab("/administration/usage", t("admin.tab.usage"))}
         {tab("/administration/security", t("admin.tab.security"))}
       </Tabs>
@@ -157,97 +158,121 @@ export function AdminOverview() {
  * them, an interface that needed to name a person could only ask for a UUID,
  * and this screen could show what it had just created and nothing else.
  */
-export function AdminIdentities() {
+/**
+ * The people on this installation.
+ *
+ * Split from the agents it used to share a screen with. Two paginated tables
+ * side by side in a two-column grid each got half the width and competed for
+ * the same vertical space — tolerable with three rows each, and the
+ * maintainer pointed out that an installation can hold hundreds. A directory
+ * is a thing you scan, so it gets the whole width.
+ */
+export function AdminPeople() {
   const t = useT();
   const users = useList((cursor) => api.users(cursor), []);
+
+  return (
+    <>
+      <PageHead title={t("admin.users")} lead={t("admin.usersLead")} />
+
+      <Stack>
+        <Panel
+          title={t("admin.users")}
+          tight
+          footer={
+            <Pager
+              shown={users.items.length}
+              hasMore={users.hasMore}
+              onLoadMore={users.loadMore}
+              busy={users.loadingMore}
+            />
+          }
+        >
+          {users.loading ? (
+            <Loading />
+          ) : users.error ? (
+            <ErrorState error={users.error} onRetry={users.reload} />
+          ) : users.items.length === 0 ? (
+            <EmptyState title={t("admin.noUsers")} />
+          ) : (
+            <DataTable
+              columns={[
+                { key: "who", label: t("admin.column.user") },
+                { key: "created", label: t("admin.column.created"), align: "r" },
+              ]}
+            >
+              {users.items.map((u) => (
+                <UserRow key={u.id} user={u} />
+              ))}
+            </DataTable>
+          )}
+        </Panel>
+
+        <CreateUser onCreated={users.reload} />
+      </Stack>
+    </>
+  );
+}
+
+/**
+ * The agents on this installation, and who registered each one.
+ *
+ * `registered by` is provenance and nothing else: an agent is its own
+ * principal and reaches a project only through its own membership there
+ * (docs/adr/0004). The column is deliberately not called "owner" — a word
+ * that would invite a reader to assume the agent inherits that person's
+ * access, which it does not.
+ */
+export function AdminAgents() {
+  const t = useT();
   const agents = useList((cursor) => api.servicePrincipals(cursor), []);
 
   return (
     <>
-      <PageHead title={t("admin.tab.identities")} lead={t("admin.identitiesLead")} />
+      <PageHead title={t("admin.servicePrincipals")} lead={t("admin.servicePrincipalsLead")} />
 
-      <Grid cols={2}>
-        <Stack>
-          <Panel
-            title={t("admin.users")}
-            tight
-            footer={
-              <>
-                <span className="dim">{t("admin.usersLead")}</span>
-                <Pager
-                  shown={users.items.length}
-                  hasMore={users.hasMore}
-                  onLoadMore={users.loadMore}
-                  busy={users.loadingMore}
-                />
-              </>
-            }
-          >
-            {users.loading ? (
-              <Loading />
-            ) : users.error ? (
-              <ErrorState error={users.error} onRetry={users.reload} />
-            ) : users.items.length === 0 ? (
-              <EmptyState title={t("admin.noUsers")} />
-            ) : (
-              <DataTable
-                columns={[
-                  { key: "who", label: t("admin.column.user") },
-                  { key: "created", label: t("admin.column.created"), align: "r" },
-                ]}
-              >
-                {users.items.map((u) => (
-                  <UserRow key={u.id} user={u} />
-                ))}
-              </DataTable>
-            )}
-          </Panel>
-
-          <CreateUser onCreated={users.reload} />
-        </Stack>
-
-        <Stack>
-          <Panel
-            title={t("admin.servicePrincipals")}
-            tight
-            footer={
-              <>
-                <span className="dim">{t("admin.servicePrincipalsLead")}</span>
-                <Pager
-                  shown={agents.items.length}
-                  hasMore={agents.hasMore}
-                  onLoadMore={agents.loadMore}
-                  busy={agents.loadingMore}
-                />
-              </>
-            }
-          >
-            {agents.loading ? (
-              <Loading />
-            ) : agents.error ? (
-              <ErrorState error={agents.error} onRetry={agents.reload} />
-            ) : agents.items.length === 0 ? (
-              <EmptyState
-                title={t("admin.noServicePrincipals")}
-                body={t("admin.noServicePrincipalsBody")}
+      <Stack>
+        <Panel
+          title={t("admin.servicePrincipals")}
+          tight
+          footer={
+            <>
+              <span className="dim">{t("admin.registeredByHelp")}</span>
+              <Pager
+                shown={agents.items.length}
+                hasMore={agents.hasMore}
+                onLoadMore={agents.loadMore}
+                busy={agents.loadingMore}
               />
-            ) : (
-              <DataTable
-                columns={[
-                  { key: "name", label: t("admin.column.name") },
-                  { key: "created", label: t("admin.column.created"), align: "r" },
-                ]}
-              >
-                {agents.items.map((a) => (
-                  <AgentRow key={a.id} agent={a} />
-                ))}
-              </DataTable>
-            )}
-          </Panel>
+            </>
+          }
+        >
+          {agents.loading ? (
+            <Loading />
+          ) : agents.error ? (
+            <ErrorState error={agents.error} onRetry={agents.reload} />
+          ) : agents.items.length === 0 ? (
+            <EmptyState
+              title={t("admin.noServicePrincipals")}
+              body={t("admin.noServicePrincipalsBody")}
+            />
+          ) : (
+            <DataTable
+              columns={[
+                { key: "name", label: t("admin.column.name") },
+                { key: "by", label: t("admin.column.registeredBy") },
+                { key: "created", label: t("admin.column.created"), align: "r" },
+              ]}
+            >
+              {agents.items.map((a) => (
+                <AgentRow key={a.id} agent={a} />
+              ))}
+            </DataTable>
+          )}
+        </Panel>
 
-          <CreateServicePrincipal onCreated={agents.reload} />
-        </Stack>
-      </Grid>
+        <CreateServicePrincipal onCreated={agents.reload} />
+      </Stack>
     </>
   );
 }
@@ -417,6 +442,26 @@ function AgentRow({ agent }: { agent: ServicePrincipal }) {
             }
           />
         </td>
+        <td>
+          {/* The name, with the address underneath: two people called Filip
+              is the normal case, and the email is what tells them apart.
+              "not recorded" is said in words rather than left blank — an
+              empty cell reads as a rendering fault, and the absence here is
+              a fact (migrations/000026 backfills nobody, because naming a
+              person who did not do it would be worse than naming none). */}
+          {agent.created_by_name || agent.created_by_email ? (
+            <Cell
+              primary={agent.created_by_name || agent.created_by_email}
+              secondary={
+                agent.created_by_name && agent.created_by_email ? (
+                  <span className="dim">{agent.created_by_email}</span>
+                ) : undefined
+              }
+            />
+          ) : (
+            <span className="dim">{t("admin.unattributed")}</span>
+          )}
+        </td>
         <td className="r nowrap">
           <span className="dim">{f.date(agent.created_at)}</span>{" "}
           {agent.principal_id && (
@@ -431,14 +476,14 @@ function AgentRow({ agent }: { agent: ServicePrincipal }) {
       </tr>
       {showTokens && agent.principal_id && (
         <tr>
-          <td colSpan={2}>
+          <td colSpan={3}>
             <Credentials principalID={agent.principal_id} />
           </td>
         </tr>
       )}
       {(issued || failure !== undefined) && (
         <tr>
-          <td colSpan={2}>
+          <td colSpan={3}>
             {failure !== undefined ? (
               <ErrorState error={failure} />
             ) : (

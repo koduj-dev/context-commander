@@ -80,7 +80,7 @@ func (d Deps) getMe(w http.ResponseWriter, r *http.Request) {
 		return nil
 	})
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 
@@ -92,7 +92,7 @@ func (d Deps) getMe(w http.ResponseWriter, r *http.Request) {
 	if callerUserID != nil {
 		isAdmin, err := d.Installation.IsAdmin(r.Context(), principalID, *callerUserID)
 		if err != nil {
-			writeDomainError(w, err)
+			writeDomainError(w, r, err)
 			return
 		}
 		resp.IsInstallationAdmin = isAdmin
@@ -132,7 +132,7 @@ func (d Deps) listMyProjects(w http.ResponseWriter, r *http.Request) {
 		return nil
 	})
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, list)
@@ -162,7 +162,7 @@ func (d Deps) listMyOrganizations(w http.ResponseWriter, r *http.Request) {
 		return nil
 	})
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 	if userID == nil {
@@ -172,7 +172,7 @@ func (d Deps) listMyOrganizations(w http.ResponseWriter, r *http.Request) {
 
 	memberships, err := d.Organizations.ListMine(r.Context(), principalID, *userID)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 	out := make([]myOrganizationResponse, len(memberships))
@@ -211,7 +211,7 @@ func (d Deps) listWaiting(w http.ResponseWriter, r *http.Request) {
 
 	waiting, err := d.Handoffs.ListWaiting(r.Context(), principalID)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 

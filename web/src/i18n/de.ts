@@ -290,7 +290,12 @@ export const de: Partial<Record<MessageKey, string>> = {
   "admin.lead":
     "Die Installation selbst: wer sie verwaltet, wer abgelehnt wurde und die Identitäten, an denen alles andere hängt.",
   "admin.tab.overview": "Überblick",
-  "admin.tab.identities": "Identitäten",
+  "admin.tab.people": "Personen",
+  "admin.tab.agents": "Agenten",
+  "admin.column.registeredBy": "Registriert von",
+  "admin.unattributed": "nicht erfasst",
+  "admin.registeredByHelp":
+    "Wer den Agenten angelegt hat. Es hält fest, woher der Agent kommt, und gewährt ihm nichts — ein Agent erreicht ein Projekt nur über seine eigene Mitgliedschaft darin.",
   "admin.tab.security": "Sicherheitsprotokoll",
   "admin.admins": "Administration der Installation",
   "admin.adminsLead":
@@ -309,8 +314,6 @@ export const de: Partial<Record<MessageKey, string>> = {
   "admin.name": "Name",
   "admin.description": "Beschreibung",
   "admin.security": "Sicherheitsprotokoll",
-  "admin.identitiesLead":
-    "Die Identitäten, an denen alles andere hängt: die Personen, die ein Token halten können, und die Agenten, die eigenständig handeln. Jeder von ihnen kann hier ein Token bekommen und wieder entzogen bekommen.",
   "admin.securityLead":
     "Was der Server abgelehnt hat: ein Token, das sich nicht auflösen ließ, eine verweigerte Berechtigung, eine gedrosselte Anfrage. Bewusst getrennt vom Projekt-Audit — eine Ablehnung betrifft oft ein Projekt, das die anfragende Seite gar nicht sehen kann, und das eigentlich interessante Muster, ein Zugangsmerkmal, das mehrere Projekte abklopft, ist aus jedem einzelnen Projekt heraus unsichtbar.",
   "admin.securityNote":

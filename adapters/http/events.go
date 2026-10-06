@@ -23,7 +23,7 @@ func (d Deps) listEvents(w http.ResponseWriter, r *http.Request) {
 	}
 	page, err := d.Events.List(r.Context(), principalID, project.ID, opts)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 

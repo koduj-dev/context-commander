@@ -272,7 +272,12 @@ export const fr: Partial<Record<MessageKey, string>> = {
   "admin.lead":
     "L’installation elle-même : qui l’administre, qui s’est vu refuser quelque chose, et les identités auxquelles tout le reste est rattaché.",
   "admin.tab.overview": "Vue d’ensemble",
-  "admin.tab.identities": "Identités",
+  "admin.tab.people": "Personnes",
+  "admin.tab.agents": "Agents",
+  "admin.column.registeredBy": "Enregistré par",
+  "admin.unattributed": "non consigné",
+  "admin.registeredByHelp":
+    "Qui a créé l’agent. C’est une trace de sa provenance et cela ne lui accorde rien : un agent n’atteint un projet que par sa propre appartenance à celui-ci.",
   "admin.tab.usage": "Utilisation",
   "admin.usage": "Utilisation",
   "admin.usageLead":
@@ -354,8 +359,6 @@ export const fr: Partial<Record<MessageKey, string>> = {
   "admin.issueForLead":
     "Un token pour cette identité, pas pour vous. Il est affiché une seule fois, et qui le détient agit en tant que cette identité.",
   "admin.security": "Journal de sécurité",
-  "admin.identitiesLead":
-    "Les identités auxquelles tout le reste est rattaché : les personnes qui peuvent détenir un token, et les agents qui agissent d’eux-mêmes. Chacune peut recevoir un token ici, et se le voir retirer.",
   "admin.securityLead":
     "Ce que le serveur a refusé : un token qui ne s’est pas résolu, une capacité refusée, un appelant limité. Tenu à part de l’audit de projet à dessein — un refus porte souvent sur un projet que l’appelant ne peut même pas voir, et le motif qui compte vraiment, un justificatif qui sonde plusieurs projets, est invisible depuis l’intérieur de n’importe lequel d’entre eux.",
   "admin.securityNote":

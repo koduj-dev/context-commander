@@ -51,7 +51,7 @@ func (d Deps) getContextPack(w http.ResponseWriter, r *http.Request) {
 
 	pack, err := d.ContextPack.Bootstrap(r.Context(), principalID, project.ID, opts)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 	// The pack's own JSON tags are the wire format: it is already a read

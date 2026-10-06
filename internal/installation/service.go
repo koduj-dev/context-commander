@@ -132,7 +132,10 @@ func (s *Service) CreateServicePrincipal(ctx context.Context, principalID, calle
 	var sp identity.ServicePrincipal
 	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
 		var err error
-		sp, err = s.identity.CreateServicePrincipal(ctx, tx, name, description)
+		// callerUserID is already resolved and capability-checked above, and
+		// was being thrown away: the agent recorded no trace of who
+		// registered it (migrations/000026).
+		sp, err = s.identity.CreateServicePrincipal(ctx, tx, name, description, &callerUserID)
 		if err != nil {
 			return err
 		}

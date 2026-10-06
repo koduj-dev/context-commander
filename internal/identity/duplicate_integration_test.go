@@ -58,7 +58,7 @@ func TestCreateReportsDuplicatesAsConflict(t *testing.T) {
 	t.Run("service principal names are not unique today", func(t *testing.T) {
 		for _, description := range []string{"first", "second"} {
 			if err := db.WithoutPrincipal(ctx, pool, func(tx pgx.Tx) error {
-				_, err := store.CreateServicePrincipal(ctx, tx, "duplicate-agent", description)
+				_, err := store.CreateServicePrincipal(ctx, tx, "duplicate-agent", description, nil)
 				return err
 			}); err != nil {
 				t.Fatalf("create %q: %v", description, err)

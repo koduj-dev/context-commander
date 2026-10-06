@@ -86,7 +86,7 @@ func (f *fixture) newServicePrincipal(name string) identity.Principal {
 	f.t.Helper()
 	var p identity.Principal
 	f.asOwner(func(tx pgx.Tx) error {
-		sp, err := f.identity.CreateServicePrincipal(f.ctx, tx, name, "test service principal")
+		sp, err := f.identity.CreateServicePrincipal(f.ctx, tx, name, "test service principal", nil)
 		if err != nil {
 			return err
 		}

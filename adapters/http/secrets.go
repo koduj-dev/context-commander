@@ -39,7 +39,7 @@ func (d Deps) createSecret(w http.ResponseWriter, r *http.Request) {
 
 	ref, err := d.Secrets.Create(r.Context(), principalID, project.ID, req.Name, []byte(req.Value))
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, secretReferenceResponse{Reference: ref.String(), Name: ref.Name})
@@ -55,7 +55,7 @@ func (d Deps) listSecrets(w http.ResponseWriter, r *http.Request) {
 	}
 	page, err := d.Secrets.List(r.Context(), principalID, project.ID, opts)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 	out := make([]secretReferenceResponse, len(page.Items))
@@ -75,7 +75,7 @@ func (d Deps) deleteSecret(w http.ResponseWriter, r *http.Request) {
 	principalID := principalIDFrom(r.Context())
 
 	if err := d.Secrets.Delete(r.Context(), principalID, project.ID, name); err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

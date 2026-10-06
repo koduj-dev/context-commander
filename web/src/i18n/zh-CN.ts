@@ -273,7 +273,12 @@ export const zhCN: Partial<Record<MessageKey, string>> = {
   "admin.title": "管理",
   "admin.lead": "安装实例本身：谁在管理它、谁被拒绝过，以及其他一切所依附的身份。",
   "admin.tab.overview": "总览",
-  "admin.tab.identities": "身份",
+  "admin.tab.people": "人员",
+  "admin.tab.agents": "agent",
+  "admin.column.registeredBy": "注册者",
+  "admin.unattributed": "未记录",
+  "admin.registeredByHelp":
+    "创建该 agent 的人。它只记录 agent 的来源，不授予任何权限——agent 只能通过自己在项目中的成员身份访问该项目。",
   "admin.tab.usage": "使用情况",
   "admin.usage": "使用情况",
   "admin.usageLead":
@@ -352,8 +357,6 @@ export const zhCN: Partial<Record<MessageKey, string>> = {
   "admin.issueForLead":
     "这是给这个身份的 token，不是给你的。它只显示一次，而持有它的东西就以这个身份行事。",
   "admin.security": "安全日志",
-  "admin.identitiesLead":
-    "其他一切所依附的身份：可以持有 token 的人，以及自主行事的 agent。每一个都能在这里获得 token，也能被取消。",
   "admin.securityLead":
     "服务器拒绝了什么：无法解析的 token、被拒的能力、被限流的调用方。故意与项目审计分开 — 一次拒绝往往关于调用方甚至看不到的项目，而真正值得抓住的模式，也就是一个凭据在多个项目上试探，从任何单个项目内部都看不见。",
   "admin.securityNote":

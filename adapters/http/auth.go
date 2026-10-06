@@ -144,7 +144,7 @@ func (d Deps) signInWithPassword(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		if !errors.Is(err, identity.ErrInvalidCredentials) {
-			writeError(w, http.StatusInternalServerError, "internal", "could not complete sign-in")
+			internalError(w, r, err, "could not complete sign-in")
 			return
 		}
 		d.recordSignInFailure(r, "password sign-in failed", security.KindAuthenticationFailed)
@@ -176,7 +176,7 @@ func (d Deps) recordSignInFailure(r *http.Request, reason string, kind security.
 func (d Deps) issueSessionResponse(w http.ResponseWriter, r *http.Request, principalID uuid.UUID) {
 	token, cred, err := identity.IssueSession(r.Context(), d.Pool, principalID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal", "could not start a session")
+		internalError(w, r, err, "could not start a session")
 		return
 	}
 
@@ -222,7 +222,7 @@ func (d Deps) signOut(w http.ResponseWriter, r *http.Request) {
 func (d Deps) getSetupStatus(w http.ResponseWriter, r *http.Request) {
 	needed, err := d.setupNeeded(r)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal", "could not read installation state")
+		internalError(w, r, err, "could not read installation state")
 		return
 	}
 	// One bit, about an installation that has no users to protect yet.
@@ -269,7 +269,7 @@ func (d Deps) completeSetup(w http.ResponseWriter, r *http.Request) {
 
 	needed, err := d.setupNeeded(r)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal", "could not read installation state")
+		internalError(w, r, err, "could not read installation state")
 		return
 	}
 	if !needed {
@@ -296,7 +296,7 @@ func (d Deps) completeSetup(w http.ResponseWriter, r *http.Request) {
 
 	hash, err := identity.HashPassword(req.Password)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal", "could not store the password")
+		internalError(w, r, err, "could not store the password")
 		return
 	}
 
@@ -329,7 +329,7 @@ func (d Deps) completeSetup(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusConflict, "conflict", "a user with this email already exists")
 			return
 		}
-		writeError(w, http.StatusInternalServerError, "internal", "could not create the first administrator")
+		internalError(w, r, err, "could not create the first administrator")
 		return
 	}
 
@@ -457,7 +457,7 @@ func (d Deps) changeOwnPassword(w http.ResponseWriter, r *http.Request) {
 				"only a user account can have a password")
 			return
 		}
-		writeError(w, http.StatusInternalServerError, "internal", "could not read the current password")
+		internalError(w, r, err, "could not read the current password")
 		return
 	}
 
@@ -479,14 +479,14 @@ func (d Deps) changeOwnPassword(w http.ResponseWriter, r *http.Request) {
 
 	hash, err := identity.HashPassword(req.NewPassword)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal", "could not store the password")
+		internalError(w, r, err, "could not store the password")
 		return
 	}
 	err = db.WithoutPrincipal(r.Context(), d.Pool, func(tx pgx.Tx) error {
 		return store.SetPassword(r.Context(), tx, userID, hash)
 	})
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal", "could not store the password")
+		internalError(w, r, err, "could not store the password")
 		return
 	}
 
@@ -520,7 +520,7 @@ func (d Deps) listOwnSessions(w http.ResponseWriter, r *http.Request) {
 		return err
 	})
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal", "could not list sessions")
+		internalError(w, r, err, "could not list sessions")
 		return
 	}
 
@@ -571,7 +571,7 @@ func (d Deps) revokeOwnSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal", "could not end that session")
+		internalError(w, r, err, "could not end that session")
 		return
 	}
 	// If that was the current session, the cookie it came from is now dead;

@@ -95,7 +95,7 @@ func (d Deps) addMember(w http.ResponseWriter, r *http.Request) {
 	// live in internal/members.Service (docs/adr/0014) — this handler only
 	// parses and maps errors.
 	if err := d.Members.Add(r.Context(), principalID, project.ID, targetPrincipalID, projects.Role(req.Role)); err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 
@@ -122,7 +122,7 @@ func (d Deps) listMembers(w http.ResponseWriter, r *http.Request) {
 
 	members, err := d.Members.List(r.Context(), principalID, project.ID)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 
@@ -138,7 +138,7 @@ func (d Deps) listMembers(w http.ResponseWriter, r *http.Request) {
 			return err
 		})
 		if err != nil {
-			writeDomainError(w, err)
+			writeDomainError(w, r, err)
 			return
 		}
 	}

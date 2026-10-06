@@ -40,6 +40,11 @@ type ServicePrincipal struct {
 	Name        string
 	Description string
 	CreatedAt   time.Time
+	// CreatedBy is the user who registered this agent, or nil for one
+	// registered before the column existed (migrations/000026). It is
+	// provenance and grants nothing: an agent's access comes from its own
+	// project memberships (docs/adr/0004), never from this user's.
+	CreatedBy *uuid.UUID
 }
 
 // ClientCredential is a PAT — see docs/adr/0009-pat-format-and-bootstrap.md

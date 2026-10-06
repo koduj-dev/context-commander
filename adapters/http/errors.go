@@ -3,7 +3,10 @@ package http
 import (
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
+
+	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/koduj-dev/context-commander/internal/artifacts"
 	"github.com/koduj-dev/context-commander/internal/audit"
@@ -70,7 +73,15 @@ func decodeJSONBody(w http.ResponseWriter, r *http.Request, dst any) error {
 // mapping, so a client sees one consistent error model across transports
 // (docs/architecture-cookbook.md §22: "Error model including authorization
 // and write conflict").
-func writeDomainError(w http.ResponseWriter, err error) {
+// writeDomainError maps a domain error onto the API's envelope.
+//
+// It takes the request so the one branch that cannot explain itself — the
+// default, a 500 — can say in the log what actually happened. It used to
+// discard `err` there and write "internal error", which is the right thing
+// to tell a caller and leaves nothing at all for whoever has to find out
+// why: a missing column cost a debugging round whose only symptom was a 500
+// and an empty log.
+func writeDomainError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, artifacts.ErrNotFound), errors.Is(err, artifacts.ErrDeleted), errors.Is(err, projects.ErrNotFound),
 		errors.Is(err, organizations.ErrNotFound), errors.Is(err, handoffs.ErrNotFound), errors.Is(err, history.ErrNotFound),
@@ -132,6 +143,36 @@ func writeDomainError(w http.ResponseWriter, err error) {
 		errors.Is(err, paging.ErrInvalidCursor):
 		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
 	default:
+		// The caller still gets no detail — an internal error's text is a
+		// chain of package prefixes written for an operator, and some of it
+		// would describe rows the caller may not see. The operator gets all
+		// of it.
+		slog.ErrorContext(r.Context(), "unhandled error in HTTP handler",
+			"err", err,
+			"method", r.Method,
+			"path", r.URL.Path,
+			"request_id", middleware.GetReqID(r.Context()),
+		)
 		writeError(w, http.StatusInternalServerError, "internal", "internal error")
 	}
+}
+
+// internalError writes the API's opaque 500 and logs what caused it.
+//
+// Distinct from writeDomainError's default branch: that one is for an error
+// nothing classified, and says so. This is for the cases a handler already
+// understands — it knows which operation failed and names it, which is the
+// difference between "unhandled error" and "could not store the password" in
+// a log someone is reading at the wrong hour.
+//
+// The caller still learns nothing beyond the message, which is written for a
+// person and carries no row-level detail.
+func internalError(w http.ResponseWriter, r *http.Request, err error, message string) {
+	slog.ErrorContext(r.Context(), message,
+		"err", err,
+		"method", r.Method,
+		"path", r.URL.Path,
+		"request_id", middleware.GetReqID(r.Context()),
+	)
+	writeError(w, http.StatusInternalServerError, "internal", message)
 }

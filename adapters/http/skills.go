@@ -71,14 +71,14 @@ func (d Deps) publishSkill(w http.ResponseWriter, r *http.Request) {
 	principalID := principalIDFrom(r.Context())
 	userID, err := resolveUserID(r.Context(), d.Pool, principalID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal", "internal error")
+		internalError(w, r, err, "could not resolve the caller's user")
 		return
 	}
 
 	v, err := d.Skills.Publish(r.Context(), principalID, userID, skills.Scope(body.Scope), body.ScopeRef,
 		body.SkillID, body.Name, body.Author, body.Origin, []byte(body.Content), body.DeclaredCapabilities)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, toSkillVersionResponse(v))
@@ -102,13 +102,13 @@ func (d Deps) installSkill(w http.ResponseWriter, r *http.Request) {
 	principalID := principalIDFrom(r.Context())
 	userID, err := resolveUserID(r.Context(), d.Pool, principalID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal", "internal error")
+		internalError(w, r, err, "could not resolve the caller's user")
 		return
 	}
 
 	b, err := d.Skills.Install(r.Context(), principalID, userID, project.ID, skills.Scope(body.Scope), body.ScopeRef, body.SkillID, body.SkillVersionID, body.Managed, body.Overridable)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, toSkillBindingResponse(b))
@@ -131,7 +131,7 @@ func (d Deps) overrideSkill(w http.ResponseWriter, r *http.Request) {
 
 	b, err := d.Skills.Override(r.Context(), principalID, project.ID, body.SkillID, body.SkillVersionID, body.Managed, body.Overridable)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, toSkillBindingResponse(b))
@@ -164,7 +164,7 @@ func (d Deps) setSkillPinned(w http.ResponseWriter, r *http.Request, pinned bool
 		err = d.Skills.Unpin(r.Context(), principalID, project.ID, body.BindingID)
 	}
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -176,7 +176,7 @@ func (d Deps) listEffectiveSkills(w http.ResponseWriter, r *http.Request) {
 
 	list, err := d.Skills.ListEffective(r.Context(), principalID, project.ID)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 	out := make([]skillBindingResponse, len(list))
@@ -215,7 +215,7 @@ func (d Deps) getSkillVersion(w http.ResponseWriter, r *http.Request) {
 
 	v, err := d.Skills.GetVersion(r.Context(), principalID, skillVersionID)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, skillContentResponse{
@@ -253,7 +253,7 @@ func (d Deps) searchSkills(w http.ResponseWriter, r *http.Request) {
 	}
 	page, err := d.Skills.Search(r.Context(), principalID, r.URL.Query().Get("q"), opts)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 	out := make([]catalogEntryResponse, len(page.Items))
@@ -283,7 +283,7 @@ func (d Deps) getSkill(w http.ResponseWriter, r *http.Request) {
 
 	e, err := d.Skills.Get(r.Context(), principalID, skillID)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, catalogEntryResponse{
@@ -309,7 +309,7 @@ func (d Deps) listSkillVersions(w http.ResponseWriter, r *http.Request) {
 	}
 	page, err := d.Skills.ListVersions(r.Context(), principalID, skillID, opts)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 	out := make([]skillVersionResponse, len(page.Items))
@@ -336,13 +336,13 @@ func (d Deps) promoteSkill(w http.ResponseWriter, r *http.Request) {
 	principalID := principalIDFrom(r.Context())
 	userID, err := resolveUserID(r.Context(), d.Pool, principalID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal", "internal error")
+		internalError(w, r, err, "could not resolve the caller's user")
 		return
 	}
 
 	sk, err := d.Skills.Promote(r.Context(), principalID, userID, body.SkillID, skills.Scope(body.Scope), body.ScopeRef)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{

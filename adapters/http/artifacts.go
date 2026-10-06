@@ -30,7 +30,7 @@ func (d Deps) listArtifacts(w http.ResponseWriter, r *http.Request) {
 	}
 	page, err := d.Artifacts.List(r.Context(), principalID, project.ID, opts)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 
@@ -52,7 +52,7 @@ func (d Deps) statArtifact(w http.ResponseWriter, r *http.Request) {
 
 	a, err := d.Artifacts.Stat(r.Context(), principalID, project.ID, path)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, artifactResponse{LogicalPath: a.LogicalPath, ContentType: a.ContentType, CurrentVersion: a.CurrentVersion})
@@ -69,7 +69,7 @@ func (d Deps) historyArtifact(w http.ResponseWriter, r *http.Request) {
 
 	versions, err := d.Artifacts.History(r.Context(), principalID, project.ID, path)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 	out := make([]versionResponse, len(versions))
@@ -100,7 +100,7 @@ func (d Deps) readArtifact(w http.ResponseWriter, r *http.Request) {
 
 	v, content, err := d.Artifacts.Read(r.Context(), principalID, project.ID, path, version)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 
@@ -139,7 +139,7 @@ func (d Deps) writeArtifact(w http.ResponseWriter, r *http.Request) {
 
 	v, err := d.Artifacts.Write(r.Context(), principalID, clientID, project.ID, path, contentType, content, expectedVersion)
 	if err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 
@@ -157,7 +157,7 @@ func (d Deps) deleteArtifact(w http.ResponseWriter, r *http.Request) {
 	clientID := clientIDFrom(r.Context())
 
 	if err := d.Artifacts.Delete(r.Context(), principalID, clientID, project.ID, path); err != nil {
-		writeDomainError(w, err)
+		writeDomainError(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
