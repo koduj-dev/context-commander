@@ -222,6 +222,21 @@ a:hover { text-decoration: underline; }
 }
 .field::placeholder { color: var(--cc-text-muted); }
 
+/* A field with a caption above it, as a <label> wrapping its own input: the
+ * association needs no id, and the caption is clickable.
+ *
+ * The caption is VISIBLE, not only an aria-label. A form of three password
+ * boxes with nothing written above them is three identical empty boxes, and
+ * the reader has to count to know which one they are standing in. The
+ * mockups hid this: every field in them carries a sample value, so an empty
+ * form was never once reviewed.
+ *
+ * Deliberately not .label-caps, which uppercases. That is a
+ * language-dependent operation this project does only on fixed captions it
+ * controls; these are translated into six languages, Chinese among them. */
+.labelled { display: grid; gap: 4px; }
+.labelled > span { font-size: 11.5px; color: var(--cc-text-muted); }
+
 /* An editor for artifact content. Monospaced because what goes in it is
  * usually structured text an agent wrote — JSON, Markdown, a config — and
  * proportional type hides the alignment that carries meaning there.

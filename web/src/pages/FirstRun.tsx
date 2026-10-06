@@ -73,6 +73,7 @@ export function FirstRun() {
               onChange={setCode}
               autoComplete="off"
               grow
+              labelled
             />
             <TextField
               label={t("setup.email")}
@@ -81,6 +82,7 @@ export function FirstRun() {
               onChange={setEmail}
               autoComplete="username"
               grow
+              labelled
             />
             <TextField
               label={t("setup.name")}
@@ -88,6 +90,7 @@ export function FirstRun() {
               onChange={setName}
               autoComplete="name"
               grow
+              labelled
             />
             <TextField
               label={t("setup.password")}
@@ -96,6 +99,7 @@ export function FirstRun() {
               onChange={setPassword}
               autoComplete="new-password"
               grow
+              labelled
             />
             <p className="sec">{t("setup.passwordHint", { min: String(MIN_PASSWORD) })}</p>
             <div className="row">

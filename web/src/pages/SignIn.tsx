@@ -88,6 +88,7 @@ export function SignIn() {
                 onChange={setEmail}
                 autoComplete="username"
                 grow
+                labelled
               />
               <TextField
                 label={t("auth.password")}
@@ -96,6 +97,7 @@ export function SignIn() {
                 onChange={setPassword}
                 autoComplete="current-password"
                 grow
+                labelled
               />
               <div className="row">
                 <Btn kind="primary" type="submit" disabled={busy || !canSubmit}>
@@ -116,6 +118,7 @@ export function SignIn() {
                 onChange={setToken}
                 autoComplete="off"
                 grow
+                labelled
               />
               <div className="row">
                 <Btn kind="primary" type="submit" disabled={busy || !canSubmit}>

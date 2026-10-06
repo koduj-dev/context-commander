@@ -241,6 +241,7 @@ function PublishSkill({
           value={content}
           onChange={setContent}
           disabled={busy}
+          labelled
         />
       </div>
 

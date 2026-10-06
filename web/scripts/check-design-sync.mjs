@@ -21,6 +21,12 @@
  *      is a private decision; a hundred is how a kit turns back into a pile
  *      of pages. (The handful that are genuinely data — a meter's width —
  *      are listed as exceptions below and must stay tiny.)
+ *   6. No input is an unlabelled empty box: every TextField/TextArea either
+ *      shows its label (`labelled`) or carries a `placeholder`. An
+ *      `aria-label` alone is a caption only a screen reader receives, and the
+ *      sign-in form shipped as two blank rectangles because of it. The
+ *      mockups could not catch this — every field in them holds a sample
+ *      value, so an empty form is a state they never show.
  *   5. No rule sets a flex-only property on something that is not a flex or
  *      grid container. `justify-content` on a block is the quietest failure
  *      in CSS: no error, no warning, no effect. It left the sign-in lockup
@@ -65,6 +71,19 @@ const MOCKUP_ONLY = new Set([
 const INLINE_STYLE_ALLOWED = new Map([
   ["Meter", "the fill width IS the value being displayed"],
   ["SelectField", "a popup's position IS the trigger's position, and no class can know it"],
+]);
+
+/**
+ * Inputs allowed to carry neither a visible label nor a placeholder, and why.
+ *
+ * Keyed by the label expression as it appears in the source, because that is
+ * what identifies the field; a file would exempt every input in it.
+ */
+const UNLABELLED_ALLOWED = new Map([
+  [
+    'label={t("artifacts.content")}',
+    'the editor is the whole body of a panel titled "Edit", so a second caption names it twice',
+  ],
 ]);
 
 /** Properties that do nothing at all unless the box is a flex or grid container. */
@@ -295,6 +314,39 @@ if (inlineStyles.length) {
     `Inline styles found in: ${[...new Set(inlineStyles)].join(", ")}\n` +
       `  Give the pattern a name in src/styles/app.css instead. If it is genuinely data\n` +
       `  (a meter's width), add it to INLINE_STYLE_ALLOWED in this script with a reason.`,
+  );
+}
+
+// 6 — an input with no caption anyone can see.
+//
+// The sign-in screen shipped as two blank rectangles: TextField renders its
+// `label` as an aria-label, which a screen reader announces and a sighted
+// reader never receives, and nothing required a placeholder either. The
+// mockups show every field holding a sample value, so "what does the empty
+// form look like" was never a question they could answer.
+const unlabelled = [];
+for await (const file of walk(SRC)) {
+  if (/\.test\.tsx?$/.test(file)) continue;
+  const src = await readFile(file, "utf8");
+  for (const m of src.matchAll(/<(TextField|TextArea)\b([\s\S]*?)\/>/g)) {
+    const body = m.group ? m.group(2) : m[2];
+    if (/\blabelled\b/.test(body) || /\bplaceholder\b/.test(body)) continue;
+
+    const label = /label=\{[^}]*\}/.exec(body);
+    const key = label ? label[0] : "";
+    if (UNLABELLED_ALLOWED.has(key)) continue;
+
+    const line = src.slice(0, m.index).split("\n").length;
+    unlabelled.push(`${relative(repo, file)}:${line}  ${m[1]}  ${key || "(no label)"}`);
+  }
+}
+if (unlabelled.length) {
+  failures.push(
+    `${unlabelled.length} input(s) show no caption a sighted reader can see:\n` +
+      unlabelled.map((u) => `    ${u}`).join("\n") +
+      `\n  Pass \`labelled\` to show the label above the field, or a \`placeholder\` where\n` +
+      `  the field is self-evident. If it genuinely needs neither, add it to\n` +
+      `  UNLABELLED_ALLOWED in this script with a reason.`,
   );
 }
 

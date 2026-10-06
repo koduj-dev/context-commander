@@ -368,6 +368,7 @@ function NewVersion({
         value={text}
         onChange={setText}
         disabled={busy}
+        labelled
       />
       {failure !== undefined && (
         <div className="mt">

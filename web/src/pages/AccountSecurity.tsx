@@ -97,6 +97,7 @@ export function PasswordPanel() {
             onChange={setCurrent}
             autoComplete="current-password"
             grow
+            labelled
           />
         )}
         <TextField
@@ -106,6 +107,7 @@ export function PasswordPanel() {
           onChange={setNext}
           autoComplete="new-password"
           grow
+          labelled
         />
         <TextField
           label={t("account.confirmPassword")}
@@ -114,6 +116,7 @@ export function PasswordPanel() {
           onChange={setAgain}
           autoComplete="new-password"
           grow
+          labelled
         />
         <p className="sec">{t("setup.passwordHint", { min: String(MIN_PASSWORD) })}</p>
         <div className="row">

@@ -182,6 +182,27 @@ describe("before signing in", () => {
     await waitFor(() => expect(screen.getByLabelText("Email")).toBeTruthy());
   });
 
+  it("writes each field's caption on the screen, not only into an attribute", async () => {
+    // The whole screen shipped as two blank rectangles: TextField rendered
+    // its label as an aria-label, which a screen reader announces and a
+    // sighted reader never receives. getByLabelText would have passed the
+    // entire time, so this asserts the caption is TEXT in the document.
+    stubServer({
+      "GET /v1/me": UNAUTHORIZED,
+      "GET /v1/setup/status": { status: 200, body: { needs_setup: false } },
+      "GET /v1/auth/methods": { status: 200, body: { methods: [{ kind: "password" }] } },
+    });
+    render(wrap());
+
+    await waitFor(() => expect(screen.getByLabelText("Email")).toBeTruthy());
+    for (const caption of ["Email", "Password"]) {
+      const written = screen
+        .getAllByText(caption)
+        .some((node) => node.tagName === "SPAN" && node.textContent === caption);
+      expect(written, `"${caption}" is not written anywhere on the screen`).toBe(true);
+    }
+  });
+
   it("sends the CSRF header on every request", async () => {
     // The server refuses a cookie-authenticated request without it, so a
     // missing header is a whole UI that silently 403s.

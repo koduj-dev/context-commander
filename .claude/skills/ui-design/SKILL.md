@@ -48,6 +48,20 @@ displayed — and those are listed explicitly in the sync check with a reason.
 One inline style is a private decision; a hundred is how a kit turns back into
 a pile of pages.
 
+**The mockups show every field holding a sample value, so the empty form is a
+state they never review.** The sign-in screen shipped as two blank
+rectangles: `TextField` renders its `label` as an `aria-label`, which a screen
+reader announces and a sighted reader never receives, and nothing required a
+`placeholder` either. In `docs/mockups/signin.html` the same input carries a
+fake token, so it looked finished. When a screen's job is to be filled in,
+look at it empty.
+
+Pass `labelled` to show the caption above the field. Prefer it to a
+`placeholder` wherever a reader has to tell one empty box from another — a
+placeholder leaves the moment they start typing, which is exactly when they
+want to check which of three password fields they are in. Check 6 fails on an
+input with neither.
+
 **A class existing in both stylesheets is not the same as it working.** The
 sync check compares whether a component is *defined* in both places; it cannot
 see geometry. The sign-in lockup sat against the card's left edge for a week

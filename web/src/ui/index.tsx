@@ -461,6 +461,7 @@ export function TextField({
   grow,
   autoComplete,
   id,
+  labelled,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -478,18 +479,39 @@ export function TextField({
   autoComplete?: string;
   /** Set when a visible <label> points here instead of the aria-label. */
   id?: string;
+  /**
+   * Show the label above the field instead of only announcing it.
+   *
+   * Needed wherever a reader has to tell one empty box from another — a
+   * sign-in form, three password boxes in a row. An `aria-label` alone is a
+   * caption only a screen reader gets, and a `placeholder` is one that
+   * leaves the moment someone starts typing, which is exactly when they
+   * want to check which field they are in.
+   */
+  labelled?: boolean;
 }) {
-  return (
+  const input = (
     <input
       className={grow ? "field grow" : "field"}
       id={id}
       type={type}
       value={value}
-      aria-label={label}
+      aria-label={labelled ? undefined : label}
       placeholder={placeholder}
       autoComplete={autoComplete}
       onChange={(e) => onChange(e.target.value)}
     />
+  );
+  // The <label> wraps its input, so the association needs no id to go stale
+  // and the caption is clickable. aria-label is dropped in that case: with
+  // both, a screen reader announces the caption and ignores the visible one,
+  // and the two are then free to drift apart.
+  if (!labelled) return input;
+  return (
+    <label className="labelled">
+      <span>{label}</span>
+      {input}
+    </label>
   );
 }
 
@@ -500,23 +522,33 @@ export function TextArea({
   label,
   rows,
   disabled,
+  labelled,
 }: {
   value: string;
   onChange: (v: string) => void;
   label: string;
   rows?: number;
   disabled?: boolean;
+  /** See TextField's `labelled`. */
+  labelled?: boolean;
 }) {
-  return (
+  const area = (
     <textarea
       className="field"
       value={value}
       rows={rows}
-      aria-label={label}
+      aria-label={labelled ? undefined : label}
       disabled={disabled}
       spellCheck={false}
       onChange={(e) => onChange(e.target.value)}
     />
+  );
+  if (!labelled) return area;
+  return (
+    <label className="labelled">
+      <span>{label}</span>
+      {area}
+    </label>
   );
 }
 
