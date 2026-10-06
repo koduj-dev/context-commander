@@ -22,28 +22,95 @@ services:
       timeout: 3s
       retries: 10
 
-  minio:
-    image: minio/minio:latest
+  s3:
+    # An S3 server for poking at internal/storage/s3 by hand. Opt-in:
+    #
+    #   docker compose -f deploy/docker-compose.yml --profile s3 up -d
+    #
+    # It used to be MinIO and it used to start with `make dev-up`. Two reasons
+    # it is neither any more:
+    #
+    #   - MinIO withdrew its community images from the public registries in
+    #     2025. `minio/minio` answers "pull access denied ... repository does
+    #     not exist" on Docker Hub and on quay.io, for `latest` and for pinned
+    #     releases alike, so `make dev-up` had quietly stopped working for
+    #     anyone cloning fresh. The symptom only appears on a machine without
+    #     the image already cached, which is why it surfaced in CI.
+    #   - Nothing needs it. `ccd serve` constructs no S3 store (the backend is
+    #     experimental and not selectable — README, cookbook §8.1), the
+    #     filesystem store is the default, and the package's own tests start
+    #     their own container. A service in the default `up` that nothing uses
+    #     is a download every contributor pays for and nobody spends.
+    #
+    # adobe/s3mock implements the S3 API and nothing else. It has no console,
+    # which is the one thing lost here, and it authenticates nothing — so any
+    # credentials are accepted.
+    profiles: ["s3"]
+    image: adobe/s3mock:latest
     restart: unless-stopped
-    command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: cc_dev
-      MINIO_ROOT_PASSWORD: cc_dev_password
+      initialBuckets: cc-dev
     ports:
-      - "127.0.0.1:9000:9000"
-      - "127.0.0.1:9001:9001"
-    volumes:
-      - cc_minio_data:/data
+      - "127.0.0.1:9090:9090"
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9090 || exit 1"]
       interval: 5s
       timeout: 3s
       retries: 10
 
+  ldap:
+    # A directory to develop LDAP sign-in against (docs/adr/0019). Opt-in, like
+    # `app` and `s3`: `make dev-up` must keep starting only Postgres, because
+    # everyday Go work and `make test` need neither this nor a pull of it.
+    #
+    #   docker compose -f deploy/docker-compose.yml --profile ldap up -d
+    #
+    # osixia/openldap is archived upstream. It is still the image with the
+    # least ceremony for a seeded, disposable directory — bitnami/openldap no
+    # longer publishes free tags at all — and this is a fixture, not a
+    # dependency of anything shipped. The Go integration test brings up its
+    # own container (internal/directory), so nothing in CI depends on this
+    # service existing.
+    profiles: ["ldap"]
+    image: osixia/openldap:1.5.0
+    restart: unless-stopped
+    # --copy-service is what makes the bootstrap LDIFs below run: without it
+    # the image ignores the mounted assets entirely and starts an empty tree,
+    # which looks like "my seed data is wrong" rather than "my seed data was
+    # never read".
+    command: ["--copy-service", "--loglevel", "info"]
+    environment:
+      LDAP_ORGANISATION: Context Commander Dev
+      LDAP_DOMAIN: example.test
+      LDAP_ADMIN_PASSWORD: ldap_admin_dev_only
+      # Keep it plain LDAP on loopback. TLS here would be a self-signed
+      # certificate that every client then has to be told to ignore, which
+      # teaches the wrong habit in the one place the habit matters.
+      LDAP_TLS: "false"
+    ports:
+      - "127.0.0.1:1389:389"
+    volumes:
+      - ./ldap:/container/service/slapd/assets/config/bootstrap/ldif/custom:ro
+      - cc_ldap_data:/var/lib/ldap
+      - cc_ldap_config:/etc/ldap/slapd.d
+    healthcheck:
+      # Binds as the service account the server will use, against the subtree
+      # it will search. A healthcheck that only proves the port is open would
+      # pass on an empty directory, which is the failure worth catching.
+      test:
+        - "CMD-SHELL"
+        - >-
+          ldapsearch -x -H ldap://localhost:389
+          -D cn=readonly,ou=services,dc=example,dc=test -w ldap-dev-password
+          -b ou=people,dc=example,dc=test "(uid=alice)" uid | grep -q "^uid: alice"
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
   app:
     # Opt-in: `make dev-up` / a plain `docker compose ... up` (used by
-    # everyday Go dev and `make test`) must keep only starting Postgres +
-    # MinIO, unchanged. Bring this service up explicitly with
+    # everyday Go dev and `make test`) must keep starting only Postgres.
+    # Bring this service up explicitly with
     # `docker compose -f deploy/docker-compose.yml --profile app up -d --build`.
     profiles: ["app"]
     build:
@@ -81,5 +148,6 @@ volumes:
   # (permission denied walking container-owned files) and is generally the
   # wrong place for engine-owned data files anyway.
   cc_postgres_data:
-  cc_minio_data:
   cc_app_storage:
+  cc_ldap_data:
+  cc_ldap_config:

@@ -5,7 +5,7 @@ DB_OWNER_URL ?= postgres://cc_owner:cc_owner_dev_password@localhost:5432/context
 
 dev-up:
 	docker compose -f deploy/docker-compose.yml up -d
-	@echo "Postgres on localhost:5432, MinIO on localhost:9000 (console :9001)"
+	@echo "Postgres on localhost:5432 — add --profile s3 or --profile ldap for those"
 
 dev-down:
 	docker compose -f deploy/docker-compose.yml down

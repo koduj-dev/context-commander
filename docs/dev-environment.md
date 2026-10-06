@@ -10,7 +10,8 @@ For behaviours of the app itself that are easy to get wrong, see
 ## Requirements
 
 - **Go 1.27+** (`go.mod` pins `go 1.27.0`).
-- **Docker + Docker Compose** — needed for local Postgres/MinIO (`make dev-up`)
+- **Docker + Docker Compose** — needed for local Postgres (`make dev-up`) and for the
+  containers the integration tests start themselves
   *and* for the test suite: `make test` runs real integration tests against a
   disposable Postgres via `testcontainers-go` (`internal/dbtest`), not mocks.
   Multi-tenant RLS bugs only show up against the real thing — see
@@ -19,7 +20,10 @@ For behaviours of the app itself that are easy to get wrong, see
 
 ## Local services
 
-`make dev-up` starts Postgres (`:5432`) and MinIO (`:9000`, console `:9001`)
+`make dev-up` starts Postgres (`:5432`). Two more services sit behind profiles because
+nothing in everyday work needs them: `--profile s3` for an S3 server to poke
+`internal/storage/s3` at (`:9090`), and `--profile ldap` for a seeded directory to develop
+LDAP sign-in against (`:1389`)
 via `deploy/docker-compose.yml`. Both are named-volume-backed, not bind-mounted
 into the repo — a container-owned bind mount under the repo tree breaks
 `go build ./...` (permission denied walking container-owned files).
@@ -59,7 +63,7 @@ test proves nothing.
 `web/dist` is embedded via `go:embed` at build time, so the image needs no
 Node stage. `deploy/docker-compose.yml`'s `app` service runs it, but sits
 behind a `profiles: ["app"]` gate so a plain `docker compose ... up` (what
-`make dev-up` runs) keeps only starting Postgres/MinIO — bring `app` up with
+`make dev-up` runs) keeps only starting Postgres — bring `app` up with
 `--profile app` explicitly. See the README's "Running entirely in Docker"
 for the exact commands; port `8490` (not `8080`) to leave room next to
 docker-commander's `8470` if both run on the same host.
@@ -68,5 +72,5 @@ docker-commander's `8470` if both run on the same host.
 (`isLoopbackAddr` in `adapters/cli/serve.go`) is why the image's `CMD` passes
 `--insecure-allow-cleartext` — `0.0.0.0` inside the container is not
 loopback, but the port is only published to `127.0.0.1` on the host (same
-posture as postgres/minio above), so Docker's own network isolation is the
+posture as postgres above), so Docker's own network isolation is the
 actual boundary, same as it is for those two.

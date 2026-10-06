@@ -31,7 +31,7 @@ best-effort basis — thanks for your patience.
 The domain design went through two rounds of external architecture review before
 implementation started (see the `docs/adr/` for what each one changed and why). During
 implementation, every phase is covered by tests that run against a real, disposable
-Postgres/MinIO (via `testcontainers-go`) — not mocks — specifically because RLS, transaction, and
+Postgres and an S3 server (via `testcontainers-go`) — not mocks — specifically because RLS, transaction, and
 encryption bugs don't reproduce against a mock. That combination has already found and fixed real
 defects before they shipped, not just hypothetical ones: see "Invariants worth knowing" below for
 three examples.
@@ -104,5 +104,5 @@ defect that implementation-time testing caught before it shipped — not a hypot
 
 Generally **out of scope**: issues that require an already-compromised host or database, running
 the app without the documented protections (e.g. exposing the dev `docker-compose.yml` credentials
-in production), or vulnerabilities in PostgreSQL/MinIO/dependencies themselves (report those
+in production), or vulnerabilities in PostgreSQL or other dependencies themselves (report those
 upstream, though we're happy to bump versions).

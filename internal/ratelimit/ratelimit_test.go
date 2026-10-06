@@ -119,8 +119,13 @@ func TestConcurrentUseIsRaceFree(t *testing.T) {
 func TestAllowSignInIsPerIdentifier(t *testing.T) {
 	l := ratelimit.New(ratelimit.Limits{PerSignIn: 0.0001, SignInBurst: 2})
 
-	if !l.AllowSignIn("alice@example.test") || !l.AllowSignIn("alice@example.test") {
-		t.Fatal("the first two attempts within the burst were refused")
+	// Two statements, not `a() || a()`: that form works only because || still
+	// evaluates its right side, which reads as a copy-paste mistake and
+	// breaks silently if anyone ever makes it &&.
+	for i := 1; i <= 2; i++ {
+		if !l.AllowSignIn("alice@example.test") {
+			t.Fatalf("attempt %d within the burst was refused", i)
+		}
 	}
 	if l.AllowSignIn("alice@example.test") {
 		t.Error("a third attempt was allowed past a burst of 2")

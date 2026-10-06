@@ -16,10 +16,9 @@ Both tiers run together: `make test` is `go test ./... -race -count=1`, and CI
 (`.github/workflows/ci.yml`) runs the same command unconditionally — GitHub's
 `ubuntu-latest` runner has a Docker daemon available, so there is no `-short`
 split to skip the integration tier in CI the way some sibling projects do.
-Locally, integration tests need Docker running (`make dev-up` starts the same
-Postgres/MinIO compose stack, but the integration tests spin up their **own**
-disposable container via `testcontainers-go` — they don't reuse `dev-up`'s
-instance). The whole suite runs in well under a minute; if it takes minutes,
+Locally, integration tests need Docker running, but not `make dev-up`: each
+one spins up its **own** disposable container via `testcontainers-go` rather
+than reusing anything the compose stack started. The whole suite runs in well under a minute; if it takes minutes,
 something has regressed in `internal/dbtest` — see below.
 
 `make lint` (`golangci-lint`, config in `.golangci.yml`) and a `gitleaks` secret

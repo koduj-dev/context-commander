@@ -55,10 +55,10 @@ a smoke test, so they cannot drift from the server's actual surface.
 ### Storage backends
 
 The supported backend is the local filesystem (`--storage-dir` / `$CC_STORAGE_DIR`).
-`internal/storage/s3` exists but no code path in `ccd serve` constructs it, so **S3/MinIO is
-experimental and not selectable** — see cookbook §8.1. The MinIO container in
+`internal/storage/s3` exists but no code path in `ccd serve` constructs it, so **S3 is
+experimental and not selectable** — see cookbook §8.1. The `s3` container in
 `deploy/docker-compose.yml` is part of the development environment, not something the running
-server talks to.
+server talks to, and it is behind a profile (`--profile s3`) for that reason.
 
 ## Architecture
 
@@ -81,7 +81,7 @@ Requires Go 1.27+, Docker, and Docker Compose (`make test` also needs Docker —
 suite runs against a real, disposable Postgres via testcontainers-go, not mocks).
 
 ```bash
-make dev-up      # start Postgres + MinIO
+make dev-up      # start Postgres
 make build       # build ./cmd/ccd -> bin/ccd
 make test        # run the test suite (unit + real-Postgres integration tests)
 make lint        # golangci-lint
@@ -100,7 +100,7 @@ export CC_DATABASE_URL=postgres://cc_app:cc_app_dev_password@localhost:5432/cont
 
 ### Running entirely in Docker
 
-`make dev-up` only starts Postgres/MinIO — everyday Go dev and `make test` don't need the app
+`make dev-up` only starts Postgres — everyday Go dev and `make test` don't need the app
 itself containerized. To run `ccd` (server + embedded web UI) in Docker too, opt into the `app`
 profile explicitly:
 

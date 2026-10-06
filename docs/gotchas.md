@@ -159,3 +159,27 @@ Rebuild first, or check the column exists:
     go build -o bin/ccd ./cmd/ccd && ./bin/ccd migrate
     docker exec context-commander-postgres-1 \
       psql -U cc_owner -d context_commander -c "\d service_principals"
+
+## `docker compose down -v` is project-wide, not service-scoped
+
+`docker compose -f deploy/docker-compose.yml --profile ldap down -v` destroyed
+`cc_postgres_data` — the whole dev database. Neither `--profile` nor naming a
+service narrows `down`: it brings down every service in the compose *project*,
+and `-v` removes every volume that project owns.
+
+To recreate one service's state, remove that one volume by name:
+
+    docker compose -f deploy/docker-compose.yml --profile ldap stop ldap
+    docker compose -f deploy/docker-compose.yml --profile ldap rm -f ldap
+    docker volume rm context-commander_cc_ldap_data context-commander_cc_ldap_config
+
+The reason this came up: osixia/openldap runs its bootstrap LDIFs **once**, on
+a fresh volume, so changing a seed file has no effect until the volume is
+gone. That makes "wipe and restart" the normal way to iterate on the seed —
+which is exactly how a careless `-v` ends up in a command.
+
+What survived, and what that is worth knowing: `.cc-dev/` lives on the host,
+so the object store and the root key were untouched. They were also useless —
+the project keys and every row of metadata were in the database, so the
+remaining ciphertext had nothing left to be read with. Encrypted bytes without
+their key hierarchy are not a backup.

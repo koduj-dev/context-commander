@@ -16,31 +16,65 @@ import (
 	"github.com/koduj-dev/context-commander/internal/ratelimit"
 )
 
-// post sends a JSON request with the header the browser endpoints require,
-// so a test has to opt OUT of being a browser rather than remember to opt in.
-func (f *fixture) post(path, body string) *http.Response {
-	f.t.Helper()
-	req, err := http.NewRequest(http.MethodPost, f.server.URL+path, strings.NewReader(body))
-	if err != nil {
-		f.t.Fatalf("new request: %v", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Requested-With", "cc-web")
-	resp, err := f.server.Client().Do(req)
-	if err != nil {
-		f.t.Fatalf("%s %s: %v", http.MethodPost, path, err)
-	}
-	return resp
+// reply is a response whose body has already been read and closed.
+//
+// This file's older neighbours hand back an *http.Response and leave closing
+// to each call site — fifteen chances to forget in this file alone, and a
+// forgotten body is a leaked connection in a suite that makes hundreds of
+// requests. Reading it here costs nothing: every assertion below wants the
+// status, the cookies or the text, never a stream.
+type reply struct {
+	status  int
+	body    string
+	cookies []*http.Cookie
 }
 
-func sessionCookieFrom(t *testing.T, resp *http.Response) *http.Cookie {
-	t.Helper()
-	for _, c := range resp.Cookies() {
+func (r reply) sessionCookie() *http.Cookie {
+	for _, c := range r.cookies {
 		if c.Name == "cc_session" {
 			return c
 		}
 	}
 	return nil
+}
+
+func (f *fixture) send(req *http.Request) reply {
+	f.t.Helper()
+	resp, err := f.server.Client().Do(req)
+	if err != nil {
+		f.t.Fatalf("%s %s: %v", req.Method, req.URL.Path, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		f.t.Fatalf("read body: %v", err)
+	}
+	return reply{status: resp.StatusCode, body: string(body), cookies: resp.Cookies()}
+}
+
+func (f *fixture) request(method, path string, body string) *http.Request {
+	f.t.Helper()
+	req, err := http.NewRequestWithContext(f.t.Context(), method, f.server.URL+path, strings.NewReader(body))
+	if err != nil {
+		f.t.Fatalf("new request: %v", err)
+	}
+	return req
+}
+
+// post sends a JSON request with the header the browser endpoints require,
+// so a test has to opt OUT of being a browser rather than remember to opt in.
+func (f *fixture) post(path, body string) reply {
+	f.t.Helper()
+	req := f.request(http.MethodPost, path, body)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Requested-With", "cc-web")
+	return f.send(req)
+}
+
+// get is the unauthenticated read the pre-credential screens make.
+func (f *fixture) get(path string) reply {
+	f.t.Helper()
+	return f.send(f.request(http.MethodGet, path, ""))
 }
 
 func TestSetupCreatesTheFirstAdministrator(t *testing.T) {
@@ -51,7 +85,7 @@ func TestSetupCreatesTheFirstAdministrator(t *testing.T) {
 	f := newFixtureWithDeps(t, nil, ratelimit.Limits{}, func(d *cchttp.Deps) { d.FirstRun = code })
 
 	// An empty installation says so. This is the bit the UI routes on.
-	resp := f.do(http.MethodGet, "/v1/setup/status", "", nil)
+	resp := f.get("/v1/setup/status")
 	var status struct {
 		NeedsSetup bool `json:"needs_setup"`
 	}
@@ -62,13 +96,13 @@ func TestSetupCreatesTheFirstAdministrator(t *testing.T) {
 
 	body := `{"code":"` + code.String() + `","email":"first@example.test","display_name":"First Admin","password":"correct horse battery staple"}`
 	resp = f.post("/v1/setup", body)
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("setup: status %d, body %s", resp.StatusCode, readBody(t, resp))
+	if resp.status != http.StatusOK {
+		t.Fatalf("setup: status %d, body %s", resp.status, resp.body)
 	}
 	// Setup must leave the new administrator signed in — sending them to a
 	// login form immediately after creating their account is a round trip
 	// for no reason.
-	if sessionCookieFrom(t, resp) == nil {
+	if resp.sessionCookie() == nil {
 		t.Error("setup did not set a session cookie")
 	}
 
@@ -101,14 +135,14 @@ func TestSetupCreatesTheFirstAdministrator(t *testing.T) {
 
 	// And now the endpoint is closed, by two independent checks: the code is
 	// spent, and the installation has a user.
-	resp = f.do(http.MethodGet, "/v1/setup/status", "", nil)
+	resp = f.get("/v1/setup/status")
 	decodeInto(t, resp, &status)
 	if status.NeedsSetup {
 		t.Error("setup still reports as needed after it completed")
 	}
 	resp = f.post("/v1/setup", body)
-	if resp.StatusCode != http.StatusConflict {
-		t.Errorf("replayed setup: status %d, want 409", resp.StatusCode)
+	if resp.status != http.StatusConflict {
+		t.Errorf("replayed setup: status %d, want 409", resp.status)
 	}
 }
 
@@ -124,21 +158,21 @@ func TestSetupRefusesWithoutTheCode(t *testing.T) {
 		"wrong code": `{"code":"00000000000000000000000000000000","email":"a@example.test","display_name":"A","password":"correct horse battery staple"}`,
 	} {
 		resp := f.post("/v1/setup", attempt)
-		if resp.StatusCode != http.StatusUnauthorized {
-			t.Errorf("%s: status %d, want 401", name, resp.StatusCode)
+		if resp.status != http.StatusUnauthorized {
+			t.Errorf("%s: status %d, want 401", name, resp.status)
 		}
 	}
 
 	// A short password is refused before the code is spent, or a typo in the
 	// password would burn the one chance to use it.
 	resp := f.post("/v1/setup", `{"code":"`+code.String()+`","email":"a@example.test","display_name":"A","password":"short"}`)
-	if resp.StatusCode != http.StatusBadRequest {
-		t.Errorf("weak password: status %d, want 400", resp.StatusCode)
+	if resp.status != http.StatusBadRequest {
+		t.Errorf("weak password: status %d, want 400", resp.status)
 	}
 	resp = f.post("/v1/setup", `{"code":"`+code.String()+`","email":"a@example.test","display_name":"A","password":"correct horse battery staple"}`)
-	if resp.StatusCode != http.StatusOK {
+	if resp.status != http.StatusOK {
 		t.Errorf("after a refused weak password the code no longer works: status %d, body %s",
-			resp.StatusCode, readBody(t, resp))
+			resp.status, resp.body)
 	}
 }
 
@@ -149,8 +183,8 @@ func TestSetupIsClosedWhenNoCodeWasMinted(t *testing.T) {
 	f.newUserWithToken("existing@example.test")
 
 	resp := f.post("/v1/setup", `{"code":"","email":"a@example.test","display_name":"A","password":"correct horse battery staple"}`)
-	if resp.StatusCode != http.StatusConflict {
-		t.Errorf("status %d, want 409 (the installation already has users)", resp.StatusCode)
+	if resp.status != http.StatusConflict {
+		t.Errorf("status %d, want 409 (the installation already has users)", resp.status)
 	}
 }
 
@@ -165,10 +199,10 @@ func TestPasswordSignIn(t *testing.T) {
 
 	t.Run("a session cookie is issued and authenticates", func(t *testing.T) {
 		resp := f.post("/v1/auth/password", `{"email":"`+email+`","password":"`+password+`"}`)
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("sign-in: status %d, body %s", resp.StatusCode, readBody(t, resp))
+		if resp.status != http.StatusOK {
+			t.Fatalf("sign-in: status %d, body %s", resp.status, resp.body)
 		}
-		cookie := sessionCookieFrom(t, resp)
+		cookie := resp.sessionCookie()
 		if cookie == nil {
 			t.Fatal("no session cookie was set")
 		}
@@ -180,7 +214,7 @@ func TestPasswordSignIn(t *testing.T) {
 		}
 		// The token must not also come back in the body, which would hand it
 		// straight to the JavaScript the cookie keeps it from.
-		if strings.Contains(readBody(t, resp), cookie.Value) {
+		if strings.Contains(resp.body, cookie.Value) {
 			t.Error("the response body contains the session token")
 		}
 
@@ -201,10 +235,10 @@ func TestPasswordSignIn(t *testing.T) {
 			`{"email":"","password":""}`,
 		} {
 			resp := f.post("/v1/auth/password", attempt)
-			if resp.StatusCode != http.StatusUnauthorized {
-				t.Errorf("status %d, want 401 for %s", resp.StatusCode, attempt)
+			if resp.status != http.StatusUnauthorized {
+				t.Errorf("status %d, want 401 for %s", resp.status, attempt)
 			}
-			messages = append(messages, readBody(t, resp))
+			messages = append(messages, resp.body)
 		}
 		for _, m := range messages[1:] {
 			if m != messages[0] {
@@ -216,18 +250,13 @@ func TestPasswordSignIn(t *testing.T) {
 	t.Run("sign-in needs the CSRF header too", func(t *testing.T) {
 		// Otherwise a cross-site form can sign someone into an account the
 		// attacker controls, which is a quieter problem than it sounds.
-		req, err := http.NewRequest(http.MethodPost, f.server.URL+"/v1/auth/password",
-			strings.NewReader(`{"email":"`+email+`","password":"`+password+`"}`))
-		if err != nil {
-			t.Fatalf("new request: %v", err)
-		}
+		// Built by hand rather than with f.post, which always sets the
+		// header: the absence of it is the whole subject of this test.
+		req := f.request(http.MethodPost, "/v1/auth/password",
+			`{"email":"`+email+`","password":"`+password+`"}`)
 		req.Header.Set("Content-Type", "application/json")
-		resp, err := f.server.Client().Do(req)
-		if err != nil {
-			t.Fatalf("do: %v", err)
-		}
-		if resp.StatusCode != http.StatusForbidden {
-			t.Errorf("status %d, want 403", resp.StatusCode)
+		if got := f.send(req).status; got != http.StatusForbidden {
+			t.Errorf("status %d, want 403", got)
 		}
 	})
 }
@@ -242,37 +271,31 @@ func TestSignOutRevokesTheSession(t *testing.T) {
 	f.setLocalPassword(email, password)
 
 	resp := f.post("/v1/auth/password", `{"email":"`+email+`","password":"`+password+`"}`)
-	cookie := sessionCookieFrom(t, resp)
+	cookie := resp.sessionCookie()
 	if cookie == nil {
 		t.Fatal("no session cookie")
 	}
 
-	req, err := http.NewRequest(http.MethodDelete, f.server.URL+"/v1/auth/session", nil)
-	if err != nil {
-		t.Fatalf("new request: %v", err)
+	signOut := func() int {
+		req := f.request(http.MethodDelete, "/v1/auth/session", "")
+		req.AddCookie(cookie)
+		req.Header.Set("X-Requested-With", "cc-web")
+		return f.send(req).status
 	}
-	req.AddCookie(cookie)
-	req.Header.Set("X-Requested-With", "cc-web")
-	resp, err = f.server.Client().Do(req)
-	if err != nil {
-		t.Fatalf("sign out: %v", err)
-	}
-	if resp.StatusCode != http.StatusNoContent {
-		t.Fatalf("sign out: status %d", resp.StatusCode)
+	if got := signOut(); got != http.StatusNoContent {
+		t.Fatalf("sign out: status %d", got)
 	}
 
 	// The test that matters: the TOKEN is dead, not merely forgotten by this
 	// client. Presented as a bearer, bypassing the cookie entirely.
-	if resp := f.do(http.MethodGet, "/v1/me", cookie.Value, nil); resp.StatusCode != http.StatusUnauthorized {
-		t.Errorf("the revoked session token still authenticates: status %d", resp.StatusCode)
+	bearer := f.do(http.MethodGet, "/v1/me", cookie.Value, nil)
+	defer func() { _ = bearer.Body.Close() }()
+	if bearer.StatusCode != http.StatusUnauthorized {
+		t.Errorf("the revoked session token still authenticates: status %d", bearer.StatusCode)
 	}
 	// Signing out again is the same end state, not an error.
-	resp, err = f.server.Client().Do(req)
-	if err != nil {
-		t.Fatalf("sign out twice: %v", err)
-	}
-	if resp.StatusCode != http.StatusNoContent {
-		t.Errorf("sign out twice: status %d, want 204", resp.StatusCode)
+	if got := signOut(); got != http.StatusNoContent {
+		t.Errorf("sign out twice: status %d, want 204", got)
 	}
 }
 
@@ -282,7 +305,7 @@ func TestSignInRateLimitIsPerIdentifier(t *testing.T) {
 
 	attempt := func(email string) int {
 		resp := f.post("/v1/auth/password", `{"email":"`+email+`","password":"wrong password entirely"}`)
-		return resp.StatusCode
+		return resp.status
 	}
 
 	for i := range 2 {
@@ -302,9 +325,9 @@ func TestSignInRateLimitIsPerIdentifier(t *testing.T) {
 
 func TestAuthMethodsNamesWhatExists(t *testing.T) {
 	f := newFixture(t)
-	resp := f.do(http.MethodGet, "/v1/auth/methods", "", nil)
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("status %d", resp.StatusCode)
+	resp := f.get("/v1/auth/methods")
+	if resp.status != http.StatusOK {
+		t.Fatalf("status %d", resp.status)
 	}
 	var got struct {
 		Methods []struct {
@@ -349,36 +372,17 @@ func (f *fixture) setLocalPassword(email, password string) {
 // the CSRF header, and returns the status.
 func (f *fixture) withCookie(method, path string, cookie *http.Cookie, withCSRF bool) int {
 	f.t.Helper()
-	req, err := http.NewRequest(method, f.server.URL+path, nil)
-	if err != nil {
-		f.t.Fatalf("new request: %v", err)
-	}
+	req := f.request(method, path, "")
 	req.AddCookie(cookie)
 	if withCSRF {
 		req.Header.Set("X-Requested-With", "cc-web")
 	}
-	resp, err := f.server.Client().Do(req)
-	if err != nil {
-		f.t.Fatalf("%s %s: %v", method, path, err)
-	}
-	defer resp.Body.Close()
-	return resp.StatusCode
+	return f.send(req).status
 }
 
-func decodeInto(t *testing.T, resp *http.Response, dst any) {
+func decodeInto(t *testing.T, r reply, dst any) {
 	t.Helper()
-	defer resp.Body.Close()
-	if err := json.NewDecoder(resp.Body).Decode(dst); err != nil {
-		t.Fatalf("decode response: %v", err)
+	if err := json.Unmarshal([]byte(r.body), dst); err != nil {
+		t.Fatalf("decode response %q: %v", r.body, err)
 	}
-}
-
-func readBody(t *testing.T, resp *http.Response) string {
-	t.Helper()
-	defer resp.Body.Close()
-	b, err := io.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatalf("read body: %v", err)
-	}
-	return string(b)
 }

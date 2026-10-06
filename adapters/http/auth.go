@@ -46,7 +46,7 @@ func requireBrowserRequest(w http.ResponseWriter, r *http.Request) bool {
 }
 
 func (d Deps) setSessionCookie(w http.ResponseWriter, token string, expires time.Time) {
-	http.SetCookie(w, &http.Cookie{
+	http.SetCookie(w, &http.Cookie{ //nolint:gosec // G124: Secure is deliberately conditional — see below
 		Name:     sessionCookie,
 		Value:    token,
 		Path:     "/",
@@ -65,7 +65,7 @@ func (d Deps) setSessionCookie(w http.ResponseWriter, token string, expires time
 }
 
 func (d Deps) clearSessionCookie(w http.ResponseWriter) {
-	http.SetCookie(w, &http.Cookie{
+	http.SetCookie(w, &http.Cookie{ //nolint:gosec // G124: same conditional Secure as setSessionCookie
 		Name:     sessionCookie,
 		Value:    "",
 		Path:     "/",

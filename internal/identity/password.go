@@ -34,6 +34,13 @@ const (
 	argonThreads = 4
 	argonKeyLen  = 32
 	argonSaltLen = 16
+
+	// The range a stored argon2id digest may claim. 32 is what this package
+	// writes; the window allows a hash made under a different key length to
+	// keep verifying, which is the same reason VerifyPassword reads the cost
+	// from the stored string rather than from the constants above.
+	minKeyLen = 16
+	maxKeyLen = 64
 )
 
 // MinPasswordLength is a length floor and nothing else: no required character
@@ -86,37 +93,45 @@ func HashPassword(plaintext string) (string, error) {
 // must not be distinguishable from "wrong password" by anyone presenting a
 // guess.
 func VerifyPassword(plaintext, stored string) bool {
-	memory, passes, threads, salt, want, err := parsePHC(stored)
+	memory, passes, keyLen, threads, salt, want, err := parsePHC(stored)
 	if err != nil {
 		return false
 	}
-	got := argon2.IDKey([]byte(plaintext), salt, passes, memory, threads, uint32(len(want)))
+	got := argon2.IDKey([]byte(plaintext), salt, passes, memory, threads, keyLen)
 	return subtle.ConstantTimeCompare(got, want) == 1
 }
 
-func parsePHC(stored string) (memory, passes uint32, threads uint8, salt, hash []byte, err error) {
+// parsePHC also returns the digest's length as the key size to recompute
+// with. Returned from here, next to the check that bounds it, rather than
+// derived at the call site: a conversion whose proof of safety lives in
+// another function is a conversion nobody can check — the linter included.
+func parsePHC(stored string) (memory, passes, keyLen uint32, threads uint8, salt, hash []byte, err error) {
 	parts := strings.Split(stored, "$")
 	// ["", "argon2id", "v=19", "m=...,t=...,p=...", salt, hash]
 	if len(parts) != 6 || parts[1] != "argon2id" {
-		return 0, 0, 0, nil, nil, errMalformedHash
+		return 0, 0, 0, 0, nil, nil, errMalformedHash
 	}
 	var version int
 	if _, err := fmt.Sscanf(parts[2], "v=%d", &version); err != nil || version != argon2.Version {
-		return 0, 0, 0, nil, nil, errMalformedHash
+		return 0, 0, 0, 0, nil, nil, errMalformedHash
 	}
 	if _, err := fmt.Sscanf(parts[3], "m=%d,t=%d,p=%d", &memory, &passes, &threads); err != nil {
-		return 0, 0, 0, nil, nil, errMalformedHash
+		return 0, 0, 0, 0, nil, nil, errMalformedHash
 	}
 	if salt, err = base64.RawStdEncoding.DecodeString(parts[4]); err != nil {
-		return 0, 0, 0, nil, nil, errMalformedHash
+		return 0, 0, 0, 0, nil, nil, errMalformedHash
 	}
 	if hash, err = base64.RawStdEncoding.DecodeString(parts[5]); err != nil {
-		return 0, 0, 0, nil, nil, errMalformedHash
+		return 0, 0, 0, 0, nil, nil, errMalformedHash
 	}
-	if len(salt) == 0 || len(hash) == 0 {
-		return 0, 0, 0, nil, nil, errMalformedHash
+	// Bounded rather than merely non-empty: a stored hash claiming an absurd
+	// length is malformed, and must be rejected rather than handed to argon2
+	// as a key size.
+	length := len(hash)
+	if len(salt) == 0 || length < minKeyLen || length > maxKeyLen {
+		return 0, 0, 0, 0, nil, nil, errMalformedHash
 	}
-	return memory, passes, threads, salt, hash, nil
+	return memory, passes, uint32(length), threads, salt, hash, nil
 }
 
 // decoyHash is a real argon2id hash of a value nobody can present, used to

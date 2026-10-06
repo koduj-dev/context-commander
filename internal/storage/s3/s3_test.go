@@ -7,52 +7,79 @@ import (
 	"io"
 	"testing"
 
-	tcminio "github.com/testcontainers/testcontainers-go/modules/minio"
+	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/wait"
 
 	"github.com/koduj-dev/context-commander/internal/storage"
 	cstorage "github.com/koduj-dev/context-commander/internal/storage/s3"
 )
 
-// newTestStore starts a disposable MinIO container (S3-compatible) so this
-// package's tests don't depend on `docker compose up` having been run
-// beforehand — same rationale as internal/dbtest for Postgres.
+// The S3 server these tests run against.
+//
+// It used to be MinIO, via testcontainers' module for it. MinIO withdrew its
+// community images from the public registries in 2025 — `minio/minio` now
+// answers "pull access denied ... repository does not exist", on Docker Hub
+// and on quay.io, for `latest` and for pinned releases alike. The failure
+// arrived in CI rather than locally, because a machine that has run
+// `make dev-up` already holds the image in its cache.
+//
+// adobe/s3mock rather than localstack: it implements the S3 API and nothing
+// else, which is all this package needs, and starts in about a second. It
+// authenticates nothing, so the credentials below are arbitrary — which is
+// honest for a test of our own code's S3 interaction rather than of a
+// server's access control.
+const (
+	s3mockImage = "adobe/s3mock:latest"
+	s3mockPort  = "9090/tcp"
+	testBucket  = "cc-test-bucket"
+)
+
+// newTestStore starts a disposable S3 server so this package's tests don't
+// depend on `docker compose up` having been run beforehand — same rationale
+// as internal/dbtest for Postgres.
 func newTestStore(t *testing.T) *cstorage.Store {
 	t.Helper()
 	ctx := context.Background()
 
-	const (
-		user     = "cc_test"
-		password = "cc_test_password"
-	)
-
-	container, err := tcminio.Run(ctx, "minio/minio:latest",
-		tcminio.WithUsername(user),
-		tcminio.WithPassword(password),
-	)
+	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+		ContainerRequest: testcontainers.ContainerRequest{
+			Image:        s3mockImage,
+			ExposedPorts: []string{s3mockPort},
+			// The bucket is created by the server at startup rather than by
+			// EnsureBucket below, so a failure in EnsureBucket is about our
+			// code and not about a race with a server still booting.
+			Env:        map[string]string{"initialBuckets": testBucket},
+			WaitingFor: wait.ForListeningPort(s3mockPort),
+		},
+		Started: true,
+	})
 	if err != nil {
-		t.Fatalf("start minio container: %v", err)
+		t.Fatalf("start s3 container: %v", err)
 	}
 	t.Cleanup(func() {
 		if err := container.Terminate(context.Background()); err != nil {
-			t.Logf("terminate minio container: %v", err)
+			t.Logf("terminate s3 container: %v", err)
 		}
 	})
 
-	endpoint, err := container.ConnectionString(ctx)
+	endpoint, err := container.PortEndpoint(ctx, s3mockPort, "http")
 	if err != nil {
-		t.Fatalf("minio connection string: %v", err)
+		t.Fatalf("s3 endpoint: %v", err)
 	}
 
 	store, err := cstorage.New(ctx, cstorage.Config{
-		Bucket:          "cc-test-bucket",
-		Endpoint:        "http://" + endpoint,
+		Bucket:          testBucket,
+		Endpoint:        endpoint,
 		UsePathStyle:    true,
-		AccessKeyID:     user,
-		SecretAccessKey: password,
+		AccessKeyID:     "cc_test",
+		SecretAccessKey: "cc_test_password",
 	})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
+	// Still called, and still has to succeed: creating a bucket that already
+	// exists is the normal case in a real deployment and must not be an
+	// error.
 	if err := store.EnsureBucket(ctx); err != nil {
 		t.Fatalf("EnsureBucket: %v", err)
 	}

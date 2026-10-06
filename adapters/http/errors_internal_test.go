@@ -33,7 +33,7 @@ func captureLog(t *testing.T, fn func()) string {
 
 func TestUnclassifiedErrorIsLoggedAndNotDisclosed(t *testing.T) {
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/v1/installation/service-principals", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/v1/installation/service-principals", nil)
 	cause := errors.New("ERROR: column \"created_by\" of relation \"service_principals\" does not exist")
 
 	out := captureLog(t, func() { writeDomainError(rec, req, cause) })
@@ -72,7 +72,7 @@ func TestClassifiedErrorIsNotLogged(t *testing.T) {
 	// bury the 500s this logging exists for — which is how a log stops being
 	// read at all.
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v1/projects/acme/thing", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/v1/projects/acme/thing", nil)
 
 	out := captureLog(t, func() { writeDomainError(rec, req, projects.ErrNotFound) })
 
@@ -88,7 +88,7 @@ func TestInternalErrorNamesTheOperation(t *testing.T) {
 	// The difference between "unhandled error" and "could not store the
 	// password" in a log someone is reading at the wrong hour.
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPut, "/v1/me/password", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodPut, "/v1/me/password", nil)
 	cause := errors.New("connection reset by peer")
 
 	out := captureLog(t, func() { internalError(rec, req, cause, "could not store the password") })

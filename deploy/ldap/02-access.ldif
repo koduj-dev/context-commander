@@ -1,0 +1,27 @@
+# Let the readonly service account search the people subtree, and nothing else.
+#
+# Two things this file got wrong the first time, both worth keeping written
+# down because both failed silently:
+#
+#   1. The database is olcDatabase={1}mdb, not {2}. A modify against a DN that
+#      does not exist is simply skipped by the bootstrap, the image's default
+#      ACLs stay in force ("by self read ... by * none"), and a search as
+#      cn=readonly then returns err=32 noSuchObject. That reads as "my seed
+#      data did not load" when in fact the data is there and unreadable —
+#      OpenLDAP deliberately answers noSuchObject rather than
+#      insufficientAccess, so as not to disclose what exists.
+#   2. `replace: olcAccess` replaces ALL of them, including the rule granting
+#      the local root (peercred over ldapi) manage access. Dropping that
+#      locks the container's own ldapsearch -Y EXTERNAL out of its data, which
+#      is the tool you reach for to find out what went wrong. It is restored
+#      as {0} below.
+#
+# Re-running this on a container whose volumes already exist does nothing:
+# osixia bootstraps once. Recreate with `docker compose ... down -v` first.
+dn: olcDatabase={1}mdb,cn=config
+changetype: modify
+replace: olcAccess
+olcAccess: {0}to * by dn.exact=gidNumber=0+uidNumber=0,cn=peercred,cn=external,cn=auth manage by * break
+olcAccess: {1}to attrs=userPassword,shadowLastChange by self write by dn="cn=admin,dc=example,dc=test" write by anonymous auth by * none
+olcAccess: {2}to dn.subtree="ou=people,dc=example,dc=test" by dn="cn=readonly,ou=services,dc=example,dc=test" read by dn="cn=admin,dc=example,dc=test" write by self read by * none
+olcAccess: {3}to * by self read by dn="cn=admin,dc=example,dc=test" write by * none

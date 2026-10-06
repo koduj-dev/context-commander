@@ -1,0 +1,73 @@
+# Seed directory for developing and testing LDAP sign-in (docs/adr/0019).
+#
+# Deliberately not a realistic corporate tree. It holds the cases the code has
+# to get right and nothing else:
+#
+#   alice   an ordinary person, with mail and displayName
+#   bob     the same, to prove nothing is keyed on "the only user"
+#   carol   NO mail attribute — provisioning must not fall over, and must not
+#           invent an address
+#   dave    mail that differs in case from the one anyone would type
+#   readonly  a service account to bind as, because binding as cn=admin in
+#           production is how a directory read turns into a directory write
+#
+# Passwords are the literal string "ldap-dev-password" for every account.
+# This file is committed on purpose: it describes a disposable container, it
+# is referenced by tests, and a seed nobody can read is a fixture nobody can
+# fix.
+
+dn: ou=people,dc=example,dc=test
+objectClass: organizationalUnit
+ou: people
+
+dn: ou=services,dc=example,dc=test
+objectClass: organizationalUnit
+ou: services
+
+# The account the server binds as to search for a person. Granted read on the
+# people subtree below and nothing else.
+dn: cn=readonly,ou=services,dc=example,dc=test
+objectClass: organizationalRole
+objectClass: simpleSecurityObject
+cn: readonly
+description: Service account Context Commander binds as to resolve a user
+userPassword: ldap-dev-password
+
+dn: uid=alice,ou=people,dc=example,dc=test
+objectClass: inetOrgPerson
+uid: alice
+cn: Alice Ashworth
+sn: Ashworth
+displayName: Alice Ashworth
+mail: alice@example.test
+userPassword: ldap-dev-password
+
+dn: uid=bob,ou=people,dc=example,dc=test
+objectClass: inetOrgPerson
+uid: bob
+cn: Bob Bellweather
+sn: Bellweather
+displayName: Bob Bellweather
+mail: bob@example.test
+userPassword: ldap-dev-password
+
+# No mail attribute. A directory is under no obligation to hold one, and the
+# code must neither crash nor make one up.
+dn: uid=carol,ou=people,dc=example,dc=test
+objectClass: inetOrgPerson
+uid: carol
+cn: Carol Czerny
+sn: Czerny
+userPassword: ldap-dev-password
+
+# Mail recorded in a different case from how anyone types it. Our own
+# users.email is matched case-insensitively (migrations/000025); this proves
+# the directory path agrees.
+dn: uid=dave,ou=people,dc=example,dc=test
+objectClass: inetOrgPerson
+uid: dave
+cn: Dave Dvorak
+sn: Dvorak
+displayName: Dave Dvorak
+mail: Dave.Dvorak@Example.Test
+userPassword: ldap-dev-password

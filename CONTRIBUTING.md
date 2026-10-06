@@ -28,7 +28,7 @@ internal/           # domain packages (identity, organizations, projects, auth, 
                     #   storage, artifacts, db, audit, events, ...) — see each package's doc.go
 adapters/           # mcp / http / cli — transport only, never business logic
 migrations/         # golang-migrate SQL, embedded into the binary (`ccd migrate`)
-deploy/             # docker-compose for local dev (Postgres + MinIO)
+deploy/             # docker-compose for local dev (Postgres; S3 and LDAP behind profiles)
 docs/adr/           # one file per load-bearing decision — read before touching internal/
 ```
 
@@ -43,7 +43,7 @@ see below).
 ```bash
 git clone git@github.com:koduj-dev/context-commander.git
 cd context-commander
-make dev-up                                              # Postgres + MinIO
+make dev-up                                              # Postgres
 make build                                                # -> bin/ccd
 CC_DATABASE_URL=postgres://cc_owner:cc_owner_dev_password@localhost:5432/context_commander?sslmode=disable \
   ./bin/ccd migrate
