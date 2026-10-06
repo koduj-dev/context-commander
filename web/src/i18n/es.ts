@@ -29,6 +29,11 @@ export const es: Partial<Record<MessageKey, string>> = {
   "auth.withPassword": "Correo y contraseña",
   "auth.withToken": "Token de acceso",
   "auth.email": "Correo electrónico",
+  "auth.emailOrUsername": "Correo o nombre de usuario",
+  "auth.directoryUnavailable":
+    "No se ha podido contactar con el directorio. No es un problema de su contraseña: inténtelo de nuevo en un momento o avise a quien administra esta instalación.",
+  "auth.directoryNoEmail":
+    "Su entrada en el directorio no tiene dirección de correo, así que no se puede crear una cuenta para ella. Alguien con permisos de administración debe añadirla.",
   "auth.password": "Contraseña",
   "auth.failed": "El correo o la contraseña no son correctos.",
   "auth.tokenLabel": "Token de acceso",

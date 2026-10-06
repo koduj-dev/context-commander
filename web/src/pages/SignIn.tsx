@@ -23,6 +23,10 @@ export function SignIn() {
 
   const hasPassword = methods.length === 0 || methods.some((m) => m.kind === "password");
   const hasToken = methods.length === 0 || methods.some((m) => m.kind === "token");
+  // With a directory configured, the identifier may be a login name rather
+  // than an address — a form that insists on "Email" is a form that argues
+  // with half the company.
+  const hasDirectory = methods.some((m) => m.kind === "ldap" || m.kind === "oidc");
 
   // Password unless the installation only offers tokens. `methods` is empty
   // when the probe failed, and in that case both are shown rather than
@@ -47,7 +51,13 @@ export function SignIn() {
       // Rate limiting is the one failure worth distinguishing: it is the
       // only one where the answer is "wait", and leaving someone to retype a
       // correct password against a closed door is a cruelty.
+      // The three cases worth telling apart. Everything else reads the same
+      // on purpose — see auth.indistinct.
       if (err instanceof ApiError && err.kind === "rate_limited") setFailure(t("auth.rateLimited"));
+      else if (err instanceof ApiError && err.code === "directory_unavailable")
+        setFailure(t("auth.directoryUnavailable"));
+      else if (err instanceof ApiError && err.code === "no_directory_email")
+        setFailure(t("auth.directoryNoEmail"));
       else if (mode === "token") setFailure(t("auth.tokenFailed"));
       else setFailure(t("auth.failed"));
     } finally {
@@ -82,8 +92,11 @@ export function SignIn() {
           <form onSubmit={submit}>
             <div className="stack">
               <TextField
-                label={t("auth.email")}
-                type="email"
+                label={hasDirectory ? t("auth.emailOrUsername") : t("auth.email")}
+                // Not type="email" once a directory is configured: the browser
+                // would refuse to submit a login name on the grounds that it
+                // is not an address.
+                type={hasDirectory ? "text" : "email"}
                 value={email}
                 onChange={setEmail}
                 autoComplete="username"

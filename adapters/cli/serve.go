@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -24,6 +25,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/contextpack"
 	"github.com/koduj-dev/context-commander/internal/crypto"
 	"github.com/koduj-dev/context-commander/internal/db"
+	"github.com/koduj-dev/context-commander/internal/directory"
 	"github.com/koduj-dev/context-commander/internal/events"
 	"github.com/koduj-dev/context-commander/internal/firstrun"
 	"github.com/koduj-dev/context-commander/internal/gates"
@@ -46,6 +48,9 @@ const (
 	tlsCertEnv                = "CC_TLS_CERT"
 	tlsKeyEnv                 = "CC_TLS_KEY"
 	insecureAllowCleartextEnv = "CC_INSECURE_ALLOW_CLEARTEXT"
+	ldapURLEnv                = "CC_LDAP_URL"
+	// The NAME of an environment variable, not a credential.
+	ldapBindPasswordEnv = "CC_LDAP_BIND_PASSWORD" //nolint:gosec // G101: an env var name
 )
 
 // isLoopbackAddr reports whether an http.Server.Addr binds only to the local
@@ -208,6 +213,18 @@ func newServeCmd() *cobra.Command {
 				MaxConcurrentPasswordHash: maxHash,
 			})
 
+			// LDAP, when an operator configured one. Built before the
+			// server starts listening so a typo in a flag is a refusal to
+			// start rather than a login screen that fails for everyone at
+			// nine in the morning.
+			ldapDir, err := ldapFromFlags(cmd)
+			if err != nil {
+				return err
+			}
+			if ldapDir != nil {
+				slog.Info("LDAP sign-in enabled", "provider", ldapDir.Provider())
+			}
+
 			// First run: when the installation has no users at all, mint a
 			// one-time setup code so the first administrator can be created
 			// in the browser instead of through a shell on this host
@@ -258,6 +275,9 @@ func newServeCmd() *cobra.Command {
 				Installation: installationSvc, ContextPack: contextSvc,
 				Security: securityRec, Limiter: limiter, SecurityEvents: securitySvc,
 				FirstRun: firstRunCode,
+				// Nil unless --ldap-url was given, and a nil Directory is what
+				// closes the path rather than opening it.
+				Directory: ldapDir,
 				// The cookie is Secure whenever the transport is: TLS here,
 				// or a reverse proxy in front of a loopback bind. Only an
 				// explicit --insecure-allow-cleartext turns it off, because
@@ -318,6 +338,28 @@ func newServeCmd() *cobra.Command {
 		"sustained requests per second allowed per credential (0 disables) — deliberately per credential, not per IP: "+
 			"X-Forwarded-For is not trusted, so behind a reverse proxy every caller would share one bucket")
 	cmd.Flags().Int("rate-limit-burst", 200, "how far above the sustained per-credential rate a short spike may go")
+	// LDAP (docs/adr/0019). --ldap-url is the switch: everything else is
+	// ignored without it.
+	cmd.Flags().String("ldap-url", "",
+		fmt.Sprintf("enable LDAP sign-in against this directory, ldap://host:389 or ldaps://host:636 (defaults to $%s)", ldapURLEnv))
+	cmd.Flags().String("ldap-name", "ldap", "provider name recorded against each linked identity — change it only if there is more than one directory")
+	cmd.Flags().Bool("ldap-start-tls", false, "upgrade a plain ldap:// connection with StartTLS (ignored for ldaps://)")
+	cmd.Flags().String("ldap-ca-cert", "", "PEM bundle to verify the directory's certificate against, for an internal CA — there is deliberately no way to skip verification")
+	cmd.Flags().String("ldap-bind-dn", "", "service account to SEARCH as, e.g. cn=readonly,ou=services,dc=example,dc=test (empty searches anonymously)")
+	// Deliberately not a --ldap-bind-password flag: an argument is visible in
+	// `ps` to every user on the machine and lands in shell history. Same
+	// reasoning as `ccd user set-password` reading from stdin.
+	cmd.Flags().String("ldap-bind-password-file", "",
+		fmt.Sprintf("file holding the bind password (defaults to $%s; there is no flag for the password itself, because an argument is visible in `ps`)", ldapBindPasswordEnv))
+	cmd.Flags().String("ldap-user-base", "", "subtree to search for people, e.g. ou=people,dc=example,dc=test")
+	cmd.Flags().String("ldap-user-filter", "",
+		"filter selecting the entry, with %s where the identifier goes (default accepts either a uid or a mail address; the identifier is escaped before substitution)")
+	cmd.Flags().String("ldap-mail-attr", "", `attribute holding the email address (default "mail")`)
+	cmd.Flags().String("ldap-name-attr", "", `attribute holding the display name (default "displayName", falling back to cn)`)
+	cmd.Flags().String("ldap-uid-attr", "",
+		`attribute holding the directory's own stable id (default "entryUUID"; Active Directory uses objectGUID) — never the email, which a person can change`)
+	cmd.Flags().Duration("ldap-timeout", 0, "bound on the whole exchange: dial, bind, search, bind again (default 10s)")
+
 	cmd.Flags().Float64("rate-limit-signin-per-minute", 5,
 		"sustained password sign-in attempts per minute allowed for one email address (0 disables) — the per-credential limit cannot see these, since a failed guess belongs to no credential")
 	cmd.Flags().Int("rate-limit-signin-burst", 5, "how many sign-in attempts for one address may arrive together")
@@ -345,4 +387,57 @@ func hasAnyUser(ctx context.Context, pool *db.Pool) (bool, error) {
 		return false, fmt.Errorf("serve: check for users: %w", err)
 	}
 	return hasUser, nil
+}
+
+// ldapFromFlags builds the LDAP directory, or returns nil when none is
+// configured. --ldap-url (or $CC_LDAP_URL) is the switch; every other flag is
+// ignored without it, rather than half-configuring something nobody asked for.
+func ldapFromFlags(cmd *cobra.Command) (*directory.LDAP, error) {
+	url, _ := cmd.Flags().GetString("ldap-url")
+	if url == "" {
+		url = os.Getenv(ldapURLEnv)
+	}
+	if url == "" {
+		return nil, nil
+	}
+
+	password, err := ldapBindPassword(cmd)
+	if err != nil {
+		return nil, err
+	}
+
+	name, _ := cmd.Flags().GetString("ldap-name")
+	startTLS, _ := cmd.Flags().GetBool("ldap-start-tls")
+	caCert, _ := cmd.Flags().GetString("ldap-ca-cert")
+	bindDN, _ := cmd.Flags().GetString("ldap-bind-dn")
+	userBase, _ := cmd.Flags().GetString("ldap-user-base")
+	userFilter, _ := cmd.Flags().GetString("ldap-user-filter")
+	mailAttr, _ := cmd.Flags().GetString("ldap-mail-attr")
+	nameAttr, _ := cmd.Flags().GetString("ldap-name-attr")
+	uidAttr, _ := cmd.Flags().GetString("ldap-uid-attr")
+	timeout, _ := cmd.Flags().GetDuration("ldap-timeout")
+
+	return directory.NewLDAP(directory.LDAPConfig{
+		Name: name, URL: url, StartTLS: startTLS, CACertFile: caCert,
+		BindDN: bindDN, BindPassword: password,
+		UserBase: userBase, UserFilter: userFilter,
+		MailAttr: mailAttr, DisplayNameAttr: nameAttr, UniqueIDAttr: uidAttr,
+		Timeout: timeout,
+	})
+}
+
+// ldapBindPassword reads the service account's password from a file or the
+// environment, never from an argument.
+func ldapBindPassword(cmd *cobra.Command) (string, error) {
+	if path, _ := cmd.Flags().GetString("ldap-bind-password-file"); path != "" {
+		raw, err := os.ReadFile(path) //nolint:gosec // operator-supplied path, same trust level as --tls-key
+		if err != nil {
+			return "", fmt.Errorf("serve: read --ldap-bind-password-file: %w", err)
+		}
+		// Only the trailing newline an editor adds. A password may legitimately
+		// end in a space, and trimming it would silently fail to authenticate
+		// against a directory that has the right one.
+		return strings.TrimRight(string(raw), "\r\n"), nil
+	}
+	return os.Getenv(ldapBindPasswordEnv), nil
 }

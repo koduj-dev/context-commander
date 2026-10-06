@@ -3,6 +3,7 @@ package http
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/koduj-dev/context-commander/internal/db"
+	"github.com/koduj-dev/context-commander/internal/directory"
 	"github.com/koduj-dev/context-commander/internal/identity"
 	"github.com/koduj-dev/context-commander/internal/installation"
 	"github.com/koduj-dev/context-commander/internal/security"
@@ -98,6 +100,9 @@ func (d Deps) listAuthMethods(w http.ResponseWriter, _ *http.Request) {
 		{Kind: "password"},
 		{Kind: "token"},
 	}
+	if d.Directory != nil {
+		methods = append(methods, authMethod{Kind: "ldap", ID: d.Directory.Provider()})
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"methods": methods})
 }
 
@@ -142,18 +147,91 @@ func (d Deps) signInWithPassword(w http.ResponseWriter, r *http.Request) {
 	principal, err := identity.AuthenticatePassword(r.Context(), d.Pool, req.Email, req.Password)
 	release()
 
-	if err != nil {
-		if !errors.Is(err, identity.ErrInvalidCredentials) {
-			internalError(w, r, err, "could not complete sign-in")
-			return
-		}
-		d.recordSignInFailure(r, "password sign-in failed", security.KindAuthenticationFailed)
-		// One message for every cause — see identity.ErrInvalidCredentials.
-		writeError(w, http.StatusUnauthorized, "unauthorized", "incorrect email or password")
+	switch {
+	case err == nil:
+		d.issueSessionResponse(w, r, principal.ID)
+		return
+	case !errors.Is(err, identity.ErrInvalidCredentials):
+		internalError(w, r, err, "could not complete sign-in")
 		return
 	}
 
-	d.issueSessionResponse(w, r, principal.ID)
+	// The local password did not match — which includes "this person has no
+	// local password at all". Only now the directory, if one is configured.
+	//
+	// Note what that costs: a directory user has no local hash, so every one
+	// of their sign-ins burns a decoy verification before getting here. That
+	// is deliberate. Skipping the decoy when no local password exists would
+	// make the response time answer "does this person have a local password?",
+	// and the saving is one argon2 run bounded by its own concurrency gate.
+	//
+	// Local first on purpose: an explicitly set local password is a deliberate
+	// act by someone with access to this installation, and it should not be
+	// silently overridden by whatever a directory says. An installation that
+	// wants directory-only sign-in simply sets no local passwords.
+	if d.Directory != nil && d.directorySignIn(w, r, req.Email, req.Password) {
+		return
+	}
+
+	d.recordSignInFailure(r, "password sign-in failed", security.KindAuthenticationFailed)
+	// One message for every cause — see identity.ErrInvalidCredentials.
+	writeError(w, http.StatusUnauthorized, "unauthorized", "incorrect email or password")
+}
+
+// directorySignIn tries the configured directory. It reports whether it
+// answered — true means a response has been written, success or not, and the
+// caller must not write another.
+//
+// The cases it answers for itself are the ones a uniform "incorrect email or
+// password" would turn into a wasted afternoon: a directory that is down, a
+// filter that matches two people, an entry with no address to provision from.
+// None of those is a wrong password, and saying so is safe — the first two are
+// facts about the installation rather than about any account, and the third is
+// only reachable after the person has already proved who they are.
+func (d Deps) directorySignIn(w http.ResponseWriter, r *http.Request, identifier, password string) bool {
+	id, err := d.Directory.Authenticate(r.Context(), identifier, password)
+	switch {
+	case err == nil:
+		// Nothing about authorization happens here: a directory proves who
+		// someone is, not what they may do (docs/adr/0019).
+		principal, perr := identity.ProvisionDirectoryUser(r.Context(), d.Pool, identity.DirectoryIdentity{
+			Provider:    id.Provider,
+			Subject:     id.Subject,
+			Email:       id.Email,
+			DisplayName: id.DisplayName,
+		})
+		if perr != nil {
+			internalError(w, r, perr, "could not create an account for this directory user")
+			return true
+		}
+		d.issueSessionResponse(w, r, principal.ID)
+		return true
+
+	case errors.Is(err, directory.ErrNoSuchUser), errors.Is(err, directory.ErrInvalidCredentials):
+		// Indistinguishable from a failed local attempt, which is the point.
+		return false
+
+	case errors.Is(err, directory.ErrNoEmail):
+		writeError(w, http.StatusUnprocessableEntity, "no_directory_email",
+			"your directory entry has no email address, so an account cannot be created for it — an administrator needs to add one")
+		return true
+
+	case errors.Is(err, directory.ErrAmbiguous):
+		internalError(w, r, err, "the directory matched more than one entry for that identifier")
+		return true
+
+	default:
+		// Unavailable, or anything unclassified. Logged with the cause,
+		// answered as a transport problem: "wrong password" would send
+		// someone to reset a password that was never the problem.
+		slog.ErrorContext(r.Context(), "directory sign-in could not be completed",
+			"err", err, "provider", d.Directory.Provider(),
+			"request_id", middleware.GetReqID(r.Context()))
+		w.Header().Set("Retry-After", "5")
+		writeError(w, http.StatusServiceUnavailable, "directory_unavailable",
+			"the directory could not be reached; this is not a problem with your password")
+		return true
+	}
 }
 
 // recordSignInFailure notes a refused sign-in without naming the address that

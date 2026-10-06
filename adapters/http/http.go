@@ -21,6 +21,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/auth"
 	"github.com/koduj-dev/context-commander/internal/contextpack"
 	"github.com/koduj-dev/context-commander/internal/db"
+	"github.com/koduj-dev/context-commander/internal/directory"
 	"github.com/koduj-dev/context-commander/internal/events"
 	"github.com/koduj-dev/context-commander/internal/firstrun"
 	"github.com/koduj-dev/context-commander/internal/gates"
@@ -61,6 +62,12 @@ type Deps struct {
 	Security       *security.Recorder
 	Limiter        *ratelimit.Limiter
 	SecurityEvents *security.Service
+	// Directory authenticates against LDAP when one is configured, and is nil
+	// otherwise — which is what closes the path rather than opening it. It is
+	// only ever asked AFTER a local password has been tried and failed
+	// (docs/adr/0019).
+	Directory directory.Authenticator
+
 	// FirstRun holds the one-time setup code that lets the very first
 	// administrator be created through the browser (docs/adr/0019). Nil once
 	// the installation has users, and a nil *firstrun.Code accepts nothing —

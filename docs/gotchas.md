@@ -183,3 +183,30 @@ so the object store and the root key were untouched. They were also useless —
 the project keys and every row of metadata were in the database, so the
 remaining ciphertext had nothing left to be read with. Encrypted bytes without
 their key hierarchy are not a backup.
+
+## osixia/openldap bootstraps once, and its ACL is on `{1}mdb`
+
+Two traps that both fail silently, found while seeding the dev directory
+(`deploy/ldap/`):
+
+**The LDIFs run only on a fresh volume.** Editing a seed file and restarting
+does nothing; the tree is whatever the first start produced. Iterating means
+removing that service's volumes — and `down -v` is not how (see above).
+
+**An `olcAccess` change must target `olcDatabase={1}mdb,cn=config`.** Getting
+the index wrong means the modify applies to a DN that does not exist, the
+bootstrap skips it without complaint, the image's default ACLs stay in force,
+and a search as the service account returns:
+
+    SEARCH RESULT tag=101 err=32 nentries=0
+
+`err=32` is `noSuchObject`. It reads as "my seed data did not load" when the
+data is there and merely unreadable — OpenLDAP answers `noSuchObject` rather
+than `insufficientAccess` on purpose, so as not to disclose what exists. If a
+bind as the service account succeeds and its searches come back empty, suspect
+the ACL before the data.
+
+Also: `replace: olcAccess` replaces *all* of them, including the rule that
+grants the local root manage access over `ldapi` — drop it and the container's
+own `ldapsearch -Y EXTERNAL`, the tool you reach for to diagnose this, stops
+working too.

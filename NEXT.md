@@ -156,7 +156,13 @@ Only on top of a core loop people actually use:
       on first success, then issue a session exactly as a password login
       does. Everything after the identity is established is already shared
       code.
-      - OIDC: authorization code + PKCE with discovery. No SAML — a second
+      - [x] ~~LDAP~~ Closed 2026-10-06: `internal/directory` (`--ldap-url` and
+        the flags beside it), provisioning in
+        `identity.ProvisionDirectoryUser`, and `GET /v1/auth/methods`
+        reporting it so the sign-in screen asks for an email **or** a
+        username. Tested against a real slapd (`deploy/ldap/`, brought up by
+        `--profile ldap` or by the package's own container).
+      - [ ] OIDC: authorization code + PKCE with discovery. No SAML — a second
         protocol whose security-critical core is XML signature verification,
         for deployments this product does not have yet.
       - Group-to-role mapping is a separate decision. A directory proves who

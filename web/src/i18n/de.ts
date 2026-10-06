@@ -33,6 +33,11 @@ export const de: Partial<Record<MessageKey, string>> = {
   "auth.withPassword": "E-Mail und Passwort",
   "auth.withToken": "Zugriffstoken",
   "auth.email": "E-Mail",
+  "auth.emailOrUsername": "E-Mail oder Benutzername",
+  "auth.directoryUnavailable":
+    "Das Verzeichnis war nicht erreichbar. Das liegt nicht an Ihrem Passwort — versuchen Sie es in Kürze erneut, oder sagen Sie es der Person, die diese Installation betreibt.",
+  "auth.directoryNoEmail":
+    "Ihr Verzeichniseintrag hat keine E-Mail-Adresse, daher kann dafür kein Konto angelegt werden. Eine Administration muss eine hinzufügen.",
   "auth.password": "Passwort",
   "auth.failed": "E-Mail oder Passwort ist falsch.",
   "auth.tokenLabel": "Zugriffstoken",

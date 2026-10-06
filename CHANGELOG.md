@@ -12,6 +12,62 @@ link definition at the bottom of the file.
 
 ### Added
 
+- **Signing in against an LDAP directory.** The second half of
+  [ADR 0019](docs/adr/0019-browser-authentication-and-directory-identity.md),
+  and the deployment the maintainer actually describes: a company installs
+  this and hands out access through its own directory.
+  - **Two binds, not one.** A service account searches for the entry, then a
+    *separate* connection binds as that entry with the presented password.
+    Searching as the person would mean already knowing their DN, and guessing
+    it by pattern breaks the first time a directory keeps people in more than
+    one place — which every real directory eventually does. The second
+    connection is separate so the service account's is never left bound as
+    somebody.
+  - **An empty password is refused before anything reaches the network.** An
+    LDAP simple bind with no password is not a failed login, it is an
+    *unauthenticated bind*. `go-ldap` happens to refuse one too, so this is
+    not the only thing in the way — it is here because the caller must see a
+    credential failure rather than a transport error, and because a security
+    property should not rest on a library keeping a behaviour it never
+    promised.
+  - **The identifier is escaped before it reaches the filter**
+    (`ldap.EscapeFilter`), and the search demands exactly one entry. Measured:
+    without the escaping, an identifier of `*` comes back as "matched more
+    than one entry" rather than as a bypass — two independent reasons it
+    cannot work, which is the point.
+  - **A directory fault is never reported as a wrong password.** A server that
+    is down, a service account with the wrong password, a filter that matches
+    two people: each answers with its own status and message. Telling someone
+    their password is wrong when the directory is unreachable sends them to
+    reset a password that was never the problem, and hides an outage behind a
+    help-desk ticket. A failed *bind* still reads exactly like a failed local
+    password, because that one is about them.
+  - **Local passwords are tried first.** An explicitly set local password is a
+    deliberate act by someone with access to this installation and is not
+    silently overridden by whatever a directory says. An installation that
+    wants directory-only sign-in sets no local passwords.
+  - **Provisioning keys on the directory's own subject**, never the email: an
+    address is a label a person can change and an administrator can reassign,
+    and keying on it is how one person inherits another's projects. On first
+    sign-in, an existing local account holding that address is *linked* rather
+    than refused — without that, every pre-created account and everyone who
+    had a local password before the directory was configured would be locked
+    out. The risk that implies is written down in
+    `identity.ProvisionDirectoryUser`.
+  - **An entry with no email is refused with something an administrator can
+    act on.** `users.email` is NOT NULL and the whole interface names people
+    by it; synthesising `uid@directory.local` would put an address into the
+    product that belongs to nobody.
+  - **Nothing about authorization comes from the directory.** A successful
+    bind proves who someone is, not what they may do. There is a test that
+    counts the admin grants and project memberships a provisioned user
+    receives, and asserts it is none.
+  - `deploy/ldap/` seeds a disposable slapd with the cases that actually break
+    code — a person with no `mail` attribute, a person whose address is
+    recorded in a different case than anyone types — and the package's
+    integration tests bring up the same seed themselves. `--profile ldap` runs
+    it beside Postgres for working by hand.
+
 - **Signing in to the web interface without a shell on the server.** A fresh
   installation could not be opened: the only sign-in was "paste a PAT", and
   the only way to get a PAT was `ccd token create` on the machine running the

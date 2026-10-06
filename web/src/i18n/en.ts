@@ -49,6 +49,11 @@ export const en = {
   "auth.withPassword": "Email and password",
   "auth.withToken": "Access token",
   "auth.email": "Email",
+  "auth.emailOrUsername": "Email or username",
+  "auth.directoryUnavailable":
+    "The directory could not be reached. This is not a problem with your password — try again shortly, or tell whoever runs this installation.",
+  "auth.directoryNoEmail":
+    "Your directory entry has no email address, so an account cannot be created for it. An administrator needs to add one.",
   "auth.password": "Password",
   "auth.failed": "Incorrect email or password.",
   "auth.tokenLabel": "Access token",

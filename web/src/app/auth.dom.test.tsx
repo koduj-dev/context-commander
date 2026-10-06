@@ -124,6 +124,25 @@ describe("before signing in", () => {
     expect(screen.queryByLabelText("Email")).toBeNull();
   });
 
+  it("asks for an email or a username once a directory is configured", async () => {
+    // A directory login name is not an address, so a field labelled "Email"
+    // with type="email" would both mislabel it and let the browser refuse to
+    // submit it.
+    stubServer({
+      "GET /v1/me": UNAUTHORIZED,
+      "GET /v1/setup/status": { status: 200, body: { needs_setup: false } },
+      "GET /v1/auth/methods": {
+        status: 200,
+        body: { methods: [{ kind: "password" }, { kind: "ldap", id: "ldap" }] },
+      },
+    });
+    render(wrap());
+
+    const field = await waitFor(() => screen.getByLabelText("Email or username"));
+    expect(field.getAttribute("type")).toBe("text");
+    expect(screen.queryByLabelText("Email")).toBeNull();
+  });
+
   it("shows both methods when the probe itself failed", async () => {
     // A network blip must not hide the way in. Empty `methods` means "we do
     // not know", not "nothing is offered".

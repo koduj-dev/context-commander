@@ -81,7 +81,7 @@ Requires Go 1.27+, Docker, and Docker Compose (`make test` also needs Docker —
 suite runs against a real, disposable Postgres via testcontainers-go, not mocks).
 
 ```bash
-make dev-up      # start Postgres
+make dev-up      # start Postgres (add --profile ldap for a directory to test sign-in against)
 make build       # build ./cmd/ccd -> bin/ccd
 make test        # run the test suite (unit + real-Postgres integration tests)
 make lint        # golangci-lint

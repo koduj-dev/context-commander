@@ -57,6 +57,10 @@ export const zhCN: Partial<Record<MessageKey, string>> = {
   "auth.withPassword": "邮箱和密码",
   "auth.withToken": "访问 token",
   "auth.email": "邮箱",
+  "auth.emailOrUsername": "邮箱或用户名",
+  "auth.directoryUnavailable":
+    "无法连接到目录服务。这与你的密码无关——请稍后重试，或告知负责运维此安装的人。",
+  "auth.directoryNoEmail": "你的目录条目没有邮箱地址，因此无法为它创建账号。需要管理员补上一个。",
   "auth.password": "密码",
   "auth.failed": "邮箱或密码不正确。",
   "auth.tokenLabel": "访问 token",

@@ -49,6 +49,11 @@ export const fr: Partial<Record<MessageKey, string>> = {
   "auth.withPassword": "E-mail et mot de passe",
   "auth.withToken": "Token d’accès",
   "auth.email": "E-mail",
+  "auth.emailOrUsername": "E-mail ou nom d’utilisateur",
+  "auth.directoryUnavailable":
+    "L’annuaire n’a pas pu être joint. Cela ne vient pas de votre mot de passe : réessayez dans un instant, ou prévenez la personne qui administre cette installation.",
+  "auth.directoryNoEmail":
+    "Votre entrée d’annuaire n’a pas d’adresse e-mail ; aucun compte ne peut donc être créé pour elle. Une personne avec les droits d’administration doit en ajouter une.",
   "auth.password": "Mot de passe",
   "auth.failed": "E-mail ou mot de passe incorrect.",
   "auth.tokenLabel": "Token d’accès",

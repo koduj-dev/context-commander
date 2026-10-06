@@ -74,3 +74,34 @@ docker-commander's `8470` if both run on the same host.
 loopback, but the port is only published to `127.0.0.1` on the host (same
 posture as postgres above), so Docker's own network isolation is the
 actual boundary, same as it is for those two.
+
+## The LDAP directory for working on sign-in
+
+`docker compose -f deploy/docker-compose.yml --profile ldap up -d` brings up a
+seeded slapd on `127.0.0.1:1389`. Then:
+
+```bash
+CC_LDAP_BIND_PASSWORD=ldap-dev-password \
+./bin/ccd serve --addr 127.0.0.1:8080 \
+  --ldap-url ldap://127.0.0.1:1389 \
+  --ldap-bind-dn "cn=readonly,ou=services,dc=example,dc=test" \
+  --ldap-user-base "ou=people,dc=example,dc=test"
+```
+
+Every seeded account's password is `ldap-dev-password`. The four people exist
+to cover what breaks code rather than to look like a company:
+
+| uid | what it is for |
+|---|---|
+| `alice`, `bob` | ordinary entries, with `mail` and `displayName` |
+| `carol` | **no `mail` attribute** — provisioning must refuse with a reason, not crash and not invent an address |
+| `dave` | `mail` recorded in a different case from how anyone types it |
+
+`cn=readonly,ou=services,…` is the service account the server searches as;
+binding as `cn=admin` would work and is exactly the habit not to teach, since
+a directory *read* does not need write access.
+
+The integration tests (`internal/directory`) start their own container from
+the same `deploy/ldap/*.ldif`, so they need Docker but not this service. If
+you edit a seed file, see `docs/gotchas.md` — the image bootstraps once, on a
+fresh volume, and the way to redo it is **not** `down -v`.
