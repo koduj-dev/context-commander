@@ -210,3 +210,33 @@ Also: `replace: olcAccess` replaces *all* of them, including the rule that
 grants the local root manage access over `ldapi` — drop it and the container's
 own `ldapsearch -Y EXTERNAL`, the tool you reach for to diagnose this, stops
 working too.
+
+**And it restarts slapd behind your back.** A third trap in the same image,
+and the one that actually reached CI. The entrypoint starts slapd, applies the
+mounted LDIFs, stops slapd, and starts it again for real:
+
+    Start OpenLDAP...                  <- bootstrap instance
+    Add custom bootstrap ldif...
+    Stop OpenLDAP...                   <- and it is killed again
+    First start is done...
+    Running .../process/slapd/run...   <- the instance that stays
+    slapd starting
+
+So any readiness check can pass against the bootstrap instance moments before
+it is torn down. A health probe run *inside* the container is no protection:
+it talks to whichever slapd is up. What you then see from outside is
+
+    read tcp [::1]:52438->[::1]:32781: read: connection reset by peer
+
+on every call, which reads as "LDAP is broken" when it is merely mid-restart.
+It is timing-dependent, so it passes locally and on most CI runs — the kind of
+failure that teaches people to re-run the suite instead of reading it.
+
+Wait for `Running /container/run/process/slapd/run` in the log, which the
+supervisor emits once and only after the bootstrap is stopped.
+**Not** the second occurrence of `slapd starting`: the bootstrap instance does
+not reliably log that line at all — it was there when the image was run by
+hand and absent on six test runs out of six, so waiting for occurrence 2 just
+hangs for the full timeout. `internal/directory/ldap_integration_test.go` does
+this, and then still binds from the host before handing the URL to any test,
+because a log line is not a bound port.

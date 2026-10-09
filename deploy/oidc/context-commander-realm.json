@@ -1,0 +1,94 @@
+{
+  "realm": "context-commander",
+  "enabled": true,
+  "displayName": "Context Commander Dev",
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "verifyEmail": false,
+  "resetPasswordAllowed": false,
+  "editUsernameAllowed": false,
+  "accessTokenLifespan": 300,
+  "clients": [
+    {
+      "clientId": "context-commander",
+      "name": "Context Commander",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "bearerOnly": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "secret": "oidc-dev-client-secret",
+      "redirectUris": [
+        "http://localhost:12001/v1/auth/oidc/callback",
+        "http://127.0.0.1:12001/v1/auth/oidc/callback",
+        "http://localhost:5173/v1/auth/oidc/callback"
+      ],
+      "webOrigins": [
+        "http://localhost:12001",
+        "http://127.0.0.1:12001"
+      ],
+      "defaultClientScopes": [
+        "openid",
+        "profile"
+      ],
+      "attributes": {
+        "post.logout.redirect.uris": "http://localhost:12001/*"
+      },
+      "optionalClientScopes": [
+        "email"
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "alice",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "alice@example.test",
+      "firstName": "Alice",
+      "lastName": "Ashworth",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "oidc-dev-password",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "bob",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "bob@example.test",
+      "firstName": "Bob",
+      "lastName": "Bowen",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "oidc-dev-password",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "dave",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "dave@example.test",
+      "firstName": "Dave",
+      "lastName": "Driscoll",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "oidc-dev-password",
+          "temporary": false
+        }
+      ]
+    }
+  ]
+}

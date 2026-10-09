@@ -93,6 +93,28 @@ scope rails on skills, the override badges, the storage meter. Neither colour
 fills a surface — the brand manual forbids large saturated areas, and the
 palette is an accent system, not a background.
 
+**A passing contrast ratio is not a readable one.** The primary button was
+near-black on raw brand pink for months. It measures 5.61:1 — comfortably
+past the 4.5:1 AA floor — and the first thing the owner said on seeing it was
+that it was hard to read. WCAG 2 compares luminance and is blind to chroma,
+so small dark text on a vivid fill scores better than it reads. The shipped
+pairing, white on `--cc-accent-primary-fill`, measures a *lower* 4.89:1 and
+is legible. When a number and a pair of eyes disagree, the eyes are the
+measurement and the number is the model.
+
+The enforceable half of this is the token's documented meaning, not its
+ratio: `*-visual` tokens are the raw brand colours, for icons and large
+visuals, and may never sit under text. Check 7 refuses that pairing whatever
+it measures, and applies a 4.5:1 floor to every other text-on-fill rule. It
+resolves both themes from the brand token file, so a token darkened for the
+light theme is verified against every light surface it can land on — which is
+how the muted grey in the search field and every table heading turned out to
+have been failing at 4.06:1 all along.
+
+Only rules declaring a background **and** a colour in the same body are
+checked. Pairing a label with a fill inherited from another rule would mean
+replaying the cascade and would invent combinations no screen renders.
+
 **Status never rides on colour alone.** Every badge carries a glyph and a
 word. It has to survive greyscale and a colour-blind reader.
 

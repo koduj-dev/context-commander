@@ -93,15 +93,51 @@ func startLDAP() (url string, terminate func(), err error) {
 			// rather than a seed that was never read.
 			Cmd:   []string{"--copy-service", "--loglevel", "info"},
 			Files: []testcontainers.ContainerFile{people, access},
-			// Waiting on a bind AND a search as the service account, not on
-			// the port: a port that accepts connections proves nothing about
-			// whether the seed loaded or whether the ACL lets anyone read it,
-			// and those are the two things that have actually gone wrong here.
-			WaitingFor: wait.ForExec([]string{
-				"ldapsearch", "-x", "-H", "ldap://localhost:389",
-				"-D", readonlyDN, "-w", ldapPassword,
-				"-b", userBase, "(uid=alice)", "uid",
-			}).WithStartupTimeout(90 * time.Second),
+			// Two signals, in this order, because each one alone has been
+			// watched to let a broken start through.
+			//
+			// The log line is the important half, and it is not decoration.
+			// This image bootstraps by starting slapd, applying the mounted
+			// LDIFs, STOPPING slapd, and then starting it again for real —
+			// its own log says so:
+			//
+			//	Start OpenLDAP...            <- bootstrap instance
+			//	Add custom bootstrap ldif...
+			//	Stop OpenLDAP...             <- and it is killed again
+			//	First start is done...
+			//	Running .../process/slapd/run...   <- the instance that stays
+			//	slapd starting
+			//
+			// So a readiness check can pass against the bootstrap instance
+			// moments before it is torn down. That is what broke CI: every
+			// subtest failed with "read: connection reset by peer" against a
+			// directory that was merely mid-restart, which reads as "LDAP
+			// sign-in is broken".
+			//
+			// It is deliberately this line rather than the second occurrence
+			// of "slapd starting", which was the first thing I tried. The
+			// bootstrap instance does not reliably log that at all — it was
+			// present when I ran the image by hand and absent on six runs out
+			// of six under the test, so waiting for occurrence 2 simply hung
+			// for the full timeout. "Running .../slapd/run" is emitted once,
+			// by the supervisor, and only after the bootstrap is stopped.
+			//
+			// This does couple the test to a log line in the image. If
+			// osixia changes the wording the wait times out and says so,
+			// which is a loud, obvious failure — unlike the race it replaces.
+			//
+			// The exec probe then checks what a log line cannot: that the
+			// seed actually loaded and that the ACL lets the service account
+			// read it, inside the container, before any port mapping is
+			// involved. Both of those have gone wrong here before.
+			WaitingFor: wait.ForAll(
+				wait.ForLog("Running /container/run/process/slapd/run"),
+				wait.ForExec([]string{
+					"ldapsearch", "-x", "-H", "ldap://localhost:389",
+					"-D", readonlyDN, "-w", ldapPassword,
+					"-b", userBase, "(uid=alice)", "uid",
+				}),
+			).WithStartupTimeoutDefault(90 * time.Second),
 		},
 		Started: true,
 	})
@@ -119,7 +155,79 @@ func startLDAP() (url string, terminate func(), err error) {
 		stop()
 		return "", nil, fmt.Errorf("ldap endpoint: %w", err)
 	}
+	if err := waitReachable(ctx, endpoint); err != nil {
+		stop()
+		return "", nil, err
+	}
 	return endpoint, stop, nil
+}
+
+// waitReachable blocks until the directory answers a real bind FROM THE HOST,
+// over the mapped port, the way every test below will.
+//
+// The exec probe above is not enough, and CI proved it. osixia's entrypoint
+// starts slapd, applies the mounted LDIFs, and then RESTARTS slapd to run it
+// for real. An `ldapsearch` executed inside the container can therefore
+// succeed against the bootstrap process moments before it is torn down, so
+// testcontainers reports the container ready and the first host-side bind
+// lands in the gap:
+//
+//	bind as uid=alice,...: unable to read LDAP response packet:
+//	read tcp [::1]:52438->[::1]:32781: read: connection reset by peer
+//
+// Every subtest then fails, which reads as "LDAP sign-in is broken" when the
+// directory is merely still starting. It is timing-dependent, so it passed
+// locally and on most CI runs and failed on one — the worst kind.
+//
+// The exec probe stays, because it checks something this cannot: that the
+// seed loaded and the ACL permits reading it, inside the container, before
+// any port mapping is involved. This adds the half that has to be true for
+// the tests to mean anything.
+func waitReachable(ctx context.Context, url string) error {
+	const (
+		deadline = 60 * time.Second
+		interval = 250 * time.Millisecond
+	)
+	ctx, cancel := context.WithTimeout(ctx, deadline)
+	defer cancel()
+
+	d, err := directory.NewLDAP(directory.LDAPConfig{
+		URL:          url,
+		BindDN:       readonlyDN,
+		BindPassword: ldapPassword,
+		UserBase:     userBase,
+	})
+	if err != nil {
+		return fmt.Errorf("probe config: %w", err)
+	}
+
+	// Every error is retried, including ones that look like a broken fixture.
+	// An earlier version of this gate failed fast on anything that was not
+	// ErrUnavailable, on the reasoning that a directory which answers but
+	// rejects the seed's own credentials is broken rather than slow. Watching
+	// it start proved that wrong twice over: mid-bootstrap slapd answers a
+	// service-account bind with LDAP code 49, and a search the ACL has not
+	// yet opened returns zero entries, which this package reports as
+	// ErrNoSuchUser (the masked access denial in docs/gotchas.md). Both are
+	// indistinguishable from a wrong fixture and both resolve themselves a
+	// moment later, so treating either as fatal just moves the flake.
+	//
+	// A genuinely broken seed therefore costs the full deadline and then says
+	// so. That is the right trade: a slow clear failure beats a fast
+	// intermittent one, which is the whole reason this function exists.
+	var last error
+	for {
+		if _, last = d.Authenticate(ctx, "alice", ldapPassword); last == nil {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf(
+				"directory on %s never answered for alice within %s — still starting, "+
+					"or deploy/ldap/*.ldif is wrong: %w", url, deadline, last)
+		case <-time.After(interval):
+		}
+	}
 }
 
 func newLDAP(t *testing.T, url string) *directory.LDAP {

@@ -107,6 +107,54 @@ services:
       timeout: 5s
       retries: 20
 
+  keycloak:
+    # An OIDC provider to develop browser sign-in against (docs/adr/0019).
+    # Opt-in like the others, and more deliberately so than most: the image is
+    # several hundred megabytes and takes tens of seconds to answer.
+    #
+    #   docker compose -f deploy/docker-compose.yml --profile oidc up -d
+    #
+    # A real provider rather than a mock on purpose. Verifying the ID token's
+    # signature IS the security core of OIDC, and a mock would mean checking
+    # our verifier against our own idea of what a token looks like.
+    #
+    # deploy/oidc/README.md records what had to be measured rather than
+    # assumed — the mandatory file name, the user who cannot sign in without
+    # an email, and the fact that Keycloak lowercases addresses.
+    profiles: ["oidc"]
+    image: quay.io/keycloak/keycloak:26.8.0
+    restart: unless-stopped
+    # start-dev keeps everything in an in-memory H2 database: the realm is
+    # re-imported on every fresh container and there is no second datastore to
+    # back up or migrate. Never this command outside development.
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: keycloak_dev_only
+      KC_HEALTH_ENABLED: "true"
+    ports:
+      # 18081, not 8080: that port is too popular to assume it is free.
+      - "127.0.0.1:18081:8080"
+    volumes:
+      # The file name must match the realm it contains or Keycloak refuses to
+      # start — see the README.
+      - ./oidc/context-commander-realm.json:/opt/keycloak/data/import/context-commander-realm.json:ro
+    healthcheck:
+      # Fetches the realm's own discovery document and looks for a claim only
+      # a started, imported realm can produce. A port check would pass while
+      # Keycloak was still serving its master realm and nothing else, which is
+      # the failure worth catching. The image carries no curl or wget, so this
+      # is a raw request over bash's /dev/tcp.
+      test:
+        - "CMD-SHELL"
+        - >-
+          exec 3<>/dev/tcp/localhost/8080 &&
+          printf 'GET /realms/context-commander/.well-known/openid-configuration HTTP/1.0\r\n\r\n' >&3 &&
+          grep -q token_endpoint <&3
+      interval: 5s
+      timeout: 5s
+      retries: 40
+
   app:
     # Opt-in: `make dev-up` / a plain `docker compose ... up` (used by
     # everyday Go dev and `make test`) must keep starting only Postgres.

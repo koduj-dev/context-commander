@@ -205,7 +205,9 @@ func newInstallationCreateUserCmd() *cobra.Command {
 			}
 
 			svc := installation.NewService(pool, installation.NewStore(), identity.NewStore())
-			u, err := svc.CreateUser(cmd.Context(), principalID, callerUserID, email, name)
+			u, err := // nil: the CLI already has `ccd user set-password`, which reads from
+				// stdin rather than from an argument visible in `ps`.
+				svc.CreateUser(cmd.Context(), principalID, callerUserID, email, name, nil)
 			if err != nil {
 				return err
 			}

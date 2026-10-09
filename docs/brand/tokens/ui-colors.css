@@ -15,10 +15,27 @@
 
   --cc-text: #111118;
   --cc-text-secondary: #4A4652;
-  --cc-text-muted: #77727F;
+  /* Darkened from #77727F, which measured 4.06:1 on --cc-surface-2 and
+   * 4.34:1 on --cc-surface-1 — the two surfaces muted text actually sits
+   * on, in the search field and in every table heading. This value clears
+   * 4.5:1 on all three light surfaces, so moving muted text onto a darker
+   * panel later cannot quietly reintroduce the failure. */
+  --cc-text-muted: #696470;
 
   --cc-accent-primary: #D91473;
   --cc-accent-primary-visual: #FF2D8D;
+
+  /* The primary action's fill, and the only colour allowed to sit on it.
+   * Deliberately one pair for both themes, and deliberately NOT the raw
+   * brand pink: #0B0B12 on #FF2D8D measures 5.61:1 and still reads badly,
+   * because WCAG 2 scores luminance and ignores chroma. White on #D91473
+   * measures a lower 4.89:1 and is legible. If you are tempted to override
+   * these under [data-theme="dark"], read section 5 of ../UI-COLORS.md
+   * first — the same recipe in both themes is the decision, not an
+   * oversight. */
+  --cc-accent-primary-fill: #D91473;
+  --cc-on-accent-primary: #FFFFFF;
+
   --cc-accent-secondary: #5F27D6;
   --cc-accent-secondary-visual: #7A35F5;
   --cc-focus-ring: #7A35F5;

@@ -191,7 +191,7 @@ func TestCreateUserRequiresAdmin(t *testing.T) {
 	f := newFixture(t)
 	plain := f.newUser("plain@example.test")
 
-	_, err := f.svc.CreateUser(f.ctx, plain.principalID, plain.userID, "new@example.test", "New User")
+	_, err := f.svc.CreateUser(f.ctx, plain.principalID, plain.userID, "new@example.test", "New User", nil)
 	if !errors.Is(err, installation.ErrForbidden) {
 		t.Fatalf("CreateUser as a non-admin: got err=%v, want ErrForbidden", err)
 	}
@@ -202,7 +202,7 @@ func TestCreateUserAsAdmin(t *testing.T) {
 	admin := f.newUser("admin@example.test")
 	f.grant(admin.userID)
 
-	u, err := f.svc.CreateUser(f.ctx, admin.principalID, admin.userID, "new@example.test", "New User")
+	u, err := f.svc.CreateUser(f.ctx, admin.principalID, admin.userID, "new@example.test", "New User", nil)
 	if err != nil {
 		t.Fatalf("CreateUser as an admin: %v", err)
 	}
@@ -251,6 +251,111 @@ func TestCreateServicePrincipalAsAdmin(t *testing.T) {
 	if err != nil {
 		t.Fatalf("created service principal has no principal: %v", err)
 	}
+}
+
+func TestCreateUserWithAnInitialPassword(t *testing.T) {
+	// The gap this closes: an administrator could create an account and had
+	// no way to let anyone into it. The setup code is gone once the
+	// installation has a user, `ccd user set-password` needs a shell, and
+	// handing over a PAT makes the new person inherit the admin's credential.
+	f := newFixture(t)
+	admin := f.newUser("admin@example.test")
+	f.grant(admin.userID)
+
+	hash, err := identity.HashPassword("an initial password")
+	if err != nil {
+		t.Fatalf("HashPassword: %v", err)
+	}
+	u, err := f.svc.CreateUser(f.ctx, admin.principalID, admin.userID, "hire@example.test", "New Hire", &hash)
+	if err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+
+	// The password and the principal land in the same transaction as the
+	// user, so there is no state where the account exists and cannot be used.
+	principal, err := identity.AuthenticatePassword(f.ctx, f.appPool, "hire@example.test", "an initial password")
+	if err != nil {
+		t.Fatalf("the new user cannot sign in: %v", err)
+	}
+	if principal.UserID == nil || *principal.UserID != u.ID {
+		t.Errorf("signed in as %v, want the created user %s", principal.UserID, u.ID)
+	}
+}
+
+func TestCreateUserWithoutAPasswordLeavesNone(t *testing.T) {
+	// Empty is a valid choice, not an incomplete form: an administrator
+	// creating twenty accounts has no business inventing twenty passwords.
+	// What must not happen is a row holding something unusable.
+	f := newFixture(t)
+	admin := f.newUser("admin@example.test")
+	f.grant(admin.userID)
+
+	u, err := f.svc.CreateUser(f.ctx, admin.principalID, admin.userID, "nopass@example.test", "No Password", nil)
+	if err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+	err = db.WithoutPrincipal(f.ctx, f.ownerPool, func(tx pgx.Tx) error {
+		_, err := identity.NewStore().GetPasswordHash(f.ctx, tx, u.ID)
+		return err
+	})
+	if !errors.Is(err, identity.ErrNoLocalPassword) {
+		t.Errorf("err = %v, want ErrNoLocalPassword", err)
+	}
+}
+
+func TestSetUserPassword(t *testing.T) {
+	f := newFixture(t)
+	admin := f.newUser("admin@example.test")
+	f.grant(admin.userID)
+	target := f.newUser("target@example.test")
+	plain := f.newUser("plain@example.test")
+
+	hash, err := identity.HashPassword("a password set by an admin")
+	if err != nil {
+		t.Fatalf("HashPassword: %v", err)
+	}
+
+	t.Run("a non-admin cannot set anyone's password", func(t *testing.T) {
+		// It is the power to sign in as them. The same capability already
+		// issues a token for any principal, so this is not a new power — but
+		// it must not be a weaker check than that one.
+		err := f.svc.SetUserPassword(f.ctx, plain.principalID, plain.userID, target.userID, hash)
+		if !errors.Is(err, installation.ErrForbidden) {
+			t.Errorf("err = %v, want ErrForbidden", err)
+		}
+	})
+
+	t.Run("an unknown user is not found, not a constraint error", func(t *testing.T) {
+		err := f.svc.SetUserPassword(f.ctx, admin.principalID, admin.userID, uuid.New(), hash)
+		if !errors.Is(err, identity.ErrNotFound) {
+			t.Errorf("err = %v, want identity.ErrNotFound", err)
+		}
+	})
+
+	t.Run("an admin sets it and the person can sign in", func(t *testing.T) {
+		if err := f.svc.SetUserPassword(f.ctx, admin.principalID, admin.userID, target.userID, hash); err != nil {
+			t.Fatalf("SetUserPassword: %v", err)
+		}
+		if _, err := identity.AuthenticatePassword(f.ctx, f.appPool, "target@example.test", "a password set by an admin"); err != nil {
+			t.Errorf("the target cannot sign in with the password just set: %v", err)
+		}
+	})
+
+	t.Run("it replaces an existing password", func(t *testing.T) {
+		replacement, err := identity.HashPassword("the replacement password")
+		if err != nil {
+			t.Fatalf("HashPassword: %v", err)
+		}
+		if err := f.svc.SetUserPassword(f.ctx, admin.principalID, admin.userID, target.userID, replacement); err != nil {
+			t.Fatalf("SetUserPassword: %v", err)
+		}
+		if _, err := identity.AuthenticatePassword(f.ctx, f.appPool, "target@example.test", "the replacement password"); err != nil {
+			t.Errorf("the replacement does not work: %v", err)
+		}
+		if _, err := identity.AuthenticatePassword(f.ctx, f.appPool, "target@example.test", "a password set by an admin"); !errors.Is(err, identity.ErrInvalidCredentials) {
+			t.Errorf("the old password still works: err = %v", err)
+		}
+	})
 }
 
 func TestServicePrincipalRecordsWhoRegisteredIt(t *testing.T) {

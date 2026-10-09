@@ -85,9 +85,11 @@ The light theme should stay neutral and technical; saturated brand colors are ac
 | `--cc-border-strong` | `#C3BECD` | Strong divider / active boundary |
 | `--cc-text` | `#111118` | Primary text |
 | `--cc-text-secondary` | `#4A4652` | Secondary text |
-| `--cc-text-muted` | `#77727F` | Metadata, placeholders |
+| `--cc-text-muted` | `#696470` | Metadata, placeholders |
 | `--cc-accent-primary` | `#D91473` | Accessible pink for text/actions on light background |
 | `--cc-accent-primary-visual` | `#FF2D8D` | Raw brand pink for icons/large visuals |
+| `--cc-accent-primary-fill` | `#D91473` | Fill behind a primary action's label (both themes) |
+| `--cc-on-accent-primary` | `#FFFFFF` | The only colour allowed on that fill (both themes) |
 | `--cc-accent-secondary` | `#5F27D6` | Accessible violet for text/actions |
 | `--cc-accent-secondary-visual` | `#7A35F5` | Raw brand violet for icons/large visuals |
 | `--cc-focus-ring` | `#7A35F5` | Keyboard focus outline |
@@ -136,21 +138,32 @@ The brand colors describe **Context Commander state and relationships**, not the
 
 ## Primary
 
-Dark theme:
+One recipe, both themes:
 
 ```css
-background: #FF2D8D;
-color: #0B0B12;
+background: var(--cc-accent-primary-fill);   /* #D91473 */
+color: var(--cc-on-accent-primary);          /* #FFFFFF */
 ```
 
-Use dark text on brand pink for better contrast than white text.
+Hover **darkens** the fill (`filter: brightness(0.92)`). Brightening a fill
+that carries a light label spends the contrast the label needs.
 
-Light theme:
+This replaces an earlier recommendation of dark text on raw brand pink
+(`#0B0B12` on `#FF2D8D`) for the dark theme. That pairing measures **5.61:1**
+— it passes WCAG AA — and was still reported as hard to read in both themes.
+The reason is that WCAG 2 scores luminance only and is blind to chroma: small
+dark text on a high-chroma fill is harder to read than its ratio claims.
+White on `#D91473` measures a *lower* **4.89:1** and is legible, which is why
+the lower number is the one shipped.
 
-```css
-background: #D91473;
-color: #FFFFFF;
-```
+Section 9's rule of thumb already pointed here — use the darker semantic
+variant when readability is the primary requirement — and a button label is
+exactly that. The raw brand pink stays where it belongs: icons, rails,
+meters, and anything that carries no text.
+
+`web/scripts/check-design-sync.mjs` (check 7) enforces both halves — a
+measured 4.5:1 floor for any text-on-fill pairing, and an outright refusal of
+a `*-visual` token under text, whatever it measures.
 
 ## Secondary
 
@@ -248,7 +261,9 @@ Important combinations:
 
 ```text
 #FF2D8D on #0B0B12   good accent contrast
-#0B0B12 on #FF2D8D   preferred for primary dark-mode pink buttons
+#0B0B12 on #FF2D8D   5.61:1 — passes AA and still reads badly. Not for text.
+#FFFFFF on #D91473   4.89:1 — the primary button, both themes
+#696470 on #F0EEF4   4.99:1 — muted text on its darkest light surface
 
 #FFFFFF on #7A35F5   suitable for violet buttons
 #7A35F5 on #0B0B12   use mainly for large/iconographic elements
@@ -256,6 +271,10 @@ Important combinations:
 #D91473 on #FFFFFF   accessible pink text/action variant
 #5F27D6 on #FFFFFF   accessible violet text/action variant
 ```
+
+A passing ratio is not the same as a readable one. WCAG 2 compares luminance
+and ignores chroma, so a vivid fill can clear 4.5:1 with dark text and still
+be unpleasant to read at 12px. Where the two disagree, trust the reading.
 
 Rule of thumb:
 
@@ -281,9 +300,11 @@ Rule of thumb:
 
   --cc-text: #111118;
   --cc-text-secondary: #4A4652;
-  --cc-text-muted: #77727F;
+  --cc-text-muted: #696470;
 
   --cc-accent-primary: #D91473;
+  --cc-accent-primary-fill: #D91473;
+  --cc-on-accent-primary: #FFFFFF;
   --cc-accent-secondary: #5F27D6;
 
   --cc-success: #18794E;

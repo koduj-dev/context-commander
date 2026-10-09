@@ -107,7 +107,10 @@ func registerInstallationTools(server *sdkmcp.Server, deps Deps, principalID, _ 
 		if err != nil {
 			return nil, userResult{}, err
 		}
-		u, err := deps.Installation.CreateUser(ctx, principalID, userID, args.Email, args.DisplayName)
+		u, err := // nil: MCP has no password surface, deliberately. A model creating
+			// accounts that can immediately be signed in to is a larger decision
+			// than adding a field (docs/adr/0019).
+			deps.Installation.CreateUser(ctx, principalID, userID, args.Email, args.DisplayName, nil)
 		if err != nil {
 			return nil, userResult{}, err
 		}

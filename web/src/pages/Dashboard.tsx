@@ -3,7 +3,7 @@ import { useT } from "../i18n";
 import { useCrumbs } from "../app/crumbs";
 import { useAuth } from "../app/auth";
 import { useFormat } from "../app/prefs";
-import { ApiError, api, principalName, type HandoffDetail, type MyProject } from "../lib/api";
+import { api, principalName, type MyProject, type WaitingHandoff } from "../lib/api";
 import { roleLabel } from "../lib/labels";
 import { useResource } from "../lib/resource";
 import {
@@ -23,36 +23,30 @@ import {
 /**
  * The landing screen: is anything waiting on you.
  *
- * There is no cross-project endpoint for open handoffs, so this asks each
- * project for its current one. That is N requests, which is acceptable here
- * and nowhere else: membership is bounded by how many projects a person was
- * added to, the calls run in parallel, and a project with no open handoff
- * answers 404 — an answer, not a failure.
+ * One request, `GET /me/handoffs`. This screen used to ask every project for
+ * its current handoff, which was N requests and the shape that stops working
+ * long before it stops being tempting — a person in thirty projects paid
+ * thirty round trips to be told about one. The server answers it in a single
+ * query now (`handoffs.Service.ListWaiting`), scoped by RLS and filtered by
+ * the capability the role holds.
  *
- * The alternative was to show nothing and call it honest. Showing nothing is
- * only honest when the answer is unobtainable, and this one is obtainable.
+ * The row carries a project PATH and no project name, because a cross-project
+ * read has no business joining a table it does not need. The name comes from
+ * /me/projects, which this screen loads anyway for the panel beside it.
  */
-// `current` returns the body as well as the status, which is why a summary
-// can be shown here and not in a handoff list.
-type Waiting = { project: MyProject; handoff: HandoffDetail };
+type Waiting = { row: WaitingHandoff; project?: MyProject };
 
-async function waitingOn(projects: MyProject[]): Promise<Waiting[]> {
-  const results = await Promise.all(
-    projects.map(async (project) => {
-      try {
-        const handoff = await api.currentHandoff(project.namespace, project.slug);
-        return { project, handoff };
-      } catch (err) {
-        // 404 is "nothing is open here", which is the common case. Anything
-        // else is a real failure for that one project and is left out rather
-        // than failing the whole screen — one unreachable project should not
-        // hide the others.
-        if (err instanceof ApiError && err.kind === "not_found") return null;
-        return null;
-      }
-    }),
-  );
-  return results.filter((r): r is Waiting => r !== null);
+/**
+ * Attaches each row's project, for its display name and its link.
+ *
+ * A row whose project is not in the list is kept rather than dropped: the two
+ * reads are not one transaction, so a project joined a moment ago can appear
+ * here first. Showing the path is worse than showing a name and far better
+ * than silently hiding work that is waiting on someone.
+ */
+function withProjects(rows: WaitingHandoff[], projects: MyProject[]): Waiting[] {
+  const byPath = new Map(projects.map((p) => [`${p.namespace}/${p.slug}`, p]));
+  return rows.map((row) => ({ row, project: byPath.get(row.project) }));
 }
 
 export function Dashboard() {
@@ -64,10 +58,11 @@ export function Dashboard() {
   const projects = useResource(() => api.myProjects(), []);
   const mine = projects.data ?? [];
 
-  const waiting = useResource(
-    () => (projects.data ? waitingOn(projects.data) : Promise.resolve([])),
-    [projects.data],
-  );
+  // Independent of the project list: it no longer needs it to make the
+  // request, only to label the result. Loading them in parallel rather than
+  // in sequence is the whole point of the change.
+  const handoffs = useResource(() => api.myHandoffs(), []);
+  const waiting = withProjects(handoffs.data ?? [], mine);
 
   return (
     <>
@@ -84,11 +79,11 @@ export function Dashboard() {
             tight
             footer={<span className="dim">{t("dashboard.waitingLead")}</span>}
           >
-            {projects.loading || waiting.loading ? (
+            {handoffs.loading ? (
               <Loading />
-            ) : projects.error ? (
-              <ErrorState error={projects.error} onRetry={projects.reload} />
-            ) : (waiting.data ?? []).length === 0 ? (
+            ) : handoffs.error ? (
+              <ErrorState error={handoffs.error} onRetry={handoffs.reload} />
+            ) : waiting.length === 0 ? (
               <EmptyState
                 title={t("dashboard.noneWaiting")}
                 body={t("dashboard.noneWaitingBody")}
@@ -101,22 +96,22 @@ export function Dashboard() {
                   { key: "status", label: t("handoff.column.status"), align: "r" },
                 ]}
               >
-                {(waiting.data ?? []).map(({ project, handoff }) => (
-                  <tr key={`${project.namespace}/${project.slug}`}>
+                {waiting.map(({ row, project }) => (
+                  <tr key={row.id}>
                     <td>
                       <Cell
                         primary={
-                          <Link to={`/p/${project.namespace}/${project.slug}`}>{project.name}</Link>
+                          <Link to={`/p/${row.project}`}>{project?.name ?? row.project}</Link>
                         }
-                        secondary={<span className="dim">{f.relative(handoff.created_at)}</span>}
+                        secondary={<span className="dim">{f.relative(row.created_at)}</span>}
                       />
                     </td>
                     <td>
-                      <span className="sec">{handoff.summary}</span>
+                      <span className="sec">{row.summary}</span>
                     </td>
                     <td className="r">
-                      <Badge tone={handoff.status === "open" ? "active" : "warn"}>
-                        {handoff.status === "open"
+                      <Badge tone={row.status === "open" ? "active" : "warn"}>
+                        {row.status === "open"
                           ? t("handoff.status.open")
                           : t("handoff.status.claimed")}
                       </Badge>

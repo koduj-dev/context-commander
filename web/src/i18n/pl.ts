@@ -336,6 +336,14 @@ export const pl: Partial<Record<MessageKey, string>> = {
   "admin.column.role": "Rola",
   "admin.column.granted": "Nadano",
   "admin.createUser": "Utwórz konto",
+  "admin.initialPassword": "Hasło początkowe (opcjonalne)",
+  "admin.initialPasswordLead":
+    "Podane pozwala tej osobie zalogować się od razu. Puste oznacza, że będzie potrzebować tokenu albo hasła ustawionego później. Co najmniej {min} znaków.",
+  "admin.setPassword": "Ustaw hasło",
+  "admin.setPasswordFor": "Ustaw hasło dla {name}",
+  "admin.passwordSetFor": "Hasło ustawione. {name} może się nim teraz zalogować.",
+  "admin.setPasswordLead":
+    "To możliwość zalogowania się jako ta osoba — to samo co wydanie jej tokenu, co ten ekran już robi. Przekaż hasło innym kanałem; później nie jest nigdzie pokazywane.",
   "admin.createUserLead": "Osoba, która może trzymać token i zostać dodana do projektów.",
   "admin.email": "Adres e-mail",
   "admin.displayName": "Nazwa wyświetlana",

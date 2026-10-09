@@ -37,6 +37,12 @@ func (d Deps) createInstallationUser(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Email       string `json:"email"`
 		DisplayName string `json:"display_name"`
+		// Optional. Given, the new person can sign in immediately; omitted,
+		// they need a token or a password set for them later. Both are
+		// supported because an administrator creating an account for someone
+		// standing next to them and one creating twenty in a script want
+		// different things.
+		Password string `json:"password,omitempty"`
 	}
 	if err := decodeJSONBody(w, r, &body); err != nil || body.Email == "" || body.DisplayName == "" {
 		writeError(w, http.StatusBadRequest, "invalid_request", "email and display_name are required")
@@ -50,7 +56,16 @@ func (d Deps) createInstallationUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	u, err := d.Installation.CreateUser(r.Context(), principalID, callerUserID, body.Email, body.DisplayName)
+	var passwordHash *string
+	if body.Password != "" {
+		hash, ok := d.hashPasswordForAnother(w, r, body.Password)
+		if !ok {
+			return
+		}
+		passwordHash = &hash
+	}
+
+	u, err := d.Installation.CreateUser(r.Context(), principalID, callerUserID, body.Email, body.DisplayName, passwordHash)
 	if errors.Is(err, identity.ErrAlreadyExists) {
 		// Said here rather than in writeDomainError because only this
 		// handler knows the clash was an email — and "that already exists"
@@ -409,4 +424,72 @@ func (d Deps) getInstallationStats(w http.ResponseWriter, r *http.Request) {
 	out.Credentials.Expired, out.Credentials.UsedLast7Days = st.CredentialsExpired, st.ActiveLast7Days
 
 	writeJSON(w, http.StatusOK, out)
+}
+
+// setUserPassword sets or replaces another user's local password.
+//
+// The way an administrator lets someone into an account they just created.
+// Before it, the options were a shell on the server (`ccd user set-password`)
+// or handing over a personal access token — which makes the new person
+// inherit a credential the administrator also holds.
+func (d Deps) setUserPassword(w http.ResponseWriter, r *http.Request) {
+	targetUserID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", "user id must be a UUID")
+		return
+	}
+	var body struct {
+		Password string `json:"password"`
+	}
+	if err := decodeJSONBody(w, r, &body); err != nil {
+		return
+	}
+
+	hash, ok := d.hashPasswordForAnother(w, r, body.Password)
+	if !ok {
+		return
+	}
+
+	principalID := principalIDFrom(r.Context())
+	callerUserID, err := resolveCallerUserID(r, d.Pool, principalID)
+	if err != nil {
+		writeDomainError(w, r, err)
+		return
+	}
+
+	if err := d.Installation.SetUserPassword(r.Context(), principalID, callerUserID, targetUserID, hash); err != nil {
+		writeDomainError(w, r, err)
+		return
+	}
+	// No body: there is nothing to return that the caller does not already
+	// know, and echoing anything about the password would be the one thing
+	// not to do.
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// hashPasswordForAnother validates and hashes a password an administrator is
+// setting for somebody else, under the same concurrency gate every other
+// argon2 call uses — 64 MiB a time, and an endpoint that forgot the gate is an
+// endpoint that can exhaust the server's memory from a single authenticated
+// session.
+//
+// Returns ok=false when it has already written the response.
+func (d Deps) hashPasswordForAnother(w http.ResponseWriter, r *http.Request, password string) (string, bool) {
+	if err := identity.ValidatePassword(password); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", passwordTooShortMessage())
+		return "", false
+	}
+	release, ok := d.Limiter.AcquirePasswordHash()
+	if !ok {
+		w.Header().Set("Retry-After", "1")
+		writeError(w, http.StatusServiceUnavailable, "overloaded", "too busy to hash a password; retry shortly")
+		return "", false
+	}
+	hash, err := identity.HashPassword(password)
+	release()
+	if err != nil {
+		internalError(w, r, err, "could not store the password")
+		return "", false
+	}
+	return hash, true
 }

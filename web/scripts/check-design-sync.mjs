@@ -8,7 +8,7 @@
  * something the product has not looked like for months and nobody trusts
  * either one. This script is the thing that notices.
  *
- * It checks four properties:
+ * It checks these properties:
  *
  *   1. Every component class the mockups define exists in the app. A class
  *      that only lives in the mockups is a design that was agreed and never
@@ -27,6 +27,13 @@
  *      sign-in form shipped as two blank rectangles because of it. The
  *      mockups could not catch this — every field in them holds a sample
  *      value, so an empty form is a state they never show.
+ *   7. Text on a coloured fill is legible, computed from the brand tokens
+ *      rather than eyeballed. The measured floor is only half of it: the
+ *      primary button spent months as near-black on raw brand pink, which
+ *      measures 5.61:1 and PASSES AA while still being hard to read, because
+ *      WCAG 2 weighs luminance and ignores chroma. So the check also refuses
+ *      a `*-visual` token under text, on the brand package's own statement
+ *      that those are for icons and large visuals.
  *   5. No rule sets a flex-only property on something that is not a flex or
  *      grid container. `justify-content` on a block is the quietest failure
  *      in CSS: no error, no warning, no effect. It left the sign-in lockup
@@ -54,6 +61,7 @@ const repo = join(here, "..", "..");
 const MOCKUP_CSS = join(repo, "docs", "mockups", "assets", "mockup.css");
 const APP_CSS = join(here, "..", "src", "styles", "app.css");
 const SRC = join(here, "..", "src");
+const TOKENS = join(repo, "docs", "brand", "tokens", "ui-colors.css");
 
 /** Classes that exist only to frame a mockup and have no place in the app. */
 const MOCKUP_ONLY = new Set([
@@ -66,6 +74,19 @@ const MOCKUP_ONLY = new Set([
   "specimen",
   "spec-note", // type and component specimens
 ]);
+
+/**
+ * Text-on-fill pairings allowed to measure below AA, and why.
+ *
+ * Keyed by selector. Empty on purpose: a readable interface is the default,
+ * and anything added here needs a reason a reader will accept, not a note
+ * saying the designer liked it.
+ */
+const CONTRAST_ALLOWED = new Map([]);
+
+/** The WCAG AA floor for body-sized text. Button labels are 12.5px — the
+ * 3:1 large-text allowance starts at 18.66px bold, so it does not apply. */
+const AA_NORMAL = 4.5;
 
 /** Inline styles that are data rather than styling, and why. */
 const INLINE_STYLE_ALLOWED = new Map([
@@ -169,6 +190,112 @@ for (const [label, css] of [
       `${label} contains ${hex.length} hard-coded colour(s): ${[...new Set(hex)].join(", ")}\n` +
         `  Colour belongs in docs/brand/tokens/ui-colors.css. A literal here is a second\n` +
         `  brand that will not follow when the first one changes.`,
+    );
+  }
+}
+
+// 7 — text on a coloured fill must be legible, measured rather than eyeballed.
+//
+// Only rules that declare BOTH a background and a colour in the same body are
+// checked. That is an exact pairing with nothing inferred: resolving a label
+// against a background inherited from another rule would mean replaying the
+// cascade, and would invent pairings that never render — `.btn-danger` sets a
+// colour and takes its fill from `.btn`, so pairing its red with every
+// `.btn*` background would report combinations no screen shows. The cost is
+// that a fill and its label written in two separate rules are invisible here;
+// in this kit they are always written together.
+//
+// The second rule is the one that catches what a ratio cannot. The brand's
+// `*-visual` tokens are the raw, vivid brand colours, documented for "icons
+// and large visuals"; the plain `--cc-accent-*` tokens are the readable
+// variants for text and actions. Near-black on raw brand pink measures
+// 5.61:1 — it PASSES AA — and still reads badly, because WCAG 2 weighs
+// luminance and is blind to chroma. So a measured floor alone would have
+// waved the primary button through, as it did until someone said it was hard
+// to read. A `*-visual` token under text is refused on the token's own
+// documented meaning, whatever it measures.
+function themeTokens(tokenCss) {
+  const stripped = tokenCss.replace(/\/\*[\s\S]*?\*\//g, "");
+  const block = (selector) => {
+    const m = new RegExp(`${selector}\\s*\\{([^}]*)\\}`).exec(stripped);
+    if (!m) throw new Error(`ui-colors.css has no ${selector} block`);
+    return Object.fromEntries(
+      [...m[1].matchAll(/(--[\w-]+)\s*:\s*(#[0-9A-Fa-f]{3,8})/g)].map((d) => [d[1], d[2]]),
+    );
+  };
+  // Dark layers over :root exactly as the cascade does, so a token the dark
+  // block does not restate keeps its light value — which is how the
+  // theme-independent tokens reach the dark theme at all.
+  const light = block(":root");
+  return { light, dark: { ...light, ...block('\\[data-theme="dark"\\]') } };
+}
+
+function contrast(a, b) {
+  const channel = (c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  const luminance = (hex) => {
+    let h = hex.slice(1);
+    if (h.length === 3) h = [...h].map((c) => c + c).join("");
+    const [r, g, b] = [0, 2, 4].map((i) => channel(parseInt(h.slice(i, i + 2), 16) / 255));
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+function illegiblePairings(css, themes) {
+  const stripped = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  const found = [];
+  for (const m of stripped.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    const selector = m[1].trim();
+    const bg = /(?:^|;)\s*background(?:-color)?\s*:\s*var\((--cc-[\w-]+)\)/.exec(m[2]);
+    const fg = /(?:^|;)\s*color\s*:\s*var\((--cc-[\w-]+)\)/.exec(m[2]);
+    if (!bg || !fg || CONTRAST_ALLOWED.has(selector)) continue;
+
+    if (bg[1].endsWith("-visual")) {
+      found.push(
+        `    ${selector}: ${bg[1]} is a raw brand colour carrying text.\n` +
+          `      The brand package documents the *-visual tokens for icons and large\n` +
+          `      visuals, and the plain --cc-accent-* variants for text and actions.\n` +
+          `      Use the readable variant, or a *-fill token paired with its *-on-* colour.`,
+      );
+      continue;
+    }
+
+    for (const [theme, tokens] of Object.entries(themes)) {
+      const back = tokens[bg[1]];
+      const front = tokens[fg[1]];
+      // An unresolved token is a typo'd or deleted variable, which renders as
+      // an unstyled element — worth failing on rather than skipping past.
+      if (!back || !front) {
+        found.push(
+          `    ${selector}: ${!back ? bg[1] : fg[1]} is not defined for the ${theme} theme.`,
+        );
+        continue;
+      }
+      const ratio = contrast(front, back);
+      if (ratio < AA_NORMAL) {
+        found.push(
+          `    ${selector} (${theme}): ${front} on ${back} measures ` +
+            `${ratio.toFixed(2)}:1, under ${AA_NORMAL}:1.`,
+        );
+      }
+    }
+  }
+  return found;
+}
+
+const themes = themeTokens(await readFile(TOKENS, "utf8"));
+for (const [label, css] of [
+  ["docs/mockups/assets/mockup.css", mockupCss],
+  ["web/src/styles/app.css", appCss],
+]) {
+  const bad = illegiblePairings(css, themes);
+  if (bad.length) {
+    failures.push(
+      `${label} has ${bad.length} unreadable text-on-fill pairing(s):\n` +
+        bad.join("\n") +
+        `\n  Fix the colours rather than the threshold. If a pairing genuinely has to\n` +
+        `  stay, add it to CONTRAST_ALLOWED with a reason.`,
     );
   }
 }

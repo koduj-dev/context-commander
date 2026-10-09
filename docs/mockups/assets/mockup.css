@@ -193,12 +193,12 @@ a:hover { text-decoration: underline; }
 }
 .btn:hover { background: var(--cc-surface-3); }
 .btn-primary {
-  background: var(--cc-accent-primary-visual);
-  border-color: var(--cc-accent-primary-visual);
-  color: var(--cc-void);
+  background: var(--cc-accent-primary-fill);
+  border-color: var(--cc-accent-primary-fill);
+  color: var(--cc-on-accent-primary);
   font-weight: 600;
 }
-.btn-primary:hover { background: var(--cc-accent-primary-visual); filter: brightness(1.08); }
+.btn-primary:hover { background: var(--cc-accent-primary-fill); filter: brightness(0.92); }
 .btn-danger { color: var(--cc-danger); border-color: var(--cc-border-strong); }
 .btn-sm { padding: 3px 8px; font-size: 12px; }
 .btn[disabled] { opacity: .45; cursor: not-allowed; }

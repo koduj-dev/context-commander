@@ -298,7 +298,7 @@ function UserRow({ user }: { user: InstallationUser }) {
           />
         </td>
         <td className="r nowrap">
-          <span className="dim">{f.date(user.created_at)}</span>{" "}
+          <span className="dim">{f.date(user.created_at)}</span> <SetPassword user={user} />{" "}
           {user.principal_id && (
             <Btn small onClick={() => setOpen((v) => !v)}>
               {t("admin.tokens")}
@@ -508,21 +508,32 @@ function AgentRow({ agent }: { agent: ServicePrincipal }) {
   );
 }
 
+/** Mirrors identity.MinPasswordLength, so the form states the rule the server enforces. */
+const MIN_PASSWORD = 12;
+
 function CreateUser({ onCreated }: { onCreated: () => void }) {
   const t = useT();
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
+  const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<unknown>();
 
+  // Optional, and empty is a valid choice rather than an incomplete form: an
+  // administrator creating twenty accounts in a row has no business inventing
+  // twenty passwords. Below the floor is a different thing — that is a typo,
+  // and submitting it would only earn a 400.
+  const passwordUsable = password === "" || password.length >= MIN_PASSWORD;
+
   async function submit() {
-    if (!email.trim() || !name.trim() || busy) return;
+    if (!email.trim() || !name.trim() || !passwordUsable || busy) return;
     setBusy(true);
     setFailure(undefined);
     try {
-      await api.createUser(email.trim(), name.trim());
+      await api.createUser(email.trim(), name.trim(), password || undefined);
       setEmail("");
       setName("");
+      setPassword("");
       onCreated();
     } catch (err) {
       setFailure(err);
@@ -534,35 +545,134 @@ function CreateUser({ onCreated }: { onCreated: () => void }) {
   return (
     <Panel title={t("admin.createUser")}>
       <p className="sec lead-out">{t("admin.createUserLead")}</p>
-      <Row gap="sm">
+      <div className="stack">
+        <Row gap="sm">
+          <TextField
+            label={t("admin.email")}
+            value={email}
+            onChange={setEmail}
+            placeholder={t("admin.email")}
+            grow
+          />
+          <TextField
+            label={t("admin.displayName")}
+            value={name}
+            onChange={setName}
+            placeholder={t("admin.displayName")}
+            grow
+          />
+        </Row>
         <TextField
-          label={t("admin.email")}
-          value={email}
-          onChange={setEmail}
-          placeholder={t("admin.email")}
+          label={t("admin.initialPassword")}
+          type="password"
+          value={password}
+          onChange={setPassword}
+          autoComplete="new-password"
           grow
+          labelled
         />
-        <TextField
-          label={t("admin.displayName")}
-          value={name}
-          onChange={setName}
-          placeholder={t("admin.displayName")}
-          grow
-        />
-        <Btn
-          kind="primary"
-          onClick={() => void submit()}
-          disabled={busy || !email.trim() || !name.trim()}
-        >
-          {busy ? t("common.loading") : t("admin.createUser")}
-        </Btn>
-      </Row>
+        <p className="sec">{t("admin.initialPasswordLead", { min: String(MIN_PASSWORD) })}</p>
+        <Row>
+          <Btn
+            kind="primary"
+            onClick={() => void submit()}
+            disabled={busy || !email.trim() || !name.trim() || !passwordUsable}
+          >
+            {busy ? t("common.loading") : t("admin.createUser")}
+          </Btn>
+        </Row>
+      </div>
       {failure !== undefined && (
         <div className="mt">
           <ErrorState error={failure} />
         </div>
       )}
     </Panel>
+  );
+}
+
+/**
+ * Giving an existing account a password.
+ *
+ * Reveals its field rather than showing it always, because the row is a
+ * directory listing and this is a rare, consequential action — the same shape
+ * the token button beside it uses.
+ */
+function SetPassword({ user }: { user: InstallationUser }) {
+  const t = useT();
+  const [open, setOpen] = useState(false);
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
+  const [failure, setFailure] = useState<unknown>();
+
+  const who = user.display_name || user.email;
+
+  async function submit() {
+    if (password.length < MIN_PASSWORD || busy) return;
+    setBusy(true);
+    setFailure(undefined);
+    try {
+      await api.setUserPassword(user.id, password);
+      setPassword("");
+      setDone(true);
+      setOpen(false);
+    } catch (err) {
+      setFailure(err);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!open) {
+    return (
+      <>
+        <Btn small onClick={() => setOpen(true)}>
+          {t("admin.setPassword")}
+        </Btn>
+        {done && (
+          <div className="mt">
+            <Note tone="info">{t("admin.passwordSetFor", { name: who })}</Note>
+          </div>
+        )}
+      </>
+    );
+  }
+
+  return (
+    <div className="stack">
+      <Note tone="warn">{t("admin.setPasswordLead")}</Note>
+      <TextField
+        label={t("admin.setPasswordFor", { name: who })}
+        type="password"
+        value={password}
+        onChange={setPassword}
+        autoComplete="new-password"
+        grow
+        labelled
+      />
+      <Row gap="sm">
+        <Btn
+          kind="primary"
+          small
+          onClick={() => void submit()}
+          disabled={busy || password.length < MIN_PASSWORD}
+        >
+          {busy ? t("common.loading") : t("admin.setPassword")}
+        </Btn>
+        <Btn
+          small
+          onClick={() => {
+            setOpen(false);
+            setPassword("");
+            setFailure(undefined);
+          }}
+        >
+          {t("common.cancel")}
+        </Btn>
+      </Row>
+      {failure !== undefined && <ErrorState error={failure} />}
+    </div>
   );
 }
 

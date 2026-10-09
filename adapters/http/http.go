@@ -174,6 +174,7 @@ func NewHandler(deps Deps) http.Handler {
 				r.Get("/stats", deps.getInstallationStats)
 				r.Get("/users", deps.listInstallationUsers)
 				r.Post("/users", deps.createInstallationUser)
+				r.Put("/users/{id}/password", deps.setUserPassword)
 				r.Get("/service-principals", deps.listServicePrincipals)
 				r.Post("/service-principals", deps.createServicePrincipal)
 				r.Post("/principals/{id}/tokens", deps.issueCredentialFor)

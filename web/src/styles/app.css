@@ -345,15 +345,22 @@ a:hover {
 .btn:hover {
   background: var(--cc-surface-3);
 }
+/* The fill is the accessible pink, not the raw brand pink, and the label is
+ * the token named for sitting on it. Near-black on the raw brand pink
+ * measures 5.61:1 — it passes AA — and still reads badly at this size,
+ * because WCAG 2 weighs luminance and is blind to chroma. Hover darkens
+ * rather than brightens: brightening a fill that carries a light label
+ * spends the contrast that label needs. Check 7 in
+ * scripts/check-design-sync.mjs now measures this. */
 .btn-primary {
-  background: var(--cc-accent-primary-visual);
-  border-color: var(--cc-accent-primary-visual);
-  color: var(--cc-void);
+  background: var(--cc-accent-primary-fill);
+  border-color: var(--cc-accent-primary-fill);
+  color: var(--cc-on-accent-primary);
   font-weight: 600;
 }
 .btn-primary:hover {
-  background: var(--cc-accent-primary-visual);
-  filter: brightness(1.08);
+  background: var(--cc-accent-primary-fill);
+  filter: brightness(0.92);
 }
 .btn-danger {
   color: var(--cc-danger);

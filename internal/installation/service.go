@@ -99,9 +99,28 @@ func (s *Service) ListAdmins(ctx context.Context, principalID, callerUserID uuid
 // holds CapUserCreate — the HTTP/MCP-reachable counterpart to `ccd user
 // create`, which internal/identity's own doc comment already anticipated
 // (docs/adr/0009's "a future adapters/http admin endpoint").
-func (s *Service) CreateUser(ctx context.Context, principalID, callerUserID uuid.UUID, email, displayName string) (identity.User, error) {
+// passwordHash, when non-nil, is set in the SAME transaction as the user and
+// its principal. Creating the account and then setting the password in a
+// second call could leave a user who cannot sign in and a screen that said
+// they could — and the person it was created for would be the one to find out.
+//
+// A password requires CapCredentialManage on top of CapUserCreate. Setting
+// someone's password is the power to sign in as them, which is exactly what
+// issuing them a token already is; both capabilities sit on the single ADMIN
+// role today, so this changes nothing in practice. It is written down for the
+// day a narrower role exists, because "may create accounts" and "may become
+// any account" are not the same permission.
+func (s *Service) CreateUser(
+	ctx context.Context, principalID, callerUserID uuid.UUID,
+	email, displayName string, passwordHash *string,
+) (identity.User, error) {
 	if err := s.checkCapability(ctx, principalID, callerUserID, CapUserCreate); err != nil {
 		return identity.User{}, err
+	}
+	if passwordHash != nil {
+		if err := s.checkCapability(ctx, principalID, callerUserID, CapCredentialManage); err != nil {
+			return identity.User{}, err
+		}
 	}
 	var u identity.User
 	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
@@ -110,13 +129,56 @@ func (s *Service) CreateUser(ctx context.Context, principalID, callerUserID uuid
 		if err != nil {
 			return err
 		}
-		_, err = s.identity.CreatePrincipalForUser(ctx, tx, u.ID)
-		return err
+		if _, err := s.identity.CreatePrincipalForUser(ctx, tx, u.ID); err != nil {
+			return err
+		}
+		if passwordHash != nil {
+			return s.identity.SetPassword(ctx, tx, u.ID, *passwordHash)
+		}
+		return nil
 	})
 	if err != nil {
 		return identity.User{}, fmt.Errorf("installation: create user: %w", err)
 	}
 	return u, nil
+}
+
+// SetUserPassword sets or replaces a user's local password.
+//
+// It exists because an administrator who creates an account had no way to let
+// anyone into it: the first-run setup code is gone once the installation has a
+// user, `ccd user set-password` needs a shell on the server, and handing over
+// a personal access token makes the new person inherit a credential the
+// administrator also holds.
+//
+// CapCredentialManage, for the reason given on CreateUser: this is the power
+// to sign in as somebody. It is not a new power — the same capability already
+// issues a token for any principal — and saying so is the point, because a
+// reader should not have to work out whether this widened anything.
+//
+// There is deliberately no "must change at next sign-in" flag. That needs a
+// column, a check on every authenticated request and a screen of its own, and
+// half of it is worse than none: a flag nothing enforces reads as a promise
+// the product does not keep. Recorded in NEXT.md instead.
+func (s *Service) SetUserPassword(
+	ctx context.Context, principalID, callerUserID, targetUserID uuid.UUID, passwordHash string,
+) error {
+	if err := s.checkCapability(ctx, principalID, callerUserID, CapCredentialManage); err != nil {
+		return err
+	}
+	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+		// Checked rather than assumed: SetPassword is an upsert keyed on
+		// user_id with a foreign key, so a stray id would fail on the
+		// constraint with a message about a relation nobody asked about.
+		if _, err := s.identity.GetUser(ctx, tx, targetUserID); err != nil {
+			return err
+		}
+		return s.identity.SetPassword(ctx, tx, targetUserID, passwordHash)
+	})
+	if err != nil {
+		return fmt.Errorf("installation: set user password: %w", err)
+	}
+	return nil
 }
 
 // CreateServicePrincipal registers a ServicePrincipal (an agent) and its

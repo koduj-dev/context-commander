@@ -332,6 +332,14 @@ export const zhCN: Partial<Record<MessageKey, string>> = {
   "admin.column.role": "角色",
   "admin.column.granted": "授予时间",
   "admin.createUser": "创建账号",
+  "admin.initialPassword": "初始密码（可选）",
+  "admin.initialPasswordLead":
+    "填了密码，这个人就能立即登录。留空则需要 token，或者之后由别人替他设置密码。至少 {min} 个字符。",
+  "admin.setPassword": "设置密码",
+  "admin.setPasswordFor": "为 {name} 设置密码",
+  "admin.passwordSetFor": "密码已设置。{name} 现在可以用它登录。",
+  "admin.setPasswordLead":
+    "这等于拥有以该用户身份登录的能力——与为他签发 token 相同，而本页面已经能那么做。请通过其他渠道把密码告诉他；此后任何地方都不再显示。",
   "admin.createUserLead": "一个可以持有 token、并被加入项目的人。",
   "admin.email": "电子邮箱",
   "admin.displayName": "显示名称",

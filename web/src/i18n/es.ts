@@ -303,6 +303,14 @@ export const es: Partial<Record<MessageKey, string>> = {
   "admin.column.role": "Rol",
   "admin.column.granted": "Concedido",
   "admin.createUser": "Crear una cuenta",
+  "admin.initialPassword": "Contraseña inicial (opcional)",
+  "admin.initialPasswordLead":
+    "Si pone una, la persona podrá iniciar sesión de inmediato. Si la deja vacía, necesitará un token o que alguien le ponga una después. Al menos {min} caracteres.",
+  "admin.setPassword": "Establecer contraseña",
+  "admin.setPasswordFor": "Establecer una contraseña para {name}",
+  "admin.passwordSetFor": "Contraseña establecida. {name} ya puede iniciar sesión con ella.",
+  "admin.setPasswordLead":
+    "Esto es poder iniciar sesión como esa persona: lo mismo que emitirle un token, algo que esta pantalla ya hace. Comunique la contraseña por otro medio; después no se muestra en ningún sitio.",
   "admin.createUserLead": "Una persona que puede tener un token y ser añadida a proyectos.",
   "admin.email": "Correo electrónico",
   "admin.displayName": "Nombre visible",
