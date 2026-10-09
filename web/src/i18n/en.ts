@@ -334,6 +334,14 @@ export const en = {
   "admin.column.role": "Role",
   "admin.column.granted": "Granted",
   "admin.createUser": "Create user",
+  "admin.initialPassword": "Initial password (optional)",
+  "admin.initialPasswordLead":
+    "Give one and the person can sign in straight away. Leave it empty and they will need a token, or a password set for them later. At least {min} characters.",
+  "admin.setPassword": "Set password",
+  "admin.setPasswordFor": "Set a password for {name}",
+  "admin.passwordSetFor": "Password set. {name} can sign in with it now.",
+  "admin.setPasswordLead":
+    "This is the power to sign in as them — the same as issuing them a token, which this screen already does. Tell them the password out of band; it is shown nowhere after this.",
   "admin.createUserLead": "A person who can hold a token and be added to projects.",
   "admin.email": "Email",
   "admin.displayName": "Display name",

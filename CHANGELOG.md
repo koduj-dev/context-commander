@@ -12,6 +12,42 @@ link definition at the bottom of the file.
 
 ### Added
 
+- **An administrator can give a new account a password.** Creating a user and
+  having no way to let anyone into it was a hole in the sign-in work that
+  preceded it: the first-run setup code is gone once the installation has a
+  user, `ccd user set-password` needs a shell on the server, and handing over a
+  personal access token makes the new person inherit a credential the
+  administrator also holds.
+  - Optional `password` on `POST /v1/installation/users`, set in the **same
+    transaction** as the user and its principal. Create-then-set in two calls
+    could leave someone who cannot sign in and a screen that said they could,
+    and the person it was created for would be the one to find out.
+  - `PUT /v1/installation/users/{id}/password` for an account that already
+    exists — including one provisioned from a directory, which is how someone
+    gets a local password as a fallback for the day LDAP is down.
+  - Both require `CapCredentialManage` on top of `CapUserCreate`. Setting
+    someone's password is the power to sign in as them, which is exactly what
+    issuing them a token already was, so this widens nothing — it is written
+    down because "may create accounts" and "may become any account" are not
+    the same permission the day a narrower role exists.
+  - Deliberately not on MCP. A model creating accounts that can immediately be
+    signed in to is a larger decision than adding a field.
+
+### Changed
+
+- **The dashboard asks once instead of once per project.** It called
+  `handoffs/current` for every membership — N requests to answer one question,
+  and a person in thirty projects paid thirty round trips to be told about
+  one. `GET /me/handoffs` had existed since 2026-09-24 and nothing used it.
+  - The row carries a project *path* and no name, because a cross-project read
+    has no business joining a table it does not need; the name comes from
+    `/me/projects`, which the screen loads anyway for the panel beside it. A
+    row whose project is not in that list yet is still shown with its path:
+    the two reads are not one transaction, and hiding work that is waiting on
+    someone is the worse failure.
+  - A DOM test counts the requests. The screen looks identical either way, so
+    nothing else would notice the loop creeping back.
+
 - **Signing in against an LDAP directory.** The second half of
   [ADR 0019](docs/adr/0019-browser-authentication-and-directory-identity.md),
   and the deployment the maintainer actually describes: a company installs

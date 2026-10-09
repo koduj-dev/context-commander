@@ -168,10 +168,17 @@ Only on top of a core loop people actually use:
       - Group-to-role mapping is a separate decision. A directory proves who
         someone is, not what they may do; authorization stays in project and
         organization membership and `installation_admins`.
-      - Not yet built on the local half either: an administrator setting an
-        initial password for a user they create. Today that user signs in
-        with a token and sets their own, or an operator runs
-        `ccd user set-password`.
+      - [x] ~~An administrator setting an initial password for a user they
+        create.~~ Closed 2026-10-09: optional `password` on
+        `POST /v1/installation/users`, set in the same transaction as the user
+        and its principal, plus `PUT /v1/installation/users/{id}/password` for
+        an account that already exists. Both need `CapCredentialManage` on top
+        of creating — setting someone's password is the power to sign in as
+        them, which is what issuing them a token already was.
+      - [ ] No "must change at next sign-in" flag. It needs a column, a check
+        on every authenticated request and a screen of its own, and half of it
+        is worse than none: a flag nothing enforces reads as a promise the
+        product does not keep.
 - [ ] **Storage quotas per user/organization.** Raised by the maintainer
       while scoping the UI: an organization deployment will want a ceiling
       on what accumulates, and nothing measures or limits anything today —
@@ -255,8 +262,10 @@ the screen rather than showing a control that would fail.
   the rows and `RoleCan(role, CapHandoffRead)` filters them — today every
   project role holds that capability, which is exactly why the filter is
   written down rather than left implied.
-  - [ ] The dashboard still asks per project. Switching it over is a small
-    interface change, left for the next pass through the UI.
+  - [x] ~~The dashboard still asks per project.~~ Closed 2026-10-09: it makes
+    one request and joins the project names against `/me/projects`, which it
+    already loads. A DOM test counts the requests, because the screen looks
+    identical either way and nothing else would notice a loop creeping back.
 - [ ] **Agent ownership that means something.** `service_principals` now
   records `created_by` and the directory shows it (migration 000026), but
   that is provenance: an immutable note of who registered the agent, granting

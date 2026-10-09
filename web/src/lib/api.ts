@@ -216,6 +216,30 @@ export type AuthMethod = {
   label?: string;
 };
 
+/**
+ * One row of "is anything waiting on me", across every project.
+ *
+ * Shaped by the handler (adapters/http/me.go), not by the domain type: the
+ * project arrives as a `namespace/slug` **path** rather than an object, and
+ * the summary is already resolved into the row — `handoffs/current` returns a
+ * body and this read does the same work server-side so the browser does not
+ * have to ask twice per project.
+ *
+ * There is no project *name* here, which is deliberate on the server's part:
+ * a cross-project read should not join a table it does not need. The screen
+ * joins it against /me/projects, which it already loads.
+ */
+export type WaitingHandoff = {
+  /** "namespace/slug". */
+  project: string;
+  role: string;
+  id: string;
+  status: string;
+  created_at: string;
+  claimed_at?: string;
+  summary: string;
+};
+
 export type Session = {
   id: string;
   created_at: string;
@@ -638,6 +662,8 @@ export const api = {
   me: () => request<Me>("/me"),
   myProjects: () => request<MyProject[]>("/me/projects"),
   myOrganizations: () => request<MyOrganization[]>("/me/organizations"),
+  // One request for every project, instead of one request per project.
+  myHandoffs: () => request<WaitingHandoff[]>("/me/handoffs"),
 
   tokens: () => request<Credential[]>("/me/tokens"),
   issueToken: (clientType: string, expiresInSeconds?: number) =>
@@ -867,10 +893,20 @@ export const api = {
   // than on the principal because a credential id is unique on its own.
   revokeCredentialFor: (credentialID: string) =>
     request<void>(`/installation/tokens/${credentialID}`, { method: "DELETE" }),
-  createUser: (email: string, displayName: string) =>
+  // password is optional: given, the new person can sign in straight away;
+  // omitted, the field is left out of the body entirely rather than sent
+  // empty, because "" is a password the server would have to reject.
+  createUser: (email: string, displayName: string, password?: string) =>
     request<InstallationUser>("/installation/users", {
       method: "POST",
-      body: { email, display_name: displayName },
+      body: password
+        ? { email, display_name: displayName, password }
+        : { email, display_name: displayName },
+    }),
+  setUserPassword: (userID: string, password: string) =>
+    request<void>(`/installation/users/${userID}/password`, {
+      method: "PUT",
+      body: { password },
     }),
   // The raw token comes back here and nowhere else, exactly like /me/tokens.
   issueTokenFor: (principalID: string, clientType: string, expiresInSeconds?: number) =>
