@@ -23,3 +23,20 @@ updates:
     groups:
       actions:
         patterns: ["*"]
+
+  # The web UI's npm dependencies (vite, react, typescript, vitest, ...).
+  # Added after a high-severity advisory in source-map-js sat on main with
+  # nobody to fix it: the frontend tree had no coverage here at all, so no
+  # update PR was ever opened for it.
+  - package-ecosystem: npm
+    directory: /web
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    # Both labels must already exist in the repo — dependabot fails the whole
+    # PR when it is told to apply one that does not. "JavaScript" is spelled
+    # the way the existing label is spelled.
+    labels: ["dependencies", "JavaScript"]
+    groups:
+      npm-minor-patch:
+        update-types: ["minor", "patch"]
