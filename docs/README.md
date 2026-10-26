@@ -59,6 +59,7 @@ supersedes it, so the trail of what was believed when stays readable.
 | [0016](adr/0016-mcp-sdk-choice.md) | Which MCP SDK, and why |
 | [0017](adr/0017-installation-admin-tier.md) | An installation-admin tier, keyed by user, with no network grant path |
 | [0018](adr/0018-skill-package-scope-and-a-browsable-registry.md) | A skill package lives at a scope; the registry is browsable |
+| [0019](adr/0019-browser-authentication-and-directory-identity.md) | Browser sign-in through sessions, local passwords and directory identity (LDAP, OIDC) |
 
 ## Not documentation
 

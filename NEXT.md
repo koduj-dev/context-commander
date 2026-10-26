@@ -307,7 +307,9 @@ on the planned move to a public repo:
   the gap meanwhile.
 - [ ] **Restrict `allowed_actions` from `all`** — any Action from any source
   can currently run here; narrow to verified creators once public.
-- [ ] `CODEOWNERS` — not critical with a single maintainer, but cheap.
+- [x] ~~`CODEOWNERS`~~ Added 2026-10-27 (`.github/CODEOWNERS`, everything to
+  the sole maintainer). It only assigns review until branch protection can
+  require it.
 
 ### Packaging and distribution
 
@@ -552,7 +554,10 @@ feature.
    which is exactly what the Phase 2 list is mostly about.
 4. **Phase 3 onward** — only on top of a core loop people actually use.
 
-Independent of the above, cheap, and pickable any time: `docs/README.md` index,
-organization "list members", `GET .../conversations`, the two UI items above,
-and the member-audit backlog entry. CI hardening unblocks itself the day the
+Independent of the above and pickable any time, but none of it is free of a
+decision any more (the cheap ones — the `docs/README.md` index, organization
+member lists, `GET .../conversations` — shipped): the two agent items under
+"UI" above (what an admin may see of an agent's projects crosses the
+boundary migration 000024 draws; unique names need a rule for existing
+duplicates) and project templates. CI hardening unblocks itself the day the
 repo goes public.

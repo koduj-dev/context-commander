@@ -1,0 +1,5 @@
+# One maintainer today, so this assigns review rather than gating it: branch
+# protection (which is what makes "Require review from Code Owners" bite) is
+# unavailable while the repository is private on GitHub Free — see NEXT.md,
+# "CI/pipeline hardening". Narrow it per path once there is a second owner.
+* @malickyeu
