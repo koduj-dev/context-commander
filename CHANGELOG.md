@@ -30,6 +30,13 @@ link definition at the bottom of the file.
     UTC day, written best-effort beside `last_used_at`. The application role
     may insert into it and **cannot read it** (tested), so it reaches nobody
     except as a count.
+  - **Kept fourteen days** (migration 000029). A finished week is first
+    reduced to two numbers — people, agents — in `activity_weeks`, which names
+    nobody, and only then are its days deleted, so the twelve-week table does
+    not turn into weeks nobody worked. With no scheduler in the server, the
+    roll-up and the delete run inside `cc_record_activity()`, on a principal's
+    first request of the day; the application can no longer insert into the
+    day table directly, so neither step can be skipped.
   - "Taken over by another client" means a different client credential than
     the one that created the handoff — the closest thing to "a client" the
     server can see. Whether the next agent *understood* the handoff is not

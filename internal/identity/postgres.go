@@ -290,17 +290,15 @@ func (s *Store) TouchCredentialLastUsed(ctx context.Context, tx pgx.Tx, id uuid.
 }
 
 // RecordActivity notes that principalID made an authenticated request today
-// (UTC), for the weekly counts in cc_installation_trends()
-// (migrations/000028). Once per principal per day: a repeat is a no-op.
+// (UTC), for the weekly counts in cc_installation_trends(). Once per
+// principal per day: a repeat is a no-op.
 //
-// The application can write this table and never read it back — a principal's
-// active days reach nobody except as a count.
+// Through a function rather than an INSERT, because recording is also when
+// finished weeks are reduced to counts and days older than fourteen are
+// deleted (migrations/000029) — there is no scheduler to do it otherwise.
+// The application can record activity and never read it back.
 func (s *Store) RecordActivity(ctx context.Context, tx pgx.Tx, principalID uuid.UUID) error {
-	_, err := tx.Exec(ctx,
-		`INSERT INTO principal_activity_days (day, principal_id)
-		 VALUES ((now() AT TIME ZONE 'UTC')::date, $1)
-		 ON CONFLICT DO NOTHING`, principalID)
-	if err != nil {
+	if _, err := tx.Exec(ctx, `SELECT cc_record_activity($1)`, principalID); err != nil {
 		return fmt.Errorf("identity: record activity: %w", err)
 	}
 	return nil

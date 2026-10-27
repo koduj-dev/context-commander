@@ -182,7 +182,7 @@ func TestTrendsCountActivePrincipalsOncePerWeek(t *testing.T) {
 	}
 }
 
-// The application writes who was active when and can never read it back:
+// The application records who was active when and can never read it back:
 // the only way out is a count. A SELECT grant added later "for a report"
 // would turn the table into a per-person activity log for anyone who finds
 // a query to run through cc_app.
@@ -196,7 +196,18 @@ func TestActivityDaysAreUnreadableToTheApplication(t *testing.T) {
 		return tx.QueryRow(f.ctx, `SELECT count(*) FROM principal_activity_days`).Scan(&n)
 	})
 	if err == nil {
-		t.Fatal("cc_app read principal_activity_days; it must only be able to insert")
+		t.Fatal("cc_app read principal_activity_days; it must only be able to record activity")
+	}
+
+	// Nor write it directly: recording goes through cc_record_activity(),
+	// which is also what enforces the retention.
+	err = db.WithoutPrincipal(f.ctx, f.appPool, func(tx pgx.Tx) error {
+		_, err := tx.Exec(f.ctx,
+			`INSERT INTO principal_activity_days (day, principal_id) VALUES (current_date - 1, $1)`, u.principalID)
+		return err
+	})
+	if err == nil {
+		t.Fatal("cc_app inserted into principal_activity_days directly, bypassing the retention")
 	}
 }
 
@@ -207,5 +218,85 @@ func TestTrendsRefuseANonAdmin(t *testing.T) {
 	_, _, err := f.svc.Trends(f.ctx, plain.principalID, plain.userID, 12)
 	if !errors.Is(err, installation.ErrForbidden) {
 		t.Fatalf("Trends as non-admin: got %v, want ErrForbidden", err)
+	}
+}
+
+// Day rows are kept fourteen days (migrations/000029) — but a week's count
+// outlives them: the week is reduced to numbers before its days go, so the
+// Usage screen still shows it rather than a week nobody worked.
+func TestActivityDaysAreKeptFourteenDaysAndTheirWeeksStillCount(t *testing.T) {
+	f := newFixture(t)
+	admin := f.newUser("retention-admin@example.test")
+	f.grant(admin.userID)
+	old := f.newUser("retention-old@example.test")
+
+	var agent uuid.UUID
+	err := db.WithoutPrincipal(f.ctx, f.ownerPool, func(tx pgx.Tx) error {
+		sp, err := f.identity.CreateServicePrincipal(f.ctx, tx, "retention-agent", "", nil)
+		if err != nil {
+			return err
+		}
+		p, err := f.identity.CreatePrincipalForService(f.ctx, tx, sp.ID)
+		if err != nil {
+			return err
+		}
+		agent = p.ID
+		_, err = tx.Exec(f.ctx, `
+			INSERT INTO principal_activity_days (day, principal_id) VALUES
+			  ((now() AT TIME ZONE 'UTC')::date - 20, $1),
+			  ((now() AT TIME ZONE 'UTC')::date - 20, $2),
+			  ((now() AT TIME ZONE 'UTC')::date - 15, $1),
+			  ((now() AT TIME ZONE 'UTC')::date - 13, $1)`, old.principalID, agent)
+		return err
+	})
+	if err != nil {
+		t.Fatalf("seed old activity: %v", err)
+	}
+
+	// The admin's first request today is what runs the roll-up and prune.
+	f.authenticate(admin.principalID)
+
+	var ages []int
+	err = db.WithoutPrincipal(f.ctx, f.ownerPool, func(tx pgx.Tx) error {
+		rows, err := tx.Query(f.ctx, `
+			SELECT (now() AT TIME ZONE 'UTC')::date - day FROM principal_activity_days
+			WHERE principal_id = ANY($1) ORDER BY 1`, []uuid.UUID{old.principalID, agent})
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var age int
+			if err := rows.Scan(&age); err != nil {
+				return err
+			}
+			ages = append(ages, age)
+		}
+		return rows.Err()
+	})
+	if err != nil {
+		t.Fatalf("read remaining days: %v", err)
+	}
+	if len(ages) != 1 || ages[0] != 13 {
+		t.Errorf("remaining day rows are %v days old, want only [13]", ages)
+	}
+
+	weeks, _, err := f.svc.Trends(f.ctx, admin.principalID, admin.userID, 5)
+	if err != nil {
+		t.Fatalf("Trends: %v", err)
+	}
+	twentyDaysAgo := time.Now().UTC().AddDate(0, 0, -20)
+	var found bool
+	for _, w := range weeks {
+		if !twentyDaysAgo.Before(w.Start) && twentyDaysAgo.Before(w.Start.AddDate(0, 0, 7)) {
+			found = true
+			if w.ActiveUsers != 1 || w.ActiveAgents != 1 {
+				t.Errorf("week of %s: %d users, %d agents; want 1 and 1 after its days were pruned",
+					w.Start.Format(time.DateOnly), w.ActiveUsers, w.ActiveAgents)
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("no week in %v contains the day twenty days ago", weeks)
 	}
 }

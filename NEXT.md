@@ -513,10 +513,9 @@ takeover by another client, time to claim, weekly active people and agents.
 What it cannot: resume success, manual context transfers and context
 efficiency — those still need the experiment below.
 
-- [ ] `principal_activity_days` grows by one row per active principal per day
-  and nothing prunes it. The screen reads at most 52 weeks; a retention bound
-  (and who runs it — there is no scheduler) belongs with the purge workflow
-  above.
+- [x] ~~`principal_activity_days` grows without bound.~~ Closed 2026-10-27:
+  day rows are kept fourteen days, finished weeks survive as anonymous
+  counts in `activity_weeks` (migration 000029).
 
 Suggested validation experiment: take one medium-sized real repository with a
 half-finished task; let client A implement the first part and create a handoff;
