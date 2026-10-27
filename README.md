@@ -126,6 +126,11 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow and review d
 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for community expectations. Please report security issues
 privately — see [SECURITY.md](SECURITY.md), not a public issue.
 
+## Made with AI
+
+Roughly **95 % of this project was built with AI** (Claude Code) — code, tests, and docs — under
+human direction and review, like its sibling [Docker Commander](https://github.com/koduj-dev/docker-commander). 🎉
+
 ## License
 
 [GNU AGPL-3.0](LICENSE). This does **not** restrict commercial use or running a competing service —
