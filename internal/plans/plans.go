@@ -75,7 +75,9 @@ const (
 	// MaxTokensPerReport caps one report's token deltas, so a client that
 	// sends a cumulative count by mistake adds one large number, not a
 	// billion every heartbeat.
-	MaxTokensPerReport = 50_000_000
+	// Generous because cache reads are: one long agent turn re-reads its
+	// context on every tool call and can read hundreds of millions.
+	MaxTokensPerReport = 1_000_000_000
 
 	// HistoryPerItem is how many status changes an item keeps.
 	HistoryPerItem = 20
@@ -139,16 +141,39 @@ type Item struct {
 // Effort is time covered by heartbeats, and tokens as clients reported them.
 // Lower bounds both: an idle client adds no time, and a client that cannot
 // see its token counts adds none.
+//
+// Cache tokens are kept apart from fresh input because they are billed
+// differently — reading from the prompt cache costs a fraction of fresh
+// input, writing to it more — and for an agent nearly all input is a cache
+// read (migrations/000032).
 type Effort struct {
-	Seconds   int64
-	TokensIn  int64
-	TokensOut int64
+	Seconds          int64
+	TokensIn         int64
+	TokensOut        int64
+	CacheReadTokens  int64
+	CacheWriteTokens int64
 }
 
 func (e *Effort) add(o Effort) {
 	e.Seconds += o.Seconds
 	e.TokensIn += o.TokensIn
 	e.TokensOut += o.TokensOut
+	e.CacheReadTokens += o.CacheReadTokens
+	e.CacheWriteTokens += o.CacheWriteTokens
+}
+
+func (e Effort) anyTokens() bool {
+	return e.TokensIn > 0 || e.TokensOut > 0 || e.CacheReadTokens > 0 || e.CacheWriteTokens > 0
+}
+
+// validTokens reports whether every token count is a plausible delta.
+func (e Effort) validTokens() bool {
+	for _, v := range []int64{e.TokensIn, e.TokensOut, e.CacheReadTokens, e.CacheWriteTokens} {
+		if v < 0 || v > MaxTokensPerReport {
+			return false
+		}
+	}
+	return true
 }
 
 type Transition struct {
@@ -218,11 +243,12 @@ type PhaseUpdate struct {
 // is now (both nil: in the project, on nothing in particular). Token deltas
 // are since the client's previous report.
 type Report struct {
-	PlanID    *uuid.UUID
-	ItemID    *uuid.UUID
-	Activity  string
-	TokensIn  int64
-	TokensOut int64
+	PlanID   *uuid.UUID
+	ItemID   *uuid.UUID
+	Activity string
+	// Usage carries token deltas; its Seconds is ignored, time comes from
+	// the heartbeats themselves.
+	Usage Effort
 }
 
 // Counts is how many items are in each status.

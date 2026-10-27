@@ -17,13 +17,30 @@ import (
 // and a model reads it once.
 
 type effortResponse struct {
-	Seconds   int64 `json:"seconds"`
-	TokensIn  int64 `json:"tokens_in"`
-	TokensOut int64 `json:"tokens_out"`
+	Seconds          int64 `json:"seconds"`
+	TokensIn         int64 `json:"tokens_in"`
+	TokensOut        int64 `json:"tokens_out"`
+	CacheReadTokens  int64 `json:"cache_read_tokens"`
+	CacheWriteTokens int64 `json:"cache_write_tokens"`
 }
 
 func effortFrom(e plans.Effort) effortResponse {
-	return effortResponse{Seconds: e.Seconds, TokensIn: e.TokensIn, TokensOut: e.TokensOut}
+	return effortResponse{
+		Seconds: e.Seconds, TokensIn: e.TokensIn, TokensOut: e.TokensOut,
+		CacheReadTokens: e.CacheReadTokens, CacheWriteTokens: e.CacheWriteTokens,
+	}
+}
+
+// usageRequest is token deltas since the client's previous report.
+type usageRequest struct {
+	TokensIn         int64 `json:"tokens_in"`
+	TokensOut        int64 `json:"tokens_out"`
+	CacheReadTokens  int64 `json:"cache_read_tokens"`
+	CacheWriteTokens int64 `json:"cache_write_tokens"`
+}
+
+func (u usageRequest) effort() plans.Effort {
+	return plans.Effort{TokensIn: u.TokensIn, TokensOut: u.TokensOut, CacheReadTokens: u.CacheReadTokens, CacheWriteTokens: u.CacheWriteTokens}
 }
 
 type countsResponse struct {
@@ -422,11 +439,10 @@ func (d Deps) searchPlans(w http.ResponseWriter, r *http.Request) {
 
 func (d Deps) reportPresence(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		PlanID    *uuid.UUID `json:"plan_id"`
-		ItemID    *uuid.UUID `json:"item_id"`
-		Activity  string     `json:"activity"`
-		TokensIn  int64      `json:"tokens_in"`
-		TokensOut int64      `json:"tokens_out"`
+		usageRequest
+		PlanID   *uuid.UUID `json:"plan_id"`
+		ItemID   *uuid.UUID `json:"item_id"`
+		Activity string     `json:"activity"`
 	}
 	if err := decodeJSONBody(w, r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_request", "could not decode request body")
@@ -434,13 +450,41 @@ func (d Deps) reportPresence(w http.ResponseWriter, r *http.Request) {
 	}
 	clientID := clientIDFrom(r.Context())
 	p, err := d.Plans.Report(r.Context(), principalIDFrom(r.Context()), clientID, projectFrom(r.Context()).ID, plans.Report{
-		PlanID: req.PlanID, ItemID: req.ItemID, Activity: req.Activity, TokensIn: req.TokensIn, TokensOut: req.TokensOut,
+		PlanID: req.PlanID, ItemID: req.ItemID, Activity: req.Activity, Usage: req.effort(),
 	})
 	if err != nil {
 		writeDomainError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, presenceFrom(p, clientID, time.Now()))
+}
+
+// reportUsage is where a client hook sends what a turn cost
+// (deploy/mcp-clients/README.md). Not project-scoped: the hook knows its
+// credential and its tokens, and the server knows where that credential last
+// said it was. credited=false means it never said, and the tokens were
+// dropped rather than attached to a guess.
+func (d Deps) reportUsage(w http.ResponseWriter, r *http.Request) {
+	var req usageRequest
+	if err := decodeJSONBody(w, r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", "could not decode request body")
+		return
+	}
+	clientID := clientIDFrom(r.Context())
+	p, ok, err := d.Plans.ReportUsage(r.Context(), principalIDFrom(r.Context()), clientID, req.effort())
+	if err != nil {
+		writeDomainError(w, r, err)
+		return
+	}
+	out := struct {
+		Credited bool       `json:"credited"`
+		PlanID   *uuid.UUID `json:"plan_id,omitempty"`
+		ItemID   *uuid.UUID `json:"item_id,omitempty"`
+	}{Credited: ok}
+	if ok {
+		out.PlanID, out.ItemID = p.PlanID, p.ItemID
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 func (d Deps) clearPresence(w http.ResponseWriter, r *http.Request) {

@@ -17,13 +17,18 @@ import (
 // goes, and say where it is.
 
 type effortResult struct {
-	Seconds   int64 `json:"seconds_tracked,omitempty"`
-	TokensIn  int64 `json:"tokens_in_reported,omitempty"`
-	TokensOut int64 `json:"tokens_out_reported,omitempty"`
+	Seconds          int64 `json:"seconds_tracked,omitempty"`
+	TokensIn         int64 `json:"tokens_in_reported,omitempty"`
+	TokensOut        int64 `json:"tokens_out_reported,omitempty"`
+	CacheReadTokens  int64 `json:"cache_read_tokens_reported,omitempty"`
+	CacheWriteTokens int64 `json:"cache_write_tokens_reported,omitempty"`
 }
 
 func toEffort(e plans.Effort) effortResult {
-	return effortResult{Seconds: e.Seconds, TokensIn: e.TokensIn, TokensOut: e.TokensOut}
+	return effortResult{
+		Seconds: e.Seconds, TokensIn: e.TokensIn, TokensOut: e.TokensOut,
+		CacheReadTokens: e.CacheReadTokens, CacheWriteTokens: e.CacheWriteTokens,
+	}
 }
 
 type itemResult struct {
@@ -464,7 +469,10 @@ func registerPlanTools(server *sdkmcp.Server, deps Deps, principalID, clientID u
 		Name: "plan.report",
 		Description: "Say where you are, so your team and your user can see it live. Call it when you move to a step " +
 			"and every few minutes while working on it: time is tracked only while reports keep coming " +
-			"(a gap over 15 minutes counts as idle). Call plan.stop when you finish or stop.",
+			"(a gap over 15 minutes counts as idle). Call plan.stop when you finish or stop. " +
+			"Leave the token fields out unless your client tells you exact counts: you cannot see your own usage, " +
+			"and the reliable way to record it is the client hook in deploy/mcp-clients/README.md " +
+			"(\"Token usage\"), which a user can ask you to install.",
 	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, args reportArgs) (*sdkmcp.CallToolResult, reportResult, error) {
 		projectID, err := resolve(ctx, args.Project)
 		if err != nil {
@@ -479,7 +487,8 @@ func registerPlanTools(server *sdkmcp.Server, deps Deps, principalID, clientID u
 			return nil, reportResult{}, err
 		}
 		p, err := deps.Plans.Report(ctx, principalID, &clientID, projectID, plans.Report{
-			PlanID: planID, ItemID: itemID, Activity: args.Activity, TokensIn: args.TokensIn, TokensOut: args.TokensOut,
+			PlanID: planID, ItemID: itemID, Activity: args.Activity,
+			Usage: plans.Effort{TokensIn: args.TokensIn, TokensOut: args.TokensOut},
 		})
 		if err != nil {
 			return nil, reportResult{}, err

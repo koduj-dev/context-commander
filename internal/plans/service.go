@@ -400,9 +400,11 @@ func (s *Service) loadPlan(ctx context.Context, tx pgx.Tx, projectID, planID uui
 func loadItems(ctx context.Context, tx pgx.Tx, where string, args ...any) ([]Item, error) {
 	rows, err := tx.Query(ctx,
 		`SELECT i.id, i.plan_id, i.position, i.kind, i.status, i.assignee_principal, i.updated_by_principal, i.updated_at, i.completed_at,
-		        COALESCE(e.seconds, 0), COALESCE(e.tokens_in, 0), COALESCE(e.tokens_out, 0)
+		        COALESCE(e.seconds, 0), COALESCE(e.tokens_in, 0), COALESCE(e.tokens_out, 0),
+		        COALESCE(e.cache_read, 0), COALESCE(e.cache_write, 0)
 		 FROM plan_items i
-		 LEFT JOIN (SELECT item_id, sum(seconds)::bigint AS seconds, sum(tokens_in)::bigint AS tokens_in, sum(tokens_out)::bigint AS tokens_out
+		 LEFT JOIN (SELECT item_id, sum(seconds)::bigint AS seconds, sum(tokens_in)::bigint AS tokens_in, sum(tokens_out)::bigint AS tokens_out,
+		                   sum(cache_read_tokens)::bigint AS cache_read, sum(cache_write_tokens)::bigint AS cache_write
 		            FROM plan_item_effort GROUP BY item_id) e ON e.item_id = i.id
 		 `+where+` ORDER BY i.plan_id, i.position`, args...)
 	if err != nil {
@@ -413,7 +415,7 @@ func loadItems(ctx context.Context, tx pgx.Tx, where string, args ...any) ([]Ite
 	for rows.Next() {
 		var it Item
 		if err := rows.Scan(&it.ID, &it.PlanID, &it.Position, &it.Kind, &it.Status, &it.Assignee, &it.UpdatedBy, &it.UpdatedAt, &it.CompletedAt,
-			&it.Effort.Seconds, &it.Effort.TokensIn, &it.Effort.TokensOut); err != nil {
+			&it.Effort.Seconds, &it.Effort.TokensIn, &it.Effort.TokensOut, &it.Effort.CacheReadTokens, &it.Effort.CacheWriteTokens); err != nil {
 			return nil, err
 		}
 		out = append(out, it)

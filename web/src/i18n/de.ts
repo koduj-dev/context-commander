@@ -854,4 +854,6 @@ export const de: Partial<Record<MessageKey, string>> = {
   "plans.noHits": "Nichts passt zu „{query}“",
   "plans.newPlan": "Neuer Plan",
   "plans.addSteps": "Schritte hinzufügen",
+  "plans.tokensBreakdown":
+    "{in} Eingabe · {out} Ausgabe · {cacheRead} aus dem Cache gelesen · {cacheWrite} in den Cache geschrieben",
 };

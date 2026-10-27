@@ -316,7 +316,7 @@ func TestHeartbeatsCountTimeOnlyWhileTheyKeepComing(t *testing.T) {
 	report := func(item uuid.UUID, tokensIn int64) {
 		t.Helper()
 		if _, err := f.svc.Report(f.ctx, agent.principalID, &agent.clientID, f.projectID,
-			plans.Report{ItemID: &item, Activity: "working", TokensIn: tokensIn}); err != nil {
+			plans.Report{ItemID: &item, Activity: "working", Usage: plans.Effort{TokensIn: tokensIn}}); err != nil {
 			t.Fatalf("Report: %v", err)
 		}
 	}
@@ -489,5 +489,47 @@ func TestPlanTextCountsAgainstTheQuota(t *testing.T) {
 	}
 	if after := used(); after != 0 {
 		t.Errorf("used %d after deleting the only plan, want 0", after)
+	}
+}
+
+// A client hook knows what a turn cost and not which step it was on; the
+// presence row knows the step. ReportUsage joins the two without moving the
+// client, and counts as a heartbeat.
+func TestAHooksUsageLandsWhereTheClientSaidItWas(t *testing.T) {
+	f := newFixture(t)
+	agent := f.join(f.projectID, "Claude", projects.RoleContributor)
+	p := f.plan(agent, "Steps", "the step")
+	item := p.Items[0].ID
+
+	if _, ok, err := f.svc.ReportUsage(f.ctx, agent.principalID, &agent.clientID, plans.Effort{TokensIn: 5}); err != nil || ok {
+		t.Fatalf("usage before any presence: ok=%v err=%v, want dropped", ok, err)
+	}
+
+	if _, err := f.svc.Report(f.ctx, agent.principalID, &agent.clientID, f.projectID,
+		plans.Report{ItemID: &item, Activity: "editing the parser"}); err != nil {
+		t.Fatal(err)
+	}
+	f.clock = f.clock.Add(4 * time.Minute)
+	usage := plans.Effort{Seconds: 99999, TokensIn: 12, TokensOut: 3400, CacheReadTokens: 2_500_000, CacheWriteTokens: 40_000}
+	pr, ok, err := f.svc.ReportUsage(f.ctx, agent.principalID, &agent.clientID, usage)
+	if err != nil || !ok || pr.ItemID == nil || *pr.ItemID != item {
+		t.Fatalf("ReportUsage: %+v ok=%v err=%v", pr, ok, err)
+	}
+
+	got, _ := f.svc.GetPlan(f.ctx, agent.principalID, f.projectID, p.ID)
+	e := got.Items[0].Effort
+	if e.Seconds != 240 {
+		t.Errorf("seconds = %d, want 240 — the hook's call is a heartbeat, and a Seconds it sends is ignored", e.Seconds)
+	}
+	if e.TokensIn != 12 || e.TokensOut != 3400 || e.CacheReadTokens != 2_500_000 || e.CacheWriteTokens != 40_000 {
+		t.Errorf("tokens %+v", e)
+	}
+
+	b, _ := f.svc.Board(f.ctx, agent.principalID, f.projectID)
+	if len(b.Presence) != 1 || b.Presence[0].Activity != "editing the parser" || *b.Presence[0].ItemID != item {
+		t.Errorf("the hook moved or blanked the presence: %+v", b.Presence)
+	}
+	if _, _, err := f.svc.ReportUsage(f.ctx, agent.principalID, &agent.clientID, plans.Effort{CacheReadTokens: -1}); !errors.Is(err, plans.ErrInvalid) {
+		t.Errorf("a negative count returned %v", err)
 	}
 }

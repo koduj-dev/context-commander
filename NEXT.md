@@ -238,10 +238,12 @@ Only on top of a core loop people actually use:
       dashboard. Raised by the maintainer's colleagues. Still open:
       - **Reordering.** Phases and items keep their creation order; nothing
         moves them yet.
-      - **Token counts depend on the client.** Hooks or a wrapper have to pass
-        them to `plan.report`. A model cannot see its own usage, so without one
-        the token columns stay empty. A ready-made Claude Code hook would close
-        this.
+      - **Tokens come from clients.** Claude Code has a hook
+        (`deploy/mcp-clients/claude-code-usage-hook.py`); Codex CLI does not
+        yet. Two gaps remain before a cost estimate is possible: which model the
+        tokens were for, since prices differ by model, and subagent transcripts.
+        The goal is deciding whether the API would be cheaper than a
+        subscription.
       - **Live updates are polling** every 10 s. Push comes with Phase 2's
         subscriptions.
       - **Search is per project.**

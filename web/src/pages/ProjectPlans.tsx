@@ -209,7 +209,8 @@ export function progress(c: Counts): { done: number; total: number; percent: num
 function EffortCell({ effort }: { effort: Effort }) {
   const t = useT();
   const f = useFormat();
-  const tokens = effort.tokens_in + effort.tokens_out;
+  const tokens =
+    effort.tokens_in + effort.tokens_out + effort.cache_read_tokens + effort.cache_write_tokens;
   if (effort.seconds === 0 && tokens === 0) return <span className="dim">—</span>;
   return (
     <Cell
@@ -218,7 +219,19 @@ function EffortCell({ effort }: { effort: Effort }) {
       }
       secondary={
         tokens > 0 ? (
-          <span className="dim">{t("plans.tokensReported", { count: tokens })}</span>
+          // The split is what a cost comparison needs: the four kinds are
+          // priced differently, and for an agent nearly all input is cache.
+          <span
+            className="dim"
+            title={t("plans.tokensBreakdown", {
+              in: f.number(effort.tokens_in),
+              out: f.number(effort.tokens_out),
+              cacheRead: f.number(effort.cache_read_tokens),
+              cacheWrite: f.number(effort.cache_write_tokens),
+            })}
+          >
+            {t("plans.tokensReported", { count: tokens })}
+          </span>
         ) : undefined
       }
     />

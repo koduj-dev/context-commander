@@ -10,7 +10,13 @@ import { ProjectLayout } from "./ProjectLayout";
 import { ProjectPlans, progress } from "./ProjectPlans";
 
 const now = new Date().toISOString();
-const effort = { seconds: 0, tokens_in: 0, tokens_out: 0 };
+const effort = {
+  seconds: 0,
+  tokens_in: 0,
+  tokens_out: 0,
+  cache_read_tokens: 0,
+  cache_write_tokens: 0,
+};
 
 const BOARD = {
   phases: [
@@ -21,7 +27,13 @@ const BOARD = {
       title: "Release 1.2",
       goal: "",
       counts: { open: 1, in_progress: 1, done: 2, blocked: 0, skipped: 3 },
-      effort: { seconds: 5400, tokens_in: 1000, tokens_out: 200 },
+      effort: {
+        seconds: 5400,
+        tokens_in: 1000,
+        tokens_out: 200,
+        cache_read_tokens: 0,
+        cache_write_tokens: 0,
+      },
     },
   ],
   plans: [
@@ -80,7 +92,13 @@ const PLAN = {
       status: "open",
       text: "Smoke test",
       updated_at: now,
-      effort: { seconds: 1800, tokens_in: 0, tokens_out: 0 },
+      effort: {
+        seconds: 1800,
+        tokens_in: 0,
+        tokens_out: 0,
+        cache_read_tokens: 0,
+        cache_write_tokens: 0,
+      },
     },
   ],
 };

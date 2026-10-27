@@ -810,4 +810,6 @@ export const zhCN: Partial<Record<MessageKey, string>> = {
   "plans.noHits": "没有与“{query}”匹配的内容",
   "plans.newPlan": "新建计划",
   "plans.addSteps": "添加步骤",
+  "plans.tokensBreakdown":
+    "输入 {in} · 输出 {out} · 从缓存读取 {cacheRead} · 写入缓存 {cacheWrite}",
 };

@@ -842,4 +842,6 @@ export const fr: Partial<Record<MessageKey, string>> = {
   "plans.noHits": "Rien ne correspond à « {query} »",
   "plans.newPlan": "Nouveau plan",
   "plans.addSteps": "Ajouter des étapes",
+  "plans.tokensBreakdown":
+    "{in} en entrée · {out} en sortie · {cacheRead} lus depuis le cache · {cacheWrite} écrits dans le cache",
 };

@@ -40,6 +40,13 @@ link definition at the bottom of the file.
   - **Search:** the text is encrypted, so search decrypts the project's plans
     and matches in Go.
   - **Quota:** plan text counts against the namespace quota.
+  - **Token usage from Claude Code:** `deploy/mcp-clients/claude-code-usage-hook.py`
+    is a `Stop` hook. It reads each turn's exact usage from the session transcript
+    and posts it to `POST /v1/me/usage`, which credits the step the client last
+    reported. Fresh input, output, cache reads and cache writes are kept apart
+    (migration 000032), because they are billed differently and an agent's input
+    is almost all cache. The README's steps are written so an agent can install
+    the hook itself.
 
 - **Storage quotas per user and organization**
   ([ADR 0021](docs/adr/0021-storage-quotas-per-namespace.md)).

@@ -639,7 +639,14 @@ export type ItemKind = "task" | "check";
 export type PlanStatus = "draft" | "active" | "done" | "abandoned";
 export type PhaseStatus = "planned" | "active" | "done";
 
-export type Effort = { seconds: number; tokens_in: number; tokens_out: number };
+export type Effort = {
+  seconds: number;
+  tokens_in: number;
+  tokens_out: number;
+  /** Billed apart from fresh input: reading the cache is cheaper, writing dearer. */
+  cache_read_tokens: number;
+  cache_write_tokens: number;
+};
 export type Counts = {
   open: number;
   in_progress: number;

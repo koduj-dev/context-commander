@@ -42,6 +42,60 @@ cat deploy/mcp-clients/codex-config.toml >> ~/.codex/config.toml
 codex                               # the tools appear as context_commander.*
 ```
 
+## Token usage
+
+The plans board (docs/adr/0022) shows the time spent on each step and, if the
+client sends them, the tokens. A model cannot see its own usage, so the
+tokens come from the client. Claude Code writes every response's usage to the
+session transcript, and
+[`claude-code-usage-hook.py`](claude-code-usage-hook.py) is a `Stop` hook
+that sends it after every turn. It counts fresh input, output, cache reads
+and cache writes separately, because they are billed differently. For an
+agent, almost all of the input is cache reads.
+
+Install it once per machine:
+
+```bash
+mkdir -p ~/.claude/hooks
+cp deploy/mcp-clients/claude-code-usage-hook.py ~/.claude/hooks/
+export CC_URL="http://127.0.0.1:8490"   # the server; CC_TOKEN is already set for MCP
+```
+
+Then add this to `~/.claude/settings.json`. Merge it into an existing
+`hooks.Stop` list if there is one; do not replace it:
+
+```json
+{
+  "hooks": {
+    "Stop": [
+      { "hooks": [ { "type": "command", "command": "python3 ~/.claude/hooks/claude-code-usage-hook.py", "timeout": 10 } ] }
+    ]
+  }
+}
+```
+
+Or ask Claude Code to do it: *"Install the Context Commander usage hook from
+deploy/mcp-clients/README.md (Token usage) into my user settings."* The steps
+above are written so an agent can follow them.
+
+What to know:
+
+- **Use the same `CC_TOKEN` as the MCP connection.** The tokens go to the
+  step that this credential last reported with `plan.report`. A different
+  token is a different client, and that client is nowhere on the board.
+- **Tokens are only recorded while the agent is on a step.** If it never called
+  `plan.report`, the server drops the tokens rather than guessing a step. The
+  hook says so on stderr, which Claude Code shows in verbose mode.
+- **Each turn's report also counts as a heartbeat.** A turn shorter than 15
+  minutes keeps the step's tracked time running even if the agent forgets to
+  report.
+- **What is not counted yet:**
+  - Subagents' turns, unless they appear in the main transcript.
+  - Which model a token was for. Prices differ by model, so a cost estimate
+    needs that next.
+- **Codex CLI** logs token counts in its session files as well. There is no
+  hook for it here yet.
+
 ## What to expect once connected
 
 The server advertises `context.bootstrap` as the first call to make. On a

@@ -838,6 +838,8 @@ export const en = {
   "plans.noHits": "Nothing matches “{query}”",
   "plans.newPlan": "New plan",
   "plans.addSteps": "Add steps",
+  "plans.tokensBreakdown":
+    "{in} input · {out} output · {cacheRead} read from cache · {cacheWrite} written to cache",
 } as const;
 
 export type MessageKey = keyof typeof en;

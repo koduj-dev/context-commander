@@ -158,6 +158,8 @@ func NewHandler(deps Deps) http.Handler {
 			r.Get("/me/storage", deps.getMyStorage)
 			// Where everyone is, across every project the caller is in.
 			r.Get("/me/presence", deps.getMyPresence)
+			// What a turn cost, from a client hook (deploy/mcp-clients).
+			r.Post("/me/usage", deps.reportUsage)
 			r.Delete("/me/sessions/{id}", deps.revokeOwnSession)
 			r.Delete("/me/tokens/{id}", deps.revokeToken)
 
