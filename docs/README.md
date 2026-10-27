@@ -8,6 +8,7 @@ one of them is wrong.
 | Document | Answers |
 |---|---|
 | [`quickstart.md`](quickstart.md) | How do I run this and get two agents handing work to each other? |
+| [`install.md`](install.md) | How do I install a release for real — packages, image, Homebrew — and verify what I downloaded? |
 | [`AGENT-GUIDE.md`](AGENT-GUIDE.md) | **For agents, not people:** how to actually drive this — what to call first, what the answers mean, which mistakes are expensive. Point a coding agent at it. |
 | [`../README.md`](../README.md) | What is Context Commander, and what is it deliberately not? |
 | [`../CHANGELOG.md`](../CHANGELOG.md) | What shipped, and when? |

@@ -1,0 +1,108 @@
+name: Publish APT repo
+
+# Publishes the signed APT repository (koduj-dev/apt) for a release tag. The
+# repository is shared with docker-commander, whose apt-publish.yml this
+# mirrors: one archive, one signing key, `apt install ccd` beside `dockercmd`.
+# It runs automatically after the Release workflow finishes, AND can be run
+# for any existing tag from the Actions tab ("Run workflow") — so the apt
+# publish is testable on its own, without cutting a new release.
+#
+# The two projects' runs are serialized only within each repo (concurrency
+# groups don't cross repos). If both ever publish at the same moment, the
+# second `git push` is refused, not merged — re-run this workflow for the tag.
+#
+# Decoupled from release.yml on purpose: the apt publish touches single-writer
+# state in another repo and is the fiddliest step, so it must be independently
+# runnable rather than re-triggering the whole (immutable) release.
+on:
+  # A release created by GITHUB_TOKEN can't fire a `release` event (GitHub's
+  # anti-recursion rule), so chain off the Release workflow completing instead.
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to (re)publish (default: the latest release)"
+        required: false
+
+# Single-writer: don't let two publishes race on the reprepro archive / git push.
+concurrency:
+  group: apt-publish
+  cancel-in-progress: false
+
+jobs:
+  apt:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read # download release assets + verify their attestations
+    env:
+      # Set both via this repo's Settings → Secrets → Actions:
+      #   APT_REPO_TOKEN       — fine-grained PAT, contents:write on koduj-dev/apt
+      #   APT_GPG_PRIVATE_KEY  — the passphraseless signing key, base64-encoded
+      #     (single line, paste-proof):  gpg --armor --export-secret-keys <key> | base64 -w0
+      # Without them the step is skipped (no failure).
+      APT_TOKEN: ${{ secrets.APT_REPO_TOKEN }}
+      APT_GPG_KEY: ${{ secrets.APT_GPG_PRIVATE_KEY }}
+    steps:
+      # Run on a manual dispatch, or only when the Release workflow succeeded.
+      - name: Publish to the APT repository
+        if: >-
+          ${{ env.APT_TOKEN != '' && env.APT_GPG_KEY != ''
+              && (github.event_name == 'workflow_dispatch'
+                  || github.event.workflow_run.conclusion == 'success') }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_INPUT: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          # The manual input, else the latest release (the one the Release
+          # workflow just published).
+          # `gh release view` with no tag skips pre-releases, so ask for the
+          # newest release of any kind.
+          TAG="${TAG_INPUT:-$(gh release list -R "$GITHUB_REPOSITORY" --limit 1 --json tagName -q '.[0].tagName')}"
+          echo "Publishing the APT repo for ${TAG}"
+
+          # Same rule as the Homebrew formula (release.yml): a pre-release
+          # goes into `stable` only while no stable release exists.
+          case "$TAG" in *-*)
+            stable="$(gh release list -R "$GITHUB_REPOSITORY" --exclude-pre-releases --limit 1 --json tagName -q '.[0].tagName')"
+            if [ -n "$stable" ]; then
+              echo "pre-release ${TAG}: ${stable} is stable, not publishing it to apt"
+              exit 0
+            fi
+          ;; esac
+
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends reprepro
+
+          # Import the (passphraseless) signing key into a throwaway keyring. The
+          # secret is base64-encoded so a multi-line armored block can't get
+          # mangled (lost -----BEGIN-----/newlines) on paste. reprepro signs
+          # Release via gpg-agent and has no passphrase option, so the key must
+          # be passphraseless — its secrecy is the secret.
+          GNUPGHOME="$(mktemp -d)"; export GNUPGHOME; chmod 700 "$GNUPGHOME"
+          printf '%s' "$APT_GPG_KEY" | base64 -d | gpg --batch --import
+
+          # Fetch the tag's .deb (explicit -R: this job has no checkout, so gh
+          # can't infer the repo from the cwd) and verify their build provenance.
+          mkdir -p pkgs
+          gh release download "$TAG" -R "$GITHUB_REPOSITORY" -p '*.deb' -D pkgs
+          for d in pkgs/*.deb; do
+            gh attestation verify "$d" --repo "$GITHUB_REPOSITORY"
+          done
+
+          # Add them to the reprepro archive and push the updated, signed repo.
+          git clone "https://x-access-token:${APT_TOKEN}@github.com/koduj-dev/apt.git" aptrepo
+          cd aptrepo
+          for d in ../pkgs/*.deb; do reprepro -b . includedeb stable "$d"; done
+          gpg --armor --export > key.asc # publish the public key for users
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "apt repo already up to date for ${TAG}"
+            exit 0
+          fi
+          git commit -m "ccd ${TAG#v}"
+          git push

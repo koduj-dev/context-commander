@@ -1,21 +1,32 @@
 [Unit]
 Description=Context Commander — shared context and collaboration layer for AI agents
 Documentation=https://github.com/koduj-dev/context-commander
-After=network-online.target
+After=network-online.target postgresql.service ccd-migrate.service
 Wants=network-online.target
+# Migrations first, on every start — so `apt upgrade` (whose postinstall
+# restarts this unit) runs the new binary's migrations before the new binary
+# serves. A migration failure keeps the server down rather than letting it
+# run against a schema it does not expect.
+Requires=ccd-migrate.service
 
 [Service]
 Type=simple
 User=ccd
 Group=ccd
 
-# ccd has no config-file loader yet (see adapters/cli) — everything is flags
-# or CC_* environment variables (CC_DATABASE_URL, CC_STORAGE_DIR, CC_ROOT_KEY,
-# ...). This file is generated empty by the package and MUST be filled in by
-# the operator before the service can start — see postinstall's message.
+# Everything is a flag or a CC_* variable (CC_DATABASE_URL, CC_ROOT_KEY, ...);
+# ccd has no config-file loader of its own. The package ships this file as a
+# commented template that MUST be filled in before the service can start.
+# Settings in it override the Environment= defaults below.
+Environment=CC_STORAGE_DIR=/var/lib/ccd/objects
 EnvironmentFile=/etc/context-commander/ccd.env
+WorkingDirectory=/var/lib/ccd
 
-ExecStart=/usr/bin/ccd serve
+# Loopback, on the port every client config and the usage hook default to.
+# Reaching it from another machine means TLS in front of it (a reverse
+# proxy), or CC_TLS_CERT/CC_TLS_KEY in ccd.env and a different --addr here
+# via `systemctl edit ccd`.
+ExecStart=/usr/bin/ccd serve --addr 127.0.0.1:8490
 Restart=on-failure
 RestartSec=5s
 

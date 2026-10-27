@@ -1,5 +1,7 @@
 # Build artifacts
 /bin/
+/dist-bin/
+/out/
 /ccd
 *.test
 *.out

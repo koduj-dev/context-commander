@@ -1,0 +1,27 @@
+[Unit]
+Description=Context Commander — apply database migrations
+Documentation=https://github.com/koduj-dev/context-commander/blob/main/docs/install.md
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Migrations connect as cc_owner, the role that owns the schema; the server
+# must never hold that privilege (docs/adr/0002). So this is its own unit
+# with its own credentials: migrate.env is root-only and read by systemd
+# itself, and the process runs as a throwaway dynamic user, not as `ccd` —
+# a compromised server cannot read the owner password.
+EnvironmentFile=/etc/context-commander/migrate.env
+DynamicUser=yes
+# An operator who runs `ccd migrate` by hand leaves CC_DATABASE_URL commented
+# out, and the unit is skipped without failing, which still satisfies
+# ccd.service's Requires=. `+` runs the check as root: the dynamic user
+# cannot read the file, which is the point of it.
+ExecCondition=+/bin/grep -qs ^CC_DATABASE_URL=. /etc/context-commander/migrate.env
+ExecStart=/usr/bin/ccd migrate
+SyslogIdentifier=ccd-migrate
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true

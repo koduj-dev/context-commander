@@ -48,7 +48,9 @@ docker compose run --rm app bootstrap --email you@example.com --name "Your Name"
 ```
 
 The full walkthrough — creating a project, connecting Claude Code and Codex CLI, and running the
-handoff loop end to end — is in [`docs/quickstart.md`](docs/quickstart.md). The two supported MCP
+handoff loop end to end — is in [`docs/quickstart.md`](docs/quickstart.md). Installing a release
+as a service (`.deb`/`.rpm`, the APT repository, the container image, Homebrew) and verifying its
+signatures is in [`docs/install.md`](docs/install.md). The two supported MCP
 client configurations are committed in [`deploy/mcp-clients/`](deploy/mcp-clients/) and covered by
 a smoke test, so they cannot drift from the server's actual surface.
 

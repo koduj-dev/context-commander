@@ -377,14 +377,22 @@ on the planned move to a public repo:
 
 ### Packaging and distribution
 
-- [x] OS packaging scaffolding (`deploy/nfpm.yaml`, `deploy/packaging/`).
-- [x] Dev Docker image (`Dockerfile`) + opt-in `app` service in
-  `deploy/docker-compose.yml` — see README "Running entirely in Docker". Not a
-  release artifact (no registry publish, no version tagging beyond `docker` as
-  a placeholder `-X main.version=`).
-- [ ] **Not yet wired to a release workflow** — no `release.yml` builds or
-  publishes the packages (OS packages or the Docker image), and there's no man
-  page. Revisit once CC is near a shippable state.
+- [x] `.deb`/`.rpm` (`deploy/nfpm.yaml`, `deploy/packaging/`) with a separate
+  `ccd-migrate.service` holding the owner credentials.
+- [x] `release.yml` + `apt-publish.yml`, step for step docker-commander's:
+  binaries for 3 OS × 2 arch, SHA256SUMS, SBOM, cosign, provenance, packages,
+  signed ghcr image, Homebrew tap, shared APT repo. See docs/install.md.
+- [ ] **The repository must be public before the first tag.** Attestations
+  are unavailable to private repos on the Free plan (the step fails), and the
+  Homebrew formula and APT repo point at release assets anonymous users must
+  be able to download.
+- [ ] The shared APT repo's `conf/distributions` still says
+  `Label: Docker Commander`; rename it to something covering both.
+- [ ] No man page (docker-commander ships `dockercmd.1`), no installer
+  scripts, no self-update. A man page should be generated from cobra, not
+  written by hand, or it drifts from `--help`.
+- [ ] The two projects' apt publishes are serialized only per repo. A
+  simultaneous publish refuses the second push; re-run it.
 
 ---
 

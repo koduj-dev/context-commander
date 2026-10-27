@@ -1,4 +1,10 @@
-.PHONY: dev-up dev-down build ui test lint migrate migrate-down tidy
+.PHONY: dev-up dev-down build ui test lint migrate migrate-down tidy release clean
+
+BINARY  := ccd
+PKG     := ./cmd/ccd
+OUT     := dist-bin
+VERSION ?= dev
+LDFLAGS := -s -w -X main.version=$(VERSION)
 
 GOBIN := $(shell go env GOPATH)/bin
 DB_OWNER_URL ?= postgres://cc_owner:cc_owner_dev_password@localhost:5432/context_commander?sslmode=disable
@@ -20,7 +26,25 @@ ui:
 
 ## build: build the web UI, then the ccd binary with it embedded
 build: ui
-	go build -o bin/ccd ./cmd/ccd
+	CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o bin/$(BINARY) $(PKG)
+
+## release: cross-compile static binaries for every supported platform, plus
+## SHA256SUMS — what release.yml publishes. ccd is a server on Linux, but the
+## CLI half (sync-skills, token, context) runs on developers' Macs and Windows
+## machines too, so all three get binaries.
+release: ui
+	@mkdir -p $(OUT)
+	GOOS=linux   GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o $(OUT)/$(BINARY)-linux-amd64       $(PKG)
+	GOOS=linux   GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o $(OUT)/$(BINARY)-linux-arm64       $(PKG)
+	GOOS=darwin  GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o $(OUT)/$(BINARY)-darwin-amd64      $(PKG)
+	GOOS=darwin  GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o $(OUT)/$(BINARY)-darwin-arm64      $(PKG)
+	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o $(OUT)/$(BINARY)-windows-amd64.exe $(PKG)
+	GOOS=windows GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o $(OUT)/$(BINARY)-windows-arm64.exe $(PKG)
+	@cd $(OUT) && sha256sum $(BINARY)-* > SHA256SUMS
+	@echo "binaries + SHA256SUMS written to $(OUT)/ (version $(VERSION))"
+
+clean:
+	rm -rf bin $(OUT) out deploy/packaging/ccd.service.rendered
 
 # Integration tests spin up a real Postgres via testcontainers-go
 # (internal/dbtest) — Docker must be running. Real DB, not mocks: see

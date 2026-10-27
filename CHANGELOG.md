@@ -6,11 +6,32 @@ All notable changes to Context Commander are documented here. The format follows
 
 ## [Unreleased]
 
-Nothing released yet — accumulate entries here as work lands. At the first
-release, this section is renamed `## [x.y.z] — YYYY-MM-DD` with a matching
-link definition at the bottom of the file.
+## [0.1.0-beta.1] — 2026-10-27
+
+The first public release, and a beta. The server, MCP surface and web UI
+are complete enough to run a team on, but it has not yet been run outside
+the team that built it. Expect rough edges, and expect the next betas to
+change things this one ships. The migrations will always carry an existing
+database forward. Install it as described in
+[docs/install.md](https://github.com/koduj-dev/context-commander/blob/main/docs/install.md).
 
 ### Added
+
+- **Releases.** A `vX.Y.Z` tag builds and publishes the same set of artifacts
+  as Docker Commander:
+  - binaries for Linux, macOS and Windows (amd64 + arm64), with
+    `SHA256SUMS`, an SPDX SBOM and a keyless cosign signature;
+  - build provenance for every binary and package;
+  - `.deb` and `.rpm` packages, also published to the signed APT repository
+    shared with Docker Commander (`apt install ccd`);
+  - a signed multi-arch image, `ghcr.io/koduj-dev/context-commander`;
+  - a Homebrew formula (`brew install koduj-dev/tap/ccd`).
+
+  The package runs migrations in a separate `ccd-migrate.service` before
+  every start. It uses the schema owner's credentials from a root-only
+  file, which the server never reads (ADR 0002), so an upgrade migrates
+  before the new binary serves. A pre-release tag never moves `latest`, and
+  once a stable release exists it no longer reaches APT or Homebrew either.
 
 - **Plans, phases and who is working where**
   ([ADR 0022](docs/adr/0022-plans-phases-and-presence.md)). The plan an agent
@@ -1245,3 +1266,6 @@ link definition at the bottom of the file.
   Name validation is now centralized in `secrets.ValidateName` and enforced
   by `Create`/`Delete` (`internal/secrets/reference.go`,
   `internal/secrets/service.go`).
+
+[Unreleased]: https://github.com/koduj-dev/context-commander/compare/v0.1.0-beta.1...HEAD
+[0.1.0-beta.1]: https://github.com/koduj-dev/context-commander/releases/tag/v0.1.0-beta.1

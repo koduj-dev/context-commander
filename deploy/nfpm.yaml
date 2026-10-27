@@ -1,11 +1,13 @@
-# nfpm config for the ccd .deb / .rpm packages. Rendered per-arch with VERSION
-# and ARCH set in the environment (mirrors docker-commander's release job):
-#   VERSION=0.1.0 ARCH=amd64 nfpm pkg -p deb -f deploy/nfpm.yaml
+# nfpm config for the ccd .deb / .rpm packages. Rendered per-arch with
+# VERSION and ARCH substituted (see the release job in
+# .github/workflows/release.yml), the same way docker-commander builds its own:
+#   sed -e 's/${ARCH}/amd64/g' -e 's/${VERSION}/0.1.0/g' deploy/nfpm.yaml > r.yaml
+#   nfpm pkg -p deb -f r.yaml -t out/
 #
-# Not wired into a release workflow yet — see NEXT.md. This is scaffolding,
-# adapted from docker-commander's deploy/nfpm.yaml rather than copied
-# verbatim: ccd needs a reachable Postgres + object storage, has no
-# config-file loader (env file, not a conf file), and no self-update.
+# Where it differs from docker-commander's: ccd needs a Postgres it does not
+# install (docs/install.md), so the package ships two env files instead of
+# one conf — the server's settings, and the schema owner's credentials for
+# the separate migration unit — and has no self-update.
 name: ccd
 arch: ${ARCH}
 platform: linux
@@ -20,7 +22,9 @@ license: AGPL-3.0-only
 description: |
   Self-hosted, vendor-neutral shared context and collaboration layer for
   humans and AI agents. ccd is a single Go binary serving the REST API and
-  MCP server, backed by Postgres and S3-compatible object storage.
+  MCP server and web UI, backed by Postgres.
+# Modes are explicit: nfpm otherwise copies the checkout's, and a
+# group-writable umask would ship group-writable unit files.
 contents:
   - src: ./dist-bin/ccd-linux-${ARCH}
     dst: /usr/bin/ccd
@@ -28,7 +32,32 @@ contents:
       mode: 0755
   - src: ./deploy/packaging/ccd.service
     dst: /lib/systemd/system/ccd.service
+    file_info:
+      mode: 0644
+  - src: ./deploy/packaging/ccd-migrate.service
+    dst: /lib/systemd/system/ccd-migrate.service
+    file_info:
+      mode: 0644
+  # Templates: config|noreplace keeps an operator's filled-in copy across
+  # upgrades. Both hold secrets once filled in; postinstall sets their
+  # ownership, because the ccd group does not exist yet when files unpack.
+  - src: ./deploy/packaging/ccd.env
+    dst: /etc/context-commander/ccd.env
+    type: "config|noreplace"
+    file_info:
+      mode: 0640
+  - src: ./deploy/packaging/migrate.env
+    dst: /etc/context-commander/migrate.env
+    type: "config|noreplace"
+    file_info:
+      mode: 0600
 scripts:
   postinstall: ./deploy/packaging/postinstall.sh
   preremove: ./deploy/packaging/preremove.sh
   postremove: ./deploy/packaging/postremove.sh
+
+# Postgres can live on another machine, so it is only recommended.
+overrides:
+  deb:
+    recommends:
+      - postgresql
