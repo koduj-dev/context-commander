@@ -36,6 +36,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/members"
 	"github.com/koduj-dev/context-commander/internal/organizations"
 	"github.com/koduj-dev/context-commander/internal/projects"
+	"github.com/koduj-dev/context-commander/internal/quota"
 	"github.com/koduj-dev/context-commander/internal/ratelimit"
 	"github.com/koduj-dev/context-commander/internal/secrets"
 	"github.com/koduj-dev/context-commander/internal/security"
@@ -54,6 +55,7 @@ const (
 	oidcIssuerEnv       = "CC_OIDC_ISSUER"
 	// The NAME of an environment variable, not a credential.
 	oidcClientSecretEnv = "CC_OIDC_CLIENT_SECRET" //nolint:gosec // G101: an env var name
+	storageQuotaEnv     = "CC_STORAGE_QUOTA"
 )
 
 // isLoopbackAddr reports whether an http.Server.Addr binds only to the local
@@ -183,6 +185,24 @@ func newServeCmd() *cobra.Command {
 				handler = slog.NewJSONHandler(os.Stderr, nil)
 			}
 			slog.SetDefault(slog.New(handler))
+
+			// Parsed before anything writes, and stated at startup either way:
+			// "is anything limited here" should not need a database query to
+			// answer (docs/adr/0021).
+			quotaRaw, _ := cmd.Flags().GetString("storage-quota")
+			if quotaRaw == "" {
+				quotaRaw = os.Getenv(storageQuotaEnv)
+			}
+			storageQuota, err := quota.ParseSize(quotaRaw)
+			if err != nil {
+				return fmt.Errorf("serve: --storage-quota: %w", err)
+			}
+			pool.SetStorageQuotaDefault(storageQuota)
+			if storageQuota > 0 {
+				slog.Info("storage quota per namespace", "default_bytes", storageQuota)
+			} else {
+				slog.Info("no default storage quota: namespaces are unlimited unless an administrator sets a limit")
+			}
 
 			securityLog, _ := cmd.Flags().GetBool("security-log")
 			if !securityLog {
@@ -353,6 +373,8 @@ func newServeCmd() *cobra.Command {
 		fmt.Sprintf("allow binding a non-loopback --addr without TLS — bearer tokens and content travel in plaintext (defaults to $%s=true)", insecureAllowCleartextEnv))
 	cmd.Flags().Bool("dev", false, "skip mounting the embedded web UI — run 'cd web && npm run dev' separately, proxying /v1 back here")
 	cmd.Flags().String("log-format", "json", `structured log format: "json" or "text"`)
+	cmd.Flags().String("storage-quota", "",
+		fmt.Sprintf("default storage limit per user or organization, e.g. 10GB or 2GiB (defaults to $%s; empty means no limit — an administrator can still set one per namespace)", storageQuotaEnv))
 	cmd.Flags().Bool("security-log", true,
 		"record failed authentications, denied capabilities and rate-limit refusals to the security_events table "+
 			"(--security-log=false opts out; nothing is recorded and attacks become invisible)")

@@ -24,6 +24,7 @@ import { SkillDetail } from "./pages/SkillDetail";
 import { Organizations } from "./pages/Organizations";
 import { Tokens } from "./pages/Tokens";
 import { AdminUsage } from "./pages/AdminUsage";
+import { AdminStorage } from "./pages/AdminStorage";
 import {
   Administration,
   AdminPeople,
@@ -104,6 +105,7 @@ export function App() {
           <Route path="people" element={<AdminPeople />} />
           <Route path="agents" element={<AdminAgents />} />
           <Route path="usage" element={<AdminUsage />} />
+          <Route path="storage" element={<AdminStorage />} />
           <Route path="security" element={<AdminSecurityLog />} />
         </Route>
         <Route path="tokens" element={<Tokens />} />

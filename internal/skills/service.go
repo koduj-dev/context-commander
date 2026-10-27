@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -15,6 +16,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/installation"
 	"github.com/koduj-dev/context-commander/internal/organizations"
 	"github.com/koduj-dev/context-commander/internal/projects"
+	"github.com/koduj-dev/context-commander/internal/quota"
 	"github.com/koduj-dev/context-commander/internal/storage"
 )
 
@@ -234,6 +236,22 @@ func (s *Service) Publish(
 		if err := s.checkPublishTarget(ctx, tx, principalID, userID, scope, scopeRef); err != nil {
 			return err
 		}
+		if skillID != nil {
+			// A new version is charged where the skill lives, which need not
+			// be the scope the caller named.
+			if err := tx.QueryRow(ctx, `SELECT scope, scope_ref FROM skills WHERE id = $1`, *skillID).Scan(&skill.Scope, &skill.ScopeRef); err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					return ErrNotFound
+				}
+				return fmt.Errorf("read skill scope: %w", err)
+			}
+		} else {
+			skill.Scope, skill.ScopeRef = scope, scopeRef
+		}
+		// Before the upload, like an artifact write (docs/adr/0021).
+		if _, err := tx.Exec(ctx, `SELECT cc_check_skill_storage($1, $2, $3)`, skill.Scope, skill.ScopeRef, int64(len(content))); err != nil {
+			return quota.Translate(err)
+		}
 		if skillID == nil {
 			// Published straight into the scope the caller named and was
 			// authorized for. A team self-hosting this can put an
@@ -258,6 +276,9 @@ func (s *Service) Publish(
 			`SELECT COALESCE(MAX(version), 0) + 1 FROM skill_versions WHERE skill_id = $1`, skill.ID,
 		).Scan(&nextVersion)
 	})
+	if errors.Is(err, quota.ErrExceeded) {
+		return SkillVersion{}, err
+	}
 	if err != nil {
 		return SkillVersion{}, fmt.Errorf("skills: publish: resolve next version: %w", err)
 	}
@@ -286,12 +307,16 @@ func (s *Service) Publish(
 	err = db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
 		_, err := tx.Exec(ctx,
 			`INSERT INTO skill_versions (id, skill_id, version, checksum, storage_key, files, declared_capabilities, trust_status,
-			                             published_in_project, published_by)
-			 VALUES ($1, $2, $3, $4, $5, $6, $7, 'unverified', $8, $9)`,
+			                             published_in_project, published_by, size_bytes)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, 'unverified', $8, $9, $10)`,
 			versionID, skill.ID, nextVersion, checksum, storageKey, []byte("[]"), declared, publishedInProject(scope, scopeRef), principalID,
+			int64(len(content)),
 		)
-		return err
+		return quota.Translate(err)
 	})
+	if errors.Is(err, quota.ErrExceeded) {
+		return SkillVersion{}, err
+	}
 	if err != nil {
 		return SkillVersion{}, fmt.Errorf("skills: publish: insert skill_versions: %w", err)
 	}

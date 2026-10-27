@@ -16,6 +16,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/history"
 	"github.com/koduj-dev/context-commander/internal/paging"
 	"github.com/koduj-dev/context-commander/internal/projects"
+	"github.com/koduj-dev/context-commander/internal/quota"
 )
 
 type fixture struct {
@@ -371,5 +372,37 @@ func TestAppendHistoryObjectRejectsForeignDerivedFrom(t *testing.T) {
 	_, err = f.svc.AppendHistoryObject(ctx, principalB, projectB, convB.ID, sessionB.ID, "compacted", &rawA.ID, []byte("x"))
 	if !errors.Is(err, history.ErrInvalidReference) {
 		t.Fatalf("AppendHistoryObject in projectB with projectA's object as derived_from: got err=%v, want ErrInvalidReference", err)
+	}
+}
+
+func TestAHistoryObjectThatDoesNotFitIsRefused(t *testing.T) {
+	f, ownerPool := newFixture(t)
+	ctx := context.Background()
+	principalID, projectID := f.seedProject(t, ownerPool, projects.RoleContributor)
+	conv, err := f.svc.CreateConversation(ctx, principalID, projectID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	session, err := f.svc.CreateExternalSession(ctx, principalID, projectID, conv.ID,
+		"anthropic", "claude-code", "sess-quota", nil, "started", time.Now().UTC())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// The ciphertext is what is counted: 100 bytes of plaintext plus the
+	// 16-byte GCM tag.
+	f.appPool.SetStorageQuotaDefault(150)
+	if _, err := f.svc.AppendHistoryObject(ctx, principalID, projectID, conv.ID, session.ID, "raw", nil, make([]byte, 100)); err != nil {
+		t.Fatalf("an object that fits: %v", err)
+	}
+	if _, err := f.svc.AppendHistoryObject(ctx, principalID, projectID, conv.ID, session.ID, "raw", nil, make([]byte, 100)); !errors.Is(err, quota.ErrExceeded) {
+		t.Fatalf("an object that does not fit returned %v, want quota.ErrExceeded", err)
+	}
+	page, err := f.svc.ListHistoryObjects(ctx, principalID, projectID, conv.ID, paging.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page.Items) != 1 {
+		t.Errorf("%d objects stored, want 1 — the refused one must not be", len(page.Items))
 	}
 }

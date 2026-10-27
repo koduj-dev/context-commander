@@ -12,6 +12,7 @@ import (
 
 	"github.com/koduj-dev/context-commander/internal/db"
 	"github.com/koduj-dev/context-commander/internal/paging"
+	"github.com/koduj-dev/context-commander/internal/quota"
 )
 
 // CatalogEntry is one row of the registry as a browser sees it: the skill's
@@ -217,7 +218,9 @@ func (s *Service) Promote(
 		return nil
 	})
 	if err != nil {
-		return Skill{}, err
+		// A promotion moves the skill's bytes to the wider scope's namespace,
+		// and is refused like a write when they do not fit (docs/adr/0021).
+		return Skill{}, quota.Translate(err)
 	}
 	return skill, nil
 }

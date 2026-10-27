@@ -216,19 +216,35 @@ Only on top of a core loop people actually use:
         on every authenticated request and a screen of its own, and half of it
         is worse than none: a flag nothing enforces reads as a promise the
         product does not keep.
-- [ ] **Storage quotas per user/organization.** Raised by the maintainer
-      while scoping the UI: an organization deployment will want a ceiling
-      on what accumulates, and nothing measures or limits anything today —
-      artifacts, skill packages and history objects all grow without bound.
-      Needs accounting per scope (the object store and the encrypted tables
-      both), a limit, and an answer for what happens at the ceiling
-      (refuse the write is the only honest one; silent eviction of a
-      project's own context would be worse than the disk filling). Not
-      small, and worth doing before a real organization uses it rather than
-      after.
+- [x] ~~**Storage quotas per user/organization.**~~ Closed 2026-10-27
+      ([ADR 0021](docs/adr/0021-storage-quotas-per-namespace.md)): the limit is per
+      namespace, set by `--storage-quota` with per-namespace exceptions made by an
+      admin, and a write over it is refused at insert. What is left:
+      - Skill versions published before migration 000030 count as zero. A one-off
+        backfill would have to read each object's size from the store.
+      - An organization's skills are uncounted until the organization has a
+        namespace, which is created with its first project.
+      - CLI writes (`--database-url`) carry no default limit, only the exceptions an
+        admin sets. That is the operator tier, which also runs migrations.
 - [ ] Retention rules, legal hold, controlled purge workflow.
 - [ ] Signed/trusted skill packages and an approval workflow.
 - [ ] Operational telemetry that doesn't leak content.
+
+- [ ] **Plans, phases and progress across a team** (raised by the maintainer's
+      colleagues, 2026-10-27). An agent writes execution plans and procedures at the
+      start of a task, and after that nobody sees them again: you cannot search them,
+      nothing marks what is done, and three people on one project cannot tell what
+      the others are working on or how far the project has got. What they asked for:
+      - phases made of plans, even short ones;
+      - task lists and operational checks inside them;
+      - a real state of the project, visible to everyone;
+      - all of it offered over MCP, so agents and developers can build a synthesis
+        from each other's work.
+
+      Needs an ADR first. Open questions:
+      - whether a plan is a new primitive or a structured artifact;
+      - who may tick what;
+      - how "where is everyone" relates to handoffs and to Phase 2's subscriptions.
 
 ### UI — remaining spec surface
 

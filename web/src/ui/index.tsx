@@ -375,6 +375,7 @@ export function ErrorState({ error, onRetry }: { error: unknown; onRetry?: () =>
     not_found: t("error.notFound.title"),
     conflict: t("error.conflict.generic"),
     rate_limited: t("error.rateLimited.title"),
+    quota_exceeded: t("error.quota.title"),
     unavailable: t("error.unavailable.title"),
     network: t("error.unavailable.title"),
   };
@@ -382,6 +383,7 @@ export function ErrorState({ error, onRetry }: { error: unknown; onRetry?: () =>
     forbidden: t("error.forbidden.body"),
     not_found: t("error.notFound.body"),
     rate_limited: t("error.rateLimited.body"),
+    quota_exceeded: t("error.quota.body"),
     unavailable: t("error.unavailable.body"),
     network: t("error.unavailable.body"),
   };

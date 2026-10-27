@@ -14,6 +14,7 @@ func TestRoleCanGrantsAdminEverything(t *testing.T) {
 		installation.CapCredentialManage,
 		installation.CapSkillManage,
 		installation.CapGateManage,
+		installation.CapStorageManage,
 	}
 	for _, cap := range caps {
 		if !installation.RoleCan(installation.RoleAdmin, cap) {

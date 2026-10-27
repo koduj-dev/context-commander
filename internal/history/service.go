@@ -16,6 +16,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/crypto"
 	"github.com/koduj-dev/context-commander/internal/db"
 	"github.com/koduj-dev/context-commander/internal/paging"
+	"github.com/koduj-dev/context-commander/internal/quota"
 )
 
 // foreignKeyViolation is Postgres's SQLSTATE for a foreign key constraint
@@ -203,6 +204,9 @@ func (s *Service) AppendHistoryObject(
 		)
 		return err
 	})
+	if err := quota.Translate(err); errors.Is(err, quota.ErrExceeded) {
+		return HistoryObject{}, err
+	}
 	if err != nil {
 		return HistoryObject{}, fmt.Errorf("history: append history object: %w", asInvalidReference(err))
 	}

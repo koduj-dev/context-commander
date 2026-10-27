@@ -21,6 +21,7 @@ export type ApiErrorKind =
   | "not_found"
   | "conflict"
   | "rate_limited"
+  | "quota_exceeded"
   | "unavailable"
   | "server"
   | "network";
@@ -55,6 +56,11 @@ function kindFor(status: number, code: string): ApiErrorKind {
       return "conflict";
     case 429:
       return "rate_limited";
+    // The namespace is full (docs/adr/0021). Its own kind because the
+    // remedy is the reader's — delete something, or ask for room — and a
+    // generic server error would tell them to retry, which cannot help.
+    case 507:
+      return "quota_exceeded";
     case 503:
       return "unavailable";
     default:
@@ -624,6 +630,25 @@ export type InstallationStats = {
  * (migrations/000028). A duration is absent when there was nothing to take
  * a median of, which is not the same as zero.
  */
+/**
+ * One namespace's storage (adapters/http/storage.go). limit_bytes is what is
+ * enforced and is absent when nothing limits the namespace. override and
+ * created_at come only with the admin listing.
+ */
+export type NamespaceStorage = {
+  namespace_id: string;
+  slug: string;
+  kind: "personal" | "organization";
+  display_name: string;
+  used_bytes: number;
+  limit_bytes?: number;
+  created_at?: string;
+  override?: "default" | "custom" | "unlimited";
+};
+
+export type StorageLimit =
+  { kind: "default" } | { kind: "unlimited" } | { kind: "custom"; bytes: number };
+
 export type InstallationTrends = {
   weeks: {
     /** A date (YYYY-MM-DD), the week's Monday in UTC — not a timestamp. */
@@ -691,6 +716,9 @@ export const api = {
       body: { current_password: currentPassword, new_password: newPassword },
     }),
   sessions: () => request<Session[]>("/me/sessions"),
+  // The caller's own namespace and their organizations'. An envelope with no
+  // cursor: it is bounded by how many organizations someone is in.
+  myStorage: () => request<Page<NamespaceStorage>>("/me/storage"),
   revokeSession: (id: string) => request<void>(`/me/sessions/${id}`, { method: "DELETE" }),
 
   me: () => request<Me>("/me"),
@@ -913,6 +941,20 @@ export const api = {
   installationStats: () => request<InstallationStats>("/installation/stats"),
   installationTrends: (weeks?: number) =>
     request<InstallationTrends>(withQuery("/installation/trends", { weeks })),
+  // Every namespace's storage, oldest first. Installation-admin only.
+  installationStorage: (cursor?: string, limit?: number) =>
+    request<Page<NamespaceStorage>>(withQuery("/installation/storage", { cursor, limit })),
+  // {} puts the namespace back on the server default.
+  setStorageLimit: (namespaceID: string, limit: StorageLimit) =>
+    request<void>(`/installation/storage/${namespaceID}`, {
+      method: "PUT",
+      body:
+        limit.kind === "custom"
+          ? { limit_bytes: limit.bytes }
+          : limit.kind === "unlimited"
+            ? { unlimited: true }
+            : {},
+    }),
   // The directory. Installation-admin only, which is why every screen that
   // uses it falls back to a plain id field when the caller is not one.
   users: (cursor?: string, limit?: number) =>

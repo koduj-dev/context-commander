@@ -727,4 +727,38 @@ export const fr: Partial<Record<MessageKey, string>> = {
   "activity.empty": "Rien ne s’est encore passé ici",
   "activity.emptyBody":
     "Les lectures et les écritures via l’API, la CLI et MCP aboutissent toutes sur cette chronologie.",
+  "error.quota.title": "Il n’y a plus de place pour cela",
+  "error.quota.body":
+    "La limite de stockage de cet utilisateur ou de cette organisation est atteinte. Supprimez les artefacts dont vous n’avez plus besoin, ou demandez une limite plus élevée à un administrateur de l’installation.",
+  "admin.tab.storage": "Stockage",
+  "admin.storage.title": "Stockage",
+  "admin.storage.lead":
+    "Ce que chaque utilisateur et chaque organisation occupe, et combien il peut occuper. Les écritures qui dépasseraient une limite sont refusées ; les suppressions fonctionnent toujours.",
+  "admin.storage.namespaces": "Utilisateurs et organisations",
+  "admin.storage.none": "Aucun utilisateur ni aucune organisation pour l’instant",
+  "admin.storage.help":
+    "Versions d’artefacts, historique des conversations et paquets de skills, comptés par la base de données. Ce n’est pas l’occupation du disque : un artefact supprimé cesse de compter avant qu’un opérateur ne le purge.",
+  "admin.storage.owner": "Propriétaire",
+  "admin.storage.used": "Utilisé",
+  "admin.storage.limit": "Limite",
+  "admin.storage.personal": "Personnel",
+  "admin.storage.organization": "Organisation",
+  "admin.storage.default": "{limit} (par défaut)",
+  "admin.storage.custom": "{limit} (définie ici)",
+  "admin.storage.unlimited": "Sans limite",
+  "admin.storage.noDefault": "Sans limite (aucune valeur par défaut)",
+  "admin.storage.change": "Modifier la limite",
+  "admin.storage.limitFor": "Limite de stockage pour {name}",
+  "admin.storage.useDefault": "Valeur par défaut du serveur",
+  "admin.storage.useCustom": "Limite propre",
+  "admin.storage.useUnlimited": "Sans limite",
+  "admin.storage.amount": "Quantité",
+  "admin.storage.unit": "Unité",
+  "admin.storage.save": "Enregistrer la limite",
+  "prefs.storage.title": "Stockage",
+  "prefs.storage.help":
+    "Versions d’artefacts, historique des conversations et paquets de skills. Supprimer un artefact libère sa place.",
+  "prefs.storage.none": "Rien n’est encore stocké",
+  "prefs.storage.ofLimit": "{used} sur {limit}",
+  "prefs.storage.unlimited": "{used} · sans limite",
 };

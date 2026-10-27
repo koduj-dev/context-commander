@@ -4,6 +4,7 @@ import { useFormat } from "../app/prefs";
 import { useAuth } from "../app/auth";
 import { ApiError, api } from "../lib/api";
 import { useResource } from "../lib/resource";
+import { meterTone, usedPercent } from "./AdminStorage";
 import {
   Badge,
   Btn,
@@ -12,6 +13,8 @@ import {
   EmptyState,
   ErrorState,
   Loading,
+  Meter,
+  Mono,
   Note,
   Panel,
   TextField,
@@ -230,6 +233,63 @@ export function SessionsPanel() {
               </td>
             </tr>
           ))}
+        </DataTable>
+      )}
+    </Panel>
+  );
+}
+
+/**
+ * How much room the reader's own namespace and their organizations' have
+ * (docs/adr/0021).
+ *
+ * Shown to everyone, not only to admins: a write refused for want of space is
+ * the reader's problem to solve, and this is where they can see it coming. It
+ * shows the limit that applies, not whether an admin set it — how the number
+ * was arrived at is an administrator's business.
+ */
+export function StoragePanel() {
+  const t = useT();
+  const f = useFormat();
+  const { data, error, loading, reload } = useResource(() => api.myStorage(), []);
+
+  return (
+    <Panel
+      title={t("prefs.storage.title")}
+      tight
+      footer={<span className="dim">{t("prefs.storage.help")}</span>}
+    >
+      {loading ? (
+        <Loading />
+      ) : error || !data ? (
+        <ErrorState error={error} onRetry={reload} />
+      ) : data.items.length === 0 ? (
+        <EmptyState title={t("prefs.storage.none")} />
+      ) : (
+        <DataTable columns={[{ key: "who" }, { key: "used", align: "r" }]}>
+          {data.items.map((n) => {
+            const percent = usedPercent(n);
+            return (
+              <tr key={n.namespace_id}>
+                <td>
+                  <Cell primary={n.display_name} secondary={<Mono>{n.slug}</Mono>} />
+                </td>
+                <td className="r">
+                  {n.limit_bytes === undefined
+                    ? t("prefs.storage.unlimited", { used: f.bytes(n.used_bytes) })
+                    : t("prefs.storage.ofLimit", {
+                        used: f.bytes(n.used_bytes),
+                        limit: f.bytes(n.limit_bytes),
+                      })}
+                  {percent !== undefined && (
+                    <div className="mt-sm">
+                      <Meter percent={percent} tone={meterTone(percent)} />
+                    </div>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
         </DataTable>
       )}
     </Panel>

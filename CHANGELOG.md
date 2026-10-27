@@ -12,6 +12,27 @@ link definition at the bottom of the file.
 
 ### Added
 
+- **Storage quotas per user and organization**
+  ([ADR 0021](docs/adr/0021-storage-quotas-per-namespace.md)).
+  - `serve --storage-quota 10GB` (or `$CC_STORAGE_QUOTA`) sets the default limit per
+    namespace. Without it nothing is limited, which is how it has always been.
+  - An installation admin can give one namespace its own limit or no limit at all, from
+    the new Administration → Storage tab or with `PUT /v1/installation/storage/{id}`.
+  - A write that would go over the limit is refused with `507 storage_quota_exceeded`.
+    The refusal never says how much is used, because the writer may be outside the
+    organization that owns the namespace. Deletes are never refused.
+  - Everyone sees their own namespace and their organizations' in Preferences
+    (`GET /v1/me/storage`).
+  - The database keeps the count, using triggers on artifact versions, history
+    objects and skill versions (migration 000030). cc_app cannot touch the count.
+  - The limit is checked in the same transaction as the insert, so concurrent writes
+    cannot both fit under it. Large uploads are also checked before they reach the
+    object store.
+  - Deleting an artifact gives its bytes back immediately. A promoted skill takes its
+    bytes with it, and a promotion is refused where they do not fit.
+  - Skill versions published before this release count as zero, because only the
+    object store knows their size.
+
 - **Usage over time on the administration's Usage screen** — the last twelve
   weeks (people and agents active, handoffs created, claimed, taken over by
   another client, median time to claim, events) and the handoff loop over the

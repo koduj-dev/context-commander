@@ -1,7 +1,7 @@
 import { LOCALES, LOCALE_NAMES, useI18n, useT } from "../i18n";
 import { useCrumbs } from "../app/crumbs";
 import { useAuth } from "../app/auth";
-import { PasswordPanel, SessionsPanel } from "./AccountSecurity";
+import { PasswordPanel, SessionsPanel, StoragePanel } from "./AccountSecurity";
 import { useFormat, usePrefs } from "../app/prefs";
 import { principalName } from "../lib/api";
 import * as fmt from "../lib/format";
@@ -200,6 +200,7 @@ export function Preferences() {
           </Panel>
 
           <SessionsPanel />
+          <StoragePanel />
         </Stack>
       </Grid>
     </>

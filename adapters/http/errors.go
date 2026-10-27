@@ -21,6 +21,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/organizations"
 	"github.com/koduj-dev/context-commander/internal/paging"
 	"github.com/koduj-dev/context-commander/internal/projects"
+	"github.com/koduj-dev/context-commander/internal/quota"
 	"github.com/koduj-dev/context-commander/internal/secrets"
 	"github.com/koduj-dev/context-commander/internal/security"
 	"github.com/koduj-dev/context-commander/internal/skills"
@@ -112,6 +113,10 @@ func writeDomainError(w http.ResponseWriter, r *http.Request, err error) {
 		writeError(w, http.StatusUnprocessableEntity, "blocked_by_gate", err.Error())
 	case errors.Is(err, artifacts.ErrTooLarge), errors.Is(err, history.ErrTooLarge):
 		writeError(w, http.StatusRequestEntityTooLarge, "too_large", err.Error())
+	case errors.Is(err, quota.ErrExceeded):
+		// 507, not 413: the request itself is fine, and the same write would
+		// succeed in a namespace with room (docs/adr/0021).
+		writeError(w, http.StatusInsufficientStorage, "storage_quota_exceeded", quota.ErrExceeded.Error())
 	case errors.Is(err, handoffs.ErrAlreadyClaimed):
 		writeError(w, http.StatusConflict, "already_claimed", "this handoff was already claimed by another client")
 	case errors.Is(err, handoffs.ErrInvalidTransition):
@@ -140,7 +145,7 @@ func writeDomainError(w http.ResponseWriter, r *http.Request, err error) {
 		writeError(w, http.StatusBadRequest, "invalid_request", "referenced conversation/session/derived_from object does not belong to this project/conversation")
 	case errors.Is(err, projects.ErrInvalidResolvePath), errors.Is(err, secrets.ErrInvalidName), errors.Is(err, identity.ErrInvalidExpiry),
 		errors.Is(err, members.ErrInvalidRole), errors.Is(err, organizations.ErrInvalidRole),
-		errors.Is(err, paging.ErrInvalidCursor):
+		errors.Is(err, paging.ErrInvalidCursor), errors.Is(err, installation.ErrInvalidLimit):
 		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
 	default:
 		// The caller still gets no detail — an internal error's text is a

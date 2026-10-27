@@ -30,6 +30,9 @@ const (
 	// CapGateManage writes installation-scope gate_bindings — unblocks
 	// internal/gates.ErrUnsupportedScope the same way.
 	CapGateManage Capability = "installation.gate_manage"
+	// CapStorageManage sets a namespace's storage limit, an exception to the
+	// server default (docs/adr/0021). Reading usage is CapAdminRead.
+	CapStorageManage Capability = "installation.storage_manage"
 )
 
 // roleCapabilities holds one role today (RoleAdmin has everything) — kept
@@ -38,7 +41,7 @@ const (
 var roleCapabilities = map[Role]map[Capability]bool{
 	RoleAdmin: setOf(
 		CapAdminRead, CapUserCreate, CapServicePrincipalCreate,
-		CapCredentialManage, CapSkillManage, CapGateManage,
+		CapCredentialManage, CapSkillManage, CapGateManage, CapStorageManage,
 	),
 }
 

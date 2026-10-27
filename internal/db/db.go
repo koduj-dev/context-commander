@@ -10,6 +10,7 @@ package db
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -30,6 +31,22 @@ type Principal struct {
 // forgotten.
 type Pool struct {
 	pool *pgxpool.Pool
+	// storageQuota is the server's default per-namespace limit in bytes, as
+	// the decimal text app.storage_quota_default carries, or "" for none
+	// (docs/adr/0021). Set once at startup, before the pool serves anything.
+	storageQuota string
+}
+
+// SetStorageQuotaDefault sets the per-namespace storage limit every
+// WithPrincipal transaction carries to the database's quota trigger. Zero or
+// less means no default limit. Call it before the pool is shared: it is not
+// synchronized, because nothing changes it after startup.
+func (p *Pool) SetStorageQuotaDefault(bytes int64) {
+	if bytes <= 0 {
+		p.storageQuota = ""
+		return
+	}
+	p.storageQuota = strconv.FormatInt(bytes, 10)
 }
 
 func NewPool(ctx context.Context, dsn string) (*Pool, error) {
@@ -65,7 +82,11 @@ func (p *Pool) Close() {
 // value. set_config() is an ordinary function call with normal, safely
 // bound parameters; is_local=true makes it behave exactly like SET LOCAL,
 // scoped to the current transaction only. See docs/adr/0003.
-const setPrincipalSQL = `SELECT set_config('app.current_principal_id', $1::text, true)`
+//
+// The storage default rides in the same statement, so there is no second
+// round trip and no transaction that has the one without the other.
+const setPrincipalSQL = `SELECT set_config('app.current_principal_id', $1::text, true),
+	set_config('app.storage_quota_default', $2::text, true)`
 
 // WithPrincipal runs fn inside a single Postgres transaction with the RLS
 // session context set to principal for the lifetime of that transaction
@@ -79,7 +100,7 @@ func WithPrincipal(ctx context.Context, p *Pool, principal Principal, fn func(tx
 	}
 	defer tx.Rollback(ctx) //nolint:errcheck // no-op once Commit has succeeded
 
-	if _, err := tx.Exec(ctx, setPrincipalSQL, principal.ID.String()); err != nil {
+	if _, err := tx.Exec(ctx, setPrincipalSQL, principal.ID.String(), p.storageQuota); err != nil {
 		return fmt.Errorf("db: set principal context: %w", err)
 	}
 

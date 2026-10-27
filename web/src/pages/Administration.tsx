@@ -50,6 +50,7 @@ export function Administration() {
         {tab("/administration/people", t("admin.tab.people"))}
         {tab("/administration/agents", t("admin.tab.agents"))}
         {tab("/administration/usage", t("admin.tab.usage"))}
+        {tab("/administration/storage", t("admin.tab.storage"))}
         {tab("/administration/security", t("admin.tab.security"))}
       </Tabs>
       <Outlet />

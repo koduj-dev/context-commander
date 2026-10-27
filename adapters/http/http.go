@@ -153,6 +153,7 @@ func NewHandler(deps Deps) http.Handler {
 			r.Get("/me/tokens", deps.listTokens)
 			r.Put("/me/password", deps.changeOwnPassword)
 			r.Get("/me/sessions", deps.listOwnSessions)
+			r.Get("/me/storage", deps.getMyStorage)
 			r.Delete("/me/sessions/{id}", deps.revokeOwnSession)
 			r.Delete("/me/tokens/{id}", deps.revokeToken)
 
@@ -182,6 +183,8 @@ func NewHandler(deps Deps) http.Handler {
 				r.Get("/admins", deps.listInstallationAdmins)
 				r.Get("/stats", deps.getInstallationStats)
 				r.Get("/trends", deps.getInstallationTrends)
+				r.Get("/storage", deps.listInstallationStorage)
+				r.Put("/storage/{id}", deps.setNamespaceStorageLimit)
 				r.Get("/users", deps.listInstallationUsers)
 				r.Post("/users", deps.createInstallationUser)
 				r.Put("/users/{id}/password", deps.setUserPassword)

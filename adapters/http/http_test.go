@@ -40,6 +40,9 @@ type fixture struct {
 	t         *testing.T
 	server    *httptest.Server
 	ownerPool *db.Pool
+	// appPool is the pool the handler runs on, exposed so a test can set
+	// what the server would set at startup (the storage default).
+	appPool *db.Pool
 }
 
 func newFixture(t *testing.T) *fixture {
@@ -141,7 +144,7 @@ func newFixtureWithDeps(t *testing.T, recordSecurity *bool, limits ratelimit.Lim
 	server := httptest.NewServer(cchttp.NewHandler(deps))
 	t.Cleanup(server.Close)
 
-	return &fixture{t: t, server: server, ownerPool: ownerPool}
+	return &fixture{t: t, server: server, ownerPool: ownerPool, appPool: appPool}
 }
 
 // newUserWithToken creates a User+Principal+PAT via the owner pool (identity

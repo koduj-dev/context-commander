@@ -724,6 +724,40 @@ export const en = {
   "activity.empty": "Nothing has happened here yet",
   "activity.emptyBody":
     "Reads and writes through the API, the CLI and MCP all land on this timeline.",
+  "error.quota.title": "There is no room for this",
+  "error.quota.body":
+    "The storage limit for this user or organization has been reached. Delete artifacts that are no longer needed, or ask an installation administrator for a larger limit.",
+  "admin.tab.storage": "Storage",
+  "admin.storage.title": "Storage",
+  "admin.storage.lead":
+    "What each user and organization holds, and how much it may hold. Writes that would go over a limit are refused; deletes always work.",
+  "admin.storage.namespaces": "Users and organizations",
+  "admin.storage.none": "No users or organizations yet",
+  "admin.storage.help":
+    "Artifact versions, conversation history and skill packages, counted by the database. Not disk usage: deleted artifacts stop counting before an operator purges them.",
+  "admin.storage.owner": "Owner",
+  "admin.storage.used": "Used",
+  "admin.storage.limit": "Limit",
+  "admin.storage.personal": "Personal",
+  "admin.storage.organization": "Organization",
+  "admin.storage.default": "{limit} (default)",
+  "admin.storage.custom": "{limit} (set here)",
+  "admin.storage.unlimited": "No limit",
+  "admin.storage.noDefault": "No limit (no default set)",
+  "admin.storage.change": "Change limit",
+  "admin.storage.limitFor": "Storage limit for {name}",
+  "admin.storage.useDefault": "Server default",
+  "admin.storage.useCustom": "Own limit",
+  "admin.storage.useUnlimited": "No limit",
+  "admin.storage.amount": "Amount",
+  "admin.storage.unit": "Unit",
+  "admin.storage.save": "Save limit",
+  "prefs.storage.title": "Storage",
+  "prefs.storage.help":
+    "Artifact versions, conversation history and skill packages. Deleting an artifact frees its space.",
+  "prefs.storage.none": "Nothing stored yet",
+  "prefs.storage.ofLimit": "{used} of {limit}",
+  "prefs.storage.unlimited": "{used} · no limit",
 } as const;
 
 export type MessageKey = keyof typeof en;

@@ -732,4 +732,38 @@ export const pl: Partial<Record<MessageKey, string>> = {
 
   "activity.empty": "Jeszcze nic się tu nie stało",
   "activity.emptyBody": "Odczyty i zapisy przez API, CLI i MCP trafiają wszystkie na tę osi czasu.",
+  "error.quota.title": "Nie ma na to miejsca",
+  "error.quota.body":
+    "Osiągnięto limit przestrzeni dla tego użytkownika lub organizacji. Usuń niepotrzebne artefakty albo poproś administratora instalacji o większy limit.",
+  "admin.tab.storage": "Przestrzeń",
+  "admin.storage.title": "Przestrzeń",
+  "admin.storage.lead":
+    "Ile zajmuje każdy użytkownik i każda organizacja oraz ile może zająć. Zapisy przekraczające limit są odrzucane; usuwanie działa zawsze.",
+  "admin.storage.namespaces": "Użytkownicy i organizacje",
+  "admin.storage.none": "Nie ma jeszcze użytkowników ani organizacji",
+  "admin.storage.help":
+    "Wersje artefaktów, historia rozmów i pakiety skilli, liczone przez bazę danych. To nie jest zajętość dysku: usunięty artefakt przestaje się liczyć, zanim operator go trwale usunie.",
+  "admin.storage.owner": "Właściciel",
+  "admin.storage.used": "Zajęte",
+  "admin.storage.limit": "Limit",
+  "admin.storage.personal": "Osobista",
+  "admin.storage.organization": "Organizacja",
+  "admin.storage.default": "{limit} (domyślny)",
+  "admin.storage.custom": "{limit} (ustawiony tutaj)",
+  "admin.storage.unlimited": "Bez limitu",
+  "admin.storage.noDefault": "Bez limitu (brak wartości domyślnej)",
+  "admin.storage.change": "Zmień limit",
+  "admin.storage.limitFor": "Limit przestrzeni dla {name}",
+  "admin.storage.useDefault": "Domyślny serwera",
+  "admin.storage.useCustom": "Własny limit",
+  "admin.storage.useUnlimited": "Bez limitu",
+  "admin.storage.amount": "Ilość",
+  "admin.storage.unit": "Jednostka",
+  "admin.storage.save": "Zapisz limit",
+  "prefs.storage.title": "Przestrzeń",
+  "prefs.storage.help":
+    "Wersje artefaktów, historia rozmów i pakiety skilli. Usunięcie artefaktu zwalnia jego miejsce.",
+  "prefs.storage.none": "Nic jeszcze nie zapisano",
+  "prefs.storage.ofLimit": "{used} z {limit}",
+  "prefs.storage.unlimited": "{used} · bez limitu",
 };

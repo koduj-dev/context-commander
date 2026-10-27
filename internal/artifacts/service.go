@@ -19,6 +19,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/db"
 	"github.com/koduj-dev/context-commander/internal/events"
 	"github.com/koduj-dev/context-commander/internal/gates"
+	"github.com/koduj-dev/context-commander/internal/quota"
 	"github.com/koduj-dev/context-commander/internal/storage"
 )
 
@@ -138,6 +139,12 @@ func (s *Service) Write(
 		if currentVersion != expectedVersion {
 			return ErrConflict // fail fast, before doing any crypto/storage work
 		}
+		// Before the upload, so a full namespace does not cost an upload
+		// and an orphan. Advisory: the insert's trigger decides
+		// (docs/adr/0021).
+		if _, err := tx.Exec(ctx, `SELECT cc_check_project_storage($1, $2)`, projectID, int64(len(plaintext))); err != nil {
+			return quota.Translate(err)
+		}
 
 		ec := crypto.EncryptionContext{
 			ProjectID: projectID, ResourceType: "artifact_version",
@@ -216,7 +223,7 @@ func (s *Service) Write(
 	if err != nil {
 		// storageKey uploaded above is now an orphan candidate if this
 		// transaction didn't commit — see SweepOrphanObjects.
-		return Version{}, err
+		return Version{}, quota.Translate(err)
 	}
 	return result, nil
 }
