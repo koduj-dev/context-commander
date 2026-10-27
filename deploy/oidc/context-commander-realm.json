@@ -89,6 +89,21 @@
           "temporary": false
         }
       ]
+    },
+    {
+      "username": "erin",
+      "enabled": true,
+      "emailVerified": false,
+      "email": "erin@example.test",
+      "firstName": "Erin",
+      "lastName": "Elwood",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "oidc-dev-password",
+          "temporary": false
+        }
+      ]
     }
   ]
 }

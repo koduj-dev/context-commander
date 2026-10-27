@@ -67,6 +67,16 @@ export const zhCN: Partial<Record<MessageKey, string>> = {
   "auth.tokenLead": "用 {command} 创建的个人访问 token。它会被换成一个会话，不会保存在此浏览器中。",
   "auth.tokenFailed": "该 token 未被接受。",
   "auth.rateLimited": "尝试次数过多。请稍候再试。",
+  "auth.withProvider": "使用 {provider} 登录",
+  "auth.oidcCancelled": "已在登录服务处取消登录。",
+  "auth.oidcExpired": "这次登录尝试已过期，或是在另一个窗口中发起的。请重新开始。",
+  "auth.oidcUnavailable":
+    "无法连接到登录服务。这与你的账号无关——请稍后重试，或告知负责运维此安装的人。",
+  "auth.oidcNoEmail":
+    "你在登录服务中的账号没有邮箱地址，因此无法为它创建账号。需要登录服务的管理员补上一个。",
+  "auth.oidcEmailUnverified":
+    "你在登录服务中的邮箱地址尚未验证，因此不能用于在此登录。请先在那里完成验证，然后重试。",
+  "auth.oidcFailed": "通过登录服务登录未成功。请重新开始。",
   "auth.indistinct":
     "密码错误、地址没有对应账号、账号没有设置密码，在这里读起来完全一样。说清是哪一种，等于告诉正在猜测的人他猜对了一半。",
   "setup.title": "创建第一个管理员账号",

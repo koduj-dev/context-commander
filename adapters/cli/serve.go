@@ -51,6 +51,9 @@ const (
 	ldapURLEnv                = "CC_LDAP_URL"
 	// The NAME of an environment variable, not a credential.
 	ldapBindPasswordEnv = "CC_LDAP_BIND_PASSWORD" //nolint:gosec // G101: an env var name
+	oidcIssuerEnv       = "CC_OIDC_ISSUER"
+	// The NAME of an environment variable, not a credential.
+	oidcClientSecretEnv = "CC_OIDC_CLIENT_SECRET" //nolint:gosec // G101: an env var name
 )
 
 // isLoopbackAddr reports whether an http.Server.Addr binds only to the local
@@ -224,6 +227,18 @@ func newServeCmd() *cobra.Command {
 			if ldapDir != nil {
 				slog.Info("LDAP sign-in enabled", "provider", ldapDir.Provider())
 			}
+			// OIDC, the same way. No network call here: discovery happens on
+			// the first sign-in, so a provider that is down costs that
+			// method rather than the whole server.
+			var oidcProviders []directory.RedirectAuthenticator
+			oidcDir, err := oidcFromFlags(cmd)
+			if err != nil {
+				return err
+			}
+			if oidcDir != nil {
+				oidcProviders = append(oidcProviders, oidcDir)
+				slog.Info("OIDC sign-in enabled", "provider", oidcDir.Provider(), "label", oidcDir.Label())
+			}
 
 			// First run: when the installation has no users at all, mint a
 			// one-time setup code so the first administrator can be created
@@ -278,6 +293,7 @@ func newServeCmd() *cobra.Command {
 				// Nil unless --ldap-url was given, and a nil Directory is what
 				// closes the path rather than opening it.
 				Directory: ldapDir,
+				OIDC:      oidcProviders,
 				// The cookie is Secure whenever the transport is: TLS here,
 				// or a reverse proxy in front of a loopback bind. Only an
 				// explicit --insecure-allow-cleartext turns it off, because
@@ -359,6 +375,21 @@ func newServeCmd() *cobra.Command {
 	cmd.Flags().String("ldap-uid-attr", "",
 		`attribute holding the directory's own stable id (default "entryUUID"; Active Directory uses objectGUID) — never the email, which a person can change`)
 	cmd.Flags().Duration("ldap-timeout", 0, "bound on the whole exchange: dial, bind, search, bind again (default 10s)")
+	// OIDC (docs/adr/0019). --oidc-issuer is the switch, as --ldap-url is.
+	cmd.Flags().String("oidc-issuer", "",
+		fmt.Sprintf("enable OpenID Connect sign-in with this issuer, exactly as its discovery document states it (defaults to $%s)", oidcIssuerEnv))
+	cmd.Flags().String("oidc-client-id", "", "this installation's client id at the provider")
+	// No --oidc-client-secret flag, for the reason there is no
+	// --ldap-bind-password.
+	cmd.Flags().String("oidc-client-secret-file", "",
+		fmt.Sprintf("file holding the client secret (defaults to $%s; there is no flag for the secret itself, because an argument is visible in `ps`)", oidcClientSecretEnv))
+	cmd.Flags().String("oidc-redirect-url", "",
+		"this server's callback exactly as registered at the provider, e.g. https://cc.example.com/v1/auth/oidc/callback — not derived from the request, which behind a proxy names the proxy's choice of host")
+	cmd.Flags().String("oidc-name", "oidc", "provider name recorded against each linked identity and used in the sign-in URL")
+	cmd.Flags().String("oidc-label", "", `what the sign-in button says, e.g. "Google" or the company's name for its single sign-on (default "Single sign-on")`)
+	cmd.Flags().StringSlice("oidc-scopes", nil, "scopes to request (default openid,profile,email — an ID token without an email cannot be provisioned)")
+	cmd.Flags().String("oidc-ca-cert", "", "PEM bundle to verify the provider's certificate against, for an internal CA — there is deliberately no way to skip verification")
+	cmd.Flags().Duration("oidc-timeout", 0, "bound on each request to the provider: discovery, key fetch, code exchange (default 10s)")
 
 	cmd.Flags().Float64("rate-limit-signin-per-minute", 5,
 		"sustained password sign-in attempts per minute allowed for one email address (0 disables) — the per-credential limit cannot see these, since a failed guess belongs to no credential")
@@ -392,7 +423,12 @@ func hasAnyUser(ctx context.Context, pool *db.Pool) (bool, error) {
 // ldapFromFlags builds the LDAP directory, or returns nil when none is
 // configured. --ldap-url (or $CC_LDAP_URL) is the switch; every other flag is
 // ignored without it, rather than half-configuring something nobody asked for.
-func ldapFromFlags(cmd *cobra.Command) (*directory.LDAP, error) {
+//
+// It returns the interface, not *directory.LDAP, and that is the fix for a
+// real outage: a nil *LDAP stored in Deps.Directory is a non-nil interface,
+// so `d.Directory != nil` held on every server WITHOUT a directory, and both
+// GET /v1/auth/methods and every mistyped password panicked into a 500.
+func ldapFromFlags(cmd *cobra.Command) (directory.Authenticator, error) {
 	url, _ := cmd.Flags().GetString("ldap-url")
 	if url == "" {
 		url = os.Getenv(ldapURLEnv)
@@ -417,12 +453,52 @@ func ldapFromFlags(cmd *cobra.Command) (*directory.LDAP, error) {
 	uidAttr, _ := cmd.Flags().GetString("ldap-uid-attr")
 	timeout, _ := cmd.Flags().GetDuration("ldap-timeout")
 
-	return directory.NewLDAP(directory.LDAPConfig{
+	ldapDir, err := directory.NewLDAP(directory.LDAPConfig{
 		Name: name, URL: url, StartTLS: startTLS, CACertFile: caCert,
 		BindDN: bindDN, BindPassword: password,
 		UserBase: userBase, UserFilter: userFilter,
 		MailAttr: mailAttr, DisplayNameAttr: nameAttr, UniqueIDAttr: uidAttr,
 		Timeout: timeout,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return ldapDir, nil
+}
+
+// oidcFromFlags builds the OIDC provider, or returns nil when none is
+// configured. --oidc-issuer (or $CC_OIDC_ISSUER) is the switch.
+func oidcFromFlags(cmd *cobra.Command) (*directory.OIDC, error) {
+	issuer, _ := cmd.Flags().GetString("oidc-issuer")
+	if issuer == "" {
+		issuer = os.Getenv(oidcIssuerEnv)
+	}
+	if issuer == "" {
+		return nil, nil
+	}
+
+	secret := os.Getenv(oidcClientSecretEnv)
+	if path, _ := cmd.Flags().GetString("oidc-client-secret-file"); path != "" {
+		raw, err := os.ReadFile(path) //nolint:gosec // operator-supplied path, same trust level as --tls-key
+		if err != nil {
+			return nil, fmt.Errorf("serve: read --oidc-client-secret-file: %w", err)
+		}
+		// Only the trailing newline, as for the LDAP bind password.
+		secret = strings.TrimRight(string(raw), "\r\n")
+	}
+
+	clientID, _ := cmd.Flags().GetString("oidc-client-id")
+	redirect, _ := cmd.Flags().GetString("oidc-redirect-url")
+	name, _ := cmd.Flags().GetString("oidc-name")
+	label, _ := cmd.Flags().GetString("oidc-label")
+	scopes, _ := cmd.Flags().GetStringSlice("oidc-scopes")
+	caCert, _ := cmd.Flags().GetString("oidc-ca-cert")
+	timeout, _ := cmd.Flags().GetDuration("oidc-timeout")
+
+	return directory.NewOIDC(directory.OIDCConfig{
+		Name: name, Label: label, IssuerURL: issuer,
+		ClientID: clientID, ClientSecret: secret, RedirectURL: redirect,
+		Scopes: scopes, CACertFile: caCert, Timeout: timeout,
 	})
 }
 

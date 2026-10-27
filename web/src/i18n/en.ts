@@ -61,6 +61,16 @@ export const en = {
     "A personal access token from {command}. It is exchanged for a session and not stored in this browser.",
   "auth.tokenFailed": "That token was not accepted.",
   "auth.rateLimited": "Too many attempts. Wait a moment and try again.",
+  "auth.withProvider": "Sign in with {provider}",
+  "auth.oidcCancelled": "Sign-in was cancelled at the provider.",
+  "auth.oidcExpired": "That sign-in attempt expired or was started in another window. Start again.",
+  "auth.oidcUnavailable":
+    "The sign-in provider could not be reached. This is not a problem with your account — try again shortly, or tell whoever runs this installation.",
+  "auth.oidcNoEmail":
+    "Your account at the sign-in provider has no email address, so an account cannot be created for it. An administrator of the provider needs to add one.",
+  "auth.oidcEmailUnverified":
+    "Your email address at the sign-in provider is not verified, so it cannot be used to sign in here. Verify it there and try again.",
+  "auth.oidcFailed": "Sign-in through the provider did not succeed. Start again.",
 
   "setup.title": "Create the first administrator",
   "setup.lead":

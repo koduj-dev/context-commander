@@ -240,3 +240,35 @@ hand and absent on six test runs out of six, so waiting for occurrence 2 just
 hangs for the full timeout. `internal/directory/ldap_integration_test.go` does
 this, and then still binds from the host before handing the URL to any test,
 because a log line is not a bound port.
+
+## A nil pointer in an interface is not a nil interface
+
+`Deps.Directory` is a `directory.Authenticator`, and the adapter closes the
+LDAP path with `if d.Directory != nil`. `ldapFromFlags` used to return a
+`*directory.LDAP`, and with no `--ldap-url` that was a nil pointer — which,
+once stored in the interface, makes the interface **non-nil**: it holds a type
+and no value. So on every server *without* LDAP, `GET /v1/auth/methods`
+called `Provider()` on nil and panicked, and every wrong password fell
+through to the "directory" and panicked too. It shipped for three weeks.
+
+Nothing caught it because every handler test builds `Deps` by hand and simply
+leaves the field unset, which is a genuine nil interface. Only the flags path
+produced the typed nil, and only running `ccd serve` itself exercised that.
+
+The rule: a constructor whose result goes into an interface field returns
+the interface, with an explicit `return nil, nil` for "not configured". And a
+test for it must assign the result to the interface before comparing — a nil
+`*LDAP` compares equal to nil right up until it is wrapped, so checking the
+pointer passes against the bug (`adapters/cli/serve_directory_test.go`).
+
+## Keycloak's cookies are `Secure`, even on plain-HTTP `start-dev`
+
+A browser sends them to `http://127.0.0.1` anyway, because loopback is a
+secure context. A scripted client usually does not: Python's `http.cookiejar`
+withholds `Secure` cookies over http, so the login form POST arrives without
+`AUTH_SESSION_ID` and Keycloak answers **400 with an empty body** — which
+reads as a broken form rather than a missing cookie. The Go integration tests
+drive the same login over plain http with `net/http/cookiejar` and pass, so
+that jar evidently does not withhold them — which is why they never showed
+it. When driving the OIDC flow from a script, clear the `secure` flag in the
+jar.

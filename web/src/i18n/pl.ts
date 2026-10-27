@@ -58,6 +58,17 @@ export const pl: Partial<Record<MessageKey, string>> = {
     "Osobisty token dostępu utworzony poleceniem {command}. Jest wymieniany na sesję i nie zapisuje się w tej przeglądarce.",
   "auth.tokenFailed": "Ten token nie został przyjęty.",
   "auth.rateLimited": "Zbyt wiele prób. Odczekaj chwilę i spróbuj ponownie.",
+  "auth.withProvider": "Zaloguj się przez {provider}",
+  "auth.oidcCancelled": "Logowanie zostało anulowane u dostawcy logowania.",
+  "auth.oidcExpired":
+    "Ta próba logowania wygasła albo została rozpoczęta w innym oknie. Zacznij od nowa.",
+  "auth.oidcUnavailable":
+    "Nie udało się połączyć z dostawcą logowania. To nie wina Twojego konta — spróbuj za chwilę albo powiadom osobę administrującą tą instalacją.",
+  "auth.oidcNoEmail":
+    "Twoje konto u dostawcy logowania nie ma adresu e-mail, więc nie można utworzyć dla niego konta. Musi go dodać osoba administrująca dostawcą.",
+  "auth.oidcEmailUnverified":
+    "Twój adres e-mail u dostawcy logowania nie jest zweryfikowany, więc nie można nim się tu zalogować. Zweryfikuj go tam i spróbuj ponownie.",
+  "auth.oidcFailed": "Logowanie przez dostawcę nie powiodło się. Zacznij od nowa.",
   "auth.indistinct":
     "Błędne hasło, adres bez konta i konto bez hasła czyta się tu identycznie. Powiedzenie, który to przypadek, zdradziłoby zgadującemu, że połowa jego domysłu była trafna.",
   "setup.title": "Utwórz pierwsze konto administracyjne",

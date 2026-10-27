@@ -45,6 +45,18 @@ export const de: Partial<Record<MessageKey, string>> = {
     "Ein persönliches Zugriffstoken aus {command}. Es wird gegen eine Sitzung getauscht und nicht in diesem Browser gespeichert.",
   "auth.tokenFailed": "Dieses Token wurde nicht akzeptiert.",
   "auth.rateLimited": "Zu viele Versuche. Warten Sie einen Moment und versuchen Sie es erneut.",
+  "auth.withProvider": "Mit {provider} anmelden",
+  "auth.oidcCancelled": "Die Anmeldung wurde beim Anmeldedienst abgebrochen.",
+  "auth.oidcExpired":
+    "Dieser Anmeldeversuch ist abgelaufen oder wurde in einem anderen Fenster gestartet. Beginnen Sie erneut.",
+  "auth.oidcUnavailable":
+    "Der Anmeldedienst war nicht erreichbar. Das liegt nicht an Ihrem Konto — versuchen Sie es in Kürze erneut, oder sagen Sie es der Person, die diese Installation betreibt.",
+  "auth.oidcNoEmail":
+    "Ihr Konto beim Anmeldedienst hat keine E-Mail-Adresse, daher kann dafür kein Konto angelegt werden. Die Administration des Anmeldedienstes muss eine hinzufügen.",
+  "auth.oidcEmailUnverified":
+    "Ihre E-Mail-Adresse beim Anmeldedienst ist nicht bestätigt und kann deshalb hier nicht zur Anmeldung dienen. Bestätigen Sie sie dort und versuchen Sie es erneut.",
+  "auth.oidcFailed":
+    "Die Anmeldung über den Anmeldedienst ist nicht gelungen. Beginnen Sie erneut.",
   "auth.indistinct":
     "Ein falsches Passwort, eine Adresse ohne Konto und ein Konto ohne Passwort lesen sich hier gleich. Zu sagen, welcher Fall vorliegt, würde jedem, der rät, verraten, dass die Hälfte seiner Vermutung richtig war.",
   "setup.title": "Erstes Administratorkonto anlegen",

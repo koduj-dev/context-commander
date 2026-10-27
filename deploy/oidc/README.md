@@ -77,6 +77,31 @@ linking path seen from the other side.
 | `alice` | `oidc-dev-password` | just-in-time provisioning of a brand new account |
 | `bob` | `oidc-dev-password` | a second account, for linking and listing |
 | `dave` | `oidc-dev-password` | links to a local account whose email differs in case |
+| `erin` | `oidc-dev-password` | **email not verified** — the server must refuse to provision her, because provisioning links to existing accounts by address |
+
+Unlike a missing email, an unverified one *can* be seeded: with the realm's
+`verifyEmail` off, Keycloak lets `erin` sign in and issues an ID token with
+`email_verified: false`, which is exactly the case to refuse.
+
+## Running the server against it
+
+    printf 'oidc-dev-client-secret\n' > /tmp/oidc-secret
+    ./bin/ccd serve --addr 127.0.0.1:12001 \
+      --oidc-issuer http://127.0.0.1:18081/realms/context-commander \
+      --oidc-client-id context-commander \
+      --oidc-client-secret-file /tmp/oidc-secret \
+      --oidc-redirect-url http://127.0.0.1:12001/v1/auth/oidc/callback \
+      --oidc-name keycloak --oidc-label Keycloak
+
+Port 12001 because that is what the realm registers as a redirect URI, and a
+provider matches redirect URIs byte for byte: `localhost` and `127.0.0.1` are
+two different callbacks, and both are registered so either works — but the
+`--oidc-redirect-url` you pass must be the one the browser will actually be
+sent back to.
+
+The issuer must be spelled the way discovery reports it. `start-dev` derives
+it from the request's host, so asking for `http://localhost:18081/...` and
+then browsing to `127.0.0.1` gives two issuers, and the ID token is refused.
 
 Sign-in must request `openid profile email`. Asking for less is how the
 no-email path above is reached, so it is not a safe default here.

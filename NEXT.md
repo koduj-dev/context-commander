@@ -162,9 +162,19 @@ Only on top of a core loop people actually use:
         reporting it so the sign-in screen asks for an email **or** a
         username. Tested against a real slapd (`deploy/ldap/`, brought up by
         `--profile ldap` or by the package's own container).
-      - [ ] OIDC: authorization code + PKCE with discovery. No SAML — a second
+      - [x] ~~OIDC~~ Closed 2026-10-27: authorization code + PKCE with
+        discovery (`internal/directory/oidc.go`, `--oidc-issuer` and the flags
+        beside it), tested against a real Keycloak. No SAML — a second
         protocol whose security-critical core is XML signature verification,
         for deployments this product does not have yet.
+      - [ ] **Entra ID cannot sign in yet.** It does not send
+        `email_verified`, and an unverified address is refused because
+        provisioning links to existing accounts by email. Trusting Entra's
+        addresses (it verifies them for its own tenant users, not for guests)
+        is a per-provider decision, and the switch for it should name the
+        provider rather than turn the check off for all of them.
+      - [ ] One OIDC provider per installation. `Deps.OIDC` and the sign-in
+        screen already take a list; only the flags configure one.
       - Group-to-role mapping is a separate decision. A directory proves who
         someone is, not what they may do; authorization stays in project and
         organization membership and `installation_admins`.
@@ -285,12 +295,22 @@ the screen rather than showing a control that would fail.
   - **What an admin actually asks**, which is neither: "what can this agent
     reach?" That is its project memberships, and nothing lists them for a
     principal other than the caller — `/me/projects` is self-only.
+    **Decided by the maintainer 2026-10-27: an installation admin does not
+    get this.** The admin tier stays as blind to users' data as it can be —
+    the boundary migration 000024 draws, counts and never paths. If "what can
+    this agent reach" is ever answered, it is answered for whoever is
+    accountable for the agent, not for the admin tier.
 
 - [ ] **Service principal names are not unique** while user emails are
   (`migrations/000001`). Two agents may share a name, which makes a name a
   poor thing to identify one by. Recorded in
   `internal/identity/duplicate_integration_test.go`; adding the constraint
-  needs a migration and a decision about existing rows.
+  needs a migration and a decision about existing rows. **Maintainer,
+  2026-10-27: unique, but within one user's or one project's namespace**
+  rather than installation-wide. Agents have no namespace today
+  (`service_principals` has only `created_by`, which is nullable), so which
+  of the two scopes it is — and what owns the name when its creator is gone —
+  is the open part.
 - [ ] Project templates — agreed in the mockups (`templates.html`), no
   schema and no endpoint.
 
@@ -557,7 +577,7 @@ feature.
 Independent of the above and pickable any time, but none of it is free of a
 decision any more (the cheap ones — the `docs/README.md` index, organization
 member lists, `GET .../conversations` — shipped): the two agent items under
-"UI" above (what an admin may see of an agent's projects crosses the
-boundary migration 000024 draws; unique names need a rule for existing
-duplicates) and project templates. CI hardening unblocks itself the day the
+"UI" above (an admin will not see an agent's projects — decided; unique
+names need a scope and a rule for existing duplicates) and project
+templates. CI hardening unblocks itself the day the
 repo goes public.

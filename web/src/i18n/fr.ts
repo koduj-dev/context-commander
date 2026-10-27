@@ -61,6 +61,17 @@ export const fr: Partial<Record<MessageKey, string>> = {
     "Un token d’accès personnel créé avec {command}. Il est échangé contre une session et n’est pas conservé dans ce navigateur.",
   "auth.tokenFailed": "Ce token n’a pas été accepté.",
   "auth.rateLimited": "Trop de tentatives. Patientez un instant puis réessayez.",
+  "auth.withProvider": "Se connecter avec {provider}",
+  "auth.oidcCancelled": "La connexion a été annulée chez le fournisseur.",
+  "auth.oidcExpired":
+    "Cette tentative de connexion a expiré ou a été lancée dans une autre fenêtre. Recommencez.",
+  "auth.oidcUnavailable":
+    "Le fournisseur de connexion n’a pas pu être joint. Cela ne vient pas de votre compte : réessayez dans un instant, ou prévenez la personne qui administre cette installation.",
+  "auth.oidcNoEmail":
+    "Votre compte chez le fournisseur de connexion n’a pas d’adresse e-mail ; aucun compte ne peut donc être créé pour lui. La personne qui administre le fournisseur doit en ajouter une.",
+  "auth.oidcEmailUnverified":
+    "Votre adresse e-mail chez le fournisseur de connexion n’est pas vérifiée ; elle ne peut donc pas servir à vous connecter ici. Vérifiez-la là-bas puis réessayez.",
+  "auth.oidcFailed": "La connexion via le fournisseur n’a pas abouti. Recommencez.",
   "auth.indistinct":
     "Un mot de passe erroné, une adresse sans compte et un compte sans mot de passe se lisent de la même façon ici. Préciser lequel reviendrait à dire à celui qui devine que la moitié de sa supposition était juste.",
   "setup.title": "Créer le premier compte d’administration",

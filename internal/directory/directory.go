@@ -63,9 +63,10 @@ type Identity struct {
 	DisplayName string
 }
 
-// Authenticator is what a directory backend implements. OIDC will satisfy a
-// different shape — it is a redirect flow, not a password check — but
-// everything after the Identity is returned is shared.
+// Authenticator is what a password-checking directory backend implements.
+// OIDC is a redirect flow rather than a password check and implements
+// RedirectAuthenticator instead, but everything after the Identity is
+// returned is shared.
 type Authenticator interface {
 	// Provider returns the configured name, for user_identities and for the
 	// sign-in screen's method list.
@@ -74,3 +75,25 @@ type Authenticator interface {
 	// Authenticate verifies an identifier and password.
 	Authenticate(ctx context.Context, identifier, password string) (Identity, error)
 }
+
+// RedirectAuthenticator is a provider the browser is sent to and returns
+// from — OpenID Connect. The caller owns the AuthRequest between the two
+// halves (a cookie, for the HTTP adapter) and checks its state; the provider
+// verifies everything it was handed back.
+type RedirectAuthenticator interface {
+	// Provider returns the configured name, for user_identities and the
+	// sign-in URL.
+	Provider() string
+
+	// Label is what the sign-in button says.
+	Label() string
+
+	// AuthCodeURL is where to send the browser for this attempt.
+	AuthCodeURL(req AuthRequest) (string, error)
+
+	// Exchange redeems the code the provider returned and reports who
+	// signed in.
+	Exchange(ctx context.Context, code string, req AuthRequest) (Identity, error)
+}
+
+var _ RedirectAuthenticator = (*OIDC)(nil)

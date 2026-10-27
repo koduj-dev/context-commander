@@ -105,3 +105,16 @@ The integration tests (`internal/directory`) start their own container from
 the same `deploy/ldap/*.ldif`, so they need Docker but not this service. If
 you edit a seed file, see `docs/gotchas.md` — the image bootstraps once, on a
 fresh volume, and the way to redo it is **not** `down -v`.
+
+## The OIDC provider for working on sign-in
+
+`docker compose -f deploy/docker-compose.yml --profile oidc up -d` brings up a
+Keycloak with the `context-commander` realm on `127.0.0.1:18081`. The command
+that points `ccd serve` at it, the seeded users and what each one is for, and
+the traps that had to be measured rather than assumed are all in
+[`deploy/oidc/README.md`](../deploy/oidc/README.md) — kept there, next to the
+realm file, rather than copied here where it would drift.
+
+The integration tests in `internal/directory` start their own Keycloak from
+the same realm file, so they need nothing from compose; it adds about thirty
+seconds to that package's run.

@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useT } from "../i18n";
+import type { MessageKey } from "../i18n/en";
 import { useAuth } from "../app/auth";
 import { Solo } from "../app/Solo";
 import { Btn, Code, Note, Panel, Seg, TextField } from "../ui";
@@ -16,10 +17,48 @@ import { ApiError } from "../lib/api";
  * A token is a sign-in method, not a stored credential. It is posted once,
  * exchanged for a session cookie, and never kept here — which is why there is
  * no longer anything in localStorage for an XSS to steal.
+ *
+ * A single sign-on provider is a link out, not a form: the browser goes to
+ * the provider and comes back to /v1/auth/oidc/callback, which either sets
+ * the session cookie and lands here signed in, or lands here with
+ * `?sign_in_error=` naming one of the reasons below.
  */
+
+// The server sends a code from this fixed set and never the provider's own
+// text (adapters/http/oidc.go). Written out rather than derived from the code
+// so the i18n check can see every key is rendered.
+const oidcErrors: Record<string, MessageKey> = {
+  oidc_cancelled: "auth.oidcCancelled",
+  oidc_expired: "auth.oidcExpired",
+  oidc_unavailable: "auth.oidcUnavailable",
+  oidc_no_email: "auth.oidcNoEmail",
+  oidc_email_unverified: "auth.oidcEmailUnverified",
+  oidc_failed: "auth.oidcFailed",
+};
+
+/**
+ * Reads the callback's reason once and removes it from the address bar, so a
+ * reload or a bookmark does not show a failure from an attempt long gone.
+ */
+function takeSignInError(): string | null {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get("sign_in_error");
+  if (code === null) return null;
+  params.delete("sign_in_error");
+  const rest = params.toString();
+  window.history.replaceState(
+    null,
+    "",
+    window.location.pathname + (rest ? `?${rest}` : "") + window.location.hash,
+  );
+  return code;
+}
+
 export function SignIn() {
   const t = useT();
   const { methods, signInWithPassword, signInWithToken } = useAuth();
+  const providers = methods.filter((m) => m.kind === "oidc" && m.id);
+  const [returned] = useState(takeSignInError);
 
   const hasPassword = methods.length === 0 || methods.some((m) => m.kind === "password");
   const hasToken = methods.length === 0 || methods.some((m) => m.kind === "token");
@@ -37,7 +76,13 @@ export function SignIn() {
   const [password, setPassword] = useState("");
   const [token, setToken] = useState("");
   const [busy, setBusy] = useState(false);
-  const [failure, setFailure] = useState<string | null>(null);
+  const [failure, setFailure] = useState<string | null>(() => {
+    if (returned === null) return null;
+    // A code this build does not know still means sign-in failed; saying
+    // nothing would leave the person back at the form with no idea why.
+    const key = oidcErrors[returned];
+    return key ? t(key) : t("auth.oidcFailed");
+  });
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -71,6 +116,24 @@ export function SignIn() {
   return (
     <Solo>
       <Panel title={t("auth.title")}>
+        {providers.length > 0 && (
+          <div className="row wrap mb">
+            {providers.map((p) => (
+              <Btn
+                key={p.id}
+                kind="primary"
+                // A full navigation, not a fetch: the provider's login page
+                // has to be shown to the person, and the callback sets the
+                // session cookie on the way back.
+                onClick={() =>
+                  window.location.assign(`/v1/auth/oidc/${encodeURIComponent(p.id!)}/start`)
+                }
+              >
+                {t("auth.withProvider", { provider: p.label || p.id! })}
+              </Btn>
+            ))}
+          </div>
+        )}
         {hasPassword && hasToken && (
           <div className="row mb">
             <Seg

@@ -50,6 +50,8 @@ func TestMain(m *testing.M) {
 	ldapURL = url
 	code := m.Run()
 	terminate()
+	// Started lazily by the OIDC tests, and a no-op if none of them ran.
+	stopKeycloak()
 	os.Exit(code)
 }
 

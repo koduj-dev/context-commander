@@ -103,6 +103,9 @@ func (d Deps) listAuthMethods(w http.ResponseWriter, _ *http.Request) {
 	if d.Directory != nil {
 		methods = append(methods, authMethod{Kind: "ldap", ID: d.Directory.Provider()})
 	}
+	for _, p := range d.OIDC {
+		methods = append(methods, authMethod{Kind: "oidc", ID: p.Provider(), Label: p.Label()})
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"methods": methods})
 }
 
@@ -252,17 +255,11 @@ func (d Deps) recordSignInFailure(r *http.Request, reason string, kind security.
 // caller now is. Shared by password sign-in and by first-run setup, which
 // must leave the new administrator signed in rather than at a login form.
 func (d Deps) issueSessionResponse(w http.ResponseWriter, r *http.Request, principalID uuid.UUID) {
-	token, cred, err := identity.IssueSession(r.Context(), d.Pool, principalID)
+	expires, err := d.startSession(w, r, principalID)
 	if err != nil {
 		internalError(w, r, err, "could not start a session")
 		return
 	}
-
-	expires := time.Now().Add(identity.SessionLifetime)
-	if cred.ExpiresAt != nil {
-		expires = *cred.ExpiresAt
-	}
-	d.setSessionCookie(w, token, expires)
 
 	// The token is deliberately NOT in the body. It is in the cookie, which
 	// the page cannot read, and putting a copy in the response would hand it
@@ -270,6 +267,22 @@ func (d Deps) issueSessionResponse(w http.ResponseWriter, r *http.Request, princ
 	writeJSON(w, http.StatusOK, map[string]any{
 		"expires_at": expires.UTC().Format(time.RFC3339),
 	})
+}
+
+// startSession mints a session and sets its cookie. Split from
+// issueSessionResponse because the OIDC callback ends in a redirect, not a
+// JSON body, and must still start the session the same way.
+func (d Deps) startSession(w http.ResponseWriter, r *http.Request, principalID uuid.UUID) (time.Time, error) {
+	token, cred, err := identity.IssueSession(r.Context(), d.Pool, principalID)
+	if err != nil {
+		return time.Time{}, err
+	}
+	expires := time.Now().Add(identity.SessionLifetime)
+	if cred.ExpiresAt != nil {
+		expires = *cred.ExpiresAt
+	}
+	d.setSessionCookie(w, token, expires)
+	return expires, nil
 }
 
 // signOut revokes the session the cookie names and clears it.

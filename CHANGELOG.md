@@ -12,6 +12,39 @@ link definition at the bottom of the file.
 
 ### Added
 
+- **Sign-in through OpenID Connect** — the second directory backend
+  [ADR 0019](docs/adr/0019-browser-authentication-and-directory-identity.md)
+  decided, after LDAP. Authorization code flow with PKCE and discovery, so one
+  implementation covers Keycloak, Google, Entra ID, Okta, Authentik and GitLab.
+  `ccd serve --oidc-issuer … --oidc-client-id … --oidc-redirect-url …` with
+  the secret from `--oidc-client-secret-file` or `$CC_OIDC_CLIENT_SECRET`
+  (never an argument, which `ps` shows to everyone).
+  - `GET /v1/auth/oidc/{provider}/start` and `GET /v1/auth/oidc/callback`.
+    The attempt's state, nonce and PKCE verifier ride in an HttpOnly cookie
+    scoped to `/v1/auth/oidc`, live ten minutes and are spent on the first
+    callback, so a replayed callback starts nothing.
+  - Verified: the ID token's signature, issuer, audience and expiry
+    (`coreos/go-oidc`), and its **nonce**, which that library leaves to the
+    caller and without which a token from another attempt would be accepted.
+  - **An unverified email is refused**, not provisioned. Provisioning links to
+    an existing local account by address, so accepting `email_verified: false`
+    would let anyone who can type a colleague's address into their profile at
+    the provider sign in as that colleague here. Entra ID does not send the
+    claim at all and is refused for the same reason until there is a decision
+    about trusting its addresses.
+  - Discovery happens on the first sign-in, not at startup: a provider that is
+    down costs that one method rather than the whole server, and a typo in a
+    flag still stops the server from starting.
+  - The sign-in screen shows a button per provider from `/v1/auth/methods` and
+    says why a sign-in came back failed — cancelled, expired, provider
+    unreachable, no address, unverified address — in all six languages. The
+    provider's own error text is never shown or put in a URL.
+  - Tested against a real Keycloak (`deploy/oidc/`), with a new seeded user
+    `erin` whose address is unverified. Rejection tests assert *where* the
+    refusal came from — a wrong nonce must be refused by our check, a wrong
+    PKCE verifier and a reused code by the provider — because a test that
+    only expects "some error" passes for the wrong reason just as happily.
+
 - **An administrator can give a new account a password.** Creating a user and
   having no way to let anyone into it was a hole in the sign-in work that
   preceded it: the first-run setup code is gone once the installation has a
@@ -772,6 +805,21 @@ link definition at the bottom of the file.
     would change which binding wins) and the member lists (bounded sets).
 
 ### Fixed
+
+- **Every server without LDAP answered the sign-in screen, and every mistyped
+  password, with a 500.** Present since LDAP sign-in landed (2026-10-06).
+  `ldapFromFlags` returned a nil `*directory.LDAP`, which stored in the
+  `Deps.Directory` interface is not a nil interface — so `d.Directory != nil`
+  held, `GET /v1/auth/methods` panicked naming the provider, and a failed
+  local password fell through to a "directory" that was a nil pointer. The
+  UI's fallback (show both forms when the methods probe fails) hid the first
+  half; the second read as "the server is broken" to anyone who typed a
+  password wrong. The adapter's tests build `Deps` by hand and could not see
+  it; found by running `ccd serve` itself for the OIDC work.
+  - `ldapFromFlags` now returns the interface with an explicit nil, and
+    `adapters/cli/serve_directory_test.go` assigns its result to the
+    interface exactly as `Deps` does — checked to fail against the old
+    signature, since comparing the pointer directly passes against the bug.
 
 - **Creating a user with an address someone already had answered 500.**
   `users.email` is UNIQUE, and the constraint violation travelled to the

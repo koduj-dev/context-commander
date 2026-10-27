@@ -41,6 +41,18 @@ export const es: Partial<Record<MessageKey, string>> = {
     "Un token de acceso personal creado con {command}. Se canjea por una sesión y no se guarda en este navegador.",
   "auth.tokenFailed": "Ese token no se ha aceptado.",
   "auth.rateLimited": "Demasiados intentos. Espere un momento y vuelva a intentarlo.",
+  "auth.withProvider": "Iniciar sesión con {provider}",
+  "auth.oidcCancelled": "Se canceló el inicio de sesión en el proveedor.",
+  "auth.oidcExpired":
+    "Ese intento de inicio de sesión ha caducado o se inició en otra ventana. Vuelva a empezar.",
+  "auth.oidcUnavailable":
+    "No se ha podido contactar con el proveedor de inicio de sesión. No es un problema de su cuenta: inténtelo de nuevo en un momento o avise a quien administra esta instalación.",
+  "auth.oidcNoEmail":
+    "Su cuenta en el proveedor de inicio de sesión no tiene dirección de correo, así que no se puede crear una cuenta para ella. Quien administra el proveedor debe añadirla.",
+  "auth.oidcEmailUnverified":
+    "Su dirección de correo en el proveedor de inicio de sesión no está verificada, así que no puede usarse para entrar aquí. Verifíquela allí y vuelva a intentarlo.",
+  "auth.oidcFailed":
+    "El inicio de sesión a través del proveedor no se ha completado. Vuelva a empezar.",
   "auth.indistinct":
     "Una contraseña incorrecta, una dirección sin cuenta y una cuenta sin contraseña se leen igual aquí. Decir cuál es el caso revelaría a quien está adivinando que la mitad de su suposición era correcta.",
   "setup.title": "Crear la primera cuenta de administración",
