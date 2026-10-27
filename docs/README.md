@@ -62,6 +62,7 @@ supersedes it, so the trail of what was believed when stays readable.
 | [0019](adr/0019-browser-authentication-and-directory-identity.md) | Browser sign-in through sessions, local passwords and directory identity (LDAP, OIDC) |
 | [0020](adr/0020-oidc-sign-up-is-off-by-default.md) | OIDC sign-up is off by default; sign-in can be limited to domains |
 | [0021](adr/0021-storage-quotas-per-namespace.md) | Storage quotas per namespace, counted by the database |
+| [0022](adr/0022-plans-phases-and-presence.md) | Plans, phases and who is working on what |
 
 ## Not documentation
 

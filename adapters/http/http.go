@@ -30,6 +30,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/installation"
 	"github.com/koduj-dev/context-commander/internal/members"
 	"github.com/koduj-dev/context-commander/internal/organizations"
+	"github.com/koduj-dev/context-commander/internal/plans"
 	"github.com/koduj-dev/context-commander/internal/projects"
 	"github.com/koduj-dev/context-commander/internal/ratelimit"
 	"github.com/koduj-dev/context-commander/internal/secrets"
@@ -55,6 +56,7 @@ type Deps struct {
 	Secrets       *secrets.Service
 	Installation  *installation.Service
 	ContextPack   *contextpack.Service
+	Plans         *plans.Service
 	// Security records refusals and Limiter bounds them. Both are safe to
 	// leave nil — a nil *security.Recorder records nothing and a nil
 	// *ratelimit.Limiter allows everything, which is what the CLI and the
@@ -154,6 +156,8 @@ func NewHandler(deps Deps) http.Handler {
 			r.Put("/me/password", deps.changeOwnPassword)
 			r.Get("/me/sessions", deps.listOwnSessions)
 			r.Get("/me/storage", deps.getMyStorage)
+			// Where everyone is, across every project the caller is in.
+			r.Get("/me/presence", deps.getMyPresence)
 			r.Delete("/me/sessions/{id}", deps.revokeOwnSession)
 			r.Delete("/me/tokens/{id}", deps.revokeToken)
 
@@ -228,6 +232,28 @@ func NewHandler(deps Deps) http.Handler {
 					r.Get("/{handoffID}", deps.getHandoff)
 					r.Post("/{handoffID}/claim", deps.claimHandoff)
 					r.Post("/{handoffID}/close", deps.closeHandoff)
+				})
+
+				// Plans, phases and presence (docs/adr/0022). Static segments
+				// ("board", "search", "items", "presence") are registered
+				// before "/{planID}": chi prefers them, so none is read as an id.
+				r.Route("/plans", func(r chi.Router) {
+					r.Get("/board", deps.getPlanBoard)
+					r.Get("/search", deps.searchPlans)
+					r.Post("/presence", deps.reportPresence)
+					r.Delete("/presence", deps.clearPresence)
+					r.Patch("/items/{itemID}", deps.updatePlanItem)
+					r.Get("/items/{itemID}/history", deps.listPlanItemHistory)
+					r.Post("/", deps.createPlan)
+					r.Get("/{planID}", deps.getPlan)
+					r.Patch("/{planID}", deps.updatePlan)
+					r.Delete("/{planID}", deps.deletePlan)
+					r.Post("/{planID}/items", deps.addPlanItems)
+				})
+				r.Route("/phases", func(r chi.Router) {
+					r.Post("/", deps.createPhase)
+					r.Patch("/{phaseID}", deps.updatePhase)
+					r.Delete("/{phaseID}", deps.deletePhase)
 				})
 
 				r.Route("/conversations", func(r chi.Router) {

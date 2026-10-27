@@ -26,6 +26,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/installation"
 	"github.com/koduj-dev/context-commander/internal/members"
 	"github.com/koduj-dev/context-commander/internal/organizations"
+	"github.com/koduj-dev/context-commander/internal/plans"
 	"github.com/koduj-dev/context-commander/internal/projects"
 	"github.com/koduj-dev/context-commander/internal/ratelimit"
 	"github.com/koduj-dev/context-commander/internal/secrets"
@@ -51,6 +52,7 @@ type Deps struct {
 	Secrets       *secrets.Service
 	Installation  *installation.Service
 	ContextPack   *contextpack.Service
+	Plans         *plans.Service
 	// Both may be nil — a nil Recorder records nothing, a nil Limiter
 	// allows everything (see adapters/http.Deps).
 	Security *security.Recorder
@@ -141,7 +143,10 @@ func newServer(deps Deps, principalID, clientID uuid.UUID) *sdkmcp.Server {
 			"continue from, the effective skills' content, the artifacts to read, and an event cursor, " +
 			"so you do not need to learn the domain model to take a first useful step. Then claim the " +
 			"handoff (handoff.claim) before working, and close it or create a new one when you stop. " +
-			"The per-domain tools (artifact.*, skill.*, handoff.*, event.list) cover everything past " +
+			"plan.board shows what is done and who is working where. Record the plan you make with " +
+			"plan.create, mark steps with plan.update_item as you go, say where you are with plan.report " +
+			"every few minutes, and call plan.stop when you stop. " +
+			"The per-domain tools (artifact.*, skill.*, handoff.*, plan.*, event.list) cover everything past " +
 			"that. Every call acts on behalf of the authenticated principal for this session.",
 	})
 
@@ -152,6 +157,7 @@ func newServer(deps Deps, principalID, clientID uuid.UUID) *sdkmcp.Server {
 	registerOrganizationTools(server, deps, principalID, clientID)
 	registerAuditTools(server, deps, principalID, clientID)
 	registerHandoffTools(server, deps, principalID, clientID)
+	registerPlanTools(server, deps, principalID, clientID)
 	registerHistoryTools(server, deps, principalID, clientID)
 	registerSkillTools(server, deps, principalID, clientID)
 	registerGateTools(server, deps, principalID, clientID)

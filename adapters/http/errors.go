@@ -20,6 +20,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/members"
 	"github.com/koduj-dev/context-commander/internal/organizations"
 	"github.com/koduj-dev/context-commander/internal/paging"
+	"github.com/koduj-dev/context-commander/internal/plans"
 	"github.com/koduj-dev/context-commander/internal/projects"
 	"github.com/koduj-dev/context-commander/internal/quota"
 	"github.com/koduj-dev/context-commander/internal/secrets"
@@ -88,7 +89,7 @@ func writeDomainError(w http.ResponseWriter, r *http.Request, err error) {
 		errors.Is(err, organizations.ErrNotFound), errors.Is(err, handoffs.ErrNotFound), errors.Is(err, history.ErrNotFound),
 		errors.Is(err, skills.ErrNotFound), errors.Is(err, gates.ErrNotFound), errors.Is(err, secrets.ErrNotFound),
 		errors.Is(err, identity.ErrNotFound), errors.Is(err, installation.ErrNotFound),
-		errors.Is(err, contextpack.ErrNotFound):
+		errors.Is(err, contextpack.ErrNotFound), errors.Is(err, plans.ErrNotFound):
 		// A deleted artifact reads as "not found," not a distinct state —
 		// same reasoning as a non-member's Resolve: don't hand out more
 		// information than "you can't have this."
@@ -97,7 +98,7 @@ func writeDomainError(w http.ResponseWriter, r *http.Request, err error) {
 		errors.Is(err, audit.ErrForbidden), errors.Is(err, handoffs.ErrForbidden), errors.Is(err, history.ErrForbidden),
 		errors.Is(err, skills.ErrForbidden), errors.Is(err, gates.ErrForbidden), errors.Is(err, secrets.ErrForbidden),
 		errors.Is(err, installation.ErrForbidden), errors.Is(err, members.ErrForbidden),
-		errors.Is(err, contextpack.ErrForbidden), errors.Is(err, security.ErrForbidden):
+		errors.Is(err, contextpack.ErrForbidden), errors.Is(err, security.ErrForbidden), errors.Is(err, plans.ErrForbidden):
 		writeError(w, http.StatusForbidden, "forbidden", "forbidden")
 	case errors.Is(err, installation.ErrAlreadyAdmin):
 		writeError(w, http.StatusConflict, "conflict", "user is already an installation admin")
@@ -107,6 +108,10 @@ func writeDomainError(w http.ResponseWriter, r *http.Request, err error) {
 		// interface. Handlers that can say which field clashed answer before
 		// reaching here (createInstallationUser); this is the fallback.
 		writeError(w, http.StatusConflict, "conflict", "that already exists")
+	case errors.Is(err, plans.ErrConflict):
+		writeError(w, http.StatusConflict, "conflict", "version conflict: the plan was changed since your expected_version")
+	case errors.Is(err, plans.ErrInvalid), errors.Is(err, plans.ErrNoClient):
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
 	case errors.Is(err, artifacts.ErrConflict):
 		writeError(w, http.StatusConflict, "conflict", "version conflict: the artifact was modified since your expected_version")
 	case errors.Is(err, artifacts.ErrBlockedByGate):

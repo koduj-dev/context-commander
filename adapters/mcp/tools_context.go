@@ -22,11 +22,50 @@ type contextPackResult struct {
 	Role         string                  `json:"role"`
 	Capabilities []string                `json:"capabilities"`
 	Handoff      *contextHandoffResult   `json:"handoff,omitempty"`
+	Work         *contextWorkResult      `json:"work,omitempty"`
 	Artifacts    []contextArtifactResult `json:"artifacts"`
 	Skills       []contextSkillResult    `json:"skills"`
 	Events       contextEventsResult     `json:"events"`
 	Budget       contextBudgetResult     `json:"budget"`
 	AssembledAt  string                  `json:"assembled_at"`
+}
+
+// contextWorkResult is contextpack.WorkSection with string IDs.
+type contextWorkResult struct {
+	Phases     []contextpack.WorkPhase    `json:"phases,omitempty"`
+	OpenPlans  int                        `json:"open_plans"`
+	InProgress []contextWorkItemResult    `json:"in_progress,omitempty"`
+	Blocked    []contextWorkItemResult    `json:"blocked,omitempty"`
+	Present    []contextpack.WorkPresence `json:"present,omitempty"`
+	Truncated  bool                       `json:"truncated,omitempty"`
+}
+
+type contextWorkItemResult struct {
+	PlanID string `json:"plan_id"`
+	ItemID string `json:"item_id"`
+	Plan   string `json:"plan"`
+	Text   string `json:"text"`
+	Note   string `json:"note,omitempty"`
+	Who    string `json:"who,omitempty"`
+}
+
+func toContextWork(w *contextpack.WorkSection) *contextWorkResult {
+	if w == nil {
+		return nil
+	}
+	items := func(in []contextpack.WorkItem) []contextWorkItemResult {
+		var out []contextWorkItemResult
+		for _, it := range in {
+			out = append(out, contextWorkItemResult{
+				PlanID: it.PlanID.String(), ItemID: it.ItemID.String(), Plan: it.Plan, Text: it.Text, Note: it.Note, Who: it.Who,
+			})
+		}
+		return out
+	}
+	return &contextWorkResult{
+		Phases: w.Phases, OpenPlans: w.OpenPlans, InProgress: items(w.InProgress), Blocked: items(w.Blocked),
+		Present: w.Present, Truncated: w.Truncated,
+	}
 }
 
 type contextProjectResult struct {
@@ -108,6 +147,7 @@ func toContextPackResult(p contextpack.Pack, thisClientID uuid.UUID) contextPack
 		Artifacts:   make([]contextArtifactResult, 0, len(p.Artifacts)),
 		Skills:      make([]contextSkillResult, 0, len(p.Skills)),
 		AssembledAt: p.AssembledAt.Format(rfc3339),
+		Work:        toContextWork(p.Work),
 	}
 	if p.Handoff != nil {
 		h := contextHandoffResult{

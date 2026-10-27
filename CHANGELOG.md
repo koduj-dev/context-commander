@@ -12,6 +12,35 @@ link definition at the bottom of the file.
 
 ### Added
 
+- **Plans, phases and who is working where**
+  ([ADR 0022](docs/adr/0022-plans-phases-and-presence.md)). The plan an agent
+  makes for a task now has a place the whole team can see, and you can watch
+  live where each agent is.
+  - **Model:** a project has phases; a phase has plans; a plan has items. An
+    item is a task or an operational check, and its status is open,
+    in_progress, done, blocked or skipped. Anyone on the project who can write
+    may change any of it.
+  - **Encryption:** titles, plan text and item text are encrypted (ADR 0011).
+    A plan's text and all of its items' text are one blob, so ticking an item
+    re-encrypts nothing. Appends and item edits are merged on the server under
+    the plan's row lock. Only rewriting a plan's own title or text takes an
+    expected version.
+  - **Bounded history:** text edits keep none. An item keeps its last 20 real
+    status changes. Ticks write no audit or outbox rows. Effort is one
+    aggregated row per item and person, and presence is one row per client.
+  - **Presence:** `plan.report` is a heartbeat. Time is credited only between
+    reports that arrive within 15 minutes of each other. Tokens are counted
+    only when the client reports them, and are never estimated.
+  - **MCP tools:** `plan.board`, `plan.create`, `plan.get`, `plan.add_items`,
+    `plan.update_item`, `plan.update`, `plan.search`, `plan.report`,
+    `plan.stop`, `phase.create` and `phase.update`. `context.bootstrap` gains a
+    `work` section.
+  - **HTTP:** `/v1/projects/{ns}/{slug}/plans/...`, `/phases/...` and
+    `GET /v1/me/presence`.
+  - **Search:** the text is encrypted, so search decrypts the project's plans
+    and matches in Go.
+  - **Quota:** plan text counts against the namespace quota.
+
 - **Storage quotas per user and organization**
   ([ADR 0021](docs/adr/0021-storage-quotas-per-namespace.md)).
   - `serve --storage-quota 10GB` (or `$CC_STORAGE_QUOTA`) sets the default limit per

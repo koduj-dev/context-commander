@@ -108,6 +108,13 @@ type Pack struct {
 	// state (nothing has been handed over yet), not an error.
 	Handoff *HandoffSection `json:"handoff,omitempty"`
 
+	// Work is where the project's plans stand (docs/adr/0022): phases, what
+	// is in progress or blocked and by whom, and who is working where. An
+	// agent reads it before planning so it neither redoes nor collides with
+	// someone else's step. Nil when the project has no plans and nobody is
+	// present.
+	Work *WorkSection `json:"work,omitempty"`
+
 	Artifacts []ArtifactSection `json:"artifacts"`
 	Skills    []SkillSection    `json:"skills"`
 	Events    EventsSection     `json:"events"`
@@ -213,3 +220,41 @@ type TruncationNote struct {
 	SizeBytes int64  `json:"size_bytes,omitempty"` // what it would have cost, when known
 	Reason    string `json:"reason"`
 }
+
+// WorkSection is a short summary of plans.Board, capped so a busy project
+// does not crowd the rest of the pack out. plan.board has the whole of it.
+type WorkSection struct {
+	Phases     []WorkPhase    `json:"phases,omitempty"`
+	OpenPlans  int            `json:"open_plans"`
+	InProgress []WorkItem     `json:"in_progress,omitempty"`
+	Blocked    []WorkItem     `json:"blocked,omitempty"`
+	Present    []WorkPresence `json:"present,omitempty"`
+	// Truncated says a list was cut at MaxWorkEntries.
+	Truncated bool `json:"truncated,omitempty"`
+}
+
+type WorkPhase struct {
+	Title  string `json:"title"`
+	Status string `json:"status"`
+	Done   int    `json:"done"`
+	Total  int    `json:"total"`
+}
+
+type WorkItem struct {
+	PlanID uuid.UUID `json:"plan_id"`
+	ItemID uuid.UUID `json:"item_id"`
+	Plan   string    `json:"plan"`
+	Text   string    `json:"text"`
+	Note   string    `json:"note,omitempty"`
+	Who    string    `json:"who,omitempty"`
+}
+
+type WorkPresence struct {
+	Who      string `json:"who"`
+	Where    string `json:"where,omitempty"`
+	Activity string `json:"activity,omitempty"`
+	Idle     bool   `json:"idle"`
+}
+
+// MaxWorkEntries caps each list in WorkSection.
+const MaxWorkEntries = 10

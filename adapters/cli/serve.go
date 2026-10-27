@@ -35,6 +35,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/installation"
 	"github.com/koduj-dev/context-commander/internal/members"
 	"github.com/koduj-dev/context-commander/internal/organizations"
+	"github.com/koduj-dev/context-commander/internal/plans"
 	"github.com/koduj-dev/context-commander/internal/projects"
 	"github.com/koduj-dev/context-commander/internal/quota"
 	"github.com/koduj-dev/context-commander/internal/ratelimit"
@@ -172,6 +173,8 @@ func newServeCmd() *cobra.Command {
 			// Constructed last: it composes the services above and owns no
 			// storage of its own (internal/contextpack).
 			contextSvc := contextpack.NewService(pool, projStore, authz, artifactsSvc, skillsSvc, handoffsSvc, eventsSvc)
+			plansSvc := plans.NewService(pool, cryptoProvider, authz)
+			contextSvc.WithPlans(plansSvc)
 
 			// Structured logs to stderr. JSON by default: these lines are
 			// meant to be shipped and queried (CRA Annex I expects security
@@ -305,7 +308,7 @@ func newServeCmd() *cobra.Command {
 				Events: eventsSvc, Organizations: orgSvc, Audit: auditSvc,
 				Handoffs: handoffsSvc, History: historySvc,
 				Skills: skillsSvc, Gates: gatesAdmin, Secrets: secretsSvc,
-				Installation: installationSvc, ContextPack: contextSvc,
+				Installation: installationSvc, ContextPack: contextSvc, Plans: plansSvc,
 				Security: securityRec, Limiter: limiter,
 			}))
 			mux.Handle("/", cchttp.NewHandler(cchttp.Deps{
@@ -313,7 +316,7 @@ func newServeCmd() *cobra.Command {
 				Events: eventsSvc, Organizations: orgSvc, Audit: auditSvc,
 				Handoffs: handoffsSvc, History: historySvc,
 				Skills: skillsSvc, Gates: gatesAdmin, Secrets: secretsSvc,
-				Installation: installationSvc, ContextPack: contextSvc,
+				Installation: installationSvc, ContextPack: contextSvc, Plans: plansSvc,
 				Security: securityRec, Limiter: limiter, SecurityEvents: securitySvc,
 				FirstRun: firstRunCode,
 				// Nil unless --ldap-url was given, and a nil Directory is what

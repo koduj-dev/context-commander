@@ -16,6 +16,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/events"
 	"github.com/koduj-dev/context-commander/internal/handoffs"
 	"github.com/koduj-dev/context-commander/internal/paging"
+	"github.com/koduj-dev/context-commander/internal/plans"
 	"github.com/koduj-dev/context-commander/internal/projects"
 	"github.com/koduj-dev/context-commander/internal/skills"
 )
@@ -41,7 +42,10 @@ type Service struct {
 	artifacts *artifacts.Service
 	skills    *skills.Service
 	handoffs  *handoffs.Service
-	events    *events.Service
+	// plans is optional: a pack without it has no Work section, which is
+	// what every caller that predates docs/adr/0022 gets.
+	plans  *plans.Service
+	events *events.Service
 }
 
 func NewService(
@@ -53,6 +57,12 @@ func NewService(
 		pool: pool, projects: projectStore, authz: authz,
 		artifacts: artifactsSvc, skills: skillsSvc, handoffs: handoffsSvc, events: eventsSvc,
 	}
+}
+
+// WithPlans adds the Work section to every pack this service assembles.
+func (s *Service) WithPlans(p *plans.Service) *Service {
+	s.plans = p
+	return s
 }
 
 // budget tracks what is left to spend and records every omission, so
@@ -131,6 +141,7 @@ func (s *Service) Bootstrap(ctx context.Context, principalID, projectID uuid.UUI
 	s.fillEvents(ctx, principalID, projectID, opts, &pack, b)
 
 	referenced := s.fillHandoff(ctx, principalID, projectID, &pack, b)
+	s.fillWork(ctx, principalID, projectID, &pack, b)
 	if !opts.SkipSkills {
 		s.fillSkills(ctx, principalID, projectID, &pack, b)
 	}
@@ -249,6 +260,79 @@ func (s *Service) fillHandoff(ctx context.Context, principalID, projectID uuid.U
 		ReferencedArtifacts: body.ReferencedArtifacts,
 	}
 	return body.ReferencedArtifacts
+}
+
+// fillWork summarizes the project's plans. Like the handoff, it is small by
+// construction (capped lists of one-line entries) and charged to the budget
+// without being omitted for it: knowing who is already on a step is what
+// keeps two agents from doing it twice.
+func (s *Service) fillWork(ctx context.Context, principalID, projectID uuid.UUID, pack *Pack, b *budget) {
+	if s.plans == nil {
+		return
+	}
+	board, err := s.plans.Board(ctx, principalID, projectID)
+	if err != nil {
+		if !errors.Is(err, plans.ErrForbidden) {
+			b.note("work", "board", 0, reasonFor(err, "could not read the project's plans"))
+		}
+		return
+	}
+	if len(board.Plans) == 0 && len(board.Presence) == 0 && len(board.Phases) == 0 {
+		return
+	}
+
+	w := &WorkSection{}
+	size := 0
+	for _, ph := range board.Phases {
+		w.Phases = append(w.Phases, WorkPhase{Title: ph.Title, Status: ph.Status, Done: ph.Counts.Done, Total: ph.Counts.Total()})
+		size += len(ph.Title)
+	}
+	for _, p := range board.Plans {
+		if p.Status == plans.PlanActive || p.Status == plans.PlanDraft {
+			w.OpenPlans++
+		}
+	}
+	item := func(a plans.ActiveItem) WorkItem {
+		it := WorkItem{PlanID: a.PlanID, ItemID: a.Item.ID, Plan: a.PlanTitle, Text: a.Item.Text, Note: a.Item.Note}
+		if a.Item.Assignee != nil {
+			it.Who = board.People[*a.Item.Assignee].Name
+		}
+		size += len(it.Plan) + len(it.Text) + len(it.Note)
+		return it
+	}
+	for i, a := range board.InProgress {
+		if i == MaxWorkEntries {
+			w.Truncated = true
+			break
+		}
+		w.InProgress = append(w.InProgress, item(a))
+	}
+	for i, a := range board.Blocked {
+		if i == MaxWorkEntries {
+			w.Truncated = true
+			break
+		}
+		w.Blocked = append(w.Blocked, item(a))
+	}
+	now := time.Now()
+	for i, p := range board.Presence {
+		if i == MaxWorkEntries {
+			w.Truncated = true
+			break
+		}
+		where := p.PlanTitle
+		if p.ItemText != "" {
+			where = p.PlanTitle + " → " + p.ItemText
+		}
+		w.Present = append(w.Present, WorkPresence{Who: board.People[p.PrincipalID].Name, Where: where, Activity: p.Activity, Idle: p.Idle(now)})
+		size += len(where) + len(p.Activity)
+	}
+
+	if !b.fits(size) {
+		b.used += size
+		b.note("work", "board", int64(size), "included despite exceeding the budget: who is on what is needed to avoid duplicate work")
+	}
+	pack.Work = w
 }
 
 // fillSkills turns each effective binding into its actual content — the

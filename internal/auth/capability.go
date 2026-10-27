@@ -78,6 +78,12 @@ const (
 
 	CapHistoryRead  Capability = "history.read"
 	CapHistoryWrite Capability = "history.write"
+
+	// Plans, phases and presence (docs/adr/0022). Write is every role that
+	// can write artifacts: "anyone on the project" in the maintainer's words,
+	// where a reader is on the project to read.
+	CapPlanRead  Capability = "plan.read"
+	CapPlanWrite Capability = "plan.write"
 )
 
 // roleCapabilities is the single source of truth for what each role can do.
@@ -89,6 +95,7 @@ var roleCapabilities = map[projects.Role]map[Capability]bool{
 		CapProjectRead, CapMemberRead, CapArtifactRead, CapSkillRead,
 		CapEventRead, CapIntegrationRead,
 		CapHandoffRead, CapHistoryRead,
+		CapPlanRead,
 	),
 	projects.RoleContributor: setOf(
 		CapProjectRead, CapMemberRead, CapArtifactRead, CapSkillRead,
@@ -98,6 +105,7 @@ var roleCapabilities = map[projects.Role]map[Capability]bool{
 		CapSecretRead, CapSecretWrite,
 		CapSkillPublish,
 		CapHandoffRead, CapHandoffWrite, CapHistoryRead, CapHistoryWrite,
+		CapPlanRead, CapPlanWrite,
 	),
 	projects.RoleAdmin: setOf(
 		CapProjectRead, CapMemberRead, CapArtifactRead, CapSkillRead,
@@ -109,6 +117,7 @@ var roleCapabilities = map[projects.Role]map[Capability]bool{
 		CapSecretRead, CapSecretWrite,
 		CapSkillPublish, CapSkillOverride, CapGateManage,
 		CapHandoffRead, CapHandoffWrite, CapHistoryRead, CapHistoryWrite,
+		CapPlanRead, CapPlanWrite,
 		// No CapProjectDelete and no CapMemberGrantOwner — both are
 		// ownership-level actions, OWNER only
 		// (docs/architecture-cookbook.md §7.1: "no ownership transfer
@@ -126,6 +135,7 @@ var roleCapabilities = map[projects.Role]map[Capability]bool{
 		CapSecretRead, CapSecretWrite,
 		CapSkillPublish, CapSkillOverride, CapGateManage,
 		CapHandoffRead, CapHandoffWrite, CapHistoryRead, CapHistoryWrite,
+		CapPlanRead, CapPlanWrite,
 		CapProjectDelete, CapMemberGrantOwner,
 	),
 }
