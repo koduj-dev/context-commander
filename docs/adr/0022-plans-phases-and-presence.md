@@ -124,6 +124,20 @@ Effort is **aggregated, never logged**: `plan_item_effort` keeps one row per
   can pass them on. They are shown labelled "reported", per item and per
   phase, and are never estimated. A single report is capped, so one bad call
   cannot add a billion.
+- **Tokens are kept as four counts:** fresh input, output, cache reads and
+  cache writes (migration 000032). They were added because the maintainer
+  wants to judge whether the API would cost less than a subscription, and the
+  four are priced differently. For an agent, nearly all input is cache reads:
+  one Claude Code session measured on 2026-10-27 had about 1k fresh input
+  tokens and about 127M read from cache.
+- **How tokens reach the server:**
+  - Claude Code's are sent by a `Stop` hook,
+    `deploy/mcp-clients/claude-code-usage-hook.py`. It reads exact usage from
+    the session transcript and posts deltas to `POST /v1/me/usage`.
+  - The server credits them to wherever this credential last reported, without
+    moving it, and counts the post as a heartbeat.
+  - A client that never reported a step gets its tokens dropped, not guessed
+    onto one.
 
 ### Surfaces
 
