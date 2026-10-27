@@ -11,8 +11,8 @@ PAT" (`web/src/pages/SignIn.tsx`), and the only way to obtain a PAT is
 `ccd token create` on the machine that runs the server. So the documented
 first-run experience for a self-hosted product is: install it, then get a
 shell on the host and run a CLI before anyone can look at it. The maintainer
-named this directly on 2026-10-06 — *"abych si vyrobil ten PAT, tak musím mít
-CCD — což je na nic"* — and it is the same chicken-and-egg ADR 0009 solved for
+named this directly on 2026-10-06 — *"to create that PAT I first need ccd itself —
+which defeats the point"* — and it is the same chicken-and-egg ADR 0009 solved for
 the API and never solved for the browser.
 
 Two further gaps make this one decision rather than three. The deployment the

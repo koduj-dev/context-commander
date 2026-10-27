@@ -63,7 +63,7 @@ clean:
 
 # Integration tests spin up a real Postgres via testcontainers-go
 # (internal/dbtest) — Docker must be running. Real DB, not mocks: see
-# docs/architecture-cookbook.md "Testování".
+# docs/testing.md "Why integration tests use a real Postgres, not mocks".
 test:
 	go test ./... -race -count=1
 

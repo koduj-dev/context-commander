@@ -15,7 +15,7 @@ For behaviours of the app itself that are easy to get wrong, see
   *and* for the test suite: `make test` runs real integration tests against a
   disposable Postgres via `testcontainers-go` (`internal/dbtest`), not mocks.
   Multi-tenant RLS bugs only show up against the real thing — see
-  `docs/architecture-cookbook.md` "Testování" and
+  [`docs/testing.md`](testing.md#why-integration-tests-use-a-real-postgres-not-mocks) and
   [ADR 0002](adr/0002-non-recursive-rls.md).
 
 ## Local services

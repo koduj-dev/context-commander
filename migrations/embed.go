@@ -1,8 +1,8 @@
 // Package migrations embeds the golang-migrate SQL files into the ccd
 // binary itself, so `ccd migrate` (and the integration test suite) don't
-// need the migrations/ directory to exist on disk at runtime — see
-// docs/architecture-cookbook.md §21 ("cmd/ccd: jediný binary: server +
-// migrace + CLI vstupní bod").
+// need the migrations/ directory to exist on disk at runtime: ccd is one
+// binary that is the server, the migrator and the CLI (see
+// docs/architecture-cookbook.md §21).
 package migrations
 
 import "embed"

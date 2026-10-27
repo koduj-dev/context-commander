@@ -25,8 +25,8 @@ type RootKeyProvider interface {
 }
 
 // EnvRootKeyProvider reads a base64-encoded 32-byte key from an environment
-// variable — the "lokálně env-based v1" provider from
-// docs/architecture-cookbook.md §14.2. A Vault/KMS-backed RootKeyProvider is
+// variable — the first, environment-based provider behind the
+// "KMS / Vault / master key provider" of docs/architecture-cookbook.md §14.2. A Vault/KMS-backed RootKeyProvider is
 // a drop-in replacement; nothing above this interface changes.
 type EnvRootKeyProvider struct {
 	key [KeySize]byte

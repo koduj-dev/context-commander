@@ -15,8 +15,8 @@ worse fit for the "self-hosted" pitch than an embedded database.
 
 The good news: nothing about the authorization model actually depends on Postgres. Row-Level
 Security was always specified as a *second* layer on top of `AuthzService.Can()`
-(`docs/architecture-cookbook.md` §4, and ADR 0002's own text: "RLS je druhá vrstva navíc k
-AuthzService, ne náhrada za ni"). `AuthzService.Can()` — called once from a central
+(`docs/architecture-cookbook.md` §4, and ADR 0002's own text: "Row-Level Security is defense-in-depth on top
+of `AuthzService.Can()`, not a replacement for it"). `AuthzService.Can()` — called once from a central
 middleware/interceptor before any repository call — is already required to be the actual source of
 truth. RLS exists to catch the case where that call was skipped by a bug, not to be the only thing
 standing between a request and another project's data.

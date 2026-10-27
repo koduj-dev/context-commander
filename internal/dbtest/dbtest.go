@@ -1,5 +1,6 @@
 // Package dbtest gives each integration test its own real Postgres
-// database — see docs/architecture-cookbook.md "Testování": real Postgres
+// database — see docs/testing.md "Why integration tests use a real Postgres,
+// not mocks": real Postgres
 // in CI, not mocks, because multi-tenant/RLS bugs only show up against the
 // real thing.
 //

@@ -115,7 +115,7 @@ func (s *Service) Write(
 	// ALLOW_WITH_GUIDANCE / ALLOW_WITH_REDACTION: v1 does not thread
 	// guidance back to the caller or apply a redaction to plaintext before
 	// encryption — both proceed as ALLOW. Surfacing guidance and applying
-	// redaction is adapter-phase work (Fáze 3).
+	// redaction is adapter-phase work (Phase 3).
 
 	principal := db.Principal{ID: principalID}
 	sum := sha256.Sum256(plaintext)

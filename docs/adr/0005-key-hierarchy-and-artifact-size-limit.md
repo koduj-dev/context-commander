@@ -22,7 +22,7 @@ question left open in round 1.
 root/installation key (KMS/Vault/env provider — never stored in DB)
         │  wraps
         ▼
-project_keys (verzovaná per-project, wrapped_key + root_key_ref)
+project_keys (versioned per project, wrapped_key + root_key_ref)
         │  wraps
         ▼
 DEK per artifact_version (in artifact_version_envelopes, not artifact_versions)
