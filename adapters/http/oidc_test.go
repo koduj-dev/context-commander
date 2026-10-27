@@ -2,6 +2,8 @@ package http_test
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -253,4 +255,23 @@ func TestAuthMethodsListsOIDCProviders(t *testing.T) {
 		}
 	}
 	t.Fatalf("no oidc method offered: %+v", got.Methods)
+}
+
+func TestOIDCCallbackForAProviderNoLongerConfigured(t *testing.T) {
+	// An attempt started before a restart that removed its provider. The
+	// cookie is well-formed and the state matches; there is just nobody left
+	// to redeem the code with.
+	f := newOIDCFixture(t, &fakeOIDC{})
+	raw, err := json.Marshal(map[string]string{"p": "gone", "s": "st", "n": "nonce", "v": "verifier"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	attempt := &http.Cookie{Name: "cc_oidc", Value: base64.RawURLEncoding.EncodeToString(raw)} //nolint:gosec // G124: a request cookie in a test; attributes are the server's to set
+	resp := f.navigate("/v1/auth/oidc/callback?state=st&code="+fakeCode, attempt)
+	if got := signInError(t, resp); got != "oidc_expired" {
+		t.Fatalf("sign_in_error = %q, want oidc_expired", got)
+	}
+	if resp.cookie("cc_session") != nil {
+		t.Fatal("a session was started for a provider that is not configured")
+	}
 }

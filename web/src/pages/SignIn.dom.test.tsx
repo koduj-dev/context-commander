@@ -98,12 +98,18 @@ describe("single sign-on on the sign-in screen", () => {
     expect(window.location.search).toBe("");
   });
 
-  it("still reports a failure whose code it does not know", async () => {
-    window.history.replaceState(null, "", "/?sign_in_error=something_new");
-    stubServer(withKeycloak);
-    renderSignIn();
-    expect(
-      await screen.findByText("Sign-in through the provider did not succeed. Start again."),
-    ).toBeTruthy();
-  });
+  // The code is read from a URL anyone can craft. Names every object
+  // inherits must not be mistaken for a message — `toString` crashed the
+  // screen before the lookup was restricted to own keys.
+  it.each(["something_new", "toString", "constructor", "__proto__", "hasOwnProperty"])(
+    "still reports a failure whose code it does not know (%s)",
+    async (code) => {
+      window.history.replaceState(null, "", `/?sign_in_error=${code}`);
+      stubServer(withKeycloak);
+      renderSignIn();
+      expect(
+        await screen.findByText("Sign-in through the provider did not succeed. Start again."),
+      ).toBeTruthy();
+    },
+  );
 });

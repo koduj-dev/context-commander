@@ -280,8 +280,11 @@ func TestOIDC_RejectsAWrongNonce(t *testing.T) {
 func TestOIDC_RejectsAWrongPKCEVerifier(t *testing.T) {
 	o := newKeycloakOIDC(t, nil)
 	code, req := begin(t, o, "alice")
-	// A code intercepted on its way back is useless without the verifier,
-	// which never left this server. That is the whole of what PKCE buys.
+	// A code intercepted on its way back — from a log, a referrer, a proxy —
+	// is useless without the verifier, which never travels to the provider's
+	// authorization endpoint or in any URL; it sits in the HttpOnly cc_oidc
+	// cookie. (A thief of that browser's cookies gets both, which is why the
+	// redirect must be https off loopback.)
 	req.Verifier = directory.NewAuthRequest().Verifier
 	_, err := o.Exchange(context.Background(), code, req)
 	if !errors.Is(err, directory.ErrSignInRejected) {
@@ -364,6 +367,10 @@ func TestNewOIDC_ValidatesAtStartup(t *testing.T) {
 		"no redirect":        func(c *directory.OIDCConfig) { c.RedirectURL = "" },
 		"name with a slash":  func(c *directory.OIDCConfig) { c.Name = "a/b" },
 		"scopes sans openid": func(c *directory.OIDCConfig) { c.Scopes = []string{"email"} },
+		// Cleartext off this host: the signing keys and the code would travel
+		// past anyone on the path.
+		"http issuer off-host":   func(c *directory.OIDCConfig) { c.IssuerURL = "http://id.example.test/realms/x" },
+		"http redirect off-host": func(c *directory.OIDCConfig) { c.RedirectURL = "http://cc.example.test/v1/auth/oidc/callback" },
 	}
 	for name, mutate := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -376,5 +383,14 @@ func TestNewOIDC_ValidatesAtStartup(t *testing.T) {
 	}
 	if _, err := directory.NewOIDC(ok); err != nil {
 		t.Fatalf("valid config refused: %v", err)
+	}
+	// The dev Keycloak speaks http on loopback, and must keep working.
+	for _, host := range []string{"127.0.0.1:18081", "localhost:18081", "[::1]:18081"} {
+		cfg := ok
+		cfg.IssuerURL = "http://" + host + "/realms/context-commander"
+		cfg.RedirectURL = "http://" + host + "/v1/auth/oidc/callback"
+		if _, err := directory.NewOIDC(cfg); err != nil {
+			t.Errorf("loopback http %s refused: %v", host, err)
+		}
 	}
 }

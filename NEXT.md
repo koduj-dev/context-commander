@@ -174,7 +174,34 @@ Only on top of a core loop people actually use:
         is a per-provider decision, and the switch for it should name the
         provider rather than turn the check off for all of them.
       - [ ] One OIDC provider per installation. `Deps.OIDC` and the sign-in
-        screen already take a list; only the flags configure one.
+        screen already take a list; only the flags configure one. **Before a
+        second one is allowed**, the callback must defend against provider
+        mix-up: today the provider comes only from the cookie and the
+        RFC 9207 `iss` response parameter is not checked (review, 2026-10-27).
+      - [ ] **Who may sign up through OIDC** — see the open question below.
+        Every account at the issuer gets a local user on first sign-in, and
+        a local user may create organizations and projects. Right for a
+        company's own Keycloak; wrong for Google, where that is everyone.
+      - Remaining review findings (2026-10-27), all low, none exploitable as
+        configured today:
+        - The `cc_oidc` cookie is unsigned, so a sibling subdomain able to
+          plant cookies can pair a victim's browser with the attacker's
+          attempt (login CSRF). An HMAC over it with a server-held key closes
+          that; the code comment states the gap.
+        - A key-fetch failure during verification (provider down right after
+          a rotation) is reported as a rejected sign-in and recorded as one,
+          rather than as unavailable — go-oidc does not type that error.
+        - Identities are keyed on the operator's `--oidc-name`, not the
+          issuer: changing the issuer but keeping the name lets the new
+          issuer's subjects resolve to the old one's links. Storing `iss`
+          beside the link would remove it; it needs a migration.
+        - A second `/start` (another tab, or a cross-site navigation) replaces
+          the first attempt, whose callback then reads as expired. Nuisance.
+        - A callback in a browser already signed in starts a second session
+          without ending the first, as password sign-in does.
+        - A mismatched state writes a security event with no limit of its
+          own — the same class as failed password sign-ins, and the per-IP
+          limit that would bound both is the backlog's trusted-proxy item.
       - Group-to-role mapping is a separate decision. A directory proves who
         someone is, not what they may do; authorization stays in project and
         organization membership and `installation_admins`.
@@ -502,6 +529,13 @@ feature.
   Codex CLI**. Both reach the server over Streamable HTTP with a bearer PAT,
   so one transport covers both, and both configure from a small committed
   file a test can parse — see `deploy/mcp-clients/`.
+- **Who may become a user by signing in through OIDC?** (Raised by review
+  2026-10-27.) Today: anyone the issuer will authenticate, which is the
+  ADR 0019 just-in-time shape and is safe for a company's own IdP — but
+  pointed at Google it is open self-registration for the internet. The
+  options, roughly: an allowed-domains list (Google's `hd`, or the email
+  domain), a "link existing accounts only, never create" mode, or both, and
+  which one is the default.
 - **Handoff vs. context pack as the headline object.** Recommendation: sell the
   outcome ("handoff"), keep the context pack as the mechanism. (Raised
   2026-09-01.)

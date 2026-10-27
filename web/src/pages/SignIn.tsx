@@ -80,7 +80,10 @@ export function SignIn() {
     if (returned === null) return null;
     // A code this build does not know still means sign-in failed; saying
     // nothing would leave the person back at the form with no idea why.
-    const key = oidcErrors[returned];
+    // Own keys only. The code arrives in a URL anyone can craft, and a plain
+    // lookup would hand `toString` or `__proto__` back as if it were a
+    // message key — which crashed this screen.
+    const key = Object.hasOwn(oidcErrors, returned) ? oidcErrors[returned] : undefined;
     return key ? t(key) : t("auth.oidcFailed");
   });
 

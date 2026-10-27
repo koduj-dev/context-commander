@@ -235,6 +235,9 @@ func newServeCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if err := distinctDirectoryNames(ldapDir, oidcDir); err != nil {
+				return err
+			}
 			if oidcDir != nil {
 				oidcProviders = append(oidcProviders, oidcDir)
 				slog.Info("OIDC sign-in enabled", "provider", oidcDir.Provider(), "label", oidcDir.Label())
@@ -468,7 +471,9 @@ func ldapFromFlags(cmd *cobra.Command) (directory.Authenticator, error) {
 
 // oidcFromFlags builds the OIDC provider, or returns nil when none is
 // configured. --oidc-issuer (or $CC_OIDC_ISSUER) is the switch.
-func oidcFromFlags(cmd *cobra.Command) (*directory.OIDC, error) {
+//
+// It returns the interface for the reason ldapFromFlags does.
+func oidcFromFlags(cmd *cobra.Command) (directory.RedirectAuthenticator, error) {
 	issuer, _ := cmd.Flags().GetString("oidc-issuer")
 	if issuer == "" {
 		issuer = os.Getenv(oidcIssuerEnv)
@@ -495,11 +500,25 @@ func oidcFromFlags(cmd *cobra.Command) (*directory.OIDC, error) {
 	caCert, _ := cmd.Flags().GetString("oidc-ca-cert")
 	timeout, _ := cmd.Flags().GetDuration("oidc-timeout")
 
-	return directory.NewOIDC(directory.OIDCConfig{
+	oidcDir, err := directory.NewOIDC(directory.OIDCConfig{
 		Name: name, Label: label, IssuerURL: issuer,
 		ClientID: clientID, ClientSecret: secret, RedirectURL: redirect,
 		Scopes: scopes, CACertFile: caCert, Timeout: timeout,
 	})
+	if err != nil {
+		return nil, err
+	}
+	return oidcDir, nil
+}
+
+// distinctDirectoryNames refuses two directories under one name. The name is
+// half of the user_identities key, so LDAP and OIDC sharing one would resolve
+// each other's subjects to the same accounts.
+func distinctDirectoryNames(ldap directory.Authenticator, oidc directory.RedirectAuthenticator) error {
+	if ldap != nil && oidc != nil && ldap.Provider() == oidc.Provider() {
+		return fmt.Errorf("serve: --oidc-name and --ldap-name are both %q; each directory needs its own name", oidc.Provider())
+	}
+	return nil
 }
 
 // ldapBindPassword reads the service account's password from a file or the

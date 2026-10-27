@@ -21,8 +21,10 @@ link definition at the bottom of the file.
   (never an argument, which `ps` shows to everyone).
   - `GET /v1/auth/oidc/{provider}/start` and `GET /v1/auth/oidc/callback`.
     The attempt's state, nonce and PKCE verifier ride in an HttpOnly cookie
-    scoped to `/v1/auth/oidc`, live ten minutes and are spent on the first
-    callback, so a replayed callback starts nothing.
+    scoped to `/v1/auth/oidc` and live ten minutes. The callback clears it,
+    so a browser that comes back twice starts over — but that is the
+    browser's courtesy, not a guarantee; what actually stops a replay is
+    that the provider redeems each code once (tested).
   - Verified: the ID token's signature, issuer, audience and expiry
     (`coreos/go-oidc`), and its **nonce**, which that library leaves to the
     caller and without which a token from another attempt would be accepted.
@@ -39,6 +41,22 @@ link definition at the bottom of the file.
     says why a sign-in came back failed — cancelled, expired, provider
     unreachable, no address, unverified address — in all six languages. The
     provider's own error text is never shown or put in a URL.
+  - **Hardened after an independent review**, before any release:
+    - The issuer and the redirect must be **https** unless they are on
+      loopback. Plain http to the issuer let anyone on the path serve their
+      own signing keys, mint a token for any verified address, and through
+      link-by-email sign in as any local account.
+    - A failed discovery is remembered for five seconds, and `/start` passes
+      the same in-flight gate as the callback: during an outage, anonymous
+      starts no longer queue behind the discovery lock for a full timeout
+      each and make their own outbound request.
+    - `?sign_in_error=toString` (or `constructor`, `__proto__`) crashed the
+      sign-in screen — an inherited property was taken for a message key.
+      Own keys only, tested with each of those names.
+    - LDAP and OIDC under the same `--*-name` are refused at startup; the
+      name is half of the identity key.
+    - The unverified address is no longer written to the log, only the
+      subject; a provider-supplied `error` is truncated before logging.
   - Tested against a real Keycloak (`deploy/oidc/`), with a new seeded user
     `erin` whose address is unverified. Rejection tests assert *where* the
     refusal came from — a wrong nonce must be refused by our check, a wrong

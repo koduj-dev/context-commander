@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -97,7 +98,20 @@ type OIDC struct {
 	mu       sync.Mutex
 	verifier *oidc.IDTokenVerifier
 	oauth    *oauth2.Config
+
+	// A failed discovery is remembered briefly. Discovery runs under mu, and
+	// without this every anonymous /start during an outage would queue
+	// behind the lock for a full client timeout and then make its own
+	// outbound request — a slow provider would be a lever for tying up this
+	// server's goroutines. now is replaceable for tests.
+	failedAt  time.Time
+	failedErr error
+	now       func() time.Time
 }
+
+// discoveryRetryAfter is how long a failed discovery is answered from memory
+// before the provider is asked again.
+const discoveryRetryAfter = 5 * time.Second
 
 // NewOIDC validates the configuration. It makes no network call — see the
 // comment on OIDC.mu — so a typo in a flag still stops the server, but an
@@ -159,9 +173,21 @@ func NewOIDC(cfg OIDCConfig) (*OIDC, error) {
 	return &OIDC{
 		cfg:    cfg,
 		client: &http.Client{Transport: transport, Timeout: cfg.Timeout},
+		now:    time.Now,
 	}, nil
 }
 
+// requireHTTPURL insists on https, except on a loopback host.
+//
+// Plain http to the issuer is not a weaker form of the same thing: discovery
+// and the signing keys arrive over that connection, so whoever is on the path
+// can serve their own keys, mint an ID token for any subject with any
+// verified address, and — through provisioning's link-by-email — sign in as
+// any local account. Cleartext to the redirect hands the code to the same
+// observer, and PKCE does not help there, because the verifier travels in the
+// same browser's cookie. Loopback is exempt because the dev Keycloak
+// (deploy/oidc) speaks http, and a packet that never leaves the host has no
+// path to be on.
 func requireHTTPURL(what, raw string) error {
 	u, err := url.Parse(raw)
 	if err != nil {
@@ -170,7 +196,18 @@ func requireHTTPURL(what, raw string) error {
 	if (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
 		return fmt.Errorf("directory: oidc %s url must be an absolute http(s) URL, got %q", what, raw)
 	}
+	if u.Scheme == "http" && !isLoopbackHost(u.Hostname()) {
+		return fmt.Errorf("directory: oidc %s url must be https unless it is on this host, got %q", what, raw)
+	}
 	return nil
+}
+
+func isLoopbackHost(host string) bool {
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 func containsString(list []string, want string) bool {
@@ -224,6 +261,9 @@ func (o *OIDC) discover() (*oauth2.Config, *oidc.IDTokenVerifier, error) {
 	if o.oauth != nil {
 		return o.oauth, o.verifier, nil
 	}
+	if o.failedErr != nil && o.now().Sub(o.failedAt) < discoveryRetryAfter {
+		return nil, nil, o.failedErr
+	}
 
 	// Background, not the request's context: go-oidc keeps this context for
 	// every later key-set refresh, and a request context is cancelled the
@@ -232,8 +272,11 @@ func (o *OIDC) discover() (*oauth2.Config, *oidc.IDTokenVerifier, error) {
 	ctx := oidc.ClientContext(context.Background(), o.client)
 	provider, err := oidc.NewProvider(ctx, o.cfg.IssuerURL)
 	if err != nil {
-		return nil, nil, fmt.Errorf("%w: oidc discovery at %s: %v", ErrUnavailable, o.cfg.IssuerURL, err) //nolint:errorlint // the cause is context, ErrUnavailable is the class
+		o.failedErr = fmt.Errorf("%w: oidc discovery at %s: %v", ErrUnavailable, o.cfg.IssuerURL, err) //nolint:errorlint // the cause is context, ErrUnavailable is the class
+		o.failedAt = o.now()
+		return nil, nil, o.failedErr
 	}
+	o.failedErr = nil
 	o.oauth = &oauth2.Config{
 		ClientID:     o.cfg.ClientID,
 		ClientSecret: o.cfg.ClientSecret,
@@ -326,7 +369,9 @@ func (o *OIDC) Exchange(ctx context.Context, code string, req AuthRequest) (Iden
 		return Identity{}, fmt.Errorf("%w: provider %s released no email for subject %s", ErrNoEmail, o.cfg.Name, idToken.Subject)
 	}
 	if !verified(claims.EmailVerified) {
-		return Identity{}, fmt.Errorf("%w: %s at provider %s", ErrEmailNotVerified, claims.Email, o.cfg.Name)
+		// The subject, not the address: this error is logged, and an address
+		// the provider has not verified may not even belong to the person.
+		return Identity{}, fmt.Errorf("%w: subject %s at provider %s", ErrEmailNotVerified, idToken.Subject, o.cfg.Name)
 	}
 
 	name := claims.Name

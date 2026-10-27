@@ -74,8 +74,17 @@ func (d Deps) startOIDCSignIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Anonymous, and its first call may be discovery — an outbound request.
+	// Bounded by the same gate as the callback and token authentication, so
+	// a flood cannot pile up goroutines waiting on a slow provider.
+	release, ok := d.Limiter.AcquireAuth()
+	if !ok {
+		signInFailed(w, r, "oidc_unavailable")
+		return
+	}
 	attempt := oidcAttempt{Provider: p.Provider(), AuthRequest: directory.NewAuthRequest()}
 	target, err := p.AuthCodeURL(attempt.AuthRequest)
+	release()
 	if err != nil {
 		slog.ErrorContext(r.Context(), "oidc sign-in could not start",
 			"err", err, "provider", p.Provider(), "request_id", middleware.GetReqID(r.Context()))
@@ -136,8 +145,10 @@ func readOIDCAttempt(r *http.Request) (oidcAttempt, bool) {
 // starts a session — then redirects into the app.
 func (d Deps) finishOIDCSignIn(w http.ResponseWriter, r *http.Request) {
 	attempt, ok := readOIDCAttempt(r)
-	// Single use, whatever happens next: a retried callback must start over
-	// rather than replay an attempt that has already been spent.
+	// Cleared whatever happens next, so a browser that comes back twice
+	// starts over. That is only as strong as the browser's obedience — a
+	// client can resend the cookie — and the guarantee against replay is the
+	// provider redeeming each code once (TestOIDC_RejectsAReusedCode).
 	d.clearOIDCCookie(w)
 	if !ok {
 		// No attempt in this browser: it expired, or this callback was not
@@ -161,6 +172,11 @@ func (d Deps) finishOIDCSignIn(w http.ResponseWriter, r *http.Request) {
 		if e == "access_denied" {
 			signInFailed(w, r, "oidc_cancelled")
 		} else {
+			// Provider-controlled and unbounded; slog quotes it, and this
+			// keeps one request from writing an arbitrarily long log line.
+			if len(e) > 64 {
+				e = e[:64]
+			}
 			slog.WarnContext(r.Context(), "oidc provider returned an error", "error", e,
 				"provider", attempt.Provider, "request_id", middleware.GetReqID(r.Context()))
 			signInFailed(w, r, "oidc_failed")
