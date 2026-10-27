@@ -386,8 +386,10 @@ on the planned move to a public repo:
   are unavailable to private repos on the Free plan (the step fails), and the
   Homebrew formula and APT repo point at release assets anonymous users must
   be able to download.
-- [ ] The shared APT repo's `conf/distributions` still says
-  `Label: Docker Commander`; rename it to something covering both.
+- [x] The shared APT repo is labelled `koduj-dev` (koduj-dev/apt c36e965,
+  2026-10-27). It takes effect at the next publish from either project, and
+  existing dockercmd users then accept the change once with
+  `apt update --allow-releaseinfo-change-label`; the apt README says so.
 - [x] Man pages, one per command, generated from the cobra tree at build
   time (`make man`, hidden `ccd man DIR`) and shipped in the .deb/.rpm.
   The Homebrew formula installs only the binary, so no pages there yet.
