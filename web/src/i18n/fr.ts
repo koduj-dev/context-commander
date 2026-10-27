@@ -341,6 +341,27 @@ export const fr: Partial<Record<MessageKey, string>> = {
   "admin.usage.quiet": "Rien ne s’est encore passé",
   "admin.usage.quietBody":
     "Aucun événement enregistré. Une installation qui a des projets mais aucun événement est une installation dans laquelle rien n’a écrit.",
+  "admin.usage.weekly": "{count, plural, one {# dernière semaine} other {# dernières semaines}}",
+  "admin.usage.week": "Semaine",
+  "admin.usage.people": "Personnes",
+  "admin.usage.agents": "Agents",
+  "admin.usage.handedOff": "Transmis",
+  "admin.usage.claimed": "Pris",
+  "admin.usage.byOtherClient": "Pris par un autre client",
+  "admin.usage.medianToClaim": "Délai médian de prise",
+  "admin.usage.weeklyHelp":
+    "Les semaines commencent le lundi, en UTC. Personnes et agents comptent une fois par semaine s’ils ont fait une requête authentifiée ; cet écran peut les compter, jamais les nommer.",
+  "admin.usage.loop": "Boucle de transfert",
+  "admin.usage.loopHelp":
+    "Mesuré à partir de ce que le serveur enregistre : quand un transfert a été créé, pris et clos, et par quel client. Que l’agent suivant ait compris ce qu’on lui a transmis, le serveur ne peut pas le voir.",
+  "admin.usage.ofClaimed": "sur {count, plural, one {# pris} other {# pris}}",
+  "admin.usage.ofProjects": "sur {count, plural, one {# projet} other {# projets}}",
+  "admin.usage.projectsWithTakeover": "Projets avec une reprise",
+  "admin.usage.firstTakeover": "Du début du projet à la première reprise (médiane)",
+  "admin.usage.p90ToClaim": "Délai de prise, 90e centile",
+  "admin.usage.claimToClose": "De la prise à la clôture (médiane)",
+  "admin.usage.staleOpen": "Ouverts depuis plus de 7 jours",
+  "admin.usage.notYet": "Pas encore mesuré",
   "admin.tab.security": "Journal de sécurité",
   "admin.admins": "Administration de l’installation",
   "admin.adminsLead":

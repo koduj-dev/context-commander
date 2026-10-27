@@ -618,6 +618,40 @@ export type InstallationStats = {
   credentials: { active: number; revoked: number; expired: number; used_last_7_days: number };
 };
 
+/**
+ * Usage per UTC week (oldest first, empty weeks included) and the handoff
+ * loop over the installation's life — counts and durations only, never who
+ * (migrations/000028). A duration is absent when there was nothing to take
+ * a median of, which is not the same as zero.
+ */
+export type InstallationTrends = {
+  weeks: {
+    /** A date (YYYY-MM-DD), the week's Monday in UTC — not a timestamp. */
+    week_start: string;
+    active_users: number;
+    active_agents: number;
+    projects_created: number;
+    handoffs_created: number;
+    handoffs_claimed: number;
+    handoffs_claimed_by_other_client: number;
+    handoffs_closed: number;
+    median_seconds_to_claim?: number;
+    events: number;
+  }[];
+  handoff_flow: {
+    handoffs: number;
+    claimed: number;
+    claimed_by_other_client: number;
+    stale_open: number;
+    median_seconds_to_claim?: number;
+    p90_seconds_to_claim?: number;
+    median_seconds_claim_to_close?: number;
+    projects: number;
+    projects_with_takeover: number;
+    median_seconds_to_first_takeover?: number;
+  };
+};
+
 export type InstallationAdmin = {
   user_id: string;
   role: string;
@@ -877,6 +911,8 @@ export const api = {
 
   installationAdmins: () => request<InstallationAdmin[]>("/installation/admins"),
   installationStats: () => request<InstallationStats>("/installation/stats"),
+  installationTrends: (weeks?: number) =>
+    request<InstallationTrends>(withQuery("/installation/trends", { weeks })),
   // The directory. Installation-admin only, which is why every screen that
   // uses it falls back to a plain id field when the caller is not one.
   users: (cursor?: string, limit?: number) =>

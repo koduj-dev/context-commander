@@ -328,16 +328,10 @@ the screen rather than showing a control that would fail.
     this agent reach" is ever answered, it is answered for whoever is
     accountable for the agent, not for the admin tier.
 
-- [ ] **Service principal names are not unique** while user emails are
-  (`migrations/000001`). Two agents may share a name, which makes a name a
-  poor thing to identify one by. Recorded in
-  `internal/identity/duplicate_integration_test.go`; adding the constraint
-  needs a migration and a decision about existing rows. **Maintainer,
-  2026-10-27: unique, but within one user's or one project's namespace**
-  rather than installation-wide. Agents have no namespace today
-  (`service_principals` has only `created_by`, which is nullable), so which
-  of the two scopes it is — and what owns the name when its creator is gone —
-  is the open part.
+- [x] ~~**Service principal names are not unique.**~~ Closed 2026-10-27:
+  unique per registrar (`created_by`), case-insensitively — the scope the
+  maintainer chose. Unattributed agents fall outside the rule; existing
+  duplicates were renamed with an id suffix (migration 000027).
 - [ ] Project templates — agreed in the mockups (`templates.html`), no
   schema and no endpoint.
 
@@ -513,6 +507,17 @@ For the first design partners, measure outcomes, not feature count:
   without SQL.
 - **Retention** — several design partners use it weekly, not just install once.
 
+What the server can now measure by itself (2026-10-27, administration →
+Usage, `GET /v1/installation/trends`): time from project start to the first
+takeover by another client, time to claim, weekly active people and agents.
+What it cannot: resume success, manual context transfers and context
+efficiency — those still need the experiment below.
+
+- [ ] `principal_activity_days` grows by one row per active principal per day
+  and nothing prunes it. The screen reads at most 52 weeks; a retention bound
+  (and who runs it — there is no scheduler) belongs with the purge workflow
+  above.
+
 Suggested validation experiment: take one medium-sized real repository with a
 half-finished task; let client A implement the first part and create a handoff;
 give client B access to the Context Commander project only, *not* A's
@@ -608,6 +613,5 @@ Independent of the above and pickable any time, but none of it is free of a
 decision any more (the cheap ones — the `docs/README.md` index, organization
 member lists, `GET .../conversations` — shipped): the two agent items under
 "UI" above (an admin will not see an agent's projects — decided; unique
-names need a scope and a rule for existing duplicates) and project
-templates. CI hardening unblocks itself the day the
+names — done) and project templates. CI hardening unblocks itself the day the
 repo goes public.

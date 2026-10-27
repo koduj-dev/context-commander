@@ -181,6 +181,7 @@ func NewHandler(deps Deps) http.Handler {
 			r.Route("/installation", func(r chi.Router) {
 				r.Get("/admins", deps.listInstallationAdmins)
 				r.Get("/stats", deps.getInstallationStats)
+				r.Get("/trends", deps.getInstallationTrends)
 				r.Get("/users", deps.listInstallationUsers)
 				r.Post("/users", deps.createInstallationUser)
 				r.Put("/users/{id}/password", deps.setUserPassword)

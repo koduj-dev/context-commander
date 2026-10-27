@@ -3,6 +3,7 @@ package http
 import (
 	"errors"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -121,6 +122,13 @@ func (d Deps) createServicePrincipal(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sp, err := d.Installation.CreateServicePrincipal(r.Context(), principalID, callerUserID, body.Name, body.Description)
+	if errors.Is(err, identity.ErrAlreadyExists) {
+		// Names are unique per registrar (migrations/000027), so the clash is
+		// with one of the caller's own agents — another person's agent of the
+		// same name is never a reason to refuse.
+		writeError(w, http.StatusConflict, "conflict", "you have already registered an agent with this name")
+		return
+	}
 	if err != nil {
 		writeDomainError(w, r, err)
 		return
@@ -423,6 +431,109 @@ func (d Deps) getInstallationStats(w http.ResponseWriter, r *http.Request) {
 	out.Credentials.Active, out.Credentials.Revoked = st.CredentialsActive, st.CredentialsRevoked
 	out.Credentials.Expired, out.Credentials.UsedLast7Days = st.CredentialsExpired, st.ActiveLast7Days
 
+	writeJSON(w, http.StatusOK, out)
+}
+
+// trendsResponse is usage per week and the handoff loop's performance —
+// counts and durations, never a principal or a project (migrations/000028).
+//
+// Durations are whole seconds and absent when there is nothing to measure,
+// so a client cannot mistake "no claims yet" for "claimed instantly".
+type trendsResponse struct {
+	Weeks       []weekResponse      `json:"weeks"`
+	HandoffFlow handoffFlowResponse `json:"handoff_flow"`
+}
+
+type weekResponse struct {
+	// A date, not a timestamp: the week is a UTC calendar week starting
+	// Monday, and a time of day would invite converting it to the reader's
+	// zone and landing on Sunday.
+	WeekStart string `json:"week_start"`
+
+	ActiveUsers  int64 `json:"active_users"`
+	ActiveAgents int64 `json:"active_agents"`
+
+	ProjectsCreated              int64  `json:"projects_created"`
+	HandoffsCreated              int64  `json:"handoffs_created"`
+	HandoffsClaimed              int64  `json:"handoffs_claimed"`
+	HandoffsClaimedByOtherClient int64  `json:"handoffs_claimed_by_other_client"`
+	HandoffsClosed               int64  `json:"handoffs_closed"`
+	MedianSecondsToClaim         *int64 `json:"median_seconds_to_claim,omitempty"`
+
+	Events int64 `json:"events"`
+}
+
+type handoffFlowResponse struct {
+	Handoffs             int64 `json:"handoffs"`
+	Claimed              int64 `json:"claimed"`
+	ClaimedByOtherClient int64 `json:"claimed_by_other_client"`
+	StaleOpen            int64 `json:"stale_open"`
+
+	MedianSecondsToClaim      *int64 `json:"median_seconds_to_claim,omitempty"`
+	P90SecondsToClaim         *int64 `json:"p90_seconds_to_claim,omitempty"`
+	MedianSecondsClaimToClose *int64 `json:"median_seconds_claim_to_close,omitempty"`
+
+	Projects                     int64  `json:"projects"`
+	ProjectsWithTakeover         int64  `json:"projects_with_takeover"`
+	MedianSecondsToFirstTakeover *int64 `json:"median_seconds_to_first_takeover,omitempty"`
+}
+
+func wholeSeconds(d *time.Duration) *int64 {
+	if d == nil {
+		return nil
+	}
+	v := int64(d.Round(time.Second) / time.Second)
+	return &v
+}
+
+// getInstallationTrends answers GET /v1/installation/trends?weeks=N. N
+// defaults to 12 and is clamped to 1..52 rather than refused: asking for too
+// long a history is not a mistake worth a round trip.
+func (d Deps) getInstallationTrends(w http.ResponseWriter, r *http.Request) {
+	weeks := 12
+	if raw := r.URL.Query().Get("weeks"); raw != "" {
+		v, err := strconv.Atoi(raw)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "invalid_request", "weeks must be an integer")
+			return
+		}
+		weeks = v
+	}
+
+	principalID := principalIDFrom(r.Context())
+	callerUserID, err := resolveCallerUserID(r, d.Pool, principalID)
+	if err != nil {
+		writeDomainError(w, r, err)
+		return
+	}
+
+	series, flow, err := d.Installation.Trends(r.Context(), principalID, callerUserID, weeks)
+	if err != nil {
+		writeDomainError(w, r, err)
+		return
+	}
+
+	out := trendsResponse{Weeks: make([]weekResponse, len(series))}
+	for i, wk := range series {
+		out.Weeks[i] = weekResponse{
+			WeekStart:   wk.Start.Format(time.DateOnly),
+			ActiveUsers: wk.ActiveUsers, ActiveAgents: wk.ActiveAgents,
+			ProjectsCreated: wk.ProjectsCreated, HandoffsCreated: wk.HandoffsCreated,
+			HandoffsClaimed: wk.HandoffsClaimed, HandoffsClaimedByOtherClient: wk.HandoffsClaimedByOtherClient,
+			HandoffsClosed: wk.HandoffsClosed, MedianSecondsToClaim: wholeSeconds(wk.MedianToClaim),
+			Events: wk.Events,
+		}
+	}
+	out.HandoffFlow = handoffFlowResponse{
+		Handoffs: flow.Handoffs, Claimed: flow.Claimed,
+		ClaimedByOtherClient: flow.ClaimedByOtherClient, StaleOpen: flow.StaleOpen,
+		MedianSecondsToClaim:         wholeSeconds(flow.MedianToClaim),
+		P90SecondsToClaim:            wholeSeconds(flow.P90ToClaim),
+		MedianSecondsClaimToClose:    wholeSeconds(flow.MedianClaimToClose),
+		Projects:                     flow.Projects,
+		ProjectsWithTakeover:         flow.ProjectsWithTakeover,
+		MedianSecondsToFirstTakeover: wholeSeconds(flow.MedianToFirstTakeover),
+	}
 	writeJSON(w, http.StatusOK, out)
 }
 

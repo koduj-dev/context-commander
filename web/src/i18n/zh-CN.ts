@@ -337,6 +337,27 @@ export const zhCN: Partial<Record<MessageKey, string>> = {
   "admin.usage.quiet": "还什么都没发生",
   "admin.usage.quietBody":
     "没有记录到任何事件。有项目却没有事件的安装实例，说明还没有东西往里写过。",
+  "admin.usage.weekly": "最近 {count, plural, other {# 周}}",
+  "admin.usage.week": "周",
+  "admin.usage.people": "人员",
+  "admin.usage.agents": "agent",
+  "admin.usage.handedOff": "已交出",
+  "admin.usage.claimed": "已接手",
+  "admin.usage.byOtherClient": "由另一客户端接手",
+  "admin.usage.medianToClaim": "接手时间中位数",
+  "admin.usage.weeklyHelp":
+    "每周从周一开始，按 UTC 计算。人员和 agent 只要当周发出过任何经认证的请求就计一次；此页面只能计数，永远无法列出是谁。",
+  "admin.usage.loop": "交接循环",
+  "admin.usage.loopHelp":
+    "依据服务器记录的内容测量：交接何时创建、何时被接手、何时关闭，以及经由哪个客户端。下一个 agent 是否理解了交给它的内容，服务器无从得知。",
+  "admin.usage.ofClaimed": "共 {count, plural, other {# 个已接手}}",
+  "admin.usage.ofProjects": "共 {count, plural, other {# 个项目}}",
+  "admin.usage.projectsWithTakeover": "发生过跨客户端接手的项目",
+  "admin.usage.firstTakeover": "从项目开始到首次接手（中位数）",
+  "admin.usage.p90ToClaim": "接手时间，第 90 百分位",
+  "admin.usage.claimToClose": "从接手到关闭（中位数）",
+  "admin.usage.staleOpen": "打开超过 7 天",
+  "admin.usage.notYet": "尚未测量",
   "admin.tab.security": "安全日志",
   "admin.admins": "安装实例管理员",
   "admin.adminsLead":

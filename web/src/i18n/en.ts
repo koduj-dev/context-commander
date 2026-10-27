@@ -340,6 +340,27 @@ export const en = {
   "admin.usage.quiet": "Nothing has happened yet",
   "admin.usage.quietBody":
     "No events recorded. An installation with projects but no events is one nothing has written to.",
+  "admin.usage.weekly": "Last {count, plural, one {# week} other {# weeks}}",
+  "admin.usage.week": "Week",
+  "admin.usage.people": "People",
+  "admin.usage.agents": "Agents",
+  "admin.usage.handedOff": "Handed off",
+  "admin.usage.claimed": "Claimed",
+  "admin.usage.byOtherClient": "Taken over by another client",
+  "admin.usage.medianToClaim": "Median time to claim",
+  "admin.usage.weeklyHelp":
+    "Weeks start on Monday, in UTC. People and agents count once a week if they made any authenticated request; this screen can count them but never name them.",
+  "admin.usage.loop": "Handoff loop",
+  "admin.usage.loopHelp":
+    "Measured from what the server records: when a handoff was created, claimed and closed, and through which client. Whether the next agent understood what it was handed is something the server cannot see.",
+  "admin.usage.ofClaimed": "of {count, plural, one {# claimed} other {# claimed}}",
+  "admin.usage.ofProjects": "of {count, plural, one {# project} other {# projects}}",
+  "admin.usage.projectsWithTakeover": "Projects with a takeover",
+  "admin.usage.firstTakeover": "Project start to first takeover (median)",
+  "admin.usage.p90ToClaim": "Time to claim, 90th percentile",
+  "admin.usage.claimToClose": "Claim to close (median)",
+  "admin.usage.staleOpen": "Open for more than 7 days",
+  "admin.usage.notYet": "Not measured yet",
   "admin.tab.security": "Security log",
   "admin.admins": "Installation admins",
   "admin.adminsLead":

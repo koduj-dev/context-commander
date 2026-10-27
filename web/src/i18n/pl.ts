@@ -343,6 +343,30 @@ export const pl: Partial<Record<MessageKey, string>> = {
   "admin.usage.quiet": "Jeszcze nic się nie stało",
   "admin.usage.quietBody":
     "Żadnych zapisanych zdarzeń. Instalacja, która ma projekty, ale nie ma zdarzeń, to instalacja, do której nic nie zapisało.",
+  "admin.usage.weekly":
+    "Ostatnie {count, plural, one {# tydzień} few {# tygodnie} many {# tygodni} other {# tygodnia}}",
+  "admin.usage.week": "Tydzień",
+  "admin.usage.people": "Osoby",
+  "admin.usage.agents": "Agenci",
+  "admin.usage.handedOff": "Przekazane",
+  "admin.usage.claimed": "Przejęte",
+  "admin.usage.byOtherClient": "Przejęte przez inny klient",
+  "admin.usage.medianToClaim": "Mediana do przejęcia",
+  "admin.usage.weeklyHelp":
+    "Tygodnie zaczynają się w poniedziałek, w UTC. Osoby i agenci liczą się raz w tygodniu, jeśli wysłali jakiekolwiek uwierzytelnione żądanie; ten ekran może ich policzyć, ale nigdy nazwać.",
+  "admin.usage.loop": "Cykl przekazania",
+  "admin.usage.loopHelp":
+    "Mierzone na podstawie tego, co zapisuje serwer: kiedy przekazanie zostało utworzone, przejęte i zamknięte oraz przez którego klienta. Czy następny agent zrozumiał, co mu przekazano, tego serwer nie widzi.",
+  "admin.usage.ofClaimed":
+    "z {count, plural, one {# przejętego} few {# przejętych} many {# przejętych} other {# przejętego}}",
+  "admin.usage.ofProjects":
+    "z {count, plural, one {# projektu} few {# projektów} many {# projektów} other {# projektu}}",
+  "admin.usage.projectsWithTakeover": "Projekty z przejęciem",
+  "admin.usage.firstTakeover": "Od startu projektu do pierwszego przejęcia (mediana)",
+  "admin.usage.p90ToClaim": "Czas do przejęcia, 90. percentyl",
+  "admin.usage.claimToClose": "Od przejęcia do zamknięcia (mediana)",
+  "admin.usage.staleOpen": "Otwarte dłużej niż 7 dni",
+  "admin.usage.notYet": "Jeszcze niezmierzone",
   "admin.tab.security": "Dziennik bezpieczeństwa",
   "admin.admins": "Administracja instalacji",
   "admin.adminsLead":

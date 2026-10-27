@@ -107,6 +107,8 @@ export function useFormat() {
       utc: (iso: string) => fmt.utcStamp(iso),
       number: (n: number) => fmt.number(n, locale),
       bytes: (n: number) => fmt.bytes(n, locale, prefs.units),
+      duration: (seconds: number) => fmt.duration(seconds, locale),
+      calendarDate: (day: string) => fmt.calendarDate(day, locale, prefs.dateOrder),
     }),
     [locale, prefs.dateOrder, prefs.hourCycle, prefs.showUTC, prefs.units, tz],
   );

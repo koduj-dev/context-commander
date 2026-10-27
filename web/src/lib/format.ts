@@ -57,6 +57,39 @@ export function number(value: number, locale: string): string {
   return new Intl.NumberFormat(locale).format(value);
 }
 
+/**
+ * A length of time, in the one unit that reads best for its size: "45 min",
+ * "3.5 h", "2 days". Not a breakdown ("3 h 27 min") — every figure this
+ * formats is a median or a percentile, and precision past the first unit
+ * would claim an accuracy the statistic does not have.
+ *
+ * `Intl.NumberFormat`'s unit style rather than `Intl.DurationFormat`, which
+ * not every supported browser has yet.
+ */
+export function duration(seconds: number, locale: string): string {
+  const unit = (value: number, u: string, digits = 0) =>
+    new Intl.NumberFormat(locale, {
+      style: "unit",
+      unit: u,
+      unitDisplay: "short",
+      maximumFractionDigits: digits,
+    }).format(value);
+  const abs = Math.abs(seconds);
+  if (abs < 90) return unit(seconds, "second");
+  if (abs < 90 * 60) return unit(seconds / 60, "minute");
+  if (abs < 48 * 3600) return unit(seconds / 3600, "hour", 1);
+  return unit(seconds / 86400, "day", 1);
+}
+
+/**
+ * A calendar date the server already fixed — a UTC week's Monday — written
+ * in the reader's preferred order but never shifted into their zone. Shifting
+ * "2026-10-26" west of Greenwich would print the Sunday before.
+ */
+export function calendarDate(day: string, locale: string, order: DateOrder): string {
+  return date(`${day}T00:00:00Z`, locale, order, "UTC");
+}
+
 const DECIMAL = ["B", "kB", "MB", "GB", "TB", "PB"];
 const BINARY = ["B", "KiB", "MiB", "GiB", "TiB", "PiB"];
 

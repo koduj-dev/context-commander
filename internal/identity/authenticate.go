@@ -46,10 +46,13 @@ func Authenticate(ctx context.Context, pool *db.Pool, token string) (ClientCrede
 		return ClientCredential{}, ErrInvalidToken
 	}
 
-	// Best-effort — a failure to record last_used_at must not block the
-	// actual request.
+	// Best-effort — a failure to record last_used_at or the day's activity
+	// must not block the actual request.
 	_ = db.WithoutPrincipal(ctx, pool, func(tx pgx.Tx) error {
-		return store.TouchCredentialLastUsed(ctx, tx, credentialID)
+		if err := store.TouchCredentialLastUsed(ctx, tx, credentialID); err != nil {
+			return err
+		}
+		return store.RecordActivity(ctx, tx, cred.PrincipalID)
 	})
 
 	return cred, nil

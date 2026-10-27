@@ -398,3 +398,110 @@ func (s *Service) Stats(ctx context.Context, principalID, callerUserID uuid.UUID
 	}
 	return st, nil
 }
+
+// Week is one week of installation-wide activity, UTC, starting Monday.
+// Counts and durations only — see migrations/000028.
+type Week struct {
+	Start time.Time
+
+	ActiveUsers  int64
+	ActiveAgents int64
+
+	ProjectsCreated int64
+	HandoffsCreated int64
+	HandoffsClaimed int64
+	// HandoffsClaimedByOtherClient is the cross-client takeover: claimed
+	// through a different credential than the one that created it.
+	HandoffsClaimedByOtherClient int64
+	HandoffsClosed               int64
+	// MedianToClaim is nil in a week with no claims — not zero, which would
+	// read as "instant".
+	MedianToClaim *time.Duration
+
+	Events int64
+}
+
+// HandoffFlow is how the handoff loop performs over the installation's life.
+// Durations are nil until there is something to take a median of.
+type HandoffFlow struct {
+	Handoffs             int64
+	Claimed              int64
+	ClaimedByOtherClient int64
+	StaleOpen            int64
+
+	MedianToClaim      *time.Duration
+	P90ToClaim         *time.Duration
+	MedianClaimToClose *time.Duration
+
+	Projects              int64
+	ProjectsWithTakeover  int64
+	MedianToFirstTakeover *time.Duration
+}
+
+// MaxTrendWeeks is the longest series Trends returns; the SQL clamps to the
+// same bound, so this exists for callers that want to say so.
+const MaxTrendWeeks = 52
+
+// Trends reports activity per week for the last `weeks` weeks (the current
+// one included) and the handoff loop's performance overall.
+//
+// Gated and computed exactly like Stats, for the same reason: the counting
+// has to see past RLS, so it happens in SECURITY DEFINER functions that
+// return nothing but numbers (migrations/000028).
+func (s *Service) Trends(ctx context.Context, principalID, callerUserID uuid.UUID, weeks int) ([]Week, HandoffFlow, error) {
+	if err := s.checkCapability(ctx, principalID, callerUserID, CapAdminRead); err != nil {
+		return nil, HandoffFlow{}, err
+	}
+	weeks = min(max(weeks, 1), MaxTrendWeeks)
+
+	var (
+		out                               []Week
+		flow                              HandoffFlow
+		toClaim, p90, toClose, toTakeover *float64
+	)
+	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+		rows, err := tx.Query(ctx, `SELECT * FROM cc_installation_trends($1)`, weeks)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var (
+				w      Week
+				median *float64
+			)
+			if err := rows.Scan(&w.Start, &w.ActiveUsers, &w.ActiveAgents,
+				&w.ProjectsCreated, &w.HandoffsCreated, &w.HandoffsClaimed,
+				&w.HandoffsClaimedByOtherClient, &w.HandoffsClosed, &median, &w.Events); err != nil {
+				return err
+			}
+			w.MedianToClaim = seconds(median)
+			out = append(out, w)
+		}
+		if err := rows.Err(); err != nil {
+			return err
+		}
+
+		return tx.QueryRow(ctx, `SELECT * FROM cc_installation_handoff_flow()`).Scan(
+			&flow.Handoffs, &flow.Claimed, &flow.ClaimedByOtherClient, &flow.StaleOpen,
+			&toClaim, &p90, &toClose,
+			&flow.Projects, &flow.ProjectsWithTakeover, &toTakeover,
+		)
+	})
+	if err != nil {
+		return nil, HandoffFlow{}, fmt.Errorf("installation: trends: %w", err)
+	}
+	flow.MedianToClaim, flow.P90ToClaim = seconds(toClaim), seconds(p90)
+	flow.MedianClaimToClose, flow.MedianToFirstTakeover = seconds(toClose), seconds(toTakeover)
+	return out, flow, nil
+}
+
+// seconds turns a nullable SQL interval in seconds into a nullable Duration,
+// keeping "no value" distinct from zero.
+func seconds(v *float64) *time.Duration {
+	if v == nil {
+		return nil
+	}
+	d := time.Duration(*v * float64(time.Second))
+	return &d
+}

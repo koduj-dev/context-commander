@@ -700,4 +700,25 @@ export const es: Partial<Record<MessageKey, string>> = {
   "admin.usage.quiet": "Todavía no ha pasado nada",
   "admin.usage.quietBody":
     "No se ha registrado ningún evento. Una instalación con proyectos pero sin eventos es una en la que nada ha escrito.",
+  "admin.usage.weekly": "Últimas {count, plural, one {# semana} other {# semanas}}",
+  "admin.usage.week": "Semana",
+  "admin.usage.people": "Personas",
+  "admin.usage.agents": "Agentes",
+  "admin.usage.handedOff": "Traspasados",
+  "admin.usage.claimed": "Tomados",
+  "admin.usage.byOtherClient": "Tomados desde otro cliente",
+  "admin.usage.medianToClaim": "Mediana hasta tomarlo",
+  "admin.usage.weeklyHelp":
+    "Las semanas empiezan el lunes, en UTC. Personas y agentes cuentan una vez por semana si hicieron alguna petición autenticada; esta pantalla puede contarlos, pero nunca nombrarlos.",
+  "admin.usage.loop": "Ciclo de traspaso",
+  "admin.usage.loopHelp":
+    "Medido a partir de lo que registra el servidor: cuándo se creó, se tomó y se cerró un traspaso, y desde qué cliente. Si el siguiente agente entendió lo que recibió es algo que el servidor no puede ver.",
+  "admin.usage.ofClaimed": "de {count, plural, one {# tomado} other {# tomados}}",
+  "admin.usage.ofProjects": "de {count, plural, one {# proyecto} other {# proyectos}}",
+  "admin.usage.projectsWithTakeover": "Proyectos con un traspaso tomado desde otro cliente",
+  "admin.usage.firstTakeover": "Del inicio del proyecto al primer traspaso tomado (mediana)",
+  "admin.usage.p90ToClaim": "Tiempo hasta tomarlo, percentil 90",
+  "admin.usage.claimToClose": "De tomado a cerrado (mediana)",
+  "admin.usage.staleOpen": "Abiertos desde hace más de 7 días",
+  "admin.usage.notYet": "Aún sin medir",
 };

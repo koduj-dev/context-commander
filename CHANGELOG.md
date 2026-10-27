@@ -12,6 +12,37 @@ link definition at the bottom of the file.
 
 ### Added
 
+- **Usage over time on the administration's Usage screen** — the last twelve
+  weeks (people and agents active, handoffs created, claimed, taken over by
+  another client, median time to claim, events) and the handoff loop over the
+  installation's life (takeovers by another client, projects that reached one,
+  median project start → first takeover, median and p90 time to claim, claim →
+  close, handoffs open longer than a week). `GET /v1/installation/trends?weeks=N`
+  (default 12, clamped to 1–52), installation admins only.
+  - Aggregated only, as asked: two SECURITY DEFINER functions
+    (`cc_installation_trends`, `cc_installation_handoff_flow`, migration
+    000028) that return counts and durations, never a principal, project or
+    path. A count is only as anonymous as the population is large — on a
+    one-person installation "1 active person" is that person; the migration
+    says so.
+  - "Active" needed a fact the schema did not keep: `last_used_at` holds only
+    the latest use. New `principal_activity_days` — one row per principal per
+    UTC day, written best-effort beside `last_used_at`. The application role
+    may insert into it and **cannot read it** (tested), so it reaches nobody
+    except as a count.
+  - "Taken over by another client" means a different client credential than
+    the one that created the handoff — the closest thing to "a client" the
+    server can see. Whether the next agent *understood* the handoff is not
+    measurable server-side, and the screen says so rather than implying it.
+- **Agent names are unique per registrar**, case-insensitively (migration
+  000027), as decided by the maintainer: one person cannot have two agents
+  called "codex", two people can. Agents with no recorded registrar
+  (registered before 000026, by `ccd installation create-service-principal`,
+  or whose registrar was deleted) are outside the rule. Existing duplicates
+  are renamed rather than failing the migration: the oldest keeps the name,
+  later ones get their id's first eight characters appended. A clash answers
+  409 "you have already registered an agent with this name".
+
 - **Sign-in through OpenID Connect** — the second directory backend
   [ADR 0019](docs/adr/0019-browser-authentication-and-directory-identity.md)
   decided, after LDAP. Authorization code flow with PKCE and discovery, so one

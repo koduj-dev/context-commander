@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bytes, date, stamp, time, utcStamp } from "./format";
+import { bytes, calendarDate, date, duration, stamp, time, utcStamp } from "./format";
 
 const SAMPLE = "2026-09-13T12:05:22Z";
 
@@ -55,5 +55,21 @@ describe("bytes", () => {
 describe("utcStamp", () => {
   it("is the shared reference an audit reader can correlate on", () => {
     expect(utcStamp(SAMPLE)).toBe("2026-09-13 12:05 UTC");
+  });
+});
+
+describe("duration", () => {
+  it("picks one unit by size", () => {
+    expect(duration(45, "en")).toBe("45 sec");
+    expect(duration(37.5 * 60, "en")).toBe("38 min");
+    expect(duration(3.5 * 3600, "en")).toBe("3.5 hr");
+    expect(duration(3 * 86400, "en")).toBe("3 days");
+  });
+});
+
+describe("calendarDate", () => {
+  it("keeps a server-fixed day whatever the reader's zone", () => {
+    // Formatted in UTC by construction, so no zone can turn Monday into Sunday.
+    expect(calendarDate("2026-10-26", "en", "ymd")).toBe("2026-10-26");
   });
 });

@@ -1,7 +1,7 @@
 import { useT } from "../i18n";
 import { useCrumbs } from "../app/crumbs";
 import { useFormat } from "../app/prefs";
-import { api } from "../lib/api";
+import { api, type InstallationTrends } from "../lib/api";
 import { useResource } from "../lib/resource";
 import {
   Badge,
@@ -216,7 +216,148 @@ export function AdminUsage() {
           </Stack>
         </Grid>
       </div>
+
+      <div className="mt">
+        <Trends />
+      </div>
     </>
+  );
+}
+
+/** Twelve weeks: a quarter, which is long enough to see a trend and short
+ *  enough that every row fits without a pager. */
+const TREND_WEEKS = 12;
+
+/**
+ * Usage over time and the handoff loop — loaded separately from the counts
+ * above, so a failure here leaves the rest of the screen standing.
+ */
+function Trends() {
+  const { data, error, loading, reload } = useResource(
+    () => api.installationTrends(TREND_WEEKS),
+    [],
+  );
+  if (loading) return <Loading />;
+  if (error || !data) return <ErrorState error={error} onRetry={reload} />;
+  return (
+    <Grid cols="2-1">
+      <Weekly weeks={data.weeks} />
+      <HandoffLoop flow={data.handoff_flow} />
+    </Grid>
+  );
+}
+
+function Weekly({ weeks }: { weeks: InstallationTrends["weeks"] }) {
+  const t = useT();
+  const f = useFormat();
+  const none = <span className="dim">—</span>;
+  // Newest first: the question a reader brings is "what about this week",
+  // and the series arrives oldest first because that is the order to draw.
+  const rows = [...weeks].reverse();
+
+  return (
+    <Panel
+      title={t("admin.usage.weekly", { count: weeks.length })}
+      tight
+      footer={<span className="dim">{t("admin.usage.weeklyHelp")}</span>}
+    >
+      <DataTable
+        columns={[
+          { key: "week", label: t("admin.usage.week") },
+          { key: "people", label: t("admin.usage.people"), align: "r" },
+          { key: "agents", label: t("admin.usage.agents"), align: "r" },
+          { key: "created", label: t("admin.usage.handedOff"), align: "r" },
+          { key: "claimed", label: t("admin.usage.claimed"), align: "r" },
+          { key: "other", label: t("admin.usage.byOtherClient"), align: "r" },
+          { key: "toClaim", label: t("admin.usage.medianToClaim"), align: "r" },
+          { key: "events", label: t("admin.usage.events"), align: "r" },
+        ]}
+      >
+        {rows.map((w) => (
+          <tr key={w.week_start}>
+            <td>
+              <span className="sec">{f.calendarDate(w.week_start)}</span>
+            </td>
+            <td className="r">
+              <span className="num">{f.number(w.active_users)}</span>
+            </td>
+            <td className="r">
+              <span className="num">{f.number(w.active_agents)}</span>
+            </td>
+            <td className="r">
+              <span className="num">{f.number(w.handoffs_created)}</span>
+            </td>
+            <td className="r">
+              <span className="num">{f.number(w.handoffs_claimed)}</span>
+            </td>
+            <td className="r">
+              <span className="num">{f.number(w.handoffs_claimed_by_other_client)}</span>
+            </td>
+            <td className="r">
+              {w.median_seconds_to_claim === undefined ? (
+                none
+              ) : (
+                <span className="num">{f.duration(w.median_seconds_to_claim)}</span>
+              )}
+            </td>
+            <td className="r">
+              <span className="num">{f.number(w.events)}</span>
+            </td>
+          </tr>
+        ))}
+      </DataTable>
+    </Panel>
+  );
+}
+
+/**
+ * Whether handing work from one agent to another actually happens, and how
+ * fast — NEXT.md's "time to first handoff", read from what the server
+ * records. It says nothing about whether the next agent understood what it
+ * was handed; the footer says so, because a screen of confident numbers
+ * invites the reader to assume it does.
+ */
+function HandoffLoop({ flow }: { flow: InstallationTrends["handoff_flow"] }) {
+  const t = useT();
+  const f = useFormat();
+  const time = (seconds?: number) =>
+    seconds === undefined ? (
+      <span className="dim">{t("admin.usage.notYet")}</span>
+    ) : (
+      <Mono>{f.duration(seconds)}</Mono>
+    );
+
+  return (
+    <Panel
+      title={t("admin.usage.loop")}
+      footer={<span className="dim">{t("admin.usage.loopHelp")}</span>}
+    >
+      {flow.handoffs === 0 ? (
+        <EmptyState title={t("handoff.none")} />
+      ) : (
+        <Defs>
+          <Def term={t("admin.usage.byOtherClient")}>
+            <Mono>{f.number(flow.claimed_by_other_client)}</Mono>{" "}
+            <span className="dim">{t("admin.usage.ofClaimed", { count: flow.claimed })}</span>
+          </Def>
+          <Def term={t("admin.usage.projectsWithTakeover")}>
+            <Mono>{f.number(flow.projects_with_takeover)}</Mono>{" "}
+            <span className="dim">{t("admin.usage.ofProjects", { count: flow.projects })}</span>
+          </Def>
+          <Def term={t("admin.usage.firstTakeover")}>
+            {time(flow.median_seconds_to_first_takeover)}
+          </Def>
+          <Def term={t("admin.usage.medianToClaim")}>{time(flow.median_seconds_to_claim)}</Def>
+          <Def term={t("admin.usage.p90ToClaim")}>{time(flow.p90_seconds_to_claim)}</Def>
+          <Def term={t("admin.usage.claimToClose")}>{time(flow.median_seconds_claim_to_close)}</Def>
+          <Def term={t("admin.usage.staleOpen")}>
+            <Badge tone={flow.stale_open > 0 ? "warn" : undefined}>
+              {f.number(flow.stale_open)}
+            </Badge>
+          </Def>
+        </Defs>
+      )}
+    </Panel>
   );
 }
 

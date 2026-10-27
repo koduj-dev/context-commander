@@ -714,4 +714,25 @@ export const de: Partial<Record<MessageKey, string>> = {
   "admin.usage.quiet": "Es ist noch nichts passiert",
   "admin.usage.quietBody":
     "Keine Ereignisse aufgezeichnet. Eine Installation mit Projekten, aber ohne Ereignisse ist eine, in die nichts geschrieben wurde.",
+  "admin.usage.weekly": "Letzte {count, plural, one {# Woche} other {# Wochen}}",
+  "admin.usage.week": "Woche",
+  "admin.usage.people": "Personen",
+  "admin.usage.agents": "Agenten",
+  "admin.usage.handedOff": "Übergeben",
+  "admin.usage.claimed": "Übernommen",
+  "admin.usage.byOtherClient": "Von einem anderen Client übernommen",
+  "admin.usage.medianToClaim": "Median bis zur Übernahme",
+  "admin.usage.weeklyHelp":
+    "Wochen beginnen montags, in UTC. Personen und Agenten zählen einmal pro Woche, wenn sie eine authentifizierte Anfrage gestellt haben; dieser Bildschirm kann sie zählen, aber nie benennen.",
+  "admin.usage.loop": "Übergabe-Kreislauf",
+  "admin.usage.loopHelp":
+    "Gemessen an dem, was der Server aufzeichnet: wann eine Übergabe erstellt, übernommen und abgeschlossen wurde, und über welchen Client. Ob der nächste Agent verstanden hat, was ihm übergeben wurde, kann der Server nicht sehen.",
+  "admin.usage.ofClaimed": "von {count, plural, one {# übernommenen} other {# übernommenen}}",
+  "admin.usage.ofProjects": "von {count, plural, one {# Projekt} other {# Projekten}}",
+  "admin.usage.projectsWithTakeover": "Projekte mit einer Übernahme",
+  "admin.usage.firstTakeover": "Projektbeginn bis zur ersten Übernahme (Median)",
+  "admin.usage.p90ToClaim": "Zeit bis zur Übernahme, 90. Perzentil",
+  "admin.usage.claimToClose": "Übernahme bis Abschluss (Median)",
+  "admin.usage.staleOpen": "Länger als 7 Tage offen",
+  "admin.usage.notYet": "Noch nicht gemessen",
 };

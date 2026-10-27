@@ -153,7 +153,10 @@ func (s *Store) CreateServicePrincipal(ctx context.Context, tx pgx.Tx, name, des
 		name, description, createdBy,
 	).Scan(&sp.ID, &sp.Name, &sp.Description, &sp.CreatedAt, &sp.CreatedBy)
 	if isUniqueViolation(err) {
-		return ServicePrincipal{}, fmt.Errorf("%w: a service principal with this name", ErrAlreadyExists)
+		// The only unique key on this table is per registrar
+		// (migrations/000027), so the clash is always with an agent the same
+		// person registered — and saying so tells them where to look.
+		return ServicePrincipal{}, fmt.Errorf("%w: you have already registered an agent with this name", ErrAlreadyExists)
 	}
 	if err != nil {
 		return ServicePrincipal{}, fmt.Errorf("identity: create service principal: %w", err)
@@ -282,6 +285,23 @@ func (s *Store) TouchCredentialLastUsed(ctx context.Context, tx pgx.Tx, id uuid.
 	_, err := tx.Exec(ctx, `UPDATE client_credentials SET last_used_at = now() WHERE id = $1`, id)
 	if err != nil {
 		return fmt.Errorf("identity: touch credential: %w", err)
+	}
+	return nil
+}
+
+// RecordActivity notes that principalID made an authenticated request today
+// (UTC), for the weekly counts in cc_installation_trends()
+// (migrations/000028). Once per principal per day: a repeat is a no-op.
+//
+// The application can write this table and never read it back — a principal's
+// active days reach nobody except as a count.
+func (s *Store) RecordActivity(ctx context.Context, tx pgx.Tx, principalID uuid.UUID) error {
+	_, err := tx.Exec(ctx,
+		`INSERT INTO principal_activity_days (day, principal_id)
+		 VALUES ((now() AT TIME ZONE 'UTC')::date, $1)
+		 ON CONFLICT DO NOTHING`, principalID)
+	if err != nil {
+		return fmt.Errorf("identity: record activity: %w", err)
 	}
 	return nil
 }
