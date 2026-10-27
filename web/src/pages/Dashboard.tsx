@@ -5,7 +5,8 @@ import { useAuth } from "../app/auth";
 import { useFormat } from "../app/prefs";
 import { api, principalName, type MyProject, type WaitingHandoff } from "../lib/api";
 import { roleLabel } from "../lib/labels";
-import { useResource } from "../lib/resource";
+import { usePolled, useResource } from "../lib/resource";
+import { BOARD_REFRESH_MS, PresenceTable } from "./ProjectPlans";
 import {
   Badge,
   Cell,
@@ -121,6 +122,7 @@ export function Dashboard() {
               </DataTable>
             )}
           </Panel>
+          <WorkingNow />
         </Stack>
 
         <Stack top>
@@ -163,5 +165,26 @@ export function Dashboard() {
         </Stack>
       </Grid>
     </>
+  );
+}
+
+/**
+ * Who is working where, across every project the reader is in — the panel
+ * for checking on an agent left running at home. Refreshes itself while
+ * visible (docs/adr/0022).
+ */
+function WorkingNow() {
+  const t = useT();
+  const presence = usePolled(() => api.myPresence(), [], BOARD_REFRESH_MS);
+  return (
+    <Panel title={t("dashboard.workingNow")} sub={t("plans.refreshes")} tight>
+      {presence.loading ? (
+        <Loading />
+      ) : presence.error || !presence.data ? (
+        <ErrorState error={presence.error} onRetry={presence.reload} />
+      ) : (
+        <PresenceTable items={presence.data.items} people={presence.data.people} showProject />
+      )}
+    </Panel>
   );
 }

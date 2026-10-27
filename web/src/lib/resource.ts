@@ -154,3 +154,69 @@ export function useDebounced<T>(value: T, ms = 250): T {
   }, [value, ms]);
   return debounced;
 }
+
+/**
+ * A read that keeps itself current: loaded once, then again every
+ * `intervalMs` while the page is visible.
+ *
+ * A refresh never goes back to "loading" — the rows on screen stay put while
+ * the next answer is in flight, or a board someone is watching would blink
+ * every ten seconds. A refresh that fails keeps the last good answer and
+ * reports `stale`; only a first load that fails is an error.
+ */
+export type Polled<T> = Resource<T> & { stale: boolean };
+
+export function usePolled<T>(
+  load: () => Promise<T>,
+  deps: unknown[],
+  intervalMs: number,
+): Polled<T> {
+  const [data, setData] = useState<T>();
+  const [error, setError] = useState<unknown>();
+  const [loading, setLoading] = useState(true);
+  const [stale, setStale] = useState(false);
+  const generation = useRef(0);
+  const hasData = useRef(false);
+  // reload() refreshes in place, like a tick: after a change someone made
+  // on this screen, the board should update, not disappear and come back.
+  const refresh = useRef<() => void>(() => {});
+
+  useEffect(() => {
+    const mine = ++generation.current;
+    hasData.current = false;
+    setLoading(true);
+    setError(undefined);
+    setData(undefined);
+
+    const fetchOnce = () => {
+      load()
+        .then((value) => {
+          if (generation.current !== mine) return;
+          hasData.current = true;
+          setData(value);
+          setError(undefined);
+          setStale(false);
+        })
+        .catch((err: unknown) => {
+          if (generation.current !== mine) return;
+          if (hasData.current) setStale(true);
+          else setError(err);
+        })
+        .finally(() => {
+          if (generation.current === mine) setLoading(false);
+        });
+    };
+    refresh.current = fetchOnce;
+
+    fetchOnce();
+    const timer = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      fetchOnce();
+    }, intervalMs);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [...deps, intervalMs]);
+
+  const reload = useCallback(() => refresh.current(), []);
+  return { data, error, loading, reload, stale };
+}

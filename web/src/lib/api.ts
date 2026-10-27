@@ -631,6 +631,117 @@ export type InstallationStats = {
  * a median of, which is not the same as zero.
  */
 /**
+ * Plans, phases and presence (adapters/http/plans.go, docs/adr/0022). People
+ * travel as ids plus a `people` map on the reads that name them.
+ */
+export type ItemStatus = "open" | "in_progress" | "done" | "blocked" | "skipped";
+export type ItemKind = "task" | "check";
+export type PlanStatus = "draft" | "active" | "done" | "abandoned";
+export type PhaseStatus = "planned" | "active" | "done";
+
+export type Effort = { seconds: number; tokens_in: number; tokens_out: number };
+export type Counts = {
+  open: number;
+  in_progress: number;
+  done: number;
+  blocked: number;
+  skipped: number;
+};
+
+export type PlanItem = {
+  id: string;
+  plan_id: string;
+  position: number;
+  kind: ItemKind;
+  status: ItemStatus;
+  text: string;
+  note?: string;
+  assignee?: string;
+  updated_by?: string;
+  updated_at: string;
+  completed_at?: string;
+  effort: Effort;
+};
+
+export type Plan = {
+  id: string;
+  phase_id?: string;
+  status: PlanStatus;
+  version: number;
+  title: string;
+  body: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  items: PlanItem[];
+};
+
+export type Phase = {
+  id: string;
+  position: number;
+  status: PhaseStatus;
+  title: string;
+  goal: string;
+  counts: Counts;
+  effort: Effort;
+};
+
+export type PlanSummary = {
+  id: string;
+  phase_id?: string;
+  status: PlanStatus;
+  title: string;
+  created_by: string;
+  updated_at: string;
+  counts: Counts;
+  effort: Effort;
+};
+
+export type Presence = {
+  client_id: string;
+  client_type: string;
+  principal_id: string;
+  you: boolean;
+  project: string;
+  plan_id?: string;
+  plan_title?: string;
+  item_id?: string;
+  item_text?: string;
+  activity?: string;
+  since: string;
+  last_seen: string;
+  idle: boolean;
+};
+
+export type Person = { kind: "user" | "service"; name: string };
+
+export type Board = {
+  phases: Phase[];
+  plans: PlanSummary[];
+  in_progress: { plan_title: string; item: PlanItem }[];
+  blocked: { plan_title: string; item: PlanItem }[];
+  presence: Presence[];
+  people: Record<string, Person>;
+};
+
+export type PlanHit = {
+  plan_id: string;
+  plan_title: string;
+  plan_status: PlanStatus;
+  item_id?: string;
+  text: string;
+  status: string;
+};
+
+export type ItemChange = {
+  status?: ItemStatus;
+  text?: string;
+  note?: string;
+  /** null unassigns; absent leaves the assignee alone. */
+  assignee?: string | null;
+};
+
+/**
  * One namespace's storage (adapters/http/storage.go). limit_bytes is what is
  * enforced and is absent when nothing limits the namespace. override and
  * created_at come only with the admin listing.
@@ -828,6 +939,67 @@ export const api = {
     }),
   deleteSecret: (ns: string, slug: string, name: string) =>
     request<void>(`${project(ns, slug)}/secrets/${encodeURIComponent(name)}`, { method: "DELETE" }),
+
+  planBoard: (ns: string, slug: string) => request<Board>(`${project(ns, slug)}/plans/board`),
+  plan: (ns: string, slug: string, id: string) => request<Plan>(`${project(ns, slug)}/plans/${id}`),
+  createPlan: (
+    ns: string,
+    slug: string,
+    plan: {
+      title: string;
+      body?: string;
+      phase_id?: string;
+      items: { text: string; kind?: ItemKind }[];
+    },
+  ) => request<Plan>(`${project(ns, slug)}/plans/`, { method: "POST", body: plan }),
+  updatePlan: (
+    ns: string,
+    slug: string,
+    id: string,
+    change: {
+      status?: PlanStatus;
+      phase_id?: string | null;
+      title?: string;
+      body?: string;
+      expected_version?: number;
+    },
+  ) => request<Plan>(`${project(ns, slug)}/plans/${id}`, { method: "PATCH", body: change }),
+  deletePlan: (ns: string, slug: string, id: string) =>
+    request<void>(`${project(ns, slug)}/plans/${id}`, { method: "DELETE" }),
+  addPlanItems: (
+    ns: string,
+    slug: string,
+    id: string,
+    items: { text: string; kind?: ItemKind }[],
+  ) => request<Plan>(`${project(ns, slug)}/plans/${id}/items`, { method: "POST", body: { items } }),
+  updatePlanItem: (ns: string, slug: string, itemID: string, change: ItemChange) =>
+    request<PlanItem>(`${project(ns, slug)}/plans/items/${itemID}`, {
+      method: "PATCH",
+      body: change,
+    }),
+  // Bare arrays: search is capped on the server, history at 20 per item.
+  searchPlans: (ns: string, slug: string, q: string, status?: ItemStatus) =>
+    request<PlanHit[]>(withQuery(`${project(ns, slug)}/plans/search`, { q, status })),
+  createPhase: (ns: string, slug: string, title: string, goal?: string) =>
+    request<Phase>(`${project(ns, slug)}/phases/`, { method: "POST", body: { title, goal } }),
+  updatePhase: (
+    ns: string,
+    slug: string,
+    id: string,
+    change: { status?: PhaseStatus; title?: string; goal?: string },
+  ) => request<Phase>(`${project(ns, slug)}/phases/${id}`, { method: "PATCH", body: change }),
+  deletePhase: (ns: string, slug: string, id: string) =>
+    request<void>(`${project(ns, slug)}/phases/${id}`, { method: "DELETE" }),
+  // The browser session is a client too: marking an item as yours puts you
+  // on the board like any agent.
+  reportPresence: (ns: string, slug: string, itemID?: string, activity?: string) =>
+    request<Presence>(`${project(ns, slug)}/plans/presence`, {
+      method: "POST",
+      body: { item_id: itemID, activity },
+    }),
+  clearPresence: (ns: string, slug: string) =>
+    request<void>(`${project(ns, slug)}/plans/presence`, { method: "DELETE" }),
+  myPresence: () => request<{ items: Presence[]; people: Record<string, Person> }>("/me/presence"),
 
   gateBindings: (ns: string, slug: string) =>
     request<GateBinding[]>(`${project(ns, slug)}/gates/bindings`),

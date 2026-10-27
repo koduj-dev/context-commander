@@ -55,6 +55,7 @@ export function ProjectLayout() {
       <Tabs label={data.name}>
         {tab(base, t("project.tab.overview"), true)}
         {tab(`${base}/context`, t("context.title"))}
+        {tab(`${base}/plans`, t("project.tab.plans"))}
         {tab(`${base}/artifacts`, t("artifacts.title"))}
         {tab(`${base}/skills`, t("project.tab.skills"))}
         {tab(`${base}/policies`, t("gates.title"))}

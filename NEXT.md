@@ -230,21 +230,26 @@ Only on top of a core loop people actually use:
 - [ ] Signed/trusted skill packages and an approval workflow.
 - [ ] Operational telemetry that doesn't leak content.
 
-- [ ] **Plans, phases and progress across a team** (raised by the maintainer's
-      colleagues, 2026-10-27). An agent writes execution plans and procedures at the
-      start of a task, and after that nobody sees them again: you cannot search them,
-      nothing marks what is done, and three people on one project cannot tell what
-      the others are working on or how far the project has got. What they asked for:
-      - phases made of plans, even short ones;
-      - task lists and operational checks inside them;
-      - a real state of the project, visible to everyone;
-      - all of it offered over MCP, so agents and developers can build a synthesis
-        from each other's work.
-
-      Needs an ADR first. Open questions:
-      - whether a plan is a new primitive or a structured artifact;
-      - who may tick what;
-      - how "where is everyone" relates to handoffs and to Phase 2's subscriptions.
+- [x] ~~**Plans, phases and progress across a team**~~ Closed 2026-10-27
+      ([ADR 0022](docs/adr/0022-plans-phases-and-presence.md)). Covers phases →
+      plans → items (task / check), live presence with tracked time and
+      reported tokens, the MCP `plan.*` tools, the `context.bootstrap` work
+      section, the project's Plans tab and "Who is working where" on the
+      dashboard. Raised by the maintainer's colleagues. Still open:
+      - **Reordering.** Phases and items keep their creation order; nothing
+        moves them yet.
+      - **Token counts depend on the client.** Hooks or a wrapper have to pass
+        them to `plan.report`. A model cannot see its own usage, so without one
+        the token columns stay empty. A ready-made Claude Code hook would close
+        this.
+      - **Live updates are polling** every 10 s. Push comes with Phase 2's
+        subscriptions.
+      - **Search is per project.**
+- [ ] **A wrong id in `POST /projects/{ns}/{slug}/members` or
+      `POST /installation/principals/{id}/tokens` is a 500.** Passing a service
+      principal's id where its *principal* id belongs fails on a foreign key and
+      surfaces as "internal error" instead of 400/404. Found while seeding an
+      E2E on 2026-10-27.
 
 ### UI — remaining spec surface
 

@@ -25,6 +25,7 @@ import { Organizations } from "./pages/Organizations";
 import { Tokens } from "./pages/Tokens";
 import { AdminUsage } from "./pages/AdminUsage";
 import { AdminStorage } from "./pages/AdminStorage";
+import { ProjectPlans } from "./pages/ProjectPlans";
 import {
   Administration,
   AdminPeople,
@@ -88,6 +89,7 @@ export function App() {
         <Route path="p/:namespace/:slug" element={<ProjectLayout />}>
           <Route index element={<ProjectOverview />} />
           <Route path="context" element={<ProjectContext />} />
+          <Route path="plans" element={<ProjectPlans />} />
           <Route path="artifacts" element={<ProjectArtifacts />} />
           <Route path="skills" element={<ProjectSkills />} />
           <Route path="policies" element={<ProjectPolicies />} />
