@@ -23,7 +23,9 @@ database forward. Install it as described in
     `SHA256SUMS`, an SPDX SBOM and a keyless cosign signature;
   - build provenance for every binary and package;
   - `.deb` and `.rpm` packages, also published to the signed APT repository
-    shared with Docker Commander (`apt install ccd`);
+    shared with Docker Commander (`apt install ccd`). They include a manual
+    page for every command (`man ccd`, `man ccd-serve`), generated from the
+    commands themselves at build time so the pages match `--help`;
   - a signed multi-arch image, `ghcr.io/koduj-dev/context-commander`;
   - a Homebrew formula (`brew install koduj-dev/tap/ccd`).
 

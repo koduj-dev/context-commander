@@ -1,10 +1,15 @@
-.PHONY: dev-up dev-down build ui test lint migrate migrate-down tidy release clean
+.PHONY: dev-up dev-down build ui test lint migrate migrate-down tidy release man clean
 
 BINARY  := ccd
 PKG     := ./cmd/ccd
 OUT     := dist-bin
 VERSION ?= dev
 LDFLAGS := -s -w -X main.version=$(VERSION)
+MANDIR  := dist-man
+# Pages are dated by the commit, not the build, so rebuilding a tag
+# reproduces them byte for byte.
+SOURCE_DATE_EPOCH ?= $(shell git log -1 --format=%ct 2>/dev/null)
+export SOURCE_DATE_EPOCH
 
 GOBIN := $(shell go env GOPATH)/bin
 DB_OWNER_URL ?= postgres://cc_owner:cc_owner_dev_password@localhost:5432/context_commander?sslmode=disable
@@ -42,9 +47,19 @@ release: ui
 	GOOS=windows GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o $(OUT)/$(BINARY)-windows-arm64.exe $(PKG)
 	@cd $(OUT) && sha256sum $(BINARY)-* > SHA256SUMS
 	@echo "binaries + SHA256SUMS written to $(OUT)/ (version $(VERSION))"
+	$(MAKE) man
+
+## man: generate the manual pages from the command tree into dist-man/,
+## gzipped as Debian policy wants. The .deb and .rpm ship them. They are not
+## committed: generated at build time, they cannot drift from --help. Kept
+## out of dist-bin/ because the release uploads everything in that directory.
+man:
+	rm -rf $(MANDIR) && mkdir -p $(MANDIR)
+	go run -ldflags "$(LDFLAGS)" $(PKG) man $(MANDIR)
+	gzip -9n $(MANDIR)/*.1
 
 clean:
-	rm -rf bin $(OUT) out deploy/packaging/ccd.service.rendered
+	rm -rf bin $(OUT) $(MANDIR) out
 
 # Integration tests spin up a real Postgres via testcontainers-go
 # (internal/dbtest) — Docker must be running. Real DB, not mocks: see

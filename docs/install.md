@@ -44,6 +44,7 @@ What the package installs:
 | Path | What it is |
 |------|------------|
 | `/usr/bin/ccd` | the server and CLI |
+| `man ccd`, `man ccd-serve`, … | one manual page per command, generated from `--help` |
 | `ccd.service` | the server, as user `ccd`, on `127.0.0.1:8490` |
 | `ccd-migrate.service` | migrations, run before every start of `ccd.service` |
 | `/etc/context-commander/ccd.env` | server settings (`root:ccd`, 0640) |

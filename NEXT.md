@@ -388,9 +388,10 @@ on the planned move to a public repo:
   be able to download.
 - [ ] The shared APT repo's `conf/distributions` still says
   `Label: Docker Commander`; rename it to something covering both.
-- [ ] No man page (docker-commander ships `dockercmd.1`), no installer
-  scripts, no self-update. A man page should be generated from cobra, not
-  written by hand, or it drifts from `--help`.
+- [x] Man pages, one per command, generated from the cobra tree at build
+  time (`make man`, hidden `ccd man DIR`) and shipped in the .deb/.rpm.
+  The Homebrew formula installs only the binary, so no pages there yet.
+- [ ] No installer scripts and no self-update (docker-commander has both).
 - [ ] The two projects' apt publishes are serialized only per repo. A
   simultaneous publish refuses the second push; re-run it.
 
