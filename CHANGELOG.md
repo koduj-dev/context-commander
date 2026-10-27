@@ -41,6 +41,14 @@ link definition at the bottom of the file.
     says why a sign-in came back failed — cancelled, expired, provider
     unreachable, no address, unverified address — in all six languages. The
     provider's own error text is never shown or put in a URL.
+  - **Sign-up is off by default** ([ADR 0020](docs/adr/0020-oidc-sign-up-is-off-by-default.md)).
+    Without `--oidc-allow-signup`, OIDC reaches only accounts that exist —
+    already linked, or created by an administrator under the same address —
+    and anyone else is told an administrator has to create their account,
+    with nothing written. Pointed at Google, the alternative was open
+    registration for everyone with a Google account. `--oidc-allowed-domains`
+    limits sign-in to verified addresses in the listed domains, on every
+    sign-in, exact match.
   - **Hardened after an independent review**, before any release:
     - The issuer and the redirect must be **https** unless they are on
       loopback. Plain http to the issuer let anyone on the path serve their

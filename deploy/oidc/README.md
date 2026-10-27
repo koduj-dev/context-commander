@@ -91,7 +91,14 @@ Unlike a missing email, an unverified one *can* be seeded: with the realm's
       --oidc-client-id context-commander \
       --oidc-client-secret-file /tmp/oidc-secret \
       --oidc-redirect-url http://127.0.0.1:12001/v1/auth/oidc/callback \
-      --oidc-name keycloak --oidc-label Keycloak
+      --oidc-name keycloak --oidc-label Keycloak \
+      --oidc-allow-signup
+
+`--oidc-allow-signup` because nobody in the realm has an account here yet.
+Without it the first sign-in is refused with "no account" — which is the
+production default (ADR 0020), and worth seeing once: create an account for
+`bob@example.test` as an administrator, drop the flag, and `bob` gets in
+while `alice` does not.
 
 Port 12001 because that is what the realm registers as a redirect URI, and a
 provider matches redirect URIs byte for byte: `localhost` and `127.0.0.1` are

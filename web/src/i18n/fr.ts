@@ -72,6 +72,10 @@ export const fr: Partial<Record<MessageKey, string>> = {
   "auth.oidcEmailUnverified":
     "Votre adresse e-mail chez le fournisseur de connexion n’est pas vérifiée ; elle ne peut donc pas servir à vous connecter ici. Vérifiez-la là-bas puis réessayez.",
   "auth.oidcFailed": "La connexion via le fournisseur n’a pas abouti. Recommencez.",
+  "auth.oidcNoAccount":
+    "Vous vous êtes connecté chez le fournisseur, mais aucun compte n’existe pour vous ici, et cette installation n’en crée pas automatiquement. Demandez à une personne avec les droits d’administration d’en créer un à votre adresse e-mail.",
+  "auth.oidcDomainNotAllowed":
+    "Votre adresse e-mail n’appartient à aucun domaine que cette installation accepte pour la connexion via ce fournisseur.",
   "auth.indistinct":
     "Un mot de passe erroné, une adresse sans compte et un compte sans mot de passe se lisent de la même façon ici. Préciser lequel reviendrait à dire à celui qui devine que la moitié de sa supposition était juste.",
   "setup.title": "Créer le premier compte d’administration",

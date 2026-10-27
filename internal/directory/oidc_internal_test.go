@@ -49,3 +49,46 @@ func TestDiscoveryFailureIsRememberedBriefly(t *testing.T) {
 		t.Fatalf("provider asked %d times after the window, want 2 — a provider that recovers must be retried", got)
 	}
 }
+
+func TestAllowedDomainsMatchExactlyAndIgnoreCase(t *testing.T) {
+	o, err := NewOIDC(OIDCConfig{
+		IssuerURL: "https://id.example.test/realms/x", ClientID: "cc", ClientSecret: "s",
+		RedirectURL:    "https://cc.example.test/v1/auth/oidc/callback",
+		AllowedDomains: []string{" Example.COM ", ""},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cases := map[string]bool{
+		"ana@example.com":      true,
+		"ANA@EXAMPLE.COM":      true,
+		"ana@mail.example.com": false, // no subdomains
+		"ana@example.com.evil": false, // not a suffix match either
+		"ana@evilexample.com":  false,
+		"example.com":          false, // no @ at all
+		"a@b@example.com":      true,  // the domain is what follows the last @
+	}
+	for email, want := range cases {
+		if got := o.domainAllowed(email); got != want {
+			t.Errorf("domainAllowed(%q) = %v, want %v", email, got, want)
+		}
+	}
+
+	open, _ := NewOIDC(OIDCConfig{
+		IssuerURL: "https://id.example.test/realms/x", ClientID: "cc", ClientSecret: "s",
+		RedirectURL: "https://cc.example.test/v1/auth/oidc/callback",
+	})
+	if !open.domainAllowed("anyone@anywhere.test") {
+		t.Error("with no list configured, every domain must be admitted")
+	}
+
+	for _, bad := range []string{"@example.com", "ana@example.com", ".example.com"} {
+		if _, err := NewOIDC(OIDCConfig{
+			IssuerURL: "https://id.example.test/realms/x", ClientID: "cc", ClientSecret: "s",
+			RedirectURL:    "https://cc.example.test/v1/auth/oidc/callback",
+			AllowedDomains: []string{bad},
+		}); err == nil {
+			t.Errorf("allowed domain %q accepted; want a configuration error", bad)
+		}
+	}
+}

@@ -49,6 +49,28 @@ type DirectoryIdentity struct {
 // No role, no membership, no admin grant is given here. A directory proves who
 // someone is, not what they may do (docs/adr/0019).
 func ProvisionDirectoryUser(ctx context.Context, pool *db.Pool, id DirectoryIdentity) (Principal, error) {
+	return ProvisionDirectoryUserWith(ctx, pool, id, ProvisionPolicy{CreateMissing: true})
+}
+
+// ErrNoAccount means a directory authenticated someone who has no account
+// here, and the policy forbids creating one. Distinct from a failed sign-in:
+// the person proved who they are, and what they need is an administrator.
+var ErrNoAccount = errors.New("identity: no account for this directory identity, and creating one is not allowed")
+
+// ProvisionPolicy is what a directory is trusted to do beyond proving who
+// someone is (docs/adr/0020).
+type ProvisionPolicy struct {
+	// CreateMissing allows case 3 — a brand-new user on first sign-in. Right
+	// for a closed directory (a company's LDAP, its own Keycloak); wrong for
+	// an issuer anyone can hold an account at, where it would be open
+	// self-registration. Without it, cases 1 and 2 still work: an existing
+	// link, or an account an administrator created under the same address.
+	CreateMissing bool
+}
+
+// ProvisionDirectoryUserWith is ProvisionDirectoryUser under an explicit
+// policy.
+func ProvisionDirectoryUserWith(ctx context.Context, pool *db.Pool, id DirectoryIdentity, policy ProvisionPolicy) (Principal, error) {
 	if id.Provider == "" || id.Subject == "" {
 		return Principal{}, errors.New("identity: provision: provider and subject are required")
 	}
@@ -75,7 +97,7 @@ func ProvisionDirectoryUser(ctx context.Context, pool *db.Pool, id DirectoryIden
 		case err == nil:
 			// Case 1.
 		case errors.Is(err, ErrNotFound):
-			userID, err = linkOrCreate(ctx, tx, store, id, name)
+			userID, err = linkOrCreate(ctx, tx, store, id, name, policy)
 			if err != nil {
 				return err
 			}
@@ -98,7 +120,7 @@ func ProvisionDirectoryUser(ctx context.Context, pool *db.Pool, id DirectoryIden
 	return principal, nil
 }
 
-func linkOrCreate(ctx context.Context, tx pgx.Tx, store *Store, id DirectoryIdentity, name string) (uuid.UUID, error) {
+func linkOrCreate(ctx context.Context, tx pgx.Tx, store *Store, id DirectoryIdentity, name string, policy ProvisionPolicy) (uuid.UUID, error) {
 	// Case 2: an account already exists under this address. GetUserByEmail is
 	// case-insensitive (migrations/000025), which matters here because a
 	// directory records addresses however its administrator typed them.
@@ -111,6 +133,9 @@ func linkOrCreate(ctx context.Context, tx pgx.Tx, store *Store, id DirectoryIden
 		return existing.ID, nil
 	case errors.Is(err, ErrNotFound):
 		// Case 3.
+		if !policy.CreateMissing {
+			return uuid.Nil, ErrNoAccount
+		}
 	default:
 		return uuid.Nil, err
 	}

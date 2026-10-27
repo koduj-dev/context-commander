@@ -394,3 +394,24 @@ func TestNewOIDC_ValidatesAtStartup(t *testing.T) {
 		}
 	}
 }
+
+func TestOIDC_AllowedDomainsApplyToTheVerifiedAddress(t *testing.T) {
+	refused := newKeycloakOIDC(t, func(c *directory.OIDCConfig) { c.AllowedDomains = []string{"elsewhere.test"} })
+	code, req := begin(t, refused, "alice")
+	if _, err := refused.Exchange(context.Background(), code, req); !errors.Is(err, directory.ErrDomainNotAllowed) {
+		t.Fatalf("alice@example.test with only elsewhere.test allowed: want ErrDomainNotAllowed, got %v", err)
+	}
+
+	admitted := newKeycloakOIDC(t, func(c *directory.OIDCConfig) { c.AllowedDomains = []string{"EXAMPLE.test"} })
+	code, req = begin(t, admitted, "alice")
+	if _, err := admitted.Exchange(context.Background(), code, req); err != nil {
+		t.Fatalf("alice@example.test with example.test allowed: %v", err)
+	}
+
+	// The verification check comes first: erin's address is in an allowed
+	// domain but unverified, and must be refused for that, not admitted.
+	code, req = begin(t, admitted, "erin")
+	if _, err := admitted.Exchange(context.Background(), code, req); !errors.Is(err, directory.ErrEmailNotVerified) {
+		t.Fatalf("erin: want ErrEmailNotVerified, got %v", err)
+	}
+}

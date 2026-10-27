@@ -33,6 +33,10 @@ var (
 	// a colleague's address into their profile at the provider sign in as
 	// that colleague here.
 	ErrEmailNotVerified = errors.New("directory: provider has not verified the email address")
+
+	// ErrDomainNotAllowed means the address is verified but its domain is
+	// not one this installation accepts from the provider (docs/adr/0020).
+	ErrDomainNotAllowed = errors.New("directory: email domain is not allowed to sign in")
 )
 
 // OIDCConfig describes one OpenID Connect provider. Discovery
@@ -78,6 +82,20 @@ type OIDCConfig struct {
 	// Timeout bounds each request to the provider — discovery, key fetch,
 	// code exchange.
 	Timeout time.Duration
+
+	// AllowSignup lets a first sign-in create a local account. Off by
+	// default: an issuer like Google authenticates anyone on the internet,
+	// and creating accounts for all of them is open self-registration. Off,
+	// a person still gets in through an account that is already linked or
+	// one an administrator created under the same address (docs/adr/0020).
+	AllowSignup bool
+
+	// AllowedDomains, when not empty, restricts every sign-in through this
+	// provider to verified addresses in these domains — checked on each
+	// sign-in, not only the first, so narrowing the list takes effect for
+	// people already linked. Exact match on the part after @, no
+	// subdomains: "example.com" does not admit "mail.example.com".
+	AllowedDomains []string
 }
 
 const (
@@ -156,6 +174,18 @@ func NewOIDC(cfg OIDCConfig) (*OIDC, error) {
 	if cfg.Timeout <= 0 {
 		cfg.Timeout = defaultOIDCTimeout
 	}
+	domains := make([]string, 0, len(cfg.AllowedDomains))
+	for _, d := range cfg.AllowedDomains {
+		d = strings.ToLower(strings.TrimSpace(d))
+		if d == "" {
+			continue
+		}
+		if strings.Contains(d, "@") || strings.HasPrefix(d, ".") {
+			return nil, fmt.Errorf("directory: oidc allowed domain %q must be a bare domain like example.com", d)
+		}
+		domains = append(domains, d)
+	}
+	cfg.AllowedDomains = domains
 
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	if cfg.CACertFile != "" {
@@ -225,6 +255,28 @@ func (o *OIDC) Provider() string { return o.cfg.Name }
 
 // Label returns what the sign-in button should say.
 func (o *OIDC) Label() string { return o.cfg.Label }
+
+// AllowsSignup reports whether a first sign-in may create a local account.
+func (o *OIDC) AllowsSignup() bool { return o.cfg.AllowSignup }
+
+// domainAllowed reports whether email's domain is admitted. Everything is
+// admitted when no list is configured.
+func (o *OIDC) domainAllowed(email string) bool {
+	if len(o.cfg.AllowedDomains) == 0 {
+		return true
+	}
+	at := strings.LastIndexByte(email, '@')
+	if at < 0 {
+		return false
+	}
+	domain := strings.ToLower(email[at+1:])
+	for _, d := range o.cfg.AllowedDomains {
+		if domain == d {
+			return true
+		}
+	}
+	return false
+}
 
 // AuthRequest is the per-attempt secret state of one sign-in: the state that
 // ties the callback to the browser that started it, the nonce that ties the
@@ -372,6 +424,12 @@ func (o *OIDC) Exchange(ctx context.Context, code string, req AuthRequest) (Iden
 		// The subject, not the address: this error is logged, and an address
 		// the provider has not verified may not even belong to the person.
 		return Identity{}, fmt.Errorf("%w: subject %s at provider %s", ErrEmailNotVerified, idToken.Subject, o.cfg.Name)
+	}
+
+	// After the verification check, never before: an unverified address
+	// could claim any domain it likes.
+	if !o.domainAllowed(claims.Email) {
+		return Identity{}, fmt.Errorf("%w: subject %s at provider %s", ErrDomainNotAllowed, idToken.Subject, o.cfg.Name)
 	}
 
 	name := claims.Name

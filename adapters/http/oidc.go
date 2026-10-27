@@ -208,12 +208,21 @@ func (d Deps) finishOIDCSignIn(w http.ResponseWriter, r *http.Request) {
 
 	// Nothing about authorization happens here: a directory proves who
 	// someone is, not what they may do (docs/adr/0019).
-	principal, err := identity.ProvisionDirectoryUser(r.Context(), d.Pool, identity.DirectoryIdentity{
+	principal, err := identity.ProvisionDirectoryUserWith(r.Context(), d.Pool, identity.DirectoryIdentity{
 		Provider:    id.Provider,
 		Subject:     id.Subject,
 		Email:       id.Email,
 		DisplayName: id.DisplayName,
-	})
+	}, identity.ProvisionPolicy{CreateMissing: p.AllowsSignup()})
+	if errors.Is(err, identity.ErrNoAccount) {
+		// Authenticated, and simply not a user here. Safe to say: only
+		// reachable after the provider proved who this is, and what they
+		// need is an administrator, not another attempt.
+		slog.InfoContext(r.Context(), "oidc sign-in for someone with no account, and sign-up is off",
+			"provider", attempt.Provider, "request_id", middleware.GetReqID(r.Context()))
+		signInFailed(w, r, "oidc_no_account")
+		return
+	}
 	if err != nil {
 		slog.ErrorContext(r.Context(), "could not provision an oidc user",
 			"err", err, "provider", attempt.Provider, "request_id", middleware.GetReqID(r.Context()))
@@ -251,6 +260,9 @@ func (d Deps) oidcExchangeFailed(w http.ResponseWriter, r *http.Request, provide
 	case errors.Is(err, directory.ErrEmailNotVerified):
 		log("oidc provider released an unverified email")
 		signInFailed(w, r, "oidc_email_unverified")
+	case errors.Is(err, directory.ErrDomainNotAllowed):
+		log("oidc sign-in from a domain this installation does not accept")
+		signInFailed(w, r, "oidc_domain_not_allowed")
 	default:
 		// Rejected: a bad code, a token that failed verification, a nonce
 		// that did not match. Recorded, because a verification failure is the

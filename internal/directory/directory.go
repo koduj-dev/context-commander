@@ -88,6 +88,10 @@ type RedirectAuthenticator interface {
 	// Label is what the sign-in button says.
 	Label() string
 
+	// AllowsSignup reports whether a first sign-in may create a local
+	// account, rather than only reach one that exists (docs/adr/0020).
+	AllowsSignup() bool
+
 	// AuthCodeURL is where to send the browser for this attempt.
 	AuthCodeURL(req AuthRequest) (string, error)
 

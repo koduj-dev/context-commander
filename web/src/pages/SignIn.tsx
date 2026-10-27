@@ -34,6 +34,8 @@ const oidcErrors: Record<string, MessageKey> = {
   oidc_no_email: "auth.oidcNoEmail",
   oidc_email_unverified: "auth.oidcEmailUnverified",
   oidc_failed: "auth.oidcFailed",
+  oidc_no_account: "auth.oidcNoAccount",
+  oidc_domain_not_allowed: "auth.oidcDomainNotAllowed",
 };
 
 /**

@@ -240,7 +240,10 @@ func newServeCmd() *cobra.Command {
 			}
 			if oidcDir != nil {
 				oidcProviders = append(oidcProviders, oidcDir)
-				slog.Info("OIDC sign-in enabled", "provider", oidcDir.Provider(), "label", oidcDir.Label())
+				// Said at startup because it is the setting whose wrong value
+				// nobody notices until strangers have accounts.
+				slog.Info("OIDC sign-in enabled", "provider", oidcDir.Provider(), "label", oidcDir.Label(),
+					"signup", oidcDir.AllowsSignup())
 			}
 
 			// First run: when the installation has no users at all, mint a
@@ -393,6 +396,12 @@ func newServeCmd() *cobra.Command {
 	cmd.Flags().StringSlice("oidc-scopes", nil, "scopes to request (default openid,profile,email — an ID token without an email cannot be provisioned)")
 	cmd.Flags().String("oidc-ca-cert", "", "PEM bundle to verify the provider's certificate against, for an internal CA — there is deliberately no way to skip verification")
 	cmd.Flags().Duration("oidc-timeout", 0, "bound on each request to the provider: discovery, key fetch, code exchange (default 10s)")
+	// Off by default (docs/adr/0020): pointed at an issuer like Google, a
+	// first sign-in that creates an account is open self-registration.
+	cmd.Flags().Bool("oidc-allow-signup", false,
+		"let a first sign-in create a local account; without it OIDC reaches only accounts that exist (linked already, or created by an administrator under the same address)")
+	cmd.Flags().StringSlice("oidc-allowed-domains", nil,
+		"accept OIDC sign-in only from verified addresses in these domains, e.g. example.com — checked on every sign-in, exact match, no subdomains")
 
 	cmd.Flags().Float64("rate-limit-signin-per-minute", 5,
 		"sustained password sign-in attempts per minute allowed for one email address (0 disables) — the per-credential limit cannot see these, since a failed guess belongs to no credential")
@@ -499,11 +508,14 @@ func oidcFromFlags(cmd *cobra.Command) (directory.RedirectAuthenticator, error) 
 	scopes, _ := cmd.Flags().GetStringSlice("oidc-scopes")
 	caCert, _ := cmd.Flags().GetString("oidc-ca-cert")
 	timeout, _ := cmd.Flags().GetDuration("oidc-timeout")
+	allowSignup, _ := cmd.Flags().GetBool("oidc-allow-signup")
+	domains, _ := cmd.Flags().GetStringSlice("oidc-allowed-domains")
 
 	oidcDir, err := directory.NewOIDC(directory.OIDCConfig{
 		Name: name, Label: label, IssuerURL: issuer,
 		ClientID: clientID, ClientSecret: secret, RedirectURL: redirect,
 		Scopes: scopes, CACertFile: caCert, Timeout: timeout,
+		AllowSignup: allowSignup, AllowedDomains: domains,
 	})
 	if err != nil {
 		return nil, err

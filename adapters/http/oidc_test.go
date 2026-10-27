@@ -28,12 +28,16 @@ type fakeOIDC struct {
 	started  directory.AuthRequest
 	identity directory.Identity
 	err      error
+	// signup is what AllowsSignup reports. The existing tests are about the
+	// flow, not the policy, so they opt in; the policy has its own tests.
+	signup bool
 }
 
 const fakeCode = "code-the-provider-issued"
 
-func (p *fakeOIDC) Provider() string { return "fake" }
-func (p *fakeOIDC) Label() string    { return "Fake SSO" }
+func (p *fakeOIDC) Provider() string   { return "fake" }
+func (p *fakeOIDC) Label() string      { return "Fake SSO" }
+func (p *fakeOIDC) AllowsSignup() bool { return p.signup }
 
 func (p *fakeOIDC) AuthCodeURL(req directory.AuthRequest) (string, error) {
 	p.started = req
@@ -128,7 +132,7 @@ func signInError(t *testing.T, resp navigation) string {
 }
 
 func TestOIDCSignInProvisionsAndStartsASession(t *testing.T) {
-	p := &fakeOIDC{identity: directory.Identity{
+	p := &fakeOIDC{signup: true, identity: directory.Identity{
 		Provider: "fake", Subject: "sub-123", Email: "olga@example.test", DisplayName: "Olga",
 	}}
 	f := newOIDCFixture(t, p)
@@ -207,6 +211,7 @@ func TestOIDCCallbackTellsThePersonWhatWentWrong(t *testing.T) {
 		{"provider down", "&code=" + fakeCode, directory.ErrUnavailable, "oidc_unavailable"},
 		{"no email", "&code=" + fakeCode, directory.ErrNoEmail, "oidc_no_email"},
 		{"unverified email", "&code=" + fakeCode, directory.ErrEmailNotVerified, "oidc_email_unverified"},
+		{"domain not allowed", "&code=" + fakeCode, directory.ErrDomainNotAllowed, "oidc_domain_not_allowed"},
 		{"rejected code", "&code=forged", nil, "oidc_failed"},
 	}
 	for _, tc := range cases {
@@ -273,5 +278,63 @@ func TestOIDCCallbackForAProviderNoLongerConfigured(t *testing.T) {
 	}
 	if resp.cookie("cc_session") != nil {
 		t.Fatal("a session was started for a provider that is not configured")
+	}
+}
+
+// With sign-up off — the default — a person the provider authenticates but
+// who has no account here is told so, and nothing is created. This is the
+// difference between "our Keycloak" and "anyone with a Google account".
+func TestOIDCWithoutSignupCreatesNoAccount(t *testing.T) {
+	p := &fakeOIDC{identity: directory.Identity{
+		Provider: "fake", Subject: "stranger", Email: "stranger@example.test", DisplayName: "Stranger",
+	}}
+	f := newOIDCFixture(t, p)
+	attempt, state := beginOIDC(t, f, p)
+	resp := f.navigate("/v1/auth/oidc/callback?state="+url.QueryEscape(state)+"&code="+fakeCode, attempt)
+
+	if got := signInError(t, resp); got != "oidc_no_account" {
+		t.Fatalf("sign_in_error = %q, want oidc_no_account", got)
+	}
+	if resp.cookie("cc_session") != nil {
+		t.Fatal("a session was started for someone with no account")
+	}
+	err := db.WithoutPrincipal(t.Context(), f.ownerPool, func(tx pgx.Tx) error {
+		_, err := identity.NewStore().GetUserByEmail(t.Context(), tx, "stranger@example.test")
+		return err
+	})
+	if !errors.Is(err, identity.ErrNotFound) {
+		t.Fatalf("a user was created with sign-up off (lookup: %v)", err)
+	}
+}
+
+// Sign-up off still lets in the people an administrator created: the account
+// exists under the same address, so the first sign-in links to it.
+func TestOIDCWithoutSignupLinksAnAccountAnAdminCreated(t *testing.T) {
+	p := &fakeOIDC{identity: directory.Identity{
+		Provider: "fake", Subject: "sub-ivan", Email: "ivan@example.test", DisplayName: "Ivan",
+	}}
+	f := newOIDCFixture(t, p)
+	err := db.WithoutPrincipal(t.Context(), f.ownerPool, func(tx pgx.Tx) error {
+		store := identity.NewStore()
+		// Mixed case on purpose: the administrator typed it one way and the
+		// provider sends it another.
+		user, err := store.CreateUser(t.Context(), tx, "Ivan@Example.test", "Ivan")
+		if err != nil {
+			return err
+		}
+		_, err = store.CreatePrincipalForUser(t.Context(), tx, user.ID)
+		return err
+	})
+	if err != nil {
+		t.Fatalf("create the account: %v", err)
+	}
+
+	attempt, state := beginOIDC(t, f, p)
+	resp := f.navigate("/v1/auth/oidc/callback?state="+url.QueryEscape(state)+"&code="+fakeCode, attempt)
+	if got := signInError(t, resp); got != "" {
+		t.Fatalf("sign-in failed with %q", got)
+	}
+	if resp.cookie("cc_session") == nil {
+		t.Fatal("no session for an account the administrator created")
 	}
 }

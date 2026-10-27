@@ -71,6 +71,10 @@ export const en = {
   "auth.oidcEmailUnverified":
     "Your email address at the sign-in provider is not verified, so it cannot be used to sign in here. Verify it there and try again.",
   "auth.oidcFailed": "Sign-in through the provider did not succeed. Start again.",
+  "auth.oidcNoAccount":
+    "You signed in at the provider, but there is no account for you here, and this installation does not create them automatically. Ask an administrator to create one under your email address.",
+  "auth.oidcDomainNotAllowed":
+    "Your email address is not in a domain this installation accepts for sign-in through this provider.",
 
   "setup.title": "Create the first administrator",
   "setup.lead":

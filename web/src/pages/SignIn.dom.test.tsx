@@ -98,6 +98,13 @@ describe("single sign-on on the sign-in screen", () => {
     expect(window.location.search).toBe("");
   });
 
+  it("tells someone with no account that an administrator has to create one", async () => {
+    window.history.replaceState(null, "", "/?sign_in_error=oidc_no_account");
+    stubServer(withKeycloak);
+    renderSignIn();
+    expect(await screen.findByText(/there is no account for you here/)).toBeTruthy();
+  });
+
   // The code is read from a URL anyone can craft. Names every object
   // inherits must not be mistaken for a message — `toString` crashed the
   // screen before the lookup was restricted to own keys.

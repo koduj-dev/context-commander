@@ -178,10 +178,10 @@ Only on top of a core loop people actually use:
         second one is allowed**, the callback must defend against provider
         mix-up: today the provider comes only from the cookie and the
         RFC 9207 `iss` response parameter is not checked (review, 2026-10-27).
-      - [ ] **Who may sign up through OIDC** — see the open question below.
-        Every account at the issuer gets a local user on first sign-in, and
-        a local user may create organizations and projects. Right for a
-        company's own Keycloak; wrong for Google, where that is everyone.
+      - [x] ~~Who may sign up through OIDC~~ Decided 2026-10-27
+        ([ADR 0020](docs/adr/0020-oidc-sign-up-is-off-by-default.md)): nobody,
+        unless `--oidc-allow-signup`; `--oidc-allowed-domains` limits sign-in
+        to verified addresses in the listed domains.
       - Remaining review findings (2026-10-27), all low, none exploitable as
         configured today:
         - The `cc_oidc` cookie is unsigned, so a sibling subdomain able to
@@ -529,13 +529,9 @@ feature.
   Codex CLI**. Both reach the server over Streamable HTTP with a bearer PAT,
   so one transport covers both, and both configure from a small committed
   file a test can parse — see `deploy/mcp-clients/`.
-- **Who may become a user by signing in through OIDC?** (Raised by review
-  2026-10-27.) Today: anyone the issuer will authenticate, which is the
-  ADR 0019 just-in-time shape and is safe for a company's own IdP — but
-  pointed at Google it is open self-registration for the internet. The
-  options, roughly: an allowed-domains list (Google's `hd`, or the email
-  domain), a "link existing accounts only, never create" mode, or both, and
-  which one is the default.
+- ~~**Who may become a user by signing in through OIDC?**~~ Decided
+  2026-10-27 by the maintainer: sign-up off by default, domains restrictable
+  — [ADR 0020](docs/adr/0020-oidc-sign-up-is-off-by-default.md).
 - **Handoff vs. context pack as the headline object.** Recommendation: sell the
   outcome ("handoff"), keep the context pack as the mechanism. (Raised
   2026-09-01.)

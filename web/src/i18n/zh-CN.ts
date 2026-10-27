@@ -77,6 +77,9 @@ export const zhCN: Partial<Record<MessageKey, string>> = {
   "auth.oidcEmailUnverified":
     "你在登录服务中的邮箱地址尚未验证，因此不能用于在此登录。请先在那里完成验证，然后重试。",
   "auth.oidcFailed": "通过登录服务登录未成功。请重新开始。",
+  "auth.oidcNoAccount":
+    "你已在登录服务处登录，但此处没有你的账号，且此安装不会自动创建账号。请让管理员用你的邮箱地址创建一个。",
+  "auth.oidcDomainNotAllowed": "你的邮箱地址不属于此安装允许通过该登录服务登录的域名。",
   "auth.indistinct":
     "密码错误、地址没有对应账号、账号没有设置密码，在这里读起来完全一样。说清是哪一种，等于告诉正在猜测的人他猜对了一半。",
   "setup.title": "创建第一个管理员账号",

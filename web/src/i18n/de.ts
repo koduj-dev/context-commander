@@ -57,6 +57,10 @@ export const de: Partial<Record<MessageKey, string>> = {
     "Ihre E-Mail-Adresse beim Anmeldedienst ist nicht bestätigt und kann deshalb hier nicht zur Anmeldung dienen. Bestätigen Sie sie dort und versuchen Sie es erneut.",
   "auth.oidcFailed":
     "Die Anmeldung über den Anmeldedienst ist nicht gelungen. Beginnen Sie erneut.",
+  "auth.oidcNoAccount":
+    "Sie haben sich beim Anmeldedienst angemeldet, aber hier gibt es kein Konto für Sie, und diese Installation legt keine automatisch an. Bitten Sie die Administration, eines unter Ihrer E-Mail-Adresse anzulegen.",
+  "auth.oidcDomainNotAllowed":
+    "Ihre E-Mail-Adresse gehört zu keiner Domain, die diese Installation für die Anmeldung über diesen Anmeldedienst akzeptiert.",
   "auth.indistinct":
     "Ein falsches Passwort, eine Adresse ohne Konto und ein Konto ohne Passwort lesen sich hier gleich. Zu sagen, welcher Fall vorliegt, würde jedem, der rät, verraten, dass die Hälfte seiner Vermutung richtig war.",
   "setup.title": "Erstes Administratorkonto anlegen",

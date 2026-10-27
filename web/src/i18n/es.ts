@@ -53,6 +53,10 @@ export const es: Partial<Record<MessageKey, string>> = {
     "Su dirección de correo en el proveedor de inicio de sesión no está verificada, así que no puede usarse para entrar aquí. Verifíquela allí y vuelva a intentarlo.",
   "auth.oidcFailed":
     "El inicio de sesión a través del proveedor no se ha completado. Vuelva a empezar.",
+  "auth.oidcNoAccount":
+    "Ha iniciado sesión en el proveedor, pero aquí no hay ninguna cuenta para usted y esta instalación no las crea automáticamente. Pida a quien administra la instalación que cree una con su dirección de correo.",
+  "auth.oidcDomainNotAllowed":
+    "Su dirección de correo no pertenece a ningún dominio que esta instalación acepte para iniciar sesión a través de este proveedor.",
   "auth.indistinct":
     "Una contraseña incorrecta, una dirección sin cuenta y una cuenta sin contraseña se leen igual aquí. Decir cuál es el caso revelaría a quien está adivinando que la mitad de su suposición era correcta.",
   "setup.title": "Crear la primera cuenta de administración",

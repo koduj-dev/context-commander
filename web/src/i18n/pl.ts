@@ -69,6 +69,10 @@ export const pl: Partial<Record<MessageKey, string>> = {
   "auth.oidcEmailUnverified":
     "Twój adres e-mail u dostawcy logowania nie jest zweryfikowany, więc nie można nim się tu zalogować. Zweryfikuj go tam i spróbuj ponownie.",
   "auth.oidcFailed": "Logowanie przez dostawcę nie powiodło się. Zacznij od nowa.",
+  "auth.oidcNoAccount":
+    "Logowanie u dostawcy się udało, ale nie masz tu konta, a ta instalacja nie tworzy ich automatycznie. Poproś osobę administrującą o utworzenie konta na Twój adres e-mail.",
+  "auth.oidcDomainNotAllowed":
+    "Twój adres e-mail nie należy do domeny, którą ta instalacja akceptuje przy logowaniu przez tego dostawcę.",
   "auth.indistinct":
     "Błędne hasło, adres bez konta i konto bez hasła czyta się tu identycznie. Powiedzenie, który to przypadek, zdradziłoby zgadującemu, że połowa jego domysłu była trafna.",
   "setup.title": "Utwórz pierwsze konto administracyjne",

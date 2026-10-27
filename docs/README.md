@@ -60,6 +60,7 @@ supersedes it, so the trail of what was believed when stays readable.
 | [0017](adr/0017-installation-admin-tier.md) | An installation-admin tier, keyed by user, with no network grant path |
 | [0018](adr/0018-skill-package-scope-and-a-browsable-registry.md) | A skill package lives at a scope; the registry is browsable |
 | [0019](adr/0019-browser-authentication-and-directory-identity.md) | Browser sign-in through sessions, local passwords and directory identity (LDAP, OIDC) |
+| [0020](adr/0020-oidc-sign-up-is-off-by-default.md) | OIDC sign-up is off by default; sign-in can be limited to domains |
 
 ## Not documentation
 

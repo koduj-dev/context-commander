@@ -2,6 +2,7 @@ package identity_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/google/uuid"
@@ -186,6 +187,71 @@ func TestProvisionDirectoryUser(t *testing.T) {
 		if _, err := identity.ProvisionDirectoryUser(ctx, pool,
 			directoryIdentity("", "nosubject@example.test", "No Subject")); err == nil {
 			t.Error("accepted an identity with no subject")
+		}
+	})
+}
+
+// Without CreateMissing, provisioning reaches only accounts that exist —
+// linked already, or created by an administrator under the same address —
+// and refuses the rest with ErrNoAccount, creating nothing (docs/adr/0020).
+func TestProvisionDirectoryUserWithoutCreate(t *testing.T) {
+	dsns := dbtest.New(t)
+	ctx := context.Background()
+	pool, err := db.NewPool(ctx, dsns.Owner)
+	if err != nil {
+		t.Fatalf("connect as cc_owner: %v", err)
+	}
+	store := identity.NewStore()
+	linkOnly := identity.ProvisionPolicy{CreateMissing: false}
+
+	t.Run("refuses someone with no account and creates nothing", func(t *testing.T) {
+		_, err := identity.ProvisionDirectoryUserWith(ctx, pool,
+			directoryIdentity("uuid-nobody", "nobody@example.test", "Nobody"), linkOnly)
+		if !errors.Is(err, identity.ErrNoAccount) {
+			t.Fatalf("want ErrNoAccount, got %v", err)
+		}
+		err = db.WithoutPrincipal(ctx, pool, func(tx pgx.Tx) error {
+			_, err := store.GetUserByEmail(ctx, tx, "nobody@example.test")
+			return err
+		})
+		if !errors.Is(err, identity.ErrNotFound) {
+			t.Fatalf("a user was created anyway (lookup: %v)", err)
+		}
+		// Nor a dangling link that would make the next attempt case 1.
+		err = db.WithoutPrincipal(ctx, pool, func(tx pgx.Tx) error {
+			_, err := store.UserForDirectoryIdentity(ctx, tx, "ldap", "uuid-nobody")
+			return err
+		})
+		if !errors.Is(err, identity.ErrNotFound) {
+			t.Fatalf("a link was recorded for a refused identity (lookup: %v)", err)
+		}
+	})
+
+	t.Run("links an account an administrator created", func(t *testing.T) {
+		var userID uuid.UUID
+		err := db.WithoutPrincipal(ctx, pool, func(tx pgx.Tx) error {
+			u, err := store.CreateUser(ctx, tx, "precreated@example.test", "Pre Created")
+			userID = u.ID
+			return err
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		principal, err := identity.ProvisionDirectoryUserWith(ctx, pool,
+			directoryIdentity("uuid-pre", "precreated@example.test", "Pre Created"), linkOnly)
+		if err != nil {
+			t.Fatalf("ProvisionDirectoryUserWith: %v", err)
+		}
+		if principal.UserID == nil || *principal.UserID != userID {
+			t.Fatalf("linked to %v, want the administrator's account %v", principal.UserID, userID)
+		}
+
+		// And once linked, the link is what is used — even with no account
+		// creation allowed and a changed address at the provider.
+		again, err := identity.ProvisionDirectoryUserWith(ctx, pool,
+			directoryIdentity("uuid-pre", "renamed@example.test", "Pre Created"), linkOnly)
+		if err != nil || again.ID != principal.ID {
+			t.Fatalf("second sign-in: principal %v, error %v; want %v", again.ID, err, principal.ID)
 		}
 	})
 }
