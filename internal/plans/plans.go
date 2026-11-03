@@ -282,6 +282,9 @@ type ItemUpdate struct {
 	// Assignee: set AssigneeSet with Assignee nil to unassign.
 	AssigneeSet bool
 	Assignee    *uuid.UUID
+	// Position moves the item to this 1-based place in its plan; past the
+	// end means last (docs/adr/0022, "Reordering").
+	Position *int
 }
 
 // PlanUpdate changes a plan. Title and Body are a rewrite of the plan's own
@@ -299,6 +302,9 @@ type PhaseUpdate struct {
 	Title  *string
 	Goal   *string
 	Status *string
+	// Position moves the phase to this 1-based place in its project; past
+	// the end means last.
+	Position *int
 }
 
 // Report is one presence heartbeat. ItemID and PlanID say where the client

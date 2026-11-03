@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useT } from "../i18n";
 import { useFormat } from "../app/prefs";
@@ -15,6 +15,7 @@ import {
   type PlanStatus,
   type Presence,
 } from "../lib/api";
+import { useLive, type Live } from "../lib/live";
 import { usePolled, useResource } from "../lib/resource";
 import {
   Badge,
@@ -40,16 +41,25 @@ import {
 } from "../ui";
 import { useProject } from "./ProjectLayout";
 
-/** How often the board refreshes while it is on screen. */
+/** How often the board refreshes while it is on screen and no stream is open. */
 export const BOARD_REFRESH_MS = 10_000;
+/**
+ * How often it refreshes while a stream is open. Not never: presence turns
+ * idle by the clock, with no write anyone could be told about.
+ */
+export const LIVE_REFRESH_MS = 60_000;
+
+/** The board's stream, shared so an open plan re-reads on the same pulse. */
+const BoardLive = createContext<Live>({ live: false, pulse: 0 });
 
 /**
  * Where the project's work stands (docs/adr/0022).
  *
  * Read top-down it answers, in order: who is working right now and on what,
- * how far each phase is, and what each plan consists of. The board refreshes
- * itself every ten seconds while visible, which is what makes it usable to
- * watch an agent from another machine; nothing here needs a reload.
+ * how far each phase is, and what each plan consists of. The board re-reads
+ * itself when the server says it changed, and every ten seconds while
+ * visible when the server cannot say (lib/live.ts). That is what makes it
+ * usable to watch an agent from another machine; nothing here needs a reload.
  *
  * Time is "tracked" and tokens "reported", never "spent": time is the span
  * covered by heartbeats and tokens are what a client chose to send, so both
@@ -58,10 +68,12 @@ export const BOARD_REFRESH_MS = 10_000;
 export function ProjectPlans() {
   const t = useT();
   const { namespace, slug } = useProject();
+  const live = useLive(api.planBoardEvents(namespace, slug));
   const board = usePolled(
     () => api.planBoard(namespace, slug),
     [namespace, slug],
-    BOARD_REFRESH_MS,
+    live.live ? LIVE_REFRESH_MS : BOARD_REFRESH_MS,
+    live.pulse,
   );
   // `?plan=…&item=…` is how a search result elsewhere (the quick finder)
   // names what it found: that plan opens and that step is marked.
@@ -77,11 +89,15 @@ export function ProjectPlans() {
   const linkedOffBoard = linkedPlan !== undefined && !b.plans.some((p) => p.id === linkedPlan);
 
   return (
-    <>
+    <BoardLive.Provider value={live}>
       <PageHead title={t("plans.title")} lead={t("plans.lead")} />
       <Stack>
         {board.stale && <Note tone="warn">{t("plans.stale")}</Note>}
-        <Panel title={t("plans.workingNow")} sub={t("plans.refreshes")} tight>
+        <Panel
+          title={t("plans.workingNow")}
+          sub={live.live ? t("plans.live") : t("plans.refreshes")}
+          tight
+        >
           <PresenceTable items={b.presence} people={b.people} />
         </Panel>
 
@@ -127,7 +143,7 @@ export function ProjectPlans() {
         />
         <Search />
       </Stack>
-    </>
+    </BoardLive.Provider>
   );
 }
 
@@ -307,6 +323,50 @@ function CostEstimateNote({ effort }: { effort: Effort }) {
   );
 }
 
+/**
+ * Move up and move down, for a row in an ordered list. Buttons rather than
+ * dragging: they work from the keyboard and with a screen reader, and need
+ * no library. `onMove` gets the 1-based place to move to, which is what the
+ * server takes (docs/adr/0022, "Reordering").
+ */
+function MoveButtons({
+  name,
+  index,
+  count,
+  disabled,
+  onMove,
+}: {
+  name: string;
+  index: number;
+  count: number;
+  disabled: boolean;
+  onMove: (position: number) => void;
+}) {
+  const t = useT();
+  return (
+    <>
+      <Btn
+        small
+        label={t("plans.moveUp", { name })}
+        title={t("plans.moveUp", { name })}
+        disabled={disabled || index === 0}
+        onClick={() => onMove(index)}
+      >
+        ↑
+      </Btn>{" "}
+      <Btn
+        small
+        label={t("plans.moveDown", { name })}
+        title={t("plans.moveDown", { name })}
+        disabled={disabled || index === count - 1}
+        onClick={() => onMove(index + 2)}
+      >
+        ↓
+      </Btn>
+    </>
+  );
+}
+
 // ---------------------------------------------------------------- phases
 
 function Phases({ board, onChanged }: { board: Board; onChanged: () => void }) {
@@ -342,16 +402,28 @@ function Phases({ board, onChanged }: { board: Board; onChanged: () => void }) {
       ) : (
         <DataTable
           columns={[
+            { key: "order", label: t("plans.column.order") },
             { key: "phase", label: t("plans.column.phase") },
             { key: "progress", label: t("plans.column.progress") },
             { key: "effort", label: t("plans.column.effort") },
             { key: "status", label: t("plans.column.status"), align: "r" },
           ]}
         >
-          {board.phases.map((ph) => {
+          {board.phases.map((ph, i) => {
             const p = progress(ph.counts);
             return (
               <tr key={ph.id}>
+                <td className="nowrap">
+                  <MoveButtons
+                    name={ph.title}
+                    index={i}
+                    count={board.phases.length}
+                    disabled={busy}
+                    onMove={(position) =>
+                      void run(() => api.updatePhase(namespace, slug, ph.id, { position }))
+                    }
+                  />
+                </td>
                 <td>
                   <Cell
                     primary={ph.title}
@@ -592,10 +664,12 @@ function PlanDetail({
 }) {
   const t = useT();
   const { namespace, slug } = useProject();
+  const live = useContext(BoardLive);
   const plan = usePolled(
     () => api.plan(namespace, slug, planID),
     [namespace, slug, planID],
-    BOARD_REFRESH_MS,
+    live.live ? LIVE_REFRESH_MS : BOARD_REFRESH_MS,
+    live.pulse,
   );
   const [failure, setFailure] = useState<unknown>();
   const [adding, setAdding] = useState("");
@@ -670,19 +744,31 @@ function PlanDetail({
       ) : (
         <DataTable
           columns={[
+            { key: "order", label: t("plans.column.order") },
             { key: "step", label: t("plans.column.step") },
             { key: "who", label: t("plans.column.who") },
             { key: "effort", label: t("plans.column.effort") },
             { key: "status", label: t("plans.column.status"), align: "r" },
           ]}
         >
-          {p.items.map((it) => (
+          {p.items.map((it, i) => (
             <tr
               key={it.id}
               className={it.id === highlight ? "active" : undefined}
               aria-current={it.id === highlight ? "true" : undefined}
               ref={it.id === highlight ? highlightRow : undefined}
             >
+              <td className="nowrap">
+                <MoveButtons
+                  name={it.text}
+                  index={i}
+                  count={p.items.length}
+                  disabled={busy}
+                  onMove={(position) =>
+                    void run(() => api.updatePlanItem(namespace, slug, it.id, { position }))
+                  }
+                />
+              </td>
               <td>
                 <Cell
                   primary={

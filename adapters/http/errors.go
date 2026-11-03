@@ -114,6 +114,13 @@ func writeDomainError(w http.ResponseWriter, r *http.Request, err error) {
 		writeError(w, http.StatusConflict, "conflict", "version conflict: the plan was changed since your expected_version")
 	case errors.Is(err, plans.ErrInvalid), errors.Is(err, plans.ErrNoClient):
 		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+	case errors.Is(err, plans.ErrTooManyStreams):
+		// The client falls back to polling, which is the right answer to
+		// "you already have enough streams open".
+		writeError(w, http.StatusTooManyRequests, "rate_limited", "this credential already holds the most open streams it may")
+	case errors.Is(err, plans.ErrShuttingDown):
+		w.Header().Set("Retry-After", "5")
+		writeError(w, http.StatusServiceUnavailable, "unavailable", "the server is shutting down")
 	case errors.Is(err, artifacts.ErrConflict):
 		writeError(w, http.StatusConflict, "conflict", "version conflict: the artifact was modified since your expected_version")
 	case errors.Is(err, artifacts.ErrBlockedByGate):

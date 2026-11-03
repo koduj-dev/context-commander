@@ -30,10 +30,13 @@ type Service struct {
 	// prices estimates what tokens would have cost; nil when the operator
 	// configured none (prices.go).
 	prices *Prices
+	// changes tells open streams what changed (changes.go). Published only
+	// after a commit, so a reader told "changed" always reads the change.
+	changes *changes
 }
 
 func NewService(pool *db.Pool, cryptoProvider *crypto.Provider, authz *auth.AuthzService) *Service {
-	return &Service{pool: pool, crypto: cryptoProvider, authz: authz, now: func() time.Time { return time.Now().UTC() }}
+	return &Service{pool: pool, crypto: cryptoProvider, authz: authz, now: func() time.Time { return time.Now().UTC() }, changes: newChanges()}
 }
 
 // SetClock replaces the service's clock. For tests: effort is time between
@@ -131,6 +134,11 @@ func (s *Service) CreatePhase(ctx context.Context, principalID, projectID uuid.U
 
 	ph := Phase{ID: uuid.New(), ProjectID: projectID, Status: PhasePlanned, Version: 1, Title: title, Goal: goal, CreatedBy: principalID}
 	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+		// Under the same lock as a move, so two phases created at once do
+		// not both take max+1.
+		if err := lockPhaseOrder(ctx, tx, projectID); err != nil {
+			return err
+		}
 		if err := tx.QueryRow(ctx, `SELECT COALESCE(max(position), 0) + 1 FROM phases WHERE project_id = $1`, projectID).Scan(&ph.Position); err != nil {
 			return err
 		}
@@ -153,6 +161,7 @@ func (s *Service) CreatePhase(ctx context.Context, principalID, projectID uuid.U
 	if err != nil {
 		return Phase{}, fmt.Errorf("plans: create phase: %w", quota.Translate(err))
 	}
+	s.changes.publish(projectID, false)
 	return ph, nil
 }
 
@@ -176,9 +185,19 @@ func (s *Service) UpdatePhase(ctx context.Context, principalID, projectID, phase
 			return Phase{}, err
 		}
 	}
+	if u.Position != nil && *u.Position < 1 {
+		return Phase{}, invalid("position is 1-based")
+	}
 
 	var ph Phase
 	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+		// The order lock before the row lock, always: that is the order
+		// CreatePhase takes them in too, which keeps the two deadlock-free.
+		if u.Position != nil {
+			if err := lockPhaseOrder(ctx, tx, projectID); err != nil {
+				return err
+			}
+		}
 		var e envelope
 		err := tx.QueryRow(ctx,
 			`SELECT id, project_id, position, status, version, ciphertext, nonce, wrapped_dek, project_key_version, created_by_principal, created_at, updated_at
@@ -211,6 +230,15 @@ func (s *Service) UpdatePhase(ctx context.Context, principalID, projectID, phase
 			}
 		}
 		ph.Title, ph.Goal = blob.Title, blob.Goal
+		if u.Position != nil {
+			if ph.Position, err = movePhase(ctx, tx, projectID, ph.ID, *u.Position); err != nil {
+				return err
+			}
+			// A move alone is not an edit of the phase.
+			if u.Status == nil && u.Title == nil && u.Goal == nil {
+				return nil
+			}
+		}
 		return tx.QueryRow(ctx,
 			`UPDATE phases SET status = $2, version = $3, ciphertext = $4, nonce = $5, wrapped_dek = $6, project_key_version = $7, updated_at = now()
 			 WHERE id = $1 RETURNING updated_at`,
@@ -220,6 +248,7 @@ func (s *Service) UpdatePhase(ctx context.Context, principalID, projectID, phase
 	if err != nil {
 		return Phase{}, fmt.Errorf("plans: update phase: %w", quota.Translate(err))
 	}
+	s.changes.publish(projectID, false)
 	return ph, nil
 }
 
@@ -245,6 +274,7 @@ func (s *Service) DeletePhase(ctx context.Context, principalID, projectID, phase
 	if err != nil {
 		return fmt.Errorf("plans: delete phase: %w", err)
 	}
+	s.changes.publish(projectID, false)
 	return nil
 }
 
@@ -341,6 +371,7 @@ func (s *Service) CreatePlan(
 	if err != nil {
 		return Plan{}, fmt.Errorf("plans: create plan: %w", quota.Translate(err))
 	}
+	s.changes.publish(projectID, false)
 	return p, nil
 }
 
@@ -429,7 +460,7 @@ func loadItems(ctx context.Context, tx pgx.Tx, where string, args ...any) ([]Ite
 		                         sum(cache_read_tokens)::bigint AS cache_read, sum(cache_write_tokens)::bigint AS cache_write
 		                  FROM plan_item_effort_models GROUP BY item_id, model) per_model
 		            GROUP BY item_id) m ON m.item_id = i.id
-		 `+where+` ORDER BY i.plan_id, i.position`, args...)
+		 `+where+` ORDER BY i.plan_id, i.position, i.id`, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -547,6 +578,8 @@ func (s *Service) UpdatePlan(ctx context.Context, principalID, projectID, planID
 	if err != nil {
 		return Plan{}, fmt.Errorf("plans: update plan: %w", quota.Translate(err))
 	}
+	// Presence shows plan titles, so a new title is news there too.
+	s.changes.publish(projectID, u.Title != nil)
 	return p, nil
 }
 
@@ -570,5 +603,7 @@ func (s *Service) DeletePlan(ctx context.Context, principalID uuid.UUID, clientI
 	if err != nil {
 		return fmt.Errorf("plans: delete plan: %w", err)
 	}
+	// Anyone on the plan is now on nothing.
+	s.changes.publish(projectID, true)
 	return nil
 }

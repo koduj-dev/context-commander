@@ -94,8 +94,9 @@ caller's newest) and 100 hits, and the answer says when either cut it.
   items × 20, and "who finished this, and when" is always answerable.
 - Item ticks write **no audit row and no outbox event**. The audit log is a
   security trail, and a checkbox is not a security event. Creating and
-  deleting phases and plans is audited. The interface sees changes by
-  polling the board, not through the outbox.
+  deleting phases and plans is audited. The interface learns of changes
+  from a board stream (see "Push instead of polling" below), not through
+  the outbox.
 
 ### Presence: where everyone is
 
@@ -193,7 +194,8 @@ Effort is **aggregated, never logged**: `plan_item_effort` keeps one row per
 
   Both poll every 10 seconds while visible. That is enough to watch an agent
   remotely, works through any proxy, and needs no server push. Push can come
-  with Phase 2's subscriptions.
+  with Phase 2's subscriptions. *(2026-11-03: push came first; see "Push
+  instead of polling". Polling stays as the fallback.)*
 
 ### Authorization
 
@@ -216,4 +218,83 @@ only position, never content outside the project.
 - A plan's text cannot be searched by SQL, and every search pays for decrypting
   the project's plans. That is the price of ADR 0011, and it is the right one.
 - Polling every 10 seconds costs one indexed read per open screen.
-  Subscriptions (Phase 2) replace it when they exist.
+  Subscriptions (Phase 2) replace it when they exist. *(2026-11-03: a board
+  stream replaces it where it can be opened; see below.)*
+
+## Reordering (2026-11-03)
+
+Phases and items kept their creation order and nothing moved them. Now a
+phase moves within its project and an item within its plan.
+
+- **A move names a 1-based place**, not a neighbour: `position: 1` is
+  first, anything past the end is last. "Before X" fails or surprises when
+  X itself moved or was deleted a moment earlier, which on a board several
+  agents write to is the normal case; a place always means something. It is
+  also exactly what move up / move down send (the row's place ± 1), and what
+  an agent means when it says "do this first".
+- **The surfaces are the existing updates**, not a new operation: `position`
+  on `PATCH …/phases/{id}` and `PATCH …/plans/items/{id}`, and on the MCP
+  `phase.update` and `plan.update_item` tools. A move is a change to the
+  thing, like its status, and a separate tool would have been one more name
+  for a model to choose between.
+- **Safe under concurrent moves by locking, not by a constraint.** A move
+  renumbers the whole list 1..n in one statement, under the lock every
+  writer of that list's positions already takes or now takes: the plan's
+  row lock for items (shared with `AddItems`), and a per-project advisory
+  lock (`db.LockClassPhaseOrder`) for phases, which `CreatePhase` now takes
+  too — before, two phases created at once could both get max+1. Moves are
+  serialized, each sees the order the previous one left, and the list stays
+  dense; `TestConcurrentMovesLeaveADenseOrder` holds that invariant.
+  There is no unique constraint on position, and none was added: it would
+  have to be `DEFERRABLE` (a renumber passes through duplicates mid-statement),
+  existing rows from the unlocked `CreatePhase` may already violate it and
+  would need renumbering in a migration, and the lock already guarantees it.
+  A move renumbers densely, so it also repairs any such duplicate it meets.
+- **A move alone is not progress.** It does not change who last updated an
+  item or when, does not auto-assign an in-progress item, and records no
+  status transition. It is not audited, like a tick.
+- **The interface uses move up / move down buttons**, keyboard- and
+  screen-reader-reachable, with no drag-and-drop library.
+
+## Push instead of polling (2026-11-03)
+
+The Plans tab and the dashboard's "Who is working where" polled every ten
+seconds. They now hold a stream instead:
+
+- `GET /v1/projects/{namespace}/{slug}/plans/events` for one board, and
+  `GET /v1/me/presence/events` for where people are across the caller's
+  projects. Both are Server-Sent Events.
+- **The stream carries no content.** It says `ready` when it opens and
+  `changed` after a change commits, nothing else; the screen re-reads the
+  board through the ordinary endpoint. Authorization and decryption stay in
+  the one read path that already has them, and a stream cannot show anyone
+  more than a read would. The presence stream is told only about changes to
+  where people are, or to the plan and item titles presence displays.
+- **In process, not LISTEN/NOTIFY.** One `ccd` per installation is the
+  supported deployment, and every write to a board goes through
+  `plans.Service`, so the process that commits a change is the process
+  holding the streams. The fan-out is `internal/plans/changes.go`; running
+  more than one process would replace that file with LISTEN/NOTIFY and
+  change nothing else.
+- **Authorized on connect, bounded in time.** Opening a stream needs
+  `plan.read` (or, for presence, takes the projects the caller can see at
+  that moment). A stream ends after ten minutes and the client reconnects,
+  which authenticates and authorizes again, so a revoked credential, an
+  expired session or a removed member stops hearing about the project within
+  that bound. A credential may hold at most four streams
+  (`plans.StreamsPerCredential`); the fifth is a 429, and a hidden tab gives
+  its stream back.
+- **It survives proxies and shutdown.** A comment line every 25 seconds keeps
+  idle connections open, `X-Accel-Buffering: no` asks nginx not to buffer
+  (docs/install.md has the explicit `proxy_buffering off`), each write pushes
+  its own deadline forward past the server's 60-second `WriteTimeout`, and
+  server shutdown ends every stream (`http.Server.RegisterOnShutdown`).
+- **The browser reads it with fetch, not EventSource.** EventSource cannot
+  send headers, and every cookie-authenticated request must carry the CSRF
+  header (ADR 0019). Exempting the stream would make it the one endpoint the
+  defence has to remember; a streamed fetch body carries the same events.
+- **Polling is the fallback.** While the stream is open the screen still
+  re-reads once a minute, because presence turns idle by the clock with no
+  write to announce it. When the stream cannot be opened — refused, a proxy
+  that does not stream, an older server — the screen polls every ten seconds
+  as before and tries the stream again after thirty.

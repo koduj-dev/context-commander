@@ -210,3 +210,43 @@ func TestPlanSearchWithoutAProjectCoversEveryProjectYouAreIn(t *testing.T) {
 		t.Errorf("over the bound: %d hits, truncated %v", len(res.Items), res.Truncated)
 	}
 }
+
+// An agent reorders its own plan: a step it finds it must do first moves
+// up, and plan.get reads the steps in the new order.
+func TestAnAgentCanMoveAStepAndAPhase(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	token := f.newUserWithToken("mover@example.test")
+	a, err := f.connect(ctx, token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = a.Close() }()
+	const project = "mover/work"
+	callTool[projectResult](t, ctx, a, "project.create", map[string]any{"project": project, "name": "Work"})
+
+	plan := callTool[planToolResult](t, ctx, a, "plan.create", map[string]any{
+		"project": project, "title": "Order matters",
+		"items": []map[string]any{{"text": "first"}, {"text": "second"}, {"text": "needed first after all"}},
+	})
+	moved := callTool[struct {
+		Position int `json:"position"`
+	}](t, ctx, a, "plan.update_item", map[string]any{"project": project, "item_id": plan.Items[2].ID, "position": 1})
+	if moved.Position != 1 {
+		t.Errorf("moved to %d, want 1", moved.Position)
+	}
+	got := callTool[planToolResult](t, ctx, a, "plan.get", map[string]any{"project": project, "plan_id": plan.ID})
+	if len(got.Items) != 3 || got.Items[0].Text != "needed first after all" || got.Items[1].Text != "first" {
+		t.Errorf("order after the move: %+v", got.Items)
+	}
+
+	type phase struct {
+		ID       string `json:"id"`
+		Position int    `json:"position"`
+	}
+	callTool[phase](t, ctx, a, "phase.create", map[string]any{"project": project, "title": "one"})
+	two := callTool[phase](t, ctx, a, "phase.create", map[string]any{"project": project, "title": "two"})
+	if p := callTool[phase](t, ctx, a, "phase.update", map[string]any{"project": project, "phase_id": two.ID, "position": 1}); p.Position != 1 {
+		t.Errorf("phase moved to %d, want 1", p.Position)
+	}
+}

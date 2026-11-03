@@ -27,6 +27,10 @@ const (
 	// internal/crypto, keyed by project_id. Taken only on the path that
 	// would insert — normal encryption of an existing key never blocks.
 	LockClassProjectKey LockClass = 2
+	// LockClassPhaseOrder serializes assigning phase positions in
+	// internal/plans — creating a phase and moving one — keyed by
+	// project_id. Never nested with another class.
+	LockClassPhaseOrder LockClass = 3
 )
 
 // AdvisoryXactLock takes a transaction-scoped exclusive advisory lock on
