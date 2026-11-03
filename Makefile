@@ -45,18 +45,29 @@ release: ui
 	GOOS=darwin  GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o $(OUT)/$(BINARY)-darwin-arm64      $(PKG)
 	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o $(OUT)/$(BINARY)-windows-amd64.exe $(PKG)
 	GOOS=windows GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o $(OUT)/$(BINARY)-windows-arm64.exe $(PKG)
+	@rm -f $(OUT)/$(BINARY)-man.tar.gz
 	@cd $(OUT) && sha256sum $(BINARY)-* > SHA256SUMS
-	@echo "binaries + SHA256SUMS written to $(OUT)/ (version $(VERSION))"
 	$(MAKE) man
+	cp $(MANDIR)/$(BINARY)-man.tar.gz $(OUT)/
+	@cd $(OUT) && sha256sum $(BINARY)-man.tar.gz >> SHA256SUMS
+	@echo "binaries, man pages + SHA256SUMS written to $(OUT)/ (version $(VERSION))"
 
 ## man: generate the manual pages from the command tree into dist-man/,
-## gzipped as Debian policy wants. The .deb and .rpm ship them. They are not
-## committed: generated at build time, they cannot drift from --help. Kept
-## out of dist-bin/ because the release uploads everything in that directory.
+## gzipped as Debian policy wants. The .deb and .rpm ship them; the
+## ccd-man.tar.gz bundle of them is a release asset, for the Homebrew formula
+## and scripts/install.sh. They are not committed: generated at build time,
+## they cannot drift from --help. Kept out of dist-bin/ because the release
+## uploads everything in that directory (`release` copies the bundle in).
+## The bundle is reproducible (sorted, dated by the commit, no owner names),
+## which takes GNU tar: TAR=gtar on macOS.
+TAR ?= tar
 man:
 	rm -rf $(MANDIR) && mkdir -p $(MANDIR)
 	go run -ldflags "$(LDFLAGS)" $(PKG) man $(MANDIR)
 	gzip -9n $(MANDIR)/*.1
+	cd $(MANDIR) && $(TAR) --sort=name --mtime=@$(SOURCE_DATE_EPOCH) --owner=0 --group=0 --numeric-owner --mode=u=rw,go=r \
+		-cf $(BINARY)-man.tar *.1.gz
+	gzip -9nf $(MANDIR)/$(BINARY)-man.tar
 
 clean:
 	rm -rf bin $(OUT) $(MANDIR) out

@@ -26,13 +26,22 @@ class Ccd < Formula
     end
   end
 
+  # One page per command, generated from --help at release time (make man);
+  # the same pages the .deb and .rpm ship.
+  resource "man" do
+    url "https://github.com/koduj-dev/context-commander/releases/download/v__VERSION__/ccd-man.tar.gz"
+    sha256 "__SHA_MAN__"
+  end
+
   def install
     # The release asset is the bare binary (ccd-<os>-<arch>); only one is
     # downloaded per platform, so install it under the canonical name.
     bin.install Dir["ccd-*"].first => "ccd"
+    resource("man").stage { man1.install Dir["*.1.gz"] }
   end
 
   test do
     assert_match version.to_s, shell_output("#{bin}/ccd version")
+    assert_path_exists man1/"ccd-serve.1.gz"
   end
 end

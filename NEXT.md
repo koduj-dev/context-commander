@@ -392,8 +392,24 @@ on the planned move to a public repo:
   `apt update --allow-releaseinfo-change-label`; the apt README says so.
 - [x] Man pages, one per command, generated from the cobra tree at build
   time (`make man`, hidden `ccd man DIR`) and shipped in the .deb/.rpm.
-  The Homebrew formula installs only the binary, so no pages there yet.
-- [ ] No installer scripts and no self-update (docker-commander has both).
+  `make man` also bundles them as the `ccd-man.tar.gz` release asset
+  (reproducible, in SHA256SUMS), which the Homebrew formula installs with
+  `man1.install` and `scripts/install.sh` puts in `../share/man/man1`.
+- [x] `scripts/install.sh` (POSIX sh) and `ccd self-update`
+  (internal/selfupdate), on docker-commander's model. Both pick the newest
+  stable release, the newest pre-release while there is no stable one, or
+  any newest release with `--pre`. Both verify SHA256SUMS before anything is
+  written, and verify the cosign bundle bound to `release.yml@refs/tags/<tag>`
+  when cosign is on PATH (`--require-signature` makes it mandatory).
+  self-update renames atomically, never downgrades, and refuses /usr/bin
+  (deb/rpm) and Homebrew Cellar binaries with the right upgrade command.
+  Tested against v0.1.0-beta.1 in alpine (busybox sh) and debian (dash,
+  real cosign v3) containers. docs/install.md.
+- [ ] Verify at the next release: `ccd-man.tar.gz` is published and covered
+  by the signed SHA256SUMS, the homebrew job renders `__SHA_MAN__`, and
+  `brew install koduj-dev/tap/ccd` then `man ccd` works (and `brew test ccd`,
+  which now checks for `ccd-serve.1.gz`). v0.1.0-beta.1 has no man bundle,
+  so until then the installer skips the pages and the formula stays as is.
 - [ ] The two projects' apt publishes are serialized only per repo. A
   simultaneous publish refuses the second push; re-run it.
 

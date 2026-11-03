@@ -39,6 +39,9 @@ func TestManPages(t *testing.T) {
 	if !strings.Contains(read("ccd-serve.1"), "--storage-quota") {
 		t.Error("ccd-serve.1 does not document --storage-quota")
 	}
+	if !strings.Contains(read("ccd-self-update.1"), "--check") {
+		t.Error("ccd-self-update.1 does not document --check")
+	}
 	if _, err := os.Stat(filepath.Join(dir, "ccd-man.1")); err == nil {
 		t.Error("the hidden man command got a page of its own")
 	}

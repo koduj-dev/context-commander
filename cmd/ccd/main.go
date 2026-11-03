@@ -41,6 +41,7 @@ Documentation: https://github.com/koduj-dev/context-commander/tree/main/docs`,
 	}
 
 	cmd.AddCommand(newVersionCmd())
+	cmd.AddCommand(newSelfUpdateCmd())
 	cmd.AddCommand(newManCmd())
 	cmd.AddCommand(cli.NewCommand()...)
 

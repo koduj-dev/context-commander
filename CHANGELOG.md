@@ -6,6 +6,27 @@ All notable changes to Context Commander are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Install script.** `scripts/install.sh` installs the release binary on
+  Linux and macOS. It checks the download against `SHA256SUMS` before writing
+  anything, and verifies the cosign signature on `SHA256SUMS` when cosign is
+  installed (`--require-signature` makes that mandatory). It installs into
+  `/usr/local/bin`, or `~/.local/bin` without root, and never calls sudo
+  itself. By default it takes the newest stable release, or the newest
+  pre-release while there is no stable one. `--pre` and `--version` pick
+  something else. See
+  [docs/install.md](https://github.com/koduj-dev/context-commander/blob/main/docs/install.md).
+- **`ccd self-update`** replaces the binary with a newer release. It picks
+  and verifies the release the same way the install script does, and swaps
+  the binary in with an atomic rename. `--check` only reports. It leaves a
+  `ccd` installed by apt, dnf or Homebrew alone and names the command that
+  upgrades it.
+- **Manual pages from Homebrew and the install script.** Each release now
+  ships the pages as `ccd-man.tar.gz`, covered by the signed `SHA256SUMS`.
+  The Homebrew formula installs them, so `man ccd` works there as it does
+  with the packages.
+
 ## [0.1.0-beta.1] — 2026-10-27
 
 The first public release, and a beta. The server, MCP surface and web UI
