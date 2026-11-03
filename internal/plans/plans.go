@@ -11,6 +11,8 @@ package plans
 
 import (
 	"errors"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -78,6 +80,8 @@ const (
 	// Generous because cache reads are: one long agent turn re-reads its
 	// context on every tool call and can read hundreds of millions.
 	MaxTokensPerReport = 1_000_000_000
+	// MaxModel bounds the model label a token report names.
+	MaxModel = 128
 
 	// HistoryPerItem is how many status changes an item keeps.
 	HistoryPerItem = 20
@@ -152,6 +156,65 @@ type Effort struct {
 	TokensOut        int64
 	CacheReadTokens  int64
 	CacheWriteTokens int64
+	// Models splits the four token counts by the model the client named,
+	// ordered by model; Model "" is "not stated". The rows add up to the
+	// totals above (migrations/000035).
+	Models []Tokens
+}
+
+// Tokens is token counts for one model: a report's deltas, or one row of an
+// Effort's breakdown. The model is a label the client gives, not something
+// this package knows — an unknown one is allowed, it just has no price.
+type Tokens struct {
+	Model            string
+	TokensIn         int64
+	TokensOut        int64
+	CacheReadTokens  int64
+	CacheWriteTokens int64
+}
+
+func (t Tokens) any() bool {
+	return t.TokensIn > 0 || t.TokensOut > 0 || t.CacheReadTokens > 0 || t.CacheWriteTokens > 0
+}
+
+func (t *Tokens) add(o Tokens) {
+	t.TokensIn += o.TokensIn
+	t.TokensOut += o.TokensOut
+	t.CacheReadTokens += o.CacheReadTokens
+	t.CacheWriteTokens += o.CacheWriteTokens
+}
+
+// check refuses a count that is not a plausible delta and a model that is
+// not a plausible label.
+func (t Tokens) check() error {
+	for _, v := range []int64{t.TokensIn, t.TokensOut, t.CacheReadTokens, t.CacheWriteTokens} {
+		if v < 0 || v > MaxTokensPerReport {
+			return invalid("token counts are deltas since the previous report, between 0 and %d", MaxTokensPerReport)
+		}
+	}
+	if !ValidModel(t.Model) {
+		return invalid("model is at most %d characters of letters, digits and . _ - : / @ +", MaxModel)
+	}
+	return nil
+}
+
+// ValidModel reports whether s can be stored as a model label: empty (not
+// stated), or up to MaxModel characters from a set that covers vendors'
+// model ids ("claude-opus-5-5", "gpt-6-astra", "anthropic/claude:latest")
+// and nothing that could be read as markup or a path escape.
+func ValidModel(s string) bool {
+	if len(s) > MaxModel {
+		return false
+	}
+	for _, c := range s {
+		switch {
+		case c >= 'a' && c <= 'z', c >= 'A' && c <= 'Z', c >= '0' && c <= '9':
+		case strings.ContainsRune("._-:/@+", c):
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 func (e *Effort) add(o Effort) {
@@ -160,20 +223,19 @@ func (e *Effort) add(o Effort) {
 	e.TokensOut += o.TokensOut
 	e.CacheReadTokens += o.CacheReadTokens
 	e.CacheWriteTokens += o.CacheWriteTokens
-}
-
-func (e Effort) anyTokens() bool {
-	return e.TokensIn > 0 || e.TokensOut > 0 || e.CacheReadTokens > 0 || e.CacheWriteTokens > 0
-}
-
-// validTokens reports whether every token count is a plausible delta.
-func (e Effort) validTokens() bool {
-	for _, v := range []int64{e.TokensIn, e.TokensOut, e.CacheReadTokens, e.CacheWriteTokens} {
-		if v < 0 || v > MaxTokensPerReport {
-			return false
-		}
+	for _, m := range o.Models {
+		e.addModel(m)
 	}
-	return true
+}
+
+// addModel adds one model's counts to the breakdown, keeping it ordered.
+func (e *Effort) addModel(t Tokens) {
+	i, found := slices.BinarySearchFunc(e.Models, t.Model, func(m Tokens, model string) int { return strings.Compare(m.Model, model) })
+	if found {
+		e.Models[i].add(t)
+		return
+	}
+	e.Models = slices.Insert(e.Models, i, t)
 }
 
 type Transition struct {
@@ -246,9 +308,9 @@ type Report struct {
 	PlanID   *uuid.UUID
 	ItemID   *uuid.UUID
 	Activity string
-	// Usage carries token deltas; its Seconds is ignored, time comes from
-	// the heartbeats themselves.
-	Usage Effort
+	// Usage carries token deltas and the model they were for. There is no
+	// time in it: time comes from the heartbeats themselves.
+	Usage Tokens
 }
 
 // Counts is how many items are in each status.

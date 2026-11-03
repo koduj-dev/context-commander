@@ -5,6 +5,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -319,7 +321,7 @@ func TestHeartbeatsCountTimeOnlyWhileTheyKeepComing(t *testing.T) {
 	report := func(item uuid.UUID, tokensIn int64) {
 		t.Helper()
 		if _, err := f.svc.Report(f.ctx, agent.principalID, &agent.clientID, f.projectID,
-			plans.Report{ItemID: &item, Activity: "working", Usage: plans.Effort{TokensIn: tokensIn}}); err != nil {
+			plans.Report{ItemID: &item, Activity: "working", Usage: plans.Tokens{TokensIn: tokensIn}}); err != nil {
 			t.Fatalf("Report: %v", err)
 		}
 	}
@@ -354,7 +356,7 @@ func TestHeartbeatsCountTimeOnlyWhileTheyKeepComing(t *testing.T) {
 	}
 
 	f.clock = f.clock.Add(3 * time.Minute)
-	if err := f.svc.ClearPresence(f.ctx, agent.principalID, &agent.clientID, f.projectID, plans.Effort{TokensOut: 42}); err != nil {
+	if err := f.svc.ClearPresence(f.ctx, agent.principalID, &agent.clientID, f.projectID, plans.Tokens{TokensOut: 42}); err != nil {
 		t.Fatal(err)
 	}
 	if e := effort(b); e.Seconds != 180 || e.TokensOut != 42 {
@@ -599,7 +601,7 @@ func TestAHooksUsageLandsWhereTheClientSaidItWas(t *testing.T) {
 	p := f.plan(agent, "Steps", "the step")
 	item := p.Items[0].ID
 
-	if _, ok, err := f.svc.ReportUsage(f.ctx, agent.principalID, &agent.clientID, plans.Effort{TokensIn: 5}); err != nil || ok {
+	if _, ok, err := f.svc.ReportUsage(f.ctx, agent.principalID, &agent.clientID, plans.Tokens{TokensIn: 5}); err != nil || ok {
 		t.Fatalf("usage before any presence: ok=%v err=%v, want dropped", ok, err)
 	}
 
@@ -608,7 +610,7 @@ func TestAHooksUsageLandsWhereTheClientSaidItWas(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.clock = f.clock.Add(4 * time.Minute)
-	usage := plans.Effort{Seconds: 99999, TokensIn: 12, TokensOut: 3400, CacheReadTokens: 2_500_000, CacheWriteTokens: 40_000}
+	usage := plans.Tokens{TokensIn: 12, TokensOut: 3400, CacheReadTokens: 2_500_000, CacheWriteTokens: 40_000}
 	pr, ok, err := f.svc.ReportUsage(f.ctx, agent.principalID, &agent.clientID, usage)
 	if err != nil || !ok || pr.ItemID == nil || *pr.ItemID != item {
 		t.Fatalf("ReportUsage: %+v ok=%v err=%v", pr, ok, err)
@@ -617,7 +619,7 @@ func TestAHooksUsageLandsWhereTheClientSaidItWas(t *testing.T) {
 	got, _ := f.svc.GetPlan(f.ctx, agent.principalID, f.projectID, p.ID)
 	e := got.Items[0].Effort
 	if e.Seconds != 240 {
-		t.Errorf("seconds = %d, want 240 — the hook's call is a heartbeat, and a Seconds it sends is ignored", e.Seconds)
+		t.Errorf("seconds = %d, want 240 — the hook's call is a heartbeat", e.Seconds)
 	}
 	if e.TokensIn != 12 || e.TokensOut != 3400 || e.CacheReadTokens != 2_500_000 || e.CacheWriteTokens != 40_000 {
 		t.Errorf("tokens %+v", e)
@@ -627,7 +629,60 @@ func TestAHooksUsageLandsWhereTheClientSaidItWas(t *testing.T) {
 	if len(b.Presence) != 1 || b.Presence[0].Activity != "editing the parser" || *b.Presence[0].ItemID != item {
 		t.Errorf("the hook moved or blanked the presence: %+v", b.Presence)
 	}
-	if _, _, err := f.svc.ReportUsage(f.ctx, agent.principalID, &agent.clientID, plans.Effort{CacheReadTokens: -1}); !errors.Is(err, plans.ErrInvalid) {
+	if _, _, err := f.svc.ReportUsage(f.ctx, agent.principalID, &agent.clientID, plans.Tokens{CacheReadTokens: -1}); !errors.Is(err, plans.ErrInvalid) {
 		t.Errorf("a negative count returned %v", err)
+	}
+}
+
+// Tokens are priced per model, so they are kept per model: the breakdown on
+// an item and on the board's plan adds up to the totals, a report without a
+// model is "not stated" rather than lost, and a model label that is not a
+// model id is refused.
+func TestTokensAreKeptPerModel(t *testing.T) {
+	f := newFixture(t)
+	agent := f.join(f.projectID, "Claude", projects.RoleContributor)
+	p := f.plan(agent, "Steps", "the step")
+	item := p.Items[0].ID
+	if _, err := f.svc.Report(f.ctx, agent.principalID, &agent.clientID, f.projectID, plans.Report{ItemID: &item}); err != nil {
+		t.Fatal(err)
+	}
+	for _, u := range []plans.Tokens{
+		{Model: "claude-opus-5-5", TokensIn: 10, TokensOut: 100, CacheReadTokens: 1000, CacheWriteTokens: 50},
+		{Model: "claude-haiku-5-5", TokensIn: 1, TokensOut: 20},
+		{Model: " claude-opus-5-5 ", TokensOut: 5},
+		{TokensIn: 7},
+	} {
+		if _, ok, err := f.svc.ReportUsage(f.ctx, agent.principalID, &agent.clientID, u); err != nil || !ok {
+			t.Fatalf("ReportUsage(%+v): ok=%v err=%v", u, ok, err)
+		}
+	}
+	for _, bad := range []string{"<synthetic>", "claude opus", strings.Repeat("m", plans.MaxModel+1), "a\\b"} {
+		if _, _, err := f.svc.ReportUsage(f.ctx, agent.principalID, &agent.clientID, plans.Tokens{Model: bad, TokensIn: 1}); !errors.Is(err, plans.ErrInvalid) {
+			t.Errorf("model %q returned %v, want ErrInvalid", bad, err)
+		}
+	}
+
+	want := []plans.Tokens{
+		{Model: "", TokensIn: 7},
+		{Model: "claude-haiku-5-5", TokensIn: 1, TokensOut: 20},
+		{Model: "claude-opus-5-5", TokensIn: 10, TokensOut: 105, CacheReadTokens: 1000, CacheWriteTokens: 50},
+	}
+	got, err := f.svc.GetPlan(f.ctx, agent.principalID, f.projectID, p.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := got.Items[0].Effort
+	if !slices.Equal(e.Models, want) {
+		t.Errorf("breakdown %+v, want %+v", e.Models, want)
+	}
+	if e.TokensIn != 18 || e.TokensOut != 125 || e.CacheReadTokens != 1000 || e.CacheWriteTokens != 50 {
+		t.Errorf("totals %+v do not add up with the breakdown", e)
+	}
+	board, err := f.svc.Board(f.ctx, agent.principalID, f.projectID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(board.Plans) != 1 || !slices.Equal(board.Plans[0].Effort.Models, want) {
+		t.Errorf("the board's plan breakdown: %+v", board.Plans)
 	}
 }

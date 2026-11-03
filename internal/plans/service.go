@@ -27,6 +27,9 @@ type Service struct {
 	authz  *auth.AuthzService
 	// now is replaceable so a test can move time without sleeping.
 	now func() time.Time
+	// prices estimates what tokens would have cost; nil when the operator
+	// configured none (prices.go).
+	prices *Prices
 }
 
 func NewService(pool *db.Pool, cryptoProvider *crypto.Provider, authz *auth.AuthzService) *Service {
@@ -395,17 +398,37 @@ func (s *Service) loadPlan(ctx context.Context, tx pgx.Tx, projectID, planID uui
 	return p, blob, nil
 }
 
-// loadItems reads item metadata with each item's total effort. where is a
-// fixed clause from this package, never caller input.
+// modelRow is one model's sums as loadItems' JSON aggregate carries them.
+type modelRow struct {
+	Model      string `json:"model"`
+	TokensIn   int64  `json:"tokens_in"`
+	TokensOut  int64  `json:"tokens_out"`
+	CacheRead  int64  `json:"cache_read"`
+	CacheWrite int64  `json:"cache_write"`
+}
+
+// loadItems reads item metadata with each item's total effort and its
+// per-model breakdown. where is a fixed clause from this package, never
+// caller input.
+//
+// One statement, so the totals and the breakdown come from one snapshot:
+// under READ COMMITTED two queries could straddle a usage report and show a
+// breakdown that no longer adds up to the totals beside it.
 func loadItems(ctx context.Context, tx pgx.Tx, where string, args ...any) ([]Item, error) {
 	rows, err := tx.Query(ctx,
 		`SELECT i.id, i.plan_id, i.position, i.kind, i.status, i.assignee_principal, i.updated_by_principal, i.updated_at, i.completed_at,
 		        COALESCE(e.seconds, 0), COALESCE(e.tokens_in, 0), COALESCE(e.tokens_out, 0),
-		        COALESCE(e.cache_read, 0), COALESCE(e.cache_write, 0)
+		        COALESCE(e.cache_read, 0), COALESCE(e.cache_write, 0), m.models
 		 FROM plan_items i
 		 LEFT JOIN (SELECT item_id, sum(seconds)::bigint AS seconds, sum(tokens_in)::bigint AS tokens_in, sum(tokens_out)::bigint AS tokens_out,
 		                   sum(cache_read_tokens)::bigint AS cache_read, sum(cache_write_tokens)::bigint AS cache_write
 		            FROM plan_item_effort GROUP BY item_id) e ON e.item_id = i.id
+		 LEFT JOIN (SELECT item_id, json_agg(json_build_object('model', model, 'tokens_in', tokens_in, 'tokens_out', tokens_out,
+		                     'cache_read', cache_read, 'cache_write', cache_write) ORDER BY model) AS models
+		            FROM (SELECT item_id, model, sum(tokens_in)::bigint AS tokens_in, sum(tokens_out)::bigint AS tokens_out,
+		                         sum(cache_read_tokens)::bigint AS cache_read, sum(cache_write_tokens)::bigint AS cache_write
+		                  FROM plan_item_effort_models GROUP BY item_id, model) per_model
+		            GROUP BY item_id) m ON m.item_id = i.id
 		 `+where+` ORDER BY i.plan_id, i.position`, args...)
 	if err != nil {
 		return nil, err
@@ -414,9 +437,19 @@ func loadItems(ctx context.Context, tx pgx.Tx, where string, args ...any) ([]Ite
 	var out []Item
 	for rows.Next() {
 		var it Item
+		var models []byte
 		if err := rows.Scan(&it.ID, &it.PlanID, &it.Position, &it.Kind, &it.Status, &it.Assignee, &it.UpdatedBy, &it.UpdatedAt, &it.CompletedAt,
-			&it.Effort.Seconds, &it.Effort.TokensIn, &it.Effort.TokensOut, &it.Effort.CacheReadTokens, &it.Effort.CacheWriteTokens); err != nil {
+			&it.Effort.Seconds, &it.Effort.TokensIn, &it.Effort.TokensOut, &it.Effort.CacheReadTokens, &it.Effort.CacheWriteTokens, &models); err != nil {
 			return nil, err
+		}
+		if models != nil {
+			var list []modelRow
+			if err := json.Unmarshal(models, &list); err != nil {
+				return nil, err
+			}
+			for _, m := range list {
+				it.Effort.addModel(Tokens{Model: m.Model, TokensIn: m.TokensIn, TokensOut: m.TokensOut, CacheReadTokens: m.CacheRead, CacheWriteTokens: m.CacheWrite})
+			}
 		}
 		out = append(out, it)
 	}

@@ -43,8 +43,9 @@ func (s *Service) Report(ctx context.Context, principalID uuid.UUID, clientID *u
 	if err := checkLen("activity", r.Activity, MaxActivity); err != nil {
 		return Presence{}, err
 	}
-	if !r.Usage.validTokens() {
-		return Presence{}, invalid("token counts are deltas since the previous report, between 0 and %d", MaxTokensPerReport)
+	r.Usage.Model = strings.TrimSpace(r.Usage.Model)
+	if err := r.Usage.check(); err != nil {
+		return Presence{}, err
 	}
 
 	now := s.now()
@@ -75,7 +76,7 @@ func (s *Service) Report(ctx context.Context, principalID uuid.UUID, clientID *u
 		}
 		out.PlanID, out.ItemID = planID, r.ItemID
 
-		since, err := s.creditPrevious(ctx, tx, principalID, *clientID, now, r.ItemID, tokensOnly(r.Usage))
+		since, err := s.creditPrevious(ctx, tx, principalID, *clientID, now, r.ItemID, r.Usage)
 		if err != nil {
 			return err
 		}
@@ -114,7 +115,10 @@ func (s *Service) Report(ctx context.Context, principalID uuid.UUID, clientID *u
 // creditPrevious adds the time since the client's previous report, and the
 // reported tokens, to the item that report was on. Returns when the client
 // arrived where it now is: unchanged if it stayed on the same item.
-func (s *Service) creditPrevious(ctx context.Context, tx pgx.Tx, principalID, clientID uuid.UUID, now time.Time, nextItem *uuid.UUID, tokens Effort) (time.Time, error) {
+//
+// The tokens go to the totals and to the model's row of the breakdown in
+// the same transaction, so the breakdown always adds up to the totals.
+func (s *Service) creditPrevious(ctx context.Context, tx pgx.Tx, principalID, clientID uuid.UUID, now time.Time, nextItem *uuid.UUID, tokens Tokens) (time.Time, error) {
 	var prevItem *uuid.UUID
 	var prevProject uuid.UUID
 	var since, lastBeat time.Time
@@ -127,14 +131,14 @@ func (s *Service) creditPrevious(ctx context.Context, tx pgx.Tx, principalID, cl
 	}
 
 	target := nextItem
-	credit := tokens
+	var seconds int64
 	if found && prevItem != nil {
 		target = prevItem
 		if gap := now.Sub(lastBeat); gap > 0 && gap <= IdleAfter {
-			credit.Seconds = int64(gap / time.Second)
+			seconds = int64(gap / time.Second)
 		}
 	}
-	if target != nil && (credit.Seconds > 0 || credit.anyTokens()) {
+	if target != nil && (seconds > 0 || tokens.any()) {
 		if _, err := tx.Exec(ctx,
 			`INSERT INTO plan_item_effort (item_id, principal_id, project_id, seconds, tokens_in, tokens_out, cache_read_tokens, cache_write_tokens)
 			 SELECT id, $2, project_id, $3, $4, $5, $6, $7 FROM plan_items WHERE id = $1
@@ -144,7 +148,20 @@ func (s *Service) creditPrevious(ctx context.Context, tx pgx.Tx, principalID, cl
 			   tokens_out = plan_item_effort.tokens_out + EXCLUDED.tokens_out,
 			   cache_read_tokens = plan_item_effort.cache_read_tokens + EXCLUDED.cache_read_tokens,
 			   cache_write_tokens = plan_item_effort.cache_write_tokens + EXCLUDED.cache_write_tokens`,
-			*target, principalID, credit.Seconds, credit.TokensIn, credit.TokensOut, credit.CacheReadTokens, credit.CacheWriteTokens); err != nil {
+			*target, principalID, seconds, tokens.TokensIn, tokens.TokensOut, tokens.CacheReadTokens, tokens.CacheWriteTokens); err != nil {
+			return time.Time{}, err
+		}
+	}
+	if target != nil && tokens.any() {
+		if _, err := tx.Exec(ctx,
+			`INSERT INTO plan_item_effort_models (item_id, principal_id, model, project_id, tokens_in, tokens_out, cache_read_tokens, cache_write_tokens)
+			 SELECT id, $2, $3, project_id, $4, $5, $6, $7 FROM plan_items WHERE id = $1
+			 ON CONFLICT (item_id, principal_id, model) DO UPDATE SET
+			   tokens_in = plan_item_effort_models.tokens_in + EXCLUDED.tokens_in,
+			   tokens_out = plan_item_effort_models.tokens_out + EXCLUDED.tokens_out,
+			   cache_read_tokens = plan_item_effort_models.cache_read_tokens + EXCLUDED.cache_read_tokens,
+			   cache_write_tokens = plan_item_effort_models.cache_write_tokens + EXCLUDED.cache_write_tokens`,
+			*target, principalID, tokens.Model, tokens.TokensIn, tokens.TokensOut, tokens.CacheReadTokens, tokens.CacheWriteTokens); err != nil {
 			return time.Time{}, err
 		}
 	}
@@ -155,12 +172,6 @@ func (s *Service) creditPrevious(ctx context.Context, tx pgx.Tx, principalID, cl
 	return now, nil
 }
 
-// tokensOnly drops a caller-supplied Seconds: time is measured, never told.
-func tokensOnly(e Effort) Effort {
-	e.Seconds = 0
-	return e
-}
-
 // ReportUsage credits token deltas to wherever the client currently is,
 // without moving it, and counts as a heartbeat there. It is what a client
 // hook calls after every turn (deploy/mcp-clients/README.md): the hook knows
@@ -169,12 +180,13 @@ func tokensOnly(e Effort) Effort {
 // Returns the presence it credited, or ok=false when the client has none —
 // it never reported where it is, so there is nothing to attach the tokens
 // to, and they are dropped rather than guessed onto some item.
-func (s *Service) ReportUsage(ctx context.Context, principalID uuid.UUID, clientID *uuid.UUID, usage Effort) (Presence, bool, error) {
+func (s *Service) ReportUsage(ctx context.Context, principalID uuid.UUID, clientID *uuid.UUID, usage Tokens) (Presence, bool, error) {
 	if clientID == nil {
 		return Presence{}, false, ErrNoClient
 	}
-	if !usage.validTokens() {
-		return Presence{}, false, invalid("token counts are deltas since the previous report, between 0 and %d", MaxTokensPerReport)
+	usage.Model = strings.TrimSpace(usage.Model)
+	if err := usage.check(); err != nil {
+		return Presence{}, false, err
 	}
 	var projectID uuid.UUID
 	var planID, itemID *uuid.UUID
@@ -195,7 +207,7 @@ func (s *Service) ReportUsage(ctx context.Context, principalID uuid.UUID, client
 	now := s.now()
 	out := Presence{ClientID: *clientID, PrincipalID: principalID, ProjectID: projectID, PlanID: planID, ItemID: itemID, LastBeat: now}
 	err = db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
-		since, err := s.creditPrevious(ctx, tx, principalID, *clientID, now, itemID, tokensOnly(usage))
+		since, err := s.creditPrevious(ctx, tx, principalID, *clientID, now, itemID, usage)
 		if err != nil {
 			return err
 		}
@@ -220,18 +232,19 @@ func sameItem(a, b *uuid.UUID) bool {
 
 // ClearPresence ends a client's presence: it stopped, finished, or signed
 // off. The time since its last report is credited first, as for a move.
-func (s *Service) ClearPresence(ctx context.Context, principalID uuid.UUID, clientID *uuid.UUID, projectID uuid.UUID, tokens Effort) error {
+func (s *Service) ClearPresence(ctx context.Context, principalID uuid.UUID, clientID *uuid.UUID, projectID uuid.UUID, tokens Tokens) error {
 	if clientID == nil {
 		return ErrNoClient
 	}
 	if err := s.checkCapability(ctx, principalID, projectID, auth.CapPlanWrite); err != nil {
 		return err
 	}
-	if !tokens.validTokens() {
-		return invalid("token counts are deltas since the previous report, between 0 and %d", MaxTokensPerReport)
+	tokens.Model = strings.TrimSpace(tokens.Model)
+	if err := tokens.check(); err != nil {
+		return err
 	}
 	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
-		if _, err := s.creditPrevious(ctx, tx, principalID, *clientID, s.now(), nil, tokensOnly(tokens)); err != nil {
+		if _, err := s.creditPrevious(ctx, tx, principalID, *clientID, s.now(), nil, tokens); err != nil {
 			return err
 		}
 		_, err := tx.Exec(ctx, `DELETE FROM work_presence WHERE client_id = $1`, *clientID)

@@ -850,4 +850,13 @@ export const fr: Partial<Record<MessageKey, string>> = {
   "plans.addSteps": "Ajouter des étapes",
   "plans.tokensBreakdown":
     "{in} en entrée · {out} en sortie · {cacheRead} lus depuis le cache · {cacheWrite} écrits dans le cache",
+  "plans.costEstimate": "{amount} estimés",
+  "plans.costEstimatePartial": "{amount} estimés, hors modèles sans prix",
+  "plans.costNoPrice": "aucun prix pour ces modèles",
+  "plans.modelTokens":
+    "{model} : {in} en entrée · {out} en sortie · {cacheRead} lus depuis le cache · {cacheWrite} écrits dans le cache",
+  "plans.modelNotStated": "modèle non indiqué",
+  "plans.modelNoPrice": "aucun prix",
+  "plans.pricesAsOf":
+    "Une estimation aux prix fournis à ce serveur, au {date} ; pas ce qui a été dépensé.",
 };

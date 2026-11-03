@@ -33,6 +33,30 @@ const BOARD = {
         tokens_out: 200,
         cache_read_tokens: 0,
         cache_write_tokens: 0,
+        models: [
+          {
+            model: "",
+            tokens_in: 400,
+            tokens_out: 0,
+            cache_read_tokens: 0,
+            cache_write_tokens: 0,
+            estimated_cost: null,
+          },
+          {
+            model: "claude-opus-5-5",
+            tokens_in: 600,
+            tokens_out: 200,
+            cache_read_tokens: 0,
+            cache_write_tokens: 0,
+            estimated_cost: 0.0064,
+          },
+        ],
+        cost_estimate: {
+          currency: "USD",
+          prices_as_of: "2026-11-03",
+          amount: 0.0064,
+          unpriced_models: [""],
+        },
       },
     },
   ],
@@ -186,6 +210,22 @@ describe("the plans board", () => {
     expect(screen.getAllByText("2 of 4 done").length).toBeGreaterThan(0);
     expect(screen.getByText("1.5 hr tracked")).toBeTruthy();
     expect(screen.getByText("1,200 tokens reported")).toBeTruthy();
+  });
+
+  it("puts a cost estimate beside the tokens, and says what it leaves out", async () => {
+    stub([]);
+    render(wrap());
+
+    const est = await waitFor(() =>
+      screen.getByText("$0.0064 estimated, models without a price left out"),
+    );
+    const title = est.getAttribute("title")!;
+    expect(title).toContain("model not stated: 400 input");
+    expect(title).toContain("— no price");
+    expect(title).toContain("claude-opus-5-5: 600 input · 200 output");
+    expect(title).toContain("as of 2026-11-03; not what was spent.");
+    // No price table, no estimate: the plan's effort carries none.
+    expect(screen.getAllByText(/estimated/).length).toBe(1);
   });
 
   it("“Work on this” starts the step and puts the reader on the board", async () => {

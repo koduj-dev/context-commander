@@ -845,6 +845,15 @@ export const en = {
   "plans.addSteps": "Add steps",
   "plans.tokensBreakdown":
     "{in} input · {out} output · {cacheRead} read from cache · {cacheWrite} written to cache",
+  "plans.costEstimate": "{amount} estimated",
+  "plans.costEstimatePartial": "{amount} estimated, models without a price left out",
+  "plans.costNoPrice": "no price for these models",
+  "plans.modelTokens":
+    "{model}: {in} input · {out} output · {cacheRead} read from cache · {cacheWrite} written to cache",
+  "plans.modelNotStated": "model not stated",
+  "plans.modelNoPrice": "no price",
+  "plans.pricesAsOf":
+    "An estimate at the prices this server was given, as of {date}; not what was spent.",
 } as const;
 
 export type MessageKey = keyof typeof en;

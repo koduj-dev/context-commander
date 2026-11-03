@@ -243,22 +243,67 @@ function EffortCell({ effort }: { effort: Effort }) {
       }
       secondary={
         tokens > 0 ? (
-          // The split is what a cost comparison needs: the four kinds are
-          // priced differently, and for an agent nearly all input is cache.
-          <span
-            className="dim"
-            title={t("plans.tokensBreakdown", {
-              in: f.number(effort.tokens_in),
-              out: f.number(effort.tokens_out),
-              cacheRead: f.number(effort.cache_read_tokens),
-              cacheWrite: f.number(effort.cache_write_tokens),
-            })}
-          >
-            {t("plans.tokensReported", { count: tokens })}
-          </span>
+          <>
+            {/* The split is what a cost comparison needs: the four kinds are
+                priced differently, and for an agent nearly all input is cache. */}
+            <span
+              className="dim"
+              title={t("plans.tokensBreakdown", {
+                in: f.number(effort.tokens_in),
+                out: f.number(effort.tokens_out),
+                cacheRead: f.number(effort.cache_read_tokens),
+                cacheWrite: f.number(effort.cache_write_tokens),
+              })}
+            >
+              {t("plans.tokensReported", { count: tokens })}
+            </span>
+            <CostEstimateNote effort={effort} />
+          </>
         ) : undefined
       }
     />
+  );
+}
+
+/**
+ * What the tokens would have cost at the operator's prices — shown only when
+ * the server has a price table, and always worded as an estimate: the tokens
+ * are what clients reported, the prices what the operator configured.
+ */
+function CostEstimateNote({ effort }: { effort: Effort }) {
+  const t = useT();
+  const f = useFormat();
+  const est = effort.cost_estimate;
+  if (!est) return null;
+  const priced = (effort.models ?? []).some((m) => m.estimated_cost !== null);
+  const amount = f.money(est.amount, est.currency);
+  const label = !priced
+    ? t("plans.costNoPrice")
+    : est.unpriced_models.length > 0
+      ? t("plans.costEstimatePartial", { amount })
+      : t("plans.costEstimate", { amount });
+  const lines = (effort.models ?? []).map((m) => {
+    const tokens = t("plans.modelTokens", {
+      model: m.model || t("plans.modelNotStated"),
+      in: f.number(m.tokens_in),
+      out: f.number(m.tokens_out),
+      cacheRead: f.number(m.cache_read_tokens),
+      cacheWrite: f.number(m.cache_write_tokens),
+    });
+    const cost =
+      m.estimated_cost === null
+        ? t("plans.modelNoPrice")
+        : t("plans.costEstimate", { amount: f.money(m.estimated_cost, est.currency) });
+    return `${tokens} — ${cost}`;
+  });
+  if (est.prices_as_of) lines.push(t("plans.pricesAsOf", { date: est.prices_as_of }));
+  return (
+    <>
+      <span className="dim"> · </span>
+      <span className="dim" title={lines.join("\n")}>
+        {label}
+      </span>
+    </>
   );
 }
 

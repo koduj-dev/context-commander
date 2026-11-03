@@ -144,6 +144,31 @@ Effort is **aggregated, never logged**: `plan_item_effort` keeps one row per
     moving it, and counts the post as a heartbeat.
   - A client that never reported a step gets its tokens dropped, not guessed
     onto one.
+- **Tokens are kept per model** (added 2026-11-03, migration 000035). Prices
+  differ by model, so a count that does not name its model cannot be
+  priced. `plan_item_effort` keeps the time and the totals, and
+  `plan_item_effort_models` keeps the four counts per (item, principal,
+  model). The two are written in the same transaction, so the breakdown
+  always adds up to the totals. The model is a label the client reports. It
+  is bounded in length and charset, and an unknown model is allowed.
+  Reports without one, including every report from before this change, are
+  "not stated".
+  - The Claude Code hook takes the model from each response in the
+    transcript (`message.model`). It also reads the subagent transcripts
+    under `<session>/subagents/`, where Claude Code writes them, and older
+    `isSidechain` entries in the session transcript.
+  - The Codex CLI hook, `deploy/mcp-clients/codex-usage-hook.py`, credits
+    the growth of each rollout `token_count` total to the model of the turn
+    it grew in.
+- **A cost estimate, from operator configuration only** (added 2026-11-03).
+  `--usage-prices` names a JSON table of per-million-token prices for the
+  four kinds. The server never ships prices of its own: prices change and
+  differ by contract, and a number the server made up would be read as a
+  fact. Given a table, responses carry an estimate for the models it prices
+  and list the models it does not. The interface shows "estimated" and "no
+  price". Like the tokens it is built on, it is never presented as spent.
+  One-hour cache writes are priced as five-minute ones, because the counts
+  do not tell them apart.
 
 ### Surfaces
 

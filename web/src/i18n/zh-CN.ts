@@ -817,4 +817,12 @@ export const zhCN: Partial<Record<MessageKey, string>> = {
   "plans.addSteps": "添加步骤",
   "plans.tokensBreakdown":
     "输入 {in} · 输出 {out} · 从缓存读取 {cacheRead} · 写入缓存 {cacheWrite}",
+  "plans.costEstimate": "估算 {amount}",
+  "plans.costEstimatePartial": "估算 {amount}，未计入无价格的模型",
+  "plans.costNoPrice": "这些模型没有价格",
+  "plans.modelTokens":
+    "{model}：输入 {in} · 输出 {out} · 从缓存读取 {cacheRead} · 写入缓存 {cacheWrite}",
+  "plans.modelNotStated": "未注明模型",
+  "plans.modelNoPrice": "无价格",
+  "plans.pricesAsOf": "按本服务器配置的价格估算，价格日期 {date}；并非实际花费。",
 };

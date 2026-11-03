@@ -264,12 +264,17 @@ Only on top of a core loop people actually use:
       dashboard. Raised by the maintainer's colleagues. Still open:
       - **Reordering.** Phases and items keep their creation order; nothing
         moves them yet.
-      - **Tokens come from clients.** Claude Code has a hook
-        (`deploy/mcp-clients/claude-code-usage-hook.py`); Codex CLI does not
-        yet. Two gaps remain before a cost estimate is possible: which model the
-        tokens were for, since prices differ by model, and subagent transcripts.
-        The goal is deciding whether the API would be cheaper than a
-        subscription.
+      - **Tokens come from clients.** Claude Code and Codex CLI have hooks
+        (`deploy/mcp-clients/claude-code-usage-hook.py`,
+        `codex-usage-hook.py`). Since 2026-11-03 they send the model per
+        response and Claude Code's include subagent transcripts; the server
+        keeps the four counts per model (migration 000035) and, given a price
+        table (`--usage-prices`, example in `deploy/usage-prices.example.json`),
+        shows a cost estimate. The goal is deciding whether the API would be
+        cheaper than a subscription. Still open: one-hour cache writes are
+        priced as five-minute ones (Claude Code's transcripts split them,
+        the counts do not), and whether Codex fires `Stop` for its subagents
+        has not been checked against a real session.
       - **Live updates are polling** every 10 s. Push comes with Phase 2's
         subscriptions.
       - [x] ~~**Search is per project.**~~ Closed 2026-11-03:

@@ -22,25 +22,72 @@ type effortResponse struct {
 	TokensOut        int64 `json:"tokens_out"`
 	CacheReadTokens  int64 `json:"cache_read_tokens"`
 	CacheWriteTokens int64 `json:"cache_write_tokens"`
+	// Models is the same four counts by model; "" is "not stated".
+	Models []modelTokensResponse `json:"models"`
+	// CostEstimate is absent when the server has no price table
+	// (--usage-prices) or there are no tokens to price.
+	CostEstimate *estimateResponse `json:"cost_estimate,omitempty"`
 }
 
-func effortFrom(e plans.Effort) effortResponse {
-	return effortResponse{
+type modelTokensResponse struct {
+	Model            string `json:"model"`
+	TokensIn         int64  `json:"tokens_in"`
+	TokensOut        int64  `json:"tokens_out"`
+	CacheReadTokens  int64  `json:"cache_read_tokens"`
+	CacheWriteTokens int64  `json:"cache_write_tokens"`
+	// EstimatedCost is null when the model has no price, or no table is
+	// configured: "no price" is not zero.
+	EstimatedCost *float64 `json:"estimated_cost"`
+}
+
+// estimateResponse is what the tokens would have cost at the operator's
+// prices — an estimate, never what was spent.
+type estimateResponse struct {
+	Currency string  `json:"currency"`
+	AsOf     string  `json:"prices_as_of,omitempty"`
+	Amount   float64 `json:"amount"`
+	// Unpriced are the models whose tokens Amount leaves out.
+	Unpriced []string `json:"unpriced_models"`
+}
+
+func effortFrom(e plans.Effort, prices *plans.Prices) effortResponse {
+	r := effortResponse{
 		Seconds: e.Seconds, TokensIn: e.TokensIn, TokensOut: e.TokensOut,
 		CacheReadTokens: e.CacheReadTokens, CacheWriteTokens: e.CacheWriteTokens,
+		Models: []modelTokensResponse{},
 	}
+	for _, m := range e.Models {
+		mr := modelTokensResponse{
+			Model: m.Model, TokensIn: m.TokensIn, TokensOut: m.TokensOut,
+			CacheReadTokens: m.CacheReadTokens, CacheWriteTokens: m.CacheWriteTokens,
+		}
+		if cost, ok := prices.Cost(m); ok {
+			mr.EstimatedCost = &cost
+		}
+		r.Models = append(r.Models, mr)
+	}
+	if est := prices.Estimate(e); est != nil {
+		r.CostEstimate = &estimateResponse{Currency: est.Currency, AsOf: est.AsOf, Amount: est.Amount, Unpriced: est.Unpriced}
+		if r.CostEstimate.Unpriced == nil {
+			r.CostEstimate.Unpriced = []string{}
+		}
+	}
+	return r
 }
 
-// usageRequest is token deltas since the client's previous report.
+// usageRequest is token deltas since the client's previous report, and the
+// model they were for. The model is optional: without it the tokens count
+// in the totals and as "not stated" in the breakdown.
 type usageRequest struct {
-	TokensIn         int64 `json:"tokens_in"`
-	TokensOut        int64 `json:"tokens_out"`
-	CacheReadTokens  int64 `json:"cache_read_tokens"`
-	CacheWriteTokens int64 `json:"cache_write_tokens"`
+	Model            string `json:"model"`
+	TokensIn         int64  `json:"tokens_in"`
+	TokensOut        int64  `json:"tokens_out"`
+	CacheReadTokens  int64  `json:"cache_read_tokens"`
+	CacheWriteTokens int64  `json:"cache_write_tokens"`
 }
 
-func (u usageRequest) effort() plans.Effort {
-	return plans.Effort{TokensIn: u.TokensIn, TokensOut: u.TokensOut, CacheReadTokens: u.CacheReadTokens, CacheWriteTokens: u.CacheWriteTokens}
+func (u usageRequest) tokens() plans.Tokens {
+	return plans.Tokens{Model: u.Model, TokensIn: u.TokensIn, TokensOut: u.TokensOut, CacheReadTokens: u.CacheReadTokens, CacheWriteTokens: u.CacheWriteTokens}
 }
 
 type countsResponse struct {
@@ -70,10 +117,10 @@ type itemResponse struct {
 	Effort      effortResponse `json:"effort"`
 }
 
-func itemFrom(it plans.Item) itemResponse {
+func itemFrom(it plans.Item, prices *plans.Prices) itemResponse {
 	r := itemResponse{
 		ID: it.ID, PlanID: it.PlanID, Position: it.Position, Kind: it.Kind, Status: it.Status, Text: it.Text, Note: it.Note,
-		Assignee: it.Assignee, UpdatedBy: it.UpdatedBy, UpdatedAt: it.UpdatedAt.Format(time.RFC3339), Effort: effortFrom(it.Effort),
+		Assignee: it.Assignee, UpdatedBy: it.UpdatedBy, UpdatedAt: it.UpdatedAt.Format(time.RFC3339), Effort: effortFrom(it.Effort, prices),
 	}
 	if it.CompletedAt != nil {
 		r.CompletedAt = it.CompletedAt.Format(time.RFC3339)
@@ -94,14 +141,14 @@ type planResponse struct {
 	Items     []itemResponse `json:"items"`
 }
 
-func planFrom(p plans.Plan) planResponse {
+func planFrom(p plans.Plan, prices *plans.Prices) planResponse {
 	r := planResponse{
 		ID: p.ID, PhaseID: p.PhaseID, Status: p.Status, Version: p.Version, Title: p.Title, Body: p.Body,
 		CreatedBy: p.CreatedBy, CreatedAt: p.CreatedAt.Format(time.RFC3339), UpdatedAt: p.UpdatedAt.Format(time.RFC3339),
 		Items: []itemResponse{},
 	}
 	for _, it := range p.Items {
-		r.Items = append(r.Items, itemFrom(it))
+		r.Items = append(r.Items, itemFrom(it, prices))
 	}
 	return r
 }
@@ -196,20 +243,20 @@ func (d Deps) getPlanBoard(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, ph := range b.Phases {
 		pr := phaseFrom(ph.Phase)
-		pr.Counts, pr.Effort = countsFrom(ph.Counts), effortFrom(ph.Effort)
+		pr.Counts, pr.Effort = countsFrom(ph.Counts), effortFrom(ph.Effort, d.Plans.Prices())
 		out.Phases = append(out.Phases, pr)
 	}
 	for _, p := range b.Plans {
 		out.Plans = append(out.Plans, planSummaryResponse{
 			ID: p.ID, PhaseID: p.PhaseID, Status: p.Status, Title: p.Title, CreatedBy: p.CreatedBy,
-			UpdatedAt: p.UpdatedAt.Format(time.RFC3339), Counts: countsFrom(p.Counts), Effort: effortFrom(p.Effort),
+			UpdatedAt: p.UpdatedAt.Format(time.RFC3339), Counts: countsFrom(p.Counts), Effort: effortFrom(p.Effort, d.Plans.Prices()),
 		})
 	}
 	for _, a := range b.InProgress {
-		out.InProgress = append(out.InProgress, activeItemResponse{PlanTitle: a.PlanTitle, Item: itemFrom(a.Item)})
+		out.InProgress = append(out.InProgress, activeItemResponse{PlanTitle: a.PlanTitle, Item: itemFrom(a.Item, d.Plans.Prices())})
 	}
 	for _, a := range b.Blocked {
-		out.Blocked = append(out.Blocked, activeItemResponse{PlanTitle: a.PlanTitle, Item: itemFrom(a.Item)})
+		out.Blocked = append(out.Blocked, activeItemResponse{PlanTitle: a.PlanTitle, Item: itemFrom(a.Item, d.Plans.Prices())})
 	}
 	now, clientID := time.Now(), clientIDFrom(r.Context())
 	for _, p := range b.Presence {
@@ -267,7 +314,7 @@ func (d Deps) createPlan(w http.ResponseWriter, r *http.Request) {
 		writeDomainError(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, planFrom(p))
+	writeJSON(w, http.StatusCreated, planFrom(p, d.Plans.Prices()))
 }
 
 func uuidParam(w http.ResponseWriter, r *http.Request, name string) (uuid.UUID, bool) {
@@ -289,7 +336,7 @@ func (d Deps) getPlan(w http.ResponseWriter, r *http.Request) {
 		writeDomainError(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, planFrom(p))
+	writeJSON(w, http.StatusOK, planFrom(p, d.Plans.Prices()))
 }
 
 func (d Deps) updatePlan(w http.ResponseWriter, r *http.Request) {
@@ -323,7 +370,7 @@ func (d Deps) updatePlan(w http.ResponseWriter, r *http.Request) {
 		writeDomainError(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, planFrom(p))
+	writeJSON(w, http.StatusOK, planFrom(p, d.Plans.Prices()))
 }
 
 func (d Deps) deletePlan(w http.ResponseWriter, r *http.Request) {
@@ -355,7 +402,7 @@ func (d Deps) addPlanItems(w http.ResponseWriter, r *http.Request) {
 		writeDomainError(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, planFrom(p))
+	writeJSON(w, http.StatusOK, planFrom(p, d.Plans.Prices()))
 }
 
 func (d Deps) updatePlanItem(w http.ResponseWriter, r *http.Request) {
@@ -386,7 +433,7 @@ func (d Deps) updatePlanItem(w http.ResponseWriter, r *http.Request) {
 		writeDomainError(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, itemFrom(it))
+	writeJSON(w, http.StatusOK, itemFrom(it, d.Plans.Prices()))
 }
 
 func (d Deps) listPlanItemHistory(w http.ResponseWriter, r *http.Request) {
@@ -487,7 +534,7 @@ func (d Deps) reportPresence(w http.ResponseWriter, r *http.Request) {
 	}
 	clientID := clientIDFrom(r.Context())
 	p, err := d.Plans.Report(r.Context(), principalIDFrom(r.Context()), clientID, projectFrom(r.Context()).ID, plans.Report{
-		PlanID: req.PlanID, ItemID: req.ItemID, Activity: req.Activity, Usage: req.effort(),
+		PlanID: req.PlanID, ItemID: req.ItemID, Activity: req.Activity, Usage: req.tokens(),
 	})
 	if err != nil {
 		writeDomainError(w, r, err)
@@ -508,7 +555,7 @@ func (d Deps) reportUsage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	clientID := clientIDFrom(r.Context())
-	p, ok, err := d.Plans.ReportUsage(r.Context(), principalIDFrom(r.Context()), clientID, req.effort())
+	p, ok, err := d.Plans.ReportUsage(r.Context(), principalIDFrom(r.Context()), clientID, req.tokens())
 	if err != nil {
 		writeDomainError(w, r, err)
 		return
@@ -525,7 +572,7 @@ func (d Deps) reportUsage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (d Deps) clearPresence(w http.ResponseWriter, r *http.Request) {
-	if err := d.Plans.ClearPresence(r.Context(), principalIDFrom(r.Context()), clientIDFrom(r.Context()), projectFrom(r.Context()).ID, plans.Effort{}); err != nil {
+	if err := d.Plans.ClearPresence(r.Context(), principalIDFrom(r.Context()), clientIDFrom(r.Context()), projectFrom(r.Context()).ID, plans.Tokens{}); err != nil {
 		writeDomainError(w, r, err)
 		return
 	}
