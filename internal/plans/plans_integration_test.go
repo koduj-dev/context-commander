@@ -58,7 +58,7 @@ func newFixture(t *testing.T) *fixture {
 	}
 	f := &fixture{
 		t: t, ctx: ctx, ownerPool: ownerPool,
-		svc:   plans.NewService(appPool, crypto.NewProvider(root), auth.NewAuthzService(appPool, projects.NewStore())),
+		svc: plans.NewService(appPool, crypto.NewProvider(root), auth.NewAuthzService(appPool, projects.NewStore())),
 		// Near the real time, not a fixed date: cc_prune_presence deletes
 		// presence by the database's now(), so a clock more than a week in
 		// the past has every row pruned the moment it is written.
