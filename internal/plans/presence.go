@@ -254,17 +254,26 @@ func (s *Service) ClearPresence(ctx context.Context, principalID uuid.UUID, clie
 	if err := tokens.check(); err != nil {
 		return err
 	}
+	// The row is per client, not per project: stopping in this project
+	// removes the client from whichever board it was last on, and that
+	// board is the one that changed.
+	var cleared *uuid.UUID
 	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
 		if _, err := s.creditPrevious(ctx, tx, principalID, *clientID, s.now(), nil, tokens); err != nil {
 			return err
 		}
-		_, err := tx.Exec(ctx, `DELETE FROM work_presence WHERE client_id = $1`, *clientID)
+		err := tx.QueryRow(ctx, `DELETE FROM work_presence WHERE client_id = $1 RETURNING project_id`, *clientID).Scan(&cleared)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
 		return err
 	})
 	if err != nil {
 		return fmt.Errorf("plans: clear presence: %w", err)
 	}
-	s.changes.publish(projectID, true)
+	if cleared != nil {
+		s.changes.publish(*cleared, true)
+	}
 	return nil
 }
 

@@ -686,3 +686,230 @@ func TestTokensAreKeptPerModel(t *testing.T) {
 		t.Errorf("the board's plan breakdown: %+v", board.Plans)
 	}
 }
+
+func TestMovingPhasesAndItemsKeepsEveryPlaceTakenOnce(t *testing.T) {
+	f := newFixture(t)
+	alice := f.join(f.projectID, "Alice", projects.RoleContributor)
+
+	var phases []plans.Phase
+	for _, title := range []string{"one", "two", "three"} {
+		ph, err := f.svc.CreatePhase(f.ctx, alice.principalID, f.projectID, title, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		phases = append(phases, ph)
+	}
+	to := 1
+	moved, err := f.svc.UpdatePhase(f.ctx, alice.principalID, f.projectID, phases[2].ID, plans.PhaseUpdate{Position: &to})
+	if err != nil {
+		t.Fatalf("move phase: %v", err)
+	}
+	if moved.Position != 1 || moved.Title != "three" {
+		t.Errorf("moved phase %+v, want three at 1", moved)
+	}
+	if got := f.phaseTitles(alice); fmt.Sprint(got) != "[three one two]" {
+		t.Errorf("phases in order %v, want [three one two]", got)
+	}
+
+	p := f.plan(alice, "Ordered", "a", "b", "c", "d")
+	last := 99
+	it, err := f.svc.UpdateItem(f.ctx, alice.principalID, &alice.clientID, f.projectID, p.Items[0].ID, plans.ItemUpdate{Position: &last})
+	if err != nil {
+		t.Fatalf("move item: %v", err)
+	}
+	if it.Position != 4 {
+		t.Errorf("moved past the end to %d, want 4", it.Position)
+	}
+	if it.UpdatedBy != nil {
+		t.Error("a move alone recorded someone as having updated the item")
+	}
+	if got := f.itemTexts(alice, p.ID); fmt.Sprint(got) != "[b c d a]" {
+		t.Errorf("items in order %v, want [b c d a]", got)
+	}
+
+	zero := 0
+	if _, err := f.svc.UpdateItem(f.ctx, alice.principalID, &alice.clientID, f.projectID, p.Items[0].ID, plans.ItemUpdate{Position: &zero}); !errors.Is(err, plans.ErrInvalid) {
+		t.Errorf("position 0: %v, want ErrInvalid", err)
+	}
+	reader := f.join(f.projectID, "Rita", projects.RoleReader)
+	if _, err := f.svc.UpdatePhase(f.ctx, reader.principalID, f.projectID, phases[0].ID, plans.PhaseUpdate{Position: &to}); !errors.Is(err, plans.ErrForbidden) {
+		t.Errorf("a reader moved a phase: %v", err)
+	}
+}
+
+// Many moves, creates and appends at once must leave each list numbered
+// 1..n with nothing lost and nothing doubled. That is the invariant the
+// locks exist for: no constraint in the schema enforces it.
+func TestConcurrentMovesLeaveADenseOrder(t *testing.T) {
+	f := newFixture(t)
+	alice := f.join(f.projectID, "Alice", projects.RoleContributor)
+	p := f.plan(alice, "Busy", "a", "b", "c", "d", "e", "f")
+	var phaseIDs []uuid.UUID
+	for i := range 4 {
+		ph, err := f.svc.CreatePhase(f.ctx, alice.principalID, f.projectID, fmt.Sprintf("phase %d", i), "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		phaseIDs = append(phaseIDs, ph.ID)
+	}
+
+	const workers = 12
+	var wg sync.WaitGroup
+	errs := make(chan error, workers*4)
+	for w := range workers {
+		wg.Go(func() {
+			to := w%7 + 1
+			item := p.Items[w%len(p.Items)].ID
+			if _, err := f.svc.UpdateItem(f.ctx, alice.principalID, &alice.clientID, f.projectID, item, plans.ItemUpdate{Position: &to}); err != nil {
+				errs <- fmt.Errorf("move item: %w", err)
+			}
+			if _, err := f.svc.UpdatePhase(f.ctx, alice.principalID, f.projectID, phaseIDs[w%len(phaseIDs)], plans.PhaseUpdate{Position: &to}); err != nil {
+				errs <- fmt.Errorf("move phase: %w", err)
+			}
+			if w%3 == 0 {
+				if _, err := f.svc.CreatePhase(f.ctx, alice.principalID, f.projectID, fmt.Sprintf("late %d", w), ""); err != nil {
+					errs <- fmt.Errorf("create phase: %w", err)
+				}
+				if _, err := f.svc.AddItems(f.ctx, alice.principalID, f.projectID, p.ID, []plans.NewItem{{Text: fmt.Sprintf("late %d", w)}}); err != nil {
+					errs <- fmt.Errorf("add item: %w", err)
+				}
+			}
+		})
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		t.Error(err)
+	}
+
+	err := db.WithoutPrincipal(f.ctx, f.ownerPool, func(tx pgx.Tx) error {
+		for _, q := range []struct {
+			what, sql string
+			arg       uuid.UUID
+		}{
+			{"phases", `SELECT position FROM phases WHERE project_id = $1 ORDER BY position`, f.projectID},
+			{"items", `SELECT position FROM plan_items WHERE plan_id = $1 ORDER BY position`, p.ID},
+		} {
+			rows, err := tx.Query(f.ctx, q.sql, q.arg)
+			if err != nil {
+				return err
+			}
+			got, err := pgx.CollectRows(rows, pgx.RowTo[int])
+			if err != nil {
+				return err
+			}
+			for i, pos := range got {
+				if pos != i+1 {
+					t.Errorf("%s positions %v are not 1..%d", q.what, got, len(got))
+					break
+				}
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := len(f.itemTexts(alice, p.ID)); n != 6+workers/3 {
+		t.Errorf("%d items, want %d", n, 6+workers/3)
+	}
+	if n := len(f.phaseTitles(alice)); n != 4+workers/3 {
+		t.Errorf("%d phases, want %d", n, 4+workers/3)
+	}
+}
+
+func TestChangesAreToldToTheStreamsThatMayReadThem(t *testing.T) {
+	f := newFixture(t)
+	alice := f.join(f.projectID, "Alice", projects.RoleContributor)
+	otherProject, _ := f.newProject("elsewhere")
+	outsider := f.join(otherProject, "Otto", projects.RoleOwner)
+	p := f.plan(alice, "Watched", "a")
+
+	board, err := f.svc.SubscribeBoard(f.ctx, alice.principalID, alice.clientID, f.projectID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer board.Close()
+	dash, err := f.svc.SubscribePresence(f.ctx, alice.principalID, alice.clientID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dash.Close()
+	theirs, err := f.svc.SubscribePresence(f.ctx, outsider.principalID, outsider.clientID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer theirs.Close()
+
+	f.set(alice, p.Items[0].ID, plans.ItemDone)
+	expectChange(t, board, "a tick reached no board stream")
+	expectNoChange(t, dash, "a tick reached the presence stream")
+
+	if _, err := f.svc.Report(f.ctx, alice.principalID, &alice.clientID, f.projectID, plans.Report{ItemID: &p.Items[0].ID}); err != nil {
+		t.Fatal(err)
+	}
+	expectChange(t, dash, "a presence report reached no presence stream")
+	expectChange(t, board, "a presence report reached no board stream")
+	expectNoChange(t, theirs, "an outsider's presence stream was told about this project")
+
+	if _, err := f.svc.SubscribeBoard(f.ctx, outsider.principalID, outsider.clientID, f.projectID); !errors.Is(err, plans.ErrForbidden) {
+		t.Errorf("an outsider subscribed to the board: %v", err)
+	}
+
+	// Presence is one row per client. Stopping while naming another project
+	// still removes the client from this board, so this board is told.
+	err = db.WithoutPrincipal(f.ctx, f.ownerPool, func(tx pgx.Tx) error {
+		return f.addMember(tx, otherProject, alice, projects.RoleContributor)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := f.svc.ClearPresence(f.ctx, alice.principalID, &alice.clientID, otherProject, plans.Tokens{}); err != nil {
+		t.Fatal(err)
+	}
+	expectChange(t, board, "stopping from another project did not tell the board the client left")
+}
+
+func expectChange(t *testing.T, s *plans.Subscription, why string) {
+	t.Helper()
+	select {
+	case <-s.C():
+	case <-time.After(5 * time.Second):
+		t.Fatal(why)
+	}
+}
+
+func expectNoChange(t *testing.T, s *plans.Subscription, why string) {
+	t.Helper()
+	select {
+	case <-s.C():
+		t.Error(why)
+	default:
+	}
+}
+
+func (f *fixture) phaseTitles(m member) []string {
+	f.t.Helper()
+	b, err := f.svc.Board(f.ctx, m.principalID, f.projectID)
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	var out []string
+	for _, ph := range b.Phases {
+		out = append(out, ph.Title)
+	}
+	return out
+}
+
+func (f *fixture) itemTexts(m member, planID uuid.UUID) []string {
+	f.t.Helper()
+	p, err := f.svc.GetPlan(f.ctx, m.principalID, f.projectID, planID)
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	var out []string
+	for _, it := range p.Items {
+		out = append(out, it.Text)
+	}
+	return out
+}

@@ -181,6 +181,12 @@ export function usePolled<T>(
   const [loading, setLoading] = useState(true);
   const [stale, setStale] = useState(false);
   const generation = useRef(0);
+  // Every request, not just every set of deps, gets a number. A pulse can
+  // start a read while the previous one is still in flight, and if the
+  // older answer arrived last it would put a stale board back on screen —
+  // for a minute, while a stream is live. Only the newest request's answer
+  // is used.
+  const latest = useRef(0);
   const hasData = useRef(false);
   // reload() refreshes in place, like a tick: after a change someone made
   // on this screen, the board should update, not disappear and come back.
@@ -194,21 +200,23 @@ export function usePolled<T>(
     setData(undefined);
 
     const fetchOnce = () => {
+      const request = ++latest.current;
+      const current = () => generation.current === mine && latest.current === request;
       load()
         .then((value) => {
-          if (generation.current !== mine) return;
+          if (!current()) return;
           hasData.current = true;
           setData(value);
           setError(undefined);
           setStale(false);
         })
         .catch((err: unknown) => {
-          if (generation.current !== mine) return;
+          if (!current()) return;
           if (hasData.current) setStale(true);
           else setError(err);
         })
         .finally(() => {
-          if (generation.current === mine) setLoading(false);
+          if (current()) setLoading(false);
         });
     };
     refresh.current = fetchOnce;
