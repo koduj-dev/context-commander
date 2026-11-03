@@ -333,8 +333,9 @@ describe("the board, live", () => {
 describe("reordering", () => {
   it("moves a step with the keyboard-reachable buttons, by 1-based place", async () => {
     const calls: Call[] = [];
-    const second = { ...PLAN.items[0], id: "it-2", position: 2, kind: "task", text: "Tag" };
-    stub(calls, { plan: { ...PLAN, items: [PLAN.items[0], second] } });
+    const first = PLAN.items[0]!;
+    const second = { ...first, id: "it-2", position: 2, kind: "task", text: "Tag" };
+    stub(calls, { plan: { ...PLAN, items: [first, second] } });
     render(wrap());
 
     fireEvent.click(await waitFor(() => screen.getByText("Open")));
