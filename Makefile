@@ -66,7 +66,8 @@ man:
 	go run -ldflags "$(LDFLAGS)" $(PKG) man $(MANDIR)
 	gzip -9n $(MANDIR)/*.1
 	cd $(MANDIR) && $(TAR) --sort=name --mtime=@$(SOURCE_DATE_EPOCH) --owner=0 --group=0 --numeric-owner --mode=u=rw,go=r \
-		-cf - *.1.gz | gzip -9n > $(BINARY)-man.tar.gz
+		-cf $(BINARY)-man.tar *.1.gz
+	gzip -9nf $(MANDIR)/$(BINARY)-man.tar
 
 clean:
 	rm -rf bin $(OUT) $(MANDIR) out

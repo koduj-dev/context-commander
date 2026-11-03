@@ -16,6 +16,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 // fakeGitHub serves the two API endpoints self-update reads and the assets
@@ -27,6 +28,8 @@ type fakeGitHub struct {
 	files    map[string][]byte // download path -> body
 	mu       sync.Mutex
 	fetched  []string
+	// onDownload, when set, runs before an asset is served.
+	onDownload func(name string)
 }
 
 func newFakeGitHub(t *testing.T) *fakeGitHub {
@@ -58,6 +61,9 @@ func (f *fakeGitHub) serve(w http.ResponseWriter, r *http.Request) {
 		f.mu.Lock()
 		f.fetched = append(f.fetched, filepath.Base(r.URL.Path))
 		f.mu.Unlock()
+		if f.onDownload != nil {
+			f.onDownload(filepath.Base(r.URL.Path))
+		}
 		_, _ = w.Write(body)
 	}
 }
@@ -170,9 +176,88 @@ func TestRunInstalls(t *testing.T) {
 			t.Errorf("output lacks %q:\n%s", want, out.String())
 		}
 	}
-	entries, _ := os.ReadDir(filepath.Dir(exe))
-	if len(entries) != 1 {
-		t.Errorf("left files behind next to the binary: %v", entries)
+	// Windows cannot rename over a running .exe, so the old one stays as .old.
+	want := []string{"ccd"}
+	if runtime.GOOS == "windows" {
+		want = []string{"ccd", "ccd.old"}
+	}
+	if got := dirNames(t, filepath.Dir(exe)); strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Errorf("next to the binary: %v, want %v", got, want)
+	}
+}
+
+func dirNames(t *testing.T, dir string) []string {
+	t.Helper()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	names := make([]string, 0, len(entries))
+	for _, e := range entries {
+		names = append(names, e.Name())
+	}
+	return names
+}
+
+// Another update that finishes while this one downloads wins: this one
+// must not swap its (possibly older) release over it.
+func TestRunExecutableChangedMeanwhile(t *testing.T) {
+	gh := newFakeGitHub(t)
+	gh.addRelease("v0.2.0", false, []byte("NEW"), nil)
+	exe := oldBinary(t)
+	gh.onDownload = func(name string) {
+		if strings.HasPrefix(name, "ccd-") {
+			other := exe + ".other"
+			_ = os.WriteFile(other, []byte("OTHER UPDATE"), 0o750) //nolint:gosec // a test file in t.TempDir()
+			_ = os.Rename(other, exe)
+		}
+	}
+	err := gh.updater(exe).Run(context.Background(), Options{Current: "v0.1.0"}, &bytes.Buffer{})
+	if err == nil || !strings.Contains(err.Error(), "changed while this update ran") {
+		t.Fatalf("err = %v, want a refusal", err)
+	}
+	if got := readFile(t, exe); got != "OTHER UPDATE" {
+		t.Errorf("exe = %q, the other update's binary was overwritten", got)
+	}
+	if got := dirNames(t, filepath.Dir(exe)); len(got) != 1 {
+		t.Errorf("left files behind: %v", got)
+	}
+}
+
+func TestRunLocked(t *testing.T) {
+	gh := newFakeGitHub(t)
+	gh.addRelease("v0.2.0", false, []byte("NEW"), nil)
+
+	// A live lock: refused, nothing replaced, the lock left to its owner.
+	exe := oldBinary(t)
+	lock := filepath.Join(filepath.Dir(exe), lockName)
+	if err := os.WriteFile(lock, []byte("1\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	err := gh.updater(exe).Run(context.Background(), Options{Current: "v0.1.0"}, &bytes.Buffer{})
+	if err == nil || !strings.Contains(err.Error(), "another ccd self-update is running") {
+		t.Fatalf("err = %v, want a lock refusal", err)
+	}
+	if readFile(t, exe) != "OLD" {
+		t.Error("replaced the binary despite the lock")
+	}
+	if _, err := os.Stat(lock); err != nil {
+		t.Error("removed someone else's lock")
+	}
+
+	// A lock left by a killed update is taken over, and released afterwards.
+	old := time.Now().Add(-2 * staleLock)
+	if err := os.Chtimes(lock, old, old); err != nil {
+		t.Fatal(err)
+	}
+	if err := gh.updater(exe).Run(context.Background(), Options{Current: "v0.1.0"}, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	if readFile(t, exe) != "NEW" {
+		t.Error("not installed after taking over a stale lock")
+	}
+	if _, err := os.Stat(lock); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("lock not released: %v", err)
 	}
 }
 

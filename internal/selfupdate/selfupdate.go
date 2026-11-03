@@ -47,6 +47,7 @@ const (
 	oidcIssuer  = "https://token.actions.githubusercontent.com"
 	sumsName    = "SHA256SUMS"
 	bundleName  = "SHA256SUMS.bundle"
+	lockName    = ".ccd-update.lock"
 	// maxAssetBytes caps a download whose size the release does not state, so
 	// an oversized body cannot fill the disk before the checksum is checked.
 	maxAssetBytes = 512 << 20
@@ -150,6 +151,14 @@ func (u *Updater) Run(ctx context.Context, opts Options, w io.Writer) error {
 	if managed != nil && !opts.CheckOnly {
 		return managed
 	}
+	// What is on disk before the release is even resolved; the swap goes
+	// ahead only if it is still this file (see commit).
+	var before os.FileInfo
+	if !opts.CheckOnly {
+		if before, err = os.Stat(exe); err != nil {
+			return err
+		}
+	}
 
 	_, _ = fmt.Fprintf(w, "Current version: %s\n", opts.Current)
 	rel, note, err := u.resolve(ctx, opts.Pre)
@@ -186,7 +195,7 @@ func (u *Updater) Run(ctx context.Context, opts Options, w io.Writer) error {
 		return nil
 	}
 
-	if err := u.install(ctx, exe, rel, opts.RequireSignature, w); err != nil {
+	if err := u.install(ctx, exe, before, rel, opts.RequireSignature, w); err != nil {
 		return err
 	}
 	_, _ = fmt.Fprintf(w, "Updated %s -> %s (%s).\n", opts.Current, rel.TagName, exe)
@@ -285,7 +294,7 @@ func (u *Updater) getJSON(ctx context.Context, path string, v any) (int, error) 
 // install verifies and swaps in rel's asset for this platform. The checksum
 // (and signature) are settled before the binary is downloaded, and the
 // directory is checked for writability before either.
-func (u *Updater) install(ctx context.Context, exe string, rel *ghRelease, requireSig bool, w io.Writer) error {
+func (u *Updater) install(ctx context.Context, exe string, before os.FileInfo, rel *ghRelease, requireSig bool, w io.Writer) error {
 	name := "ccd-" + u.GOOS + "-" + u.GOARCH
 	if u.GOOS == "windows" {
 		name += ".exe"
@@ -328,7 +337,50 @@ func (u *Updater) install(ctx context.Context, exe string, rel *ghRelease, requi
 		return fmt.Errorf("checksum mismatch for %s: expected %s, got %s (refusing to install)", name, want, got)
 	}
 	_, _ = fmt.Fprintf(w, "Checksum OK (sha256:%s)\n", got)
-	return replaceExecutable(u.GOOS, exe, tmp)
+	return commit(u.GOOS, exe, before, tmp)
+}
+
+// staleLock is how old a lock file must be before it is taken to be left
+// over from a killed update: longer than a whole update may take.
+const staleLock = 2 * httpTimeout
+
+// commit swaps tmp in for exe, but only while holding the lock beside exe
+// and only if exe is still the file Run found at the start. Two updates run
+// at once would otherwise both swap, and the one that resolved its release
+// first (perhaps an older one) could land last.
+func commit(goos, exe string, before os.FileInfo, tmp string) error {
+	unlock, err := lockBeside(exe)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	now, err := os.Stat(exe)
+	if err != nil || !os.SameFile(before, now) || now.Size() != before.Size() || !now.ModTime().Equal(before.ModTime()) {
+		return fmt.Errorf("%s changed while this update ran (another self-update?); nothing replaced, run ccd self-update again", exe)
+	}
+	return replaceExecutable(goos, exe, tmp)
+}
+
+// lockBeside creates the lock file next to exe exclusively and returns its
+// release. A lock older than staleLock is removed and taken over once.
+func lockBeside(exe string) (unlock func(), err error) {
+	path := filepath.Join(filepath.Dir(exe), lockName)
+	for attempt := 0; ; attempt++ {
+		f, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600) //nolint:gosec // a fixed name in the executable's directory
+		if err == nil {
+			_, _ = fmt.Fprintf(f, "%d\n", os.Getpid())
+			_ = f.Close()
+			return func() { _ = os.Remove(path) }, nil
+		}
+		if !errors.Is(err, os.ErrExist) {
+			return nil, err
+		}
+		fi, serr := os.Stat(path)
+		if attempt > 0 || serr != nil || time.Since(fi.ModTime()) < staleLock {
+			return nil, fmt.Errorf("another ccd self-update is running (lock %s; delete it if none is)", path)
+		}
+		_ = os.Remove(path)
+	}
 }
 
 func (r *ghRelease) asset(name string) *ghAsset {

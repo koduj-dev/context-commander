@@ -109,6 +109,13 @@ type installRun struct {
 	binDir string
 }
 
+// scriptTools are the external commands install.sh may run. Missing ones
+// (sha256sum on macOS, say) are simply not linked; the script falls back.
+var scriptTools = []string{
+	"awk", "basename", "cat", "chmod", "cp", "curl", "dirname", "grep", "gzip", "id",
+	"mkdir", "mktemp", "mv", "openssl", "rm", "sha256sum", "shasum", "tar", "tr", "uname",
+}
+
 // runInstall runs install.sh against srv with args. A fake cosign that exits
 // with cosignExit is put on PATH unless cosignExit is -1.
 func runInstall(t *testing.T, srv *httptest.Server, cosignExit int, args ...string) installRun {
@@ -125,9 +132,17 @@ func runInstall(t *testing.T, srv *httptest.Server, cosignExit int, args ...stri
 			t.Fatal(err)
 		}
 	}
-	// A PATH with the system tools but no real cosign: only the directories
-	// curl, tar and coreutils live in.
-	path := fake + ":/usr/bin:/bin"
+	// PATH is the fixture directory alone: links to just the tools the
+	// script uses, so a real cosign (or anything else) installed on this
+	// machine cannot change what the script does.
+	for _, tool := range scriptTools {
+		if real, err := exec.LookPath(tool); err == nil {
+			if err := os.Symlink(real, filepath.Join(fake, tool)); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	path := fake
 	cmd := exec.CommandContext(t.Context(), "sh", append([]string{"install.sh", "--bin-dir", binDir}, args...)...) //nolint:gosec // the repo's own script with test arguments
 	cmd.Env = []string{"PATH=" + path, "HOME=" + root, "CCD_GITHUB_API=" + srv.URL, "CCD_GITHUB_URL=" + srv.URL}
 	out, err := cmd.CombinedOutput()
@@ -182,6 +197,8 @@ func TestInstallScript(t *testing.T) {
 	}
 
 	// Refusals: nothing may be installed.
+	asset := "ccd-" + runtime.GOOS + "-" + runtime.GOARCH
+	f.publish(t, "v7.7.7", true, sumLine([]byte("#!/bin/sh\necho v7.7.7\n"), asset)+strings.Repeat("ab", 32)+"  ccd-man.tar.gz\n")
 	f.publish(t, "v6.6.6", false, strings.Repeat("ab", 32)+"  ccd-"+runtime.GOOS+"-"+runtime.GOARCH+"\n")
 	for name, c := range map[string]struct {
 		cosign int
@@ -193,6 +210,8 @@ func TestInstallScript(t *testing.T) {
 		"signature missing": {-1, []string{"--require-signature"}, "cosign is not on PATH"},
 		"not a tag":         {-1, []string{"--version", "v1.0.0/../../x"}, "not a release tag"},
 		"no such release":   {-1, []string{"--version", "v9.9.9"}, "cannot download SHA256SUMS"},
+		// The man bundle is verified before the binary is installed, too.
+		"man bundle mismatch": {-1, []string{"--version", "v7.7.7"}, "checksum mismatch for ccd-man.tar.gz"},
 	} {
 		r := runInstall(t, srv, c.cosign, c.args...)
 		if r.err == nil || !strings.Contains(r.out, c.want) {
@@ -200,6 +219,21 @@ func TestInstallScript(t *testing.T) {
 		}
 		if _, err := os.Stat(filepath.Join(r.binDir, "ccd")); err == nil {
 			t.Errorf("%s: installed a binary anyway", name)
+		}
+	}
+
+	// A man directory it cannot write fails before the binary is touched.
+	if os.Geteuid() != 0 {
+		ro := filepath.Join(t.TempDir(), "man1")
+		if err := os.Mkdir(ro, 0o500); err != nil {
+			t.Fatal(err)
+		}
+		r := runInstall(t, srv, -1, "--version", "v0.1.0-beta.2", "--man-dir", ro)
+		if r.err == nil || !strings.Contains(r.out, "is not writable") {
+			t.Errorf("read-only --man-dir: err %v\n%s", r.err, r.out)
+		}
+		if _, err := os.Stat(filepath.Join(r.binDir, "ccd")); err == nil {
+			t.Error("read-only --man-dir: installed the binary anyway")
 		}
 	}
 }

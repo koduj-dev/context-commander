@@ -218,41 +218,53 @@ main() {
 		warn "cosign not found: checking checksums only, not who signed them"
 	fi
 
+	# Fetch and verify everything first; nothing in the installation changes
+	# until every asset this run installs has passed its checksum.
 	fetch "$base/$asset" "$tmp/$asset" || die "cannot download $asset"
 	verify "$tmp/SHA256SUMS" "$tmp/$asset" "$asset"
 	say "==> $asset checksum OK"
 
 	[ -n "$bin_dir" ] || bin_dir="$(default_bin_dir)"
+	have_pages=0
+	if [ "$no_man" = 0 ] && grep -Eq '[[:space:]]\*?ccd-man\.tar\.gz$' "$tmp/SHA256SUMS"; then
+		if [ -z "$man_dir" ] && [ "$(basename "$bin_dir")" = bin ]; then
+			man_dir="$(dirname "$bin_dir")/share/man/man1"
+		fi
+		if [ -n "$man_dir" ]; then
+			fetch "$base/ccd-man.tar.gz" "$tmp/ccd-man.tar.gz" || die "cannot download ccd-man.tar.gz"
+			verify "$tmp/SHA256SUMS" "$tmp/ccd-man.tar.gz" ccd-man.tar.gz
+			mkdir "$tmp/man" || die "cannot create a temporary directory"
+			tar -xzf "$tmp/ccd-man.tar.gz" -C "$tmp/man" || die "cannot unpack ccd-man.tar.gz"
+			for page in "$tmp"/man/ccd*.1.gz; do
+				[ -f "$page" ] && have_pages=1
+			done
+			[ "$have_pages" = 1 ] || die "ccd-man.tar.gz holds no manual pages"
+			mkdir -p "$man_dir" || die "cannot create $man_dir"
+			[ -w "$man_dir" ] || die "$man_dir is not writable; run with sudo, or pass --man-dir or --no-man"
+		else
+			warn "not installing manual pages: pass --man-dir for a bin directory not named bin"
+		fi
+	fi
 	mkdir -p "$bin_dir" || die "cannot create $bin_dir"
 	[ -w "$bin_dir" ] || die "$bin_dir is not writable; run with sudo or pass --bin-dir"
+
 	# Copy into the target directory first, then rename: a running ccd, or
 	# one started meanwhile, sees the old binary or the new one, never half.
-	cp "$tmp/$asset" "$bin_dir/.ccd.install.$$"
-	chmod 0755 "$bin_dir/.ccd.install.$$"
-	mv -f "$bin_dir/.ccd.install.$$" "$bin_dir/ccd"
+	staged="$bin_dir/.ccd.install.$$"
+	cp "$tmp/$asset" "$staged" || { rm -f "$staged"; die "cannot write $staged"; }
+	chmod 0755 "$staged" || { rm -f "$staged"; die "cannot chmod $staged"; }
+	mv -f "$staged" "$bin_dir/ccd" || { rm -f "$staged"; die "cannot install $bin_dir/ccd"; }
 	say "==> installed $bin_dir/ccd"
 
-	if [ "$no_man" = 0 ]; then
-		if grep -Eq '[[:space:]]\*?ccd-man\.tar\.gz$' "$tmp/SHA256SUMS"; then
-			if [ -z "$man_dir" ] && [ "$(basename "$bin_dir")" = bin ]; then
-				man_dir="$(dirname "$bin_dir")/share/man/man1"
-			fi
-			if [ -n "$man_dir" ]; then
-				fetch "$base/ccd-man.tar.gz" "$tmp/ccd-man.tar.gz" || die "cannot download ccd-man.tar.gz"
-				verify "$tmp/SHA256SUMS" "$tmp/ccd-man.tar.gz" ccd-man.tar.gz
-				mkdir -p "$tmp/man" "$man_dir" || die "cannot create $man_dir"
-				tar -xzf "$tmp/ccd-man.tar.gz" -C "$tmp/man"
-				n=0
-				for page in "$tmp"/man/ccd*.1.gz; do
-					[ -f "$page" ] || continue
-					cp "$page" "$man_dir/" && chmod 0644 "$man_dir/$(basename "$page")"
-					n=$((n + 1))
-				done
-				say "==> $n manual pages in $man_dir (man ccd)"
-			else
-				warn "not installing manual pages: pass --man-dir for a bin directory not named bin"
-			fi
-		fi
+	if [ "$have_pages" = 1 ]; then
+		n=0
+		for page in "$tmp"/man/ccd*.1.gz; do
+			dest="$man_dir/$(basename "$page")"
+			cp "$page" "$dest" || die "cannot write $dest"
+			chmod 0644 "$dest" || die "cannot chmod $dest"
+			n=$((n + 1))
+		done
+		say "==> $n manual pages in $man_dir (man ccd)"
 	fi
 
 	"$bin_dir/ccd" version >/dev/null 2>&1 || warn "$bin_dir/ccd does not run on this machine"
