@@ -7,7 +7,8 @@
 # Where it differs from docker-commander's: ccd needs a Postgres it does not
 # install (docs/install.md), so the package ships two env files instead of
 # one conf — the server's settings, and the schema owner's credentials for
-# the separate migration unit — and has no self-update.
+# the separate migration unit — and `ccd self-update` refuses to replace
+# its /usr/bin/ccd, naming apt / dnf instead.
 name: ccd
 arch: ${ARCH}
 platform: linux
