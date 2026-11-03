@@ -61,7 +61,7 @@ All notable changes to Context Commander are documented here. The format follows
   caveat: the domain check reads the address, not the `hd` claim.
 
 - **Tokens per model, and a cost estimate.** Reported tokens are now kept per
-  model as well as in total (migration 000033), so they can be priced.
+  model as well as in total (migration 000035), so they can be priced.
   `POST /v1/me/usage`, `plan.report` and `plan.stop` take an optional
   `model`; reports without one count as "model not stated". Board and plan
   responses carry the breakdown (`effort.models` over HTTP, `by_model` over

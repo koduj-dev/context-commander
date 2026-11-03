@@ -144,7 +144,7 @@ Effort is **aggregated, never logged**: `plan_item_effort` keeps one row per
     moving it, and counts the post as a heartbeat.
   - A client that never reported a step gets its tokens dropped, not guessed
     onto one.
-- **Tokens are kept per model** (added 2026-11-03, migration 000033). Prices
+- **Tokens are kept per model** (added 2026-11-03, migration 000035). Prices
   differ by model, so a count that does not name its model cannot be
   priced. `plan_item_effort` keeps the time and the totals, and
   `plan_item_effort_models` keeps the four counts per (item, principal,

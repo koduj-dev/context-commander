@@ -158,7 +158,7 @@ type Effort struct {
 	CacheWriteTokens int64
 	// Models splits the four token counts by the model the client named,
 	// ordered by model; Model "" is "not stated". The rows add up to the
-	// totals above (migrations/000033).
+	// totals above (migrations/000035).
 	Models []Tokens
 }
 

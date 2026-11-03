@@ -268,7 +268,7 @@ Only on top of a core loop people actually use:
         (`deploy/mcp-clients/claude-code-usage-hook.py`,
         `codex-usage-hook.py`). Since 2026-11-03 they send the model per
         response and Claude Code's include subagent transcripts; the server
-        keeps the four counts per model (migration 000033) and, given a price
+        keeps the four counts per model (migration 000035) and, given a price
         table (`--usage-prices`, example in `deploy/usage-prices.example.json`),
         shows a cost estimate. The goal is deciding whether the API would be
         cheaper than a subscription. Still open: one-hour cache writes are
