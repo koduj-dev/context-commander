@@ -628,28 +628,60 @@ func (s *Store) HasAnyUser(ctx context.Context, tx pgx.Tx) (bool, error) {
 // can change and an administrator can reassign, and keying on it is how one
 // person inherits another's projects.
 func (s *Store) UserForDirectoryIdentity(ctx context.Context, tx pgx.Tx, provider, subject string) (uuid.UUID, error) {
-	var userID uuid.UUID
+	link, err := s.DirectoryLink(ctx, tx, provider, subject)
+	return link.UserID, err
+}
+
+// DirectoryLinkRow is one user_identities row as provisioning reads it.
+type DirectoryLinkRow struct {
+	UserID uuid.UUID
+	// Issuer is the OIDC issuer the link was made under, or "" when none is
+	// recorded — an LDAP link, or an OIDC link older than migrations/000034.
+	Issuer string
+}
+
+// DirectoryLink is UserForDirectoryIdentity with the issuer the link was
+// recorded under, which provisioning compares against the configured one.
+func (s *Store) DirectoryLink(ctx context.Context, tx pgx.Tx, provider, subject string) (DirectoryLinkRow, error) {
+	var link DirectoryLinkRow
 	err := tx.QueryRow(ctx,
-		`SELECT user_id FROM user_identities WHERE provider = $1 AND subject = $2`,
+		`SELECT user_id, coalesce(issuer, '') FROM user_identities WHERE provider = $1 AND subject = $2`,
 		provider, subject,
-	).Scan(&userID)
+	).Scan(&link.UserID, &link.Issuer)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return uuid.Nil, ErrNotFound
+		return DirectoryLinkRow{}, ErrNotFound
 	}
 	if err != nil {
-		return uuid.Nil, fmt.Errorf("identity: user for directory identity: %w", err)
+		return DirectoryLinkRow{}, fmt.Errorf("identity: user for directory identity: %w", err)
 	}
-	return userID, nil
+	return link, nil
+}
+
+// AdoptDirectoryIssuer records an issuer on a link that has none — an OIDC
+// link made before migrations/000034. Never overwrites one that is set: the
+// WHERE clause is the guard, so a race between two first sign-ins cannot
+// re-point a recorded issuer either.
+func (s *Store) AdoptDirectoryIssuer(ctx context.Context, tx pgx.Tx, provider, subject, issuer string) error {
+	_, err := tx.Exec(ctx,
+		`UPDATE user_identities SET issuer = $3
+		 WHERE provider = $1 AND subject = $2 AND issuer IS NULL`,
+		provider, subject, issuer,
+	)
+	if err != nil {
+		return fmt.Errorf("identity: adopt directory issuer: %w", err)
+	}
+	return nil
 }
 
 // LinkDirectoryIdentity records that a directory subject is this local user.
 // A conflict is ErrAlreadyExists rather than a silent re-point: a subject
 // that already maps somewhere else means two people are being treated as one,
 // and quietly moving the mapping would hand one of them the other's access.
-func (s *Store) LinkDirectoryIdentity(ctx context.Context, tx pgx.Tx, provider, subject string, userID uuid.UUID) error {
+// issuer is the OIDC issuer, or "" for a directory that has none (LDAP).
+func (s *Store) LinkDirectoryIdentity(ctx context.Context, tx pgx.Tx, provider, issuer, subject string, userID uuid.UUID) error {
 	_, err := tx.Exec(ctx,
-		`INSERT INTO user_identities (provider, subject, user_id) VALUES ($1, $2, $3)`,
-		provider, subject, userID,
+		`INSERT INTO user_identities (provider, issuer, subject, user_id) VALUES ($1, nullif($2, ''), $3, $4)`,
+		provider, issuer, subject, userID,
 	)
 	if isUniqueViolation(err) {
 		return ErrAlreadyExists

@@ -96,6 +96,16 @@ type OIDCConfig struct {
 	// people already linked. Exact match on the part after @, no
 	// subdomains: "example.com" does not admit "mail.example.com".
 	AllowedDomains []string
+
+	// EntraVerifiedDomain accepts Microsoft Entra ID's `xms_edov` claim in
+	// place of `email_verified`, which Entra never sends. True means the
+	// address's domain is verified by the tenant the account lives in — the
+	// thing a guest whose home tenant merely typed someone else's address
+	// cannot have (docs/adr/0023). Refused at startup for any issuer that is
+	// not Entra's, so it cannot become a way to switch the check off for
+	// every provider. The app registration must release the claim: without
+	// it every address reads as unverified, which is the safe failure.
+	EntraVerifiedDomain bool
 }
 
 const (
@@ -116,6 +126,9 @@ type OIDC struct {
 	mu       sync.Mutex
 	verifier *oidc.IDTokenVerifier
 	oauth    *oauth2.Config
+	// requireIss is the provider advertising RFC 9207: from then on an
+	// authorization response without `iss` is refused, not excused.
+	requireIss bool
 
 	// A failed discovery is remembered briefly. Discovery runs under mu, and
 	// without this every anonymous /start during an outage would queue
@@ -186,6 +199,9 @@ func NewOIDC(cfg OIDCConfig) (*OIDC, error) {
 		domains = append(domains, d)
 	}
 	cfg.AllowedDomains = domains
+	if cfg.EntraVerifiedDomain && !isEntraIssuer(cfg.IssuerURL) {
+		return nil, fmt.Errorf("directory: the Entra verified-domain switch is for a Microsoft Entra ID issuer (https://login.microsoftonline.com/<tenant>/v2.0), not %q", cfg.IssuerURL)
+	}
 
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	if cfg.CACertFile != "" {
@@ -232,6 +248,24 @@ func requireHTTPURL(what, raw string) error {
 	return nil
 }
 
+// entraHosts are the authorities Microsoft Entra ID issues tokens from: the
+// public cloud and the national clouds.
+var entraHosts = map[string]bool{
+	"login.microsoftonline.com":        true,
+	"login.microsoftonline.us":         true,
+	"login.chinacloudapi.cn":           true,
+	"login.partner.microsoftonline.cn": true,
+}
+
+// isEntraIssuer reports whether raw is an Entra issuer. The multi-tenant
+// aliases (common, organizations, consumers) need no check of their own:
+// their discovery documents name a templated issuer, which go-oidc refuses
+// to match, so a host check is the whole test.
+func isEntraIssuer(raw string) bool {
+	u, err := url.Parse(raw)
+	return err == nil && u.Scheme == "https" && entraHosts[strings.ToLower(u.Hostname())]
+}
+
 func isLoopbackHost(host string) bool {
 	if strings.EqualFold(host, "localhost") {
 		return true
@@ -252,6 +286,10 @@ func containsString(list []string, want string) bool {
 // Provider returns the configured name, for user_identities and the sign-in
 // URL.
 func (o *OIDC) Provider() string { return o.cfg.Name }
+
+// Issuer returns the configured issuer, which every identity this provider
+// asserts is stored beside.
+func (o *OIDC) Issuer() string { return o.cfg.IssuerURL }
 
 // Label returns what the sign-in button should say.
 func (o *OIDC) Label() string { return o.cfg.Label }
@@ -307,14 +345,14 @@ func (a AuthRequest) StateMatches(got string) bool {
 
 // discover returns the provider's endpoints and verifier, fetching them on
 // first use.
-func (o *OIDC) discover() (*oauth2.Config, *oidc.IDTokenVerifier, error) {
+func (o *OIDC) discover() (*oauth2.Config, *oidc.IDTokenVerifier, bool, error) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	if o.oauth != nil {
-		return o.oauth, o.verifier, nil
+		return o.oauth, o.verifier, o.requireIss, nil
 	}
 	if o.failedErr != nil && o.now().Sub(o.failedAt) < discoveryRetryAfter {
-		return nil, nil, o.failedErr
+		return nil, nil, false, o.failedErr
 	}
 
 	// Background, not the request's context: go-oidc keeps this context for
@@ -326,7 +364,13 @@ func (o *OIDC) discover() (*oauth2.Config, *oidc.IDTokenVerifier, error) {
 	if err != nil {
 		o.failedErr = fmt.Errorf("%w: oidc discovery at %s: %v", ErrUnavailable, o.cfg.IssuerURL, err) //nolint:errorlint // the cause is context, ErrUnavailable is the class
 		o.failedAt = o.now()
-		return nil, nil, o.failedErr
+		return nil, nil, false, o.failedErr
+	}
+	var meta providerMetadata
+	if err := provider.Claims(&meta); err != nil {
+		// NewProvider has parsed this document already, so this is not
+		// expected; it is an answer this server cannot use either way.
+		return nil, nil, false, fmt.Errorf("%w: oidc discovery at %s: %v", ErrUnavailable, o.cfg.IssuerURL, err) //nolint:errorlint // as above
 	}
 	o.failedErr = nil
 	o.oauth = &oauth2.Config{
@@ -336,13 +380,81 @@ func (o *OIDC) discover() (*oauth2.Config, *oidc.IDTokenVerifier, error) {
 		Endpoint:     provider.Endpoint(),
 		Scopes:       o.cfg.Scopes,
 	}
-	o.verifier = provider.Verifier(&oidc.Config{ClientID: o.cfg.ClientID})
-	return o.oauth, o.verifier, nil
+	// Built by hand rather than with provider.Verifier only so the key set
+	// can be wrapped (keyFetchSet). The same key set, on the same
+	// background context, and the same algorithms provider.Verifier uses.
+	keys := oidc.NewRemoteKeySet(ctx, meta.JWKSURL)
+	o.verifier = oidc.NewVerifier(o.cfg.IssuerURL, keyFetchSet{inner: keys}, &oidc.Config{
+		ClientID:             o.cfg.ClientID,
+		SupportedSigningAlgs: signingAlgs(meta.SigningAlgs),
+	})
+	o.requireIss = meta.IssParameterSupported
+	return o.oauth, o.verifier, o.requireIss, nil
+}
+
+// providerMetadata is what discovery says beyond the endpoints go-oidc reads
+// for itself.
+type providerMetadata struct {
+	JWKSURL     string   `json:"jwks_uri"`
+	SigningAlgs []string `json:"id_token_signing_alg_values_supported"`
+	// RFC 9207 section 3.
+	IssParameterSupported bool `json:"authorization_response_iss_parameter_supported"`
+}
+
+// verifiableAlgs is go-oidc's own list of the algorithms it verifies
+// (oidc.supportedAlgorithms, unexported), through which provider.Verifier
+// filters the advertised ones. Anything else — HS256, none — a provider may
+// advertise but must not be allowed to sign with.
+var verifiableAlgs = map[string]bool{
+	oidc.RS256: true, oidc.RS384: true, oidc.RS512: true,
+	oidc.ES256: true, oidc.ES384: true, oidc.ES512: true,
+	oidc.PS256: true, oidc.PS384: true, oidc.PS512: true,
+	oidc.EdDSA: true,
+}
+
+// signingAlgs filters the advertised algorithms. Empty means go-oidc's
+// default, RS256 alone — the one every provider must support.
+func signingAlgs(advertised []string) []string {
+	var out []string
+	for _, a := range advertised {
+		if verifiableAlgs[a] {
+			out = append(out, a)
+		}
+	}
+	return out
+}
+
+// keyFetchSet tells a key set that could not be fetched apart from a
+// signature that did not verify.
+//
+// go-oidc reports both as one untyped error: the verifier formats whatever
+// the key set returned with %v, so neither errors.Is nor errors.As can see
+// through it. The key set is called with the verifier's context, though,
+// and is the last place the distinction exists. RemoteKeySet prefixes a
+// failed fetch — transport error, non-2xx answer, a body that is not a key
+// set — with "fetching keys"; keys that fetched and did not verify say
+// "failed to verify". TestOIDC_KeyFetchFailureIsUnavailable pins the prefix,
+// so a go-oidc upgrade that changes it fails a test rather than quietly
+// turning an outage back into a rejected sign-in.
+type keyFetchSet struct{ inner oidc.KeySet }
+
+// keyFetchErr is the context key under which a caller of Verify leaves a
+// slot for a fetch failure.
+type keyFetchErr struct{}
+
+func (k keyFetchSet) VerifySignature(ctx context.Context, jwt string) ([]byte, error) {
+	payload, err := k.inner.VerifySignature(ctx, jwt)
+	if err != nil && strings.HasPrefix(err.Error(), "fetching keys") {
+		if slot, ok := ctx.Value(keyFetchErr{}).(*error); ok {
+			*slot = err
+		}
+	}
+	return payload, err
 }
 
 // AuthCodeURL is where to send the browser to sign in.
 func (o *OIDC) AuthCodeURL(req AuthRequest) (string, error) {
-	cfg, _, err := o.discover()
+	cfg, _, _, err := o.discover()
 	if err != nil {
 		return "", err
 	}
@@ -359,6 +471,20 @@ type idClaims struct {
 	EmailVerified     any    `json:"email_verified"`
 	Name              string `json:"name"`
 	PreferredUsername string `json:"preferred_username"`
+	// Entra ID's "email domain owner verified" (docs/adr/0023). Read only
+	// under OIDCConfig.EntraVerifiedDomain.
+	XMSEdov any `json:"xms_edov"`
+}
+
+// emailVerified decides whether the address may be trusted. email_verified,
+// whenever the provider sends it, decides — an explicit false is never
+// overruled. Only when it is absent, and only for an Entra issuer the
+// operator opted in, does xms_edov stand in for it.
+func (o *OIDC) emailVerified(c idClaims) bool {
+	if c.EmailVerified != nil || !o.cfg.EntraVerifiedDomain {
+		return verified(c.EmailVerified)
+	}
+	return verified(c.XMSEdov)
 }
 
 func verified(v any) bool {
@@ -372,20 +498,51 @@ func verified(v any) bool {
 	}
 }
 
-// Exchange completes a sign-in: it redeems the code with the PKCE verifier,
-// verifies the ID token (signature, issuer, audience, expiry — go-oidc — and
-// the nonce, here), and reports who the provider says this is.
+// Callback is what the provider sent back to the redirect URI.
+type Callback struct {
+	Code string
+	// Issuer is the RFC 9207 `iss` parameter, empty when none was sent.
+	Issuer string
+}
+
+// checkResponseIssuer is the RFC 9207 defence against provider mix-up: an
+// authorization response that names an issuer must name this one, and once
+// a provider advertises the parameter, a response without it is refused —
+// otherwise a response stripped of it would pass. Checked before the code is
+// redeemed, so a code meant for another provider is never sent to this
+// one's token endpoint together with this attempt's PKCE verifier.
+func (o *OIDC) checkResponseIssuer(iss string, required bool) error {
+	if iss == "" {
+		if required {
+			return fmt.Errorf("%w: the provider advertises the RFC 9207 iss parameter and the response carried none", ErrSignInRejected)
+		}
+		return nil
+	}
+	if iss != o.cfg.IssuerURL {
+		// Not quoted: the value came from the browser, and this is logged.
+		return fmt.Errorf("%w: the authorization response names a different issuer", ErrSignInRejected)
+	}
+	return nil
+}
+
+// Exchange completes a sign-in: it checks the response's issuer, redeems the
+// code with the PKCE verifier, verifies the ID token (signature, issuer,
+// audience, expiry — go-oidc — and the nonce, here), and reports who the
+// provider says this is.
 //
 // The state has already been checked by the caller; it lives in the
 // caller's cookie, not here.
-func (o *OIDC) Exchange(ctx context.Context, code string, req AuthRequest) (Identity, error) {
-	cfg, verifier, err := o.discover()
+func (o *OIDC) Exchange(ctx context.Context, cb Callback, req AuthRequest) (Identity, error) {
+	cfg, verifier, requireIss, err := o.discover()
 	if err != nil {
+		return Identity{}, err
+	}
+	if err := o.checkResponseIssuer(cb.Issuer, requireIss); err != nil {
 		return Identity{}, err
 	}
 	ctx = oidc.ClientContext(ctx, o.client)
 
-	token, err := cfg.Exchange(ctx, code, oauth2.VerifierOption(req.Verifier))
+	token, err := cfg.Exchange(ctx, cb.Code, oauth2.VerifierOption(req.Verifier))
 	if err != nil {
 		var re *oauth2.RetrieveError
 		if errors.As(err, &re) {
@@ -399,8 +556,16 @@ func (o *OIDC) Exchange(ctx context.Context, code string, req AuthRequest) (Iden
 	if !ok || raw == "" {
 		return Identity{}, fmt.Errorf("%w: the token response carried no id_token", ErrSignInRejected)
 	}
-	idToken, err := verifier.Verify(ctx, raw)
+	var fetchErr error
+	idToken, err := verifier.Verify(context.WithValue(ctx, keyFetchErr{}, &fetchErr), raw)
 	if err != nil {
+		if fetchErr != nil {
+			// The token may be perfectly good; the keys to check it could
+			// not be had — the provider is down, typically right after a
+			// rotation put an unknown kid in front of us. An outage, not a
+			// refusal, and nothing to record as an attack.
+			return Identity{}, fmt.Errorf("%w: signing keys: %v", ErrUnavailable, fetchErr) //nolint:errorlint // see above
+		}
 		return Identity{}, fmt.Errorf("%w: id token: %v", ErrSignInRejected, err) //nolint:errorlint // see above
 	}
 	// go-oidc leaves the nonce to the caller. Without this check an ID token
@@ -420,7 +585,7 @@ func (o *OIDC) Exchange(ctx context.Context, code string, req AuthRequest) (Iden
 	if claims.Email == "" {
 		return Identity{}, fmt.Errorf("%w: provider %s released no email for subject %s", ErrNoEmail, o.cfg.Name, idToken.Subject)
 	}
-	if !verified(claims.EmailVerified) {
+	if !o.emailVerified(claims) {
 		// The subject, not the address: this error is logged, and an address
 		// the provider has not verified may not even belong to the person.
 		return Identity{}, fmt.Errorf("%w: subject %s at provider %s", ErrEmailNotVerified, idToken.Subject, o.cfg.Name)
@@ -441,5 +606,6 @@ func (o *OIDC) Exchange(ctx context.Context, code string, req AuthRequest) (Iden
 		Subject:     idToken.Subject,
 		Email:       claims.Email,
 		DisplayName: name,
+		Issuer:      idToken.Issuer,
 	}, nil
 }

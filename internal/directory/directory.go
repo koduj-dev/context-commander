@@ -61,6 +61,12 @@ type Identity struct {
 	// directory offers nothing better, because a person with no name on
 	// screen is worse than a person whose name is their login.
 	DisplayName string
+
+	// Issuer is the OIDC `iss` the identity was asserted by, empty for LDAP.
+	// Stored beside the link, so a provider name that is re-pointed at
+	// another issuer does not hand the new issuer's subjects the old one's
+	// accounts (migrations/000034).
+	Issuer string
 }
 
 // Authenticator is what a password-checking directory backend implements.
@@ -97,7 +103,7 @@ type RedirectAuthenticator interface {
 
 	// Exchange redeems the code the provider returned and reports who
 	// signed in.
-	Exchange(ctx context.Context, code string, req AuthRequest) (Identity, error)
+	Exchange(ctx context.Context, cb Callback, req AuthRequest) (Identity, error)
 }
 
 var _ RedirectAuthenticator = (*OIDC)(nil)

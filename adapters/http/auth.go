@@ -272,6 +272,13 @@ func (d Deps) issueSessionResponse(w http.ResponseWriter, r *http.Request, princ
 // startSession mints a session and sets its cookie. Split from
 // issueSessionResponse because the OIDC callback ends in a redirect, not a
 // JSON body, and must still start the session the same way.
+//
+// A session this browser already holds is ended once the new one exists.
+// Overwriting the cookie alone would leave the old token valid for the rest
+// of its twelve hours, held by nobody the person can see — and whoever
+// copied it before is the reason someone signs in again. Every sign-in goes
+// through here (password, directory, token, first-run setup, OIDC), so they
+// all behave the same.
 func (d Deps) startSession(w http.ResponseWriter, r *http.Request, principalID uuid.UUID) (time.Time, error) {
 	token, cred, err := identity.IssueSession(r.Context(), d.Pool, principalID)
 	if err != nil {
@@ -281,8 +288,31 @@ func (d Deps) startSession(w http.ResponseWriter, r *http.Request, principalID u
 	if cred.ExpiresAt != nil {
 		expires = *cred.ExpiresAt
 	}
+	d.endPreviousSession(r)
 	d.setSessionCookie(w, token, expires)
 	return expires, nil
+}
+
+// endPreviousSession revokes the session in the request's cookie, if there is
+// a live one. Best-effort: failing to end it must not fail the sign-in that
+// replaces it, and it is logged so the miss is visible.
+//
+// Authenticated first, for the reason signOut gives, and only a session is
+// ended: the cookie is set by this server, but a PAT pasted into it by hand
+// must not be revoked by signing in.
+func (d Deps) endPreviousSession(r *http.Request) {
+	c, err := r.Cookie(sessionCookie)
+	if err != nil || c.Value == "" {
+		return
+	}
+	prev, err := identity.Authenticate(r.Context(), d.Pool, c.Value)
+	if err != nil || prev.ClientType != identity.SessionClientType {
+		return
+	}
+	if err := identity.EndSession(r.Context(), d.Pool, prev.ID); err != nil {
+		slog.WarnContext(r.Context(), "could not end the session a new sign-in replaces",
+			"err", err, "credential_id", prev.ID, "request_id", middleware.GetReqID(r.Context()))
+	}
 }
 
 // signOut revokes the session the cookie names and clears it.

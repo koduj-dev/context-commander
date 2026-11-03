@@ -203,8 +203,9 @@ func mustHost(t *testing.T, raw string) string {
 	return u.Host
 }
 
-// begin starts an attempt and signs in at the provider, returning the code.
-func begin(t *testing.T, o *directory.OIDC, username string) (string, directory.AuthRequest) {
+// begin starts an attempt and signs in at the provider, returning what the
+// provider sent back: the code, and the RFC 9207 iss.
+func begin(t *testing.T, o *directory.OIDC, username string) (directory.Callback, directory.AuthRequest) {
 	t.Helper()
 	req := directory.NewAuthRequest()
 	authURL, err := o.AuthCodeURL(req)
@@ -219,7 +220,7 @@ func begin(t *testing.T, o *directory.OIDC, username string) (string, directory.
 	if code == "" {
 		t.Fatalf("callback carried no code: %v", q)
 	}
-	return code, req
+	return directory.Callback{Code: code, Issuer: q.Get("iss")}, req
 }
 
 func TestOIDC_SignIn(t *testing.T) {
@@ -242,6 +243,38 @@ func TestOIDC_SignIn(t *testing.T) {
 	}
 	if id.DisplayName != "Alice Ashworth" {
 		t.Errorf("display name = %q", id.DisplayName)
+	}
+	if id.Issuer != issuer(t) {
+		t.Errorf("issuer = %q, want %q", id.Issuer, issuer(t))
+	}
+	// Keycloak sends the RFC 9207 parameter, which is what the next test
+	// relies on.
+	if code.Issuer != issuer(t) {
+		t.Errorf("the authorization response's iss = %q, want %q", code.Issuer, issuer(t))
+	}
+}
+
+// Provider mix-up (RFC 9207): Keycloak advertises the iss parameter, so a
+// response naming another issuer, or none, is refused before the code is
+// redeemed — the code stays unspent and the genuine response still works.
+func TestOIDC_RejectsAnAuthorizationResponseFromAnotherIssuer(t *testing.T) {
+	o := newKeycloakOIDC(t, nil)
+	cb, req := begin(t, o, "alice")
+
+	for name, iss := range map[string]string{
+		"another issuer": "https://attacker.example.test/realms/context-commander",
+		"no iss at all":  "",
+	} {
+		_, err := o.Exchange(context.Background(), directory.Callback{Code: cb.Code, Issuer: iss}, req)
+		if !errors.Is(err, directory.ErrSignInRejected) {
+			t.Fatalf("%s: want ErrSignInRejected, got %v", name, err)
+		}
+		if strings.Contains(err.Error(), "token endpoint") {
+			t.Fatalf("%s: the code was sent to the token endpoint before the issuer was checked: %v", name, err)
+		}
+	}
+	if _, err := o.Exchange(context.Background(), cb, req); err != nil {
+		t.Fatalf("the genuine response after the refused ones: %v", err)
 	}
 }
 
@@ -282,7 +315,7 @@ func TestOIDC_RejectsAWrongPKCEVerifier(t *testing.T) {
 	code, req := begin(t, o, "alice")
 	// A code intercepted on its way back — from a log, a referrer, a proxy —
 	// is useless without the verifier, which never travels to the provider's
-	// authorization endpoint or in any URL; it sits in the HttpOnly cc_oidc
+	// authorization endpoint or in any URL; it sits in the HttpOnly cc_oidc_*
 	// cookie. (A thief of that browser's cookies gets both, which is why the
 	// redirect must be https off loopback.)
 	req.Verifier = directory.NewAuthRequest().Verifier
@@ -371,6 +404,13 @@ func TestNewOIDC_ValidatesAtStartup(t *testing.T) {
 		// past anyone on the path.
 		"http issuer off-host":   func(c *directory.OIDCConfig) { c.IssuerURL = "http://id.example.test/realms/x" },
 		"http redirect off-host": func(c *directory.OIDCConfig) { c.RedirectURL = "http://cc.example.test/v1/auth/oidc/callback" },
+		// The Entra switch names its provider so it cannot turn the
+		// email_verified check off anywhere else.
+		"entra switch on another issuer": func(c *directory.OIDCConfig) { c.EntraVerifiedDomain = true },
+		"entra switch on a look-alike": func(c *directory.OIDCConfig) {
+			c.EntraVerifiedDomain = true
+			c.IssuerURL = "https://login.microsoftonline.com.example.test/tenant/v2.0"
+		},
 	}
 	for name, mutate := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -383,6 +423,12 @@ func TestNewOIDC_ValidatesAtStartup(t *testing.T) {
 	}
 	if _, err := directory.NewOIDC(ok); err != nil {
 		t.Fatalf("valid config refused: %v", err)
+	}
+	entra := ok
+	entra.IssuerURL = "https://login.microsoftonline.com/00000000-0000-0000-0000-000000000001/v2.0"
+	entra.EntraVerifiedDomain = true
+	if _, err := directory.NewOIDC(entra); err != nil {
+		t.Fatalf("the Entra switch refused for an Entra issuer: %v", err)
 	}
 	// The dev Keycloak speaks http on loopback, and must keep working.
 	for _, host := range []string{"127.0.0.1:18081", "localhost:18081", "[::1]:18081"} {
