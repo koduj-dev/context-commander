@@ -124,6 +124,8 @@ ExecStart=/usr/bin/ccd serve --addr 0.0.0.0:8490
 
 Other settings, such as OIDC or LDAP sign-in and the storage quota, are
 listed in `ccd.env` and in `ccd serve --help`.
+Single sign-on through OpenID Connect, including Microsoft Entra ID and
+Google, is described in [oidc.md](oidc.md).
 
 **Removing** the package stops the service. It keeps `/etc/context-commander`,
 `/var/lib/ccd` and the `ccd` user, so a reinstall finds its key and its data.

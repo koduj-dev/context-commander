@@ -9,6 +9,7 @@ one of them is wrong.
 |---|---|
 | [`quickstart.md`](quickstart.md) | How do I run this and get two agents handing work to each other? |
 | [`install.md`](install.md) | How do I install a release for real — packages, image, Homebrew — and verify what I downloaded? |
+| [`oidc.md`](oidc.md) | How do I set up single sign-on — Keycloak, Microsoft Entra ID, Google? |
 | [`AGENT-GUIDE.md`](AGENT-GUIDE.md) | **For agents, not people:** how to actually drive this — what to call first, what the answers mean, which mistakes are expensive. Point a coding agent at it. |
 | [`../README.md`](../README.md) | What is Context Commander, and what is it deliberately not? |
 | [`../CHANGELOG.md`](../CHANGELOG.md) | What shipped, and when? |
@@ -64,6 +65,7 @@ supersedes it, so the trail of what was believed when stays readable.
 | [0020](adr/0020-oidc-sign-up-is-off-by-default.md) | OIDC sign-up is off by default; sign-in can be limited to domains |
 | [0021](adr/0021-storage-quotas-per-namespace.md) | Storage quotas per namespace, counted by the database |
 | [0022](adr/0022-plans-phases-and-presence.md) | Plans, phases and who is working on what |
+| [0023](adr/0023-oidc-hardening.md) | OIDC hardening: Entra's verified domains, a signed attempt cookie, the issuer beside each link |
 
 ## Not documentation
 
