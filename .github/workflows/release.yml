@@ -52,7 +52,9 @@ jobs:
           cache-dependency-path: web/package-lock.json
 
       # Cross-compile linux/macos/windows (amd64+arm64) with the tag stamped in,
-      # producing dist-bin/<binary>-<os>-<arch>[.exe] and SHA256SUMS.
+      # producing dist-bin/<binary>-<os>-<arch>[.exe], the man pages for the
+      # packages (dist-man/) and the Homebrew formula (dist-bin/ccd-man.tar.gz),
+      # and SHA256SUMS over all of dist-bin.
       - name: Build release binaries
         run: VERSION="${GITHUB_REF_NAME}" make release
 
@@ -211,6 +213,10 @@ jobs:
           ;; esac
           gh release download "$VERSION" -p SHA256SUMS -D /tmp
           sha() { awk -v f="ccd-$1" '$2==f {print $1}' /tmp/SHA256SUMS; }
+          # A missing entry would render a formula brew refuses to install.
+          for a in darwin-amd64 darwin-arm64 linux-amd64 linux-arm64 man.tar.gz; do
+            [ -n "$(sha "$a")" ] || { echo "SHA256SUMS has no ccd-$a" >&2; exit 1; }
+          done
           tap="$(mktemp -d)"
           git clone "https://x-access-token:${TAP_TOKEN}@github.com/koduj-dev/homebrew-tap.git" "$tap"
           mkdir -p "$tap/Formula"
@@ -219,6 +225,7 @@ jobs:
               -e "s/__SHA_DARWIN_ARM64__/$(sha darwin-arm64)/g" \
               -e "s/__SHA_LINUX_AMD64__/$(sha linux-amd64)/g" \
               -e "s/__SHA_LINUX_ARM64__/$(sha linux-arm64)/g" \
+              -e "s/__SHA_MAN__/$(sha man.tar.gz)/g" \
               deploy/homebrew/ccd.rb.tmpl > "$tap/Formula/ccd.rb"
           cd "$tap"
           git config user.name "github-actions[bot]"
