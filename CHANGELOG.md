@@ -6,6 +6,23 @@ All notable changes to Context Commander are documented here. The format follows
 
 ## [Unreleased]
 
+### Security
+
+- **The OIDC attempt cookie is a `__Host-` cookie, and it is signed.** A
+  sibling subdomain can no longer plant an attempt, so it can no longer sign
+  a victim into the attacker's account. This does not apply under
+  `--insecure-allow-cleartext`, where browsers refuse the prefix. The HMAC
+  uses a key derived from the root key by HKDF, for this purpose only. Each
+  attempt has its own cookie (`__Host-cc_oidc_…`), so a second sign-in tab no
+  longer expires the first.
+  At most three attempts are kept. A tampered cookie is refused and recorded.
+  Attempts in flight during the upgrade must be started again.
+- **The OIDC callback defends against provider mix-up (RFC 9207).** A
+  response naming another issuer is refused. A response with no `iss` is also
+  refused when the provider advertises the parameter.
+- **An OIDC provider whose signing keys cannot be fetched is reported as
+  unavailable.** It is no longer recorded as a rejected sign-in.
+
 ### Added
 
 - **Install script.** `scripts/install.sh` installs the release binary on
@@ -33,11 +50,29 @@ All notable changes to Context Commander are documented here. The format follows
   (Ctrl/⌘ K) shows them too and opens the plan and step that matched, even
   one the board leaves out. It covers at most 50 projects and returns at
   most 100 hits, and says when either bound cut the answer (ADR 0022).
+- **Microsoft Entra ID sign-in**
+  ([ADR 0023](docs/adr/0023-oidc-hardening.md)). Entra sends no
+  `email_verified`. With `--oidc-entra-verified-domain`, an address is
+  accepted when the token's `xms_edov` claim says the user's tenant verified
+  its domain. The server refuses the switch for any issuer that is not
+  Entra's. The app registration must release `xms_edov` as an optional claim.
+- **[docs/oidc.md](docs/oidc.md)** explains how to configure single sign-on,
+  with sections for Entra ID and Google. It includes the Google Workspace
+  caveat: the domain check reads the address, not the `hd` claim.
 
 ### Changed
 
 - **`plan.search` answers `{items, truncated}`** instead of a bare list, in
   both modes, so an agent can tell a complete answer from a bounded one.
+- **Migration 000034** adds `user_identities.issuer`. Each OIDC link records
+  the issuer it was made under, and a sign-in through the same provider name
+  from a different issuer is refused. A link made before this release adopts
+  the issuer configured at its next sign-in.
+- **Signing in ends the browser's previous session.** This applies to every
+  method: password, LDAP, token, first-run setup and OIDC. Before, the old
+  session stayed valid until it expired.
+- `RedirectAuthenticator.Exchange` now takes a `directory.Callback` with the
+  code and the `iss` response parameter.
 
 ### Fixed
 

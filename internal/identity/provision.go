@@ -21,7 +21,18 @@ type DirectoryIdentity struct {
 	Subject     string
 	Email       string
 	DisplayName string
+	// Issuer is the OIDC issuer that asserted this identity, "" for LDAP.
+	// An existing link recorded under a different issuer is refused with
+	// ErrIssuerMismatch (docs/adr/0023).
+	Issuer string
 }
+
+// ErrIssuerMismatch means the (provider, subject) link exists but was made
+// under a different issuer than the one asserting it now: the provider name
+// was re-pointed at another issuer. Refused, because a subject is only
+// unique within its issuer — the new issuer's "sub" may be someone else
+// entirely. An operator's problem, not the person's.
+var ErrIssuerMismatch = errors.New("identity: directory identity is linked under a different issuer")
 
 // ProvisionDirectoryUser turns a directory assertion into a local principal,
 // creating the user on first sign-in.
@@ -92,10 +103,23 @@ func ProvisionDirectoryUserWith(ctx context.Context, pool *db.Pool, id Directory
 	// again on the next sign-in and fail on the unique email, locking the
 	// person out of an account that exists because of them.
 	err := db.WithoutPrincipal(ctx, pool, func(tx pgx.Tx) error {
-		userID, err := store.UserForDirectoryIdentity(ctx, tx, id.Provider, id.Subject)
+		link, err := store.DirectoryLink(ctx, tx, id.Provider, id.Subject)
+		userID := link.UserID
 		switch {
 		case err == nil:
-			// Case 1.
+			// Case 1 — provided the link was made under this issuer.
+			switch link.Issuer {
+			case id.Issuer:
+			case "":
+				// A link older than migrations/000034. It is adopted by the
+				// issuer configured now; the alternative, refusing, locks out
+				// everyone who signed in before the upgrade.
+				if err := store.AdoptDirectoryIssuer(ctx, tx, id.Provider, id.Subject, id.Issuer); err != nil {
+					return err
+				}
+			default:
+				return ErrIssuerMismatch
+			}
 		case errors.Is(err, ErrNotFound):
 			userID, err = linkOrCreate(ctx, tx, store, id, name, policy)
 			if err != nil {
@@ -127,7 +151,7 @@ func linkOrCreate(ctx context.Context, tx pgx.Tx, store *Store, id DirectoryIden
 	existing, err := store.GetUserByEmail(ctx, tx, id.Email)
 	switch {
 	case err == nil:
-		if err := store.LinkDirectoryIdentity(ctx, tx, id.Provider, id.Subject, existing.ID); err != nil {
+		if err := store.LinkDirectoryIdentity(ctx, tx, id.Provider, id.Issuer, id.Subject, existing.ID); err != nil {
 			return uuid.Nil, err
 		}
 		return existing.ID, nil
@@ -144,7 +168,7 @@ func linkOrCreate(ctx context.Context, tx pgx.Tx, store *Store, id DirectoryIden
 	if err != nil {
 		return uuid.Nil, err
 	}
-	if err := store.LinkDirectoryIdentity(ctx, tx, id.Provider, id.Subject, created.ID); err != nil {
+	if err := store.LinkDirectoryIdentity(ctx, tx, id.Provider, id.Issuer, id.Subject, created.ID); err != nil {
 		return uuid.Nil, err
 	}
 	return created.ID, nil

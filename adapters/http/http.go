@@ -74,6 +74,13 @@ type Deps struct {
 	// name. Empty closes /v1/auth/oidc entirely (docs/adr/0019).
 	OIDC []directory.RedirectAuthenticator
 
+	// OIDCCookieKey signs the cookies that carry an OIDC sign-in attempt
+	// from /start to the callback. Derived from the root key for that one
+	// purpose (crypto.PurposeOIDCAttemptCookie). Required when OIDC is
+	// configured: without it /start refuses rather than issuing a cookie
+	// nothing can verify.
+	OIDCCookieKey []byte
+
 	// FirstRun holds the one-time setup code that lets the very first
 	// administrator be created through the browser (docs/adr/0019). Nil once
 	// the installation has users, and a nil *firstrun.Code accepts nothing —
@@ -127,7 +134,7 @@ func NewHandler(deps Deps) http.Handler {
 			r.Delete("/auth/session", deps.signOut)
 			// OpenID Connect. Browser navigations, not fetches, so neither
 			// carries the CSRF header: the state parameter, bound to the
-			// browser by the cc_oidc cookie, is what stands in for it.
+			// browser by the cc_oidc_* attempt cookie, is what stands in for it.
 			r.Get("/auth/oidc/{provider}/start", deps.startOIDCSignIn)
 			r.Get("/auth/oidc/callback", deps.finishOIDCSignIn)
 

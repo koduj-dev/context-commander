@@ -2,13 +2,18 @@ package http_test
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -25,7 +30,12 @@ import (
 // adapter: the attempt cookie, the state check, and what each outcome tells
 // the browser.
 type fakeOIDC struct {
-	started  directory.AuthRequest
+	started directory.AuthRequest
+	// starts is every attempt begun, so a callback for an earlier one can
+	// be told apart from a forged one.
+	starts []directory.AuthRequest
+	// callback is what the adapter handed Exchange last.
+	callback directory.Callback
 	identity directory.Identity
 	err      error
 	// signup is what AllowsSignup reports. The existing tests are about the
@@ -41,23 +51,67 @@ func (p *fakeOIDC) AllowsSignup() bool { return p.signup }
 
 func (p *fakeOIDC) AuthCodeURL(req directory.AuthRequest) (string, error) {
 	p.started = req
+	p.starts = append(p.starts, req)
 	return "https://idp.example.test/authorize?state=" + url.QueryEscape(req.State), nil
 }
 
-func (p *fakeOIDC) Exchange(_ context.Context, code string, req directory.AuthRequest) (directory.Identity, error) {
-	// The adapter must hand back exactly the attempt it started: the nonce
+func (p *fakeOIDC) Exchange(_ context.Context, cb directory.Callback, req directory.AuthRequest) (directory.Identity, error) {
+	p.callback = cb
+	// The adapter must hand back exactly an attempt it started: the nonce
 	// and verifier are what the real provider checks.
-	if code != fakeCode || req != p.started {
+	known := false
+	for _, s := range p.starts {
+		known = known || s == req
+	}
+	if cb.Code != fakeCode || !known {
 		return directory.Identity{}, directory.ErrSignInRejected
 	}
 	return p.identity, p.err
 }
 
+// testCookieKey stands in for the key serve derives from the root key.
+var testCookieKey = []byte("0123456789abcdef0123456789abcdef")
+
 func newOIDCFixture(t *testing.T, p *fakeOIDC) *fixture {
 	t.Helper()
-	return newFixtureWithDeps(t, nil, ratelimit.Limits{}, func(d *cchttp.Deps) {
+	// Recording on: several of these tests are about which outcomes write
+	// a security event and which do not.
+	return newFixtureWithDeps(t, boolPtr(true), ratelimit.Limits{}, func(d *cchttp.Deps) {
 		d.OIDC = []directory.RedirectAuthenticator{p}
+		d.OIDCCookieKey = testCookieKey
 	})
+}
+
+// signedAttempt builds an attempt cookie the way the server does, so a test
+// can present one the server never issued — for a provider since removed, or
+// one that has outlived its lifetime.
+func signedAttempt(t *testing.T, fields map[string]any) *http.Cookie {
+	t.Helper()
+	raw, err := json.Marshal(fields)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sum := sha256.Sum256([]byte(fields["s"].(string)))
+	name := "cc_oidc_" + hex.EncodeToString(sum[:8])
+	payload := base64.RawURLEncoding.EncodeToString(raw)
+	m := hmac.New(sha256.New, testCookieKey)
+	m.Write([]byte(name))
+	m.Write([]byte{0})
+	m.Write([]byte(payload))
+	return &http.Cookie{Name: name, Value: payload + "." + base64.RawURLEncoding.EncodeToString(m.Sum(nil))} //nolint:gosec // G124: a request cookie in a test; attributes are the server's to set
+}
+
+// securityEvents counts recorded refusals with this reason.
+func (f *fixture) securityEvents(reason string) int {
+	f.t.Helper()
+	var n int
+	err := db.WithoutPrincipal(f.t.Context(), f.ownerPool, func(tx pgx.Tx) error {
+		return tx.QueryRow(f.t.Context(), `SELECT count(*) FROM security_events WHERE reason = $1`, reason).Scan(&n)
+	})
+	if err != nil {
+		f.t.Fatalf("count security events: %v", err)
+	}
+	return n
 }
 
 // navigation is where a browser was sent, with the body already read and
@@ -75,6 +129,23 @@ func (n navigation) cookie(name string) *http.Cookie {
 		}
 	}
 	return nil
+}
+
+// attemptCookie is the attempt cookie a response set, by its prefix — the
+// name is derived from the state.
+func (n navigation) attemptCookie() *http.Cookie {
+	for _, c := range n.cookies {
+		if strings.Contains(c.Name, "cc_oidc_") && c.MaxAge > 0 {
+			return c
+		}
+	}
+	return nil
+}
+
+// cleared reports whether the response expired the named cookie.
+func (n navigation) cleared(name string) bool {
+	c := n.cookie(name)
+	return c != nil && c.MaxAge < 0
 }
 
 // navigate is a browser following a link, minus following the redirect:
@@ -98,9 +169,15 @@ func (f *fixture) navigate(path string, cookies ...*http.Cookie) navigation {
 
 // begin starts an attempt and returns the cookie it set and the state the
 // provider would echo back.
-func beginOIDC(t *testing.T, f *fixture, p *fakeOIDC) (*http.Cookie, string) {
+func beginOIDC(t *testing.T, f *fixture, p *fakeOIDC, held ...*http.Cookie) (*http.Cookie, string) {
 	t.Helper()
-	resp := f.navigate("/v1/auth/oidc/fake/start")
+	c, state, _ := beginOIDCResp(t, f, p, held...)
+	return c, state
+}
+
+func beginOIDCResp(t *testing.T, f *fixture, p *fakeOIDC, held ...*http.Cookie) (*http.Cookie, string, navigation) {
+	t.Helper()
+	resp := f.navigate("/v1/auth/oidc/fake/start", held...)
 	if resp.status != http.StatusFound {
 		t.Fatalf("start: status %d, want a redirect to the provider", resp.status)
 	}
@@ -108,15 +185,21 @@ func beginOIDC(t *testing.T, f *fixture, p *fakeOIDC) (*http.Cookie, string) {
 	if err != nil || loc.Host != "idp.example.test" {
 		t.Fatalf("start redirected to %q, want the provider", resp.location)
 	}
-	c := resp.cookie("cc_oidc")
+	c := resp.attemptCookie()
 	if c == nil {
-		t.Fatal("start set no cc_oidc cookie")
+		t.Fatal("start set no cc_oidc_ cookie")
 	}
-	if !c.HttpOnly || c.Path != "/v1/auth/oidc" || c.SameSite != http.SameSiteLaxMode {
-		t.Errorf("cc_oidc cookie: HttpOnly=%v Path=%q SameSite=%v, want HttpOnly, /v1/auth/oidc, Lax",
-			c.HttpOnly, c.Path, c.SameSite)
+	// A __Host- cookie must be Path=/ and Secure; the cleartext name is
+	// scoped to the OIDC endpoints.
+	wantPath, wantSecure := "/v1/auth/oidc", false
+	if strings.HasPrefix(c.Name, "__Host-") {
+		wantPath, wantSecure = "/", true
 	}
-	return c, p.started.State
+	if !c.HttpOnly || c.Path != wantPath || c.Secure != wantSecure || c.Domain != "" || c.SameSite != http.SameSiteLaxMode {
+		t.Errorf("attempt cookie %s: HttpOnly=%v Path=%q Secure=%v Domain=%q SameSite=%v, want HttpOnly, %s, Secure=%v, no Domain, Lax",
+			c.Name, c.HttpOnly, c.Path, c.Secure, c.Domain, c.SameSite, wantPath, wantSecure)
+	}
+	return c, p.started.State, resp
 }
 
 func signInError(t *testing.T, resp navigation) string {
@@ -147,7 +230,7 @@ func TestOIDCSignInProvisionsAndStartsASession(t *testing.T) {
 	if session == nil || session.Value == "" {
 		t.Fatal("callback started no session")
 	}
-	if c := resp.cookie("cc_oidc"); c == nil || c.MaxAge >= 0 {
+	if !resp.cleared(attempt.Name) {
 		t.Error("the attempt cookie was not cleared — a second callback could replay it")
 	}
 	if status := f.withCookie(http.MethodGet, "/v1/me", session, true); status != http.StatusOK {
@@ -188,6 +271,13 @@ func TestOIDCCallbackRefusesAStateItDidNotIssue(t *testing.T) {
 	if resp.cookie("cc_session") != nil {
 		t.Fatal("a session was started for a callback whose state did not match")
 	}
+	if n := f.securityEvents("oidc callback state did not match the attempt this browser started"); n != 1 {
+		t.Fatalf("%d state-mismatch events recorded, want 1", n)
+	}
+	// The browser's real attempt is still there for its own callback.
+	if resp.cleared(attempt.Name) {
+		t.Error("a forged callback cleared the browser's genuine attempt")
+	}
 }
 
 func TestOIDCCallbackWithoutAnAttemptStartsNothing(t *testing.T) {
@@ -196,6 +286,10 @@ func TestOIDCCallbackWithoutAnAttemptStartsNothing(t *testing.T) {
 	resp := f.navigate("/v1/auth/oidc/callback?state=anything&code=" + fakeCode)
 	if got := signInError(t, resp); got != "oidc_expired" {
 		t.Fatalf("sign_in_error = %q, want oidc_expired", got)
+	}
+	// Nothing to match against is an expired attempt, not an attack.
+	if n := f.securityEvents("oidc callback state did not match the attempt this browser started"); n != 0 {
+		t.Fatalf("%d state-mismatch events for a browser holding no attempt, want 0", n)
 	}
 }
 
@@ -267,11 +361,7 @@ func TestOIDCCallbackForAProviderNoLongerConfigured(t *testing.T) {
 	// cookie is well-formed and the state matches; there is just nobody left
 	// to redeem the code with.
 	f := newOIDCFixture(t, &fakeOIDC{})
-	raw, err := json.Marshal(map[string]string{"p": "gone", "s": "st", "n": "nonce", "v": "verifier"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	attempt := &http.Cookie{Name: "cc_oidc", Value: base64.RawURLEncoding.EncodeToString(raw)} //nolint:gosec // G124: a request cookie in a test; attributes are the server's to set
+	attempt := signedAttempt(t, map[string]any{"p": "gone", "t": time.Now().Unix(), "s": "st", "n": "nonce", "v": "verifier"})
 	resp := f.navigate("/v1/auth/oidc/callback?state=st&code="+fakeCode, attempt)
 	if got := signInError(t, resp); got != "oidc_expired" {
 		t.Fatalf("sign_in_error = %q, want oidc_expired", got)

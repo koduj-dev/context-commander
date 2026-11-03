@@ -261,8 +261,14 @@ func newServeCmd() *cobra.Command {
 			if err := distinctDirectoryNames(ldapDir, oidcDir); err != nil {
 				return err
 			}
+			var oidcCookieKey []byte
 			if oidcDir != nil {
 				oidcProviders = append(oidcProviders, oidcDir)
+				key, err := crypto.DeriveKey(cmd.Context(), root, crypto.PurposeOIDCAttemptCookie)
+				if err != nil {
+					return err
+				}
+				oidcCookieKey = key[:]
 				// Said at startup because it is the setting whose wrong value
 				// nobody notices until strangers have accounts.
 				slog.Info("OIDC sign-in enabled", "provider", oidcDir.Provider(), "label", oidcDir.Label(),
@@ -321,8 +327,9 @@ func newServeCmd() *cobra.Command {
 				FirstRun: firstRunCode,
 				// Nil unless --ldap-url was given, and a nil Directory is what
 				// closes the path rather than opening it.
-				Directory: ldapDir,
-				OIDC:      oidcProviders,
+				Directory:     ldapDir,
+				OIDC:          oidcProviders,
+				OIDCCookieKey: oidcCookieKey,
 				// The cookie is Secure whenever the transport is: TLS here,
 				// or a reverse proxy in front of a loopback bind. Only an
 				// explicit --insecure-allow-cleartext turns it off, because
@@ -427,6 +434,11 @@ func newServeCmd() *cobra.Command {
 		"let a first sign-in create a local account; without it OIDC reaches only accounts that exist (linked already, or created by an administrator under the same address)")
 	cmd.Flags().StringSlice("oidc-allowed-domains", nil,
 		"accept OIDC sign-in only from verified addresses in these domains, e.g. example.com — checked on every sign-in, exact match, no subdomains")
+	// Named for the provider on purpose (docs/adr/0023): it is not a way to
+	// stop checking email_verified, and NewOIDC refuses it for any issuer
+	// that is not Entra's.
+	cmd.Flags().Bool("oidc-entra-verified-domain", false,
+		"Microsoft Entra ID only: Entra sends no email_verified, so accept an address when the ID token's xms_edov claim says its domain is verified by the user's tenant (the app registration must release xms_edov as an optional claim)")
 
 	cmd.Flags().Float64("rate-limit-signin-per-minute", 5,
 		"sustained password sign-in attempts per minute allowed for one email address (0 disables) — the per-credential limit cannot see these, since a failed guess belongs to no credential")
@@ -535,12 +547,14 @@ func oidcFromFlags(cmd *cobra.Command) (directory.RedirectAuthenticator, error) 
 	timeout, _ := cmd.Flags().GetDuration("oidc-timeout")
 	allowSignup, _ := cmd.Flags().GetBool("oidc-allow-signup")
 	domains, _ := cmd.Flags().GetStringSlice("oidc-allowed-domains")
+	entra, _ := cmd.Flags().GetBool("oidc-entra-verified-domain")
 
 	oidcDir, err := directory.NewOIDC(directory.OIDCConfig{
 		Name: name, Label: label, IssuerURL: issuer,
 		ClientID: clientID, ClientSecret: secret, RedirectURL: redirect,
 		Scopes: scopes, CACertFile: caCert, Timeout: timeout,
 		AllowSignup: allowSignup, AllowedDomains: domains,
+		EntraVerifiedDomain: entra,
 	})
 	if err != nil {
 		return nil, err

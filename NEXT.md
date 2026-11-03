@@ -167,41 +167,67 @@ Only on top of a core loop people actually use:
         beside it), tested against a real Keycloak. No SAML — a second
         protocol whose security-critical core is XML signature verification,
         for deployments this product does not have yet.
-      - [ ] **Entra ID cannot sign in yet.** It does not send
-        `email_verified`, and an unverified address is refused because
-        provisioning links to existing accounts by email. Trusting Entra's
-        addresses (it verifies them for its own tenant users, not for guests)
-        is a per-provider decision, and the switch for it should name the
-        provider rather than turn the check off for all of them.
+      - [x] ~~**Entra ID cannot sign in yet.**~~ Closed 2026-11-03
+        ([ADR 0023](docs/adr/0023-oidc-hardening.md)):
+        `--oidc-entra-verified-domain` accepts an address when the token's
+        `xms_edov` claim is true. That claim says the tenant the account
+        lives in verified the domain, which is exactly what a guest carrying
+        an address set by another tenant lacks. The server refuses the switch
+        for any issuer not on an Entra host. Setup is in
+        [docs/oidc.md](docs/oidc.md). Tested against Entra-shaped tokens from
+        a fake provider, not against a live tenant.
       - [ ] One OIDC provider per installation. `Deps.OIDC` and the sign-in
-        screen already take a list; only the flags configure one. **Before a
-        second one is allowed**, the callback must defend against provider
-        mix-up: today the provider comes only from the cookie and the
-        RFC 9207 `iss` response parameter is not checked (review, 2026-10-27).
+        screen already take a list; only the flags configure one. The mix-up
+        defence that had to come first is in place (below), so what is left
+        is the configuration surface.
+        - [x] ~~Provider mix-up~~ Closed 2026-11-03: the callback checks the
+          RFC 9207 `iss` against the provider's issuer before redeeming the
+          code, and requires it when discovery advertises
+          `authorization_response_iss_parameter_supported`.
       - [x] ~~Who may sign up through OIDC~~ Decided 2026-10-27
         ([ADR 0020](docs/adr/0020-oidc-sign-up-is-off-by-default.md)): nobody,
         unless `--oidc-allow-signup`; `--oidc-allowed-domains` limits sign-in
         to verified addresses in the listed domains.
-      - Remaining review findings (2026-10-27), all low, none exploitable as
-        configured today:
-        - The `cc_oidc` cookie is unsigned, so a sibling subdomain able to
-          plant cookies can pair a victim's browser with the attacker's
-          attempt (login CSRF). An HMAC over it with a server-held key closes
-          that; the code comment states the gap.
-        - A key-fetch failure during verification (provider down right after
-          a rotation) is reported as a rejected sign-in and recorded as one,
-          rather than as unavailable — go-oidc does not type that error.
-        - Identities are keyed on the operator's `--oidc-name`, not the
-          issuer: changing the issuer but keeping the name lets the new
-          issuer's subjects resolve to the old one's links. Storing `iss`
-          beside the link would remove it; it needs a migration.
-        - A second `/start` (another tab, or a cross-site navigation) replaces
-          the first attempt, whose callback then reads as expired. Nuisance.
-        - A callback in a browser already signed in starts a second session
-          without ending the first, as password sign-in does.
-        - A mismatched state writes a security event with no limit of its
-          own — the same class as failed password sign-ins, and the per-IP
-          limit that would bound both is the backlog's trusted-proxy item.
+      - [ ] **Google Workspace: `--oidc-allowed-domains` checks the address,
+        not the Workspace.** A personal Google account registered under a
+        work address stays verified after its owner leaves the Workspace, and
+        its first sign-in links to the local account by address. Requiring
+        Google's `hd` claim would close it, behind a switch named for Google,
+        as the Entra one is. Until then, [docs/oidc.md](docs/oidc.md) says to
+        disable the local account as well.
+      - Review findings (2026-10-27). All were low, and none was exploitable
+        as configured:
+        - [x] ~~The `cc_oidc` cookie is unsigned~~ Closed 2026-11-03: the
+          sibling-subdomain login CSRF is closed by a `__Host-` attempt
+          cookie, which no sibling can set (not under
+          `--insecure-allow-cleartext`, where browsers refuse the prefix).
+          The cookie also carries an HMAC under a key derived from the root
+          key for that one purpose (HKDF, `crypto.DeriveKey`), which stops
+          forged or edited attempts. The start time is under the MAC.
+        - [x] ~~A key-fetch failure is reported as a rejected sign-in~~
+          Closed 2026-11-03: a key set that cannot be fetched is now
+          `ErrUnavailable`. The person sees "unavailable" and no security
+          event is written. Tested against a provider whose key endpoint
+          answers 503, is unreachable, or goes down after a rotation.
+        - [x] ~~Identities are keyed on `--oidc-name`, not the issuer~~
+          Closed 2026-11-03: migration 000034 stores the issuer beside each
+          link, and a link made under another issuer is refused. A link
+          older than the migration adopts the issuer configured at its next
+          sign-in.
+        - [x] ~~A second `/start` replaces the first attempt~~ Closed
+          2026-11-03: each attempt has its own cookie, keyed by its state,
+          and the browser keeps at most three.
+        - [x] ~~A callback in a browser already signed in starts a second
+          session~~ Closed 2026-11-03: every sign-in (OIDC, password, LDAP,
+          token, first-run setup) ends the session the browser already
+          held.
+        - [ ] A mismatched state writes a security event with no limit of
+          its own. A global bound was considered and rejected (ADR 0023): it
+          would let anyone either lock everyone out of OIDC or silence the
+          security log. With Secure cookies a sibling can no longer plant
+          an attempt, but anyone can still call `/start`. The per-IP limit that would bound this
+          and failed password sign-ins alike is still the backlog's
+          trusted-proxy item.
       - Group-to-role mapping is a separate decision. A directory proves who
         someone is, not what they may do; authorization stays in project and
         organization membership and `installation_admins`.
