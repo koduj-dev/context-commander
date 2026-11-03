@@ -59,7 +59,10 @@ func newFixture(t *testing.T) *fixture {
 	f := &fixture{
 		t: t, ctx: ctx, ownerPool: ownerPool,
 		svc:   plans.NewService(appPool, crypto.NewProvider(root), auth.NewAuthzService(appPool, projects.NewStore())),
-		clock: time.Date(2026, 10, 27, 9, 0, 0, 0, time.UTC),
+		// Near the real time, not a fixed date: cc_prune_presence deletes
+		// presence by the database's now(), so a clock more than a week in
+		// the past has every row pruned the moment it is written.
+		clock: time.Now().UTC().Add(-2 * time.Hour).Truncate(time.Minute),
 	}
 	f.svc.SetClock(func() time.Time { return f.clock })
 	f.projectID, f.nsSlug = f.newProject("work")
