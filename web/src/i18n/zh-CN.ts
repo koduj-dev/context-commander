@@ -45,6 +45,10 @@ export const zhCN: Partial<Record<MessageKey, string>> = {
   "find.placeholder": "跳转到项目、skill 或页面…",
   "find.project": "项目",
   "find.skill": "Skill",
+  "find.plan": "计划",
+  "find.plansTruncated":
+    "计划搜索提前结束，可能遗漏了部分计划。请打开项目的“计划”标签页以完整搜索。",
+  "find.plansFailed": "无法搜索计划。已显示其他结果。",
   "find.screen": "页面",
   "find.nothing": "没有匹配项",
   "find.hint": "{shortcut} 打开此窗口。↑↓ 移动，Enter 前往，Esc 关闭。",
@@ -736,6 +740,7 @@ export const zhCN: Partial<Record<MessageKey, string>> = {
   "project.tab.plans": "计划",
   "dashboard.workingNow": "谁在做什么",
   "plans.title": "计划",
+  "plans.linkedPlan": "从搜索中打开",
   "plans.lead": "阶段、阶段中的计划，以及此刻谁在哪个步骤上——agent 和人都一样。",
   "plans.stale": "最近一次刷新失败。显示的内容可能已过时；系统会自动重试。",
   "plans.workingNow": "正在工作",

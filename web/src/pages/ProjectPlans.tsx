@@ -1,4 +1,5 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useT } from "../i18n";
 import { useFormat } from "../app/prefs";
 import {
@@ -62,10 +63,18 @@ export function ProjectPlans() {
     [namespace, slug],
     BOARD_REFRESH_MS,
   );
+  // `?plan=…&item=…` is how a search result elsewhere (the quick finder)
+  // names what it found: that plan opens and that step is marked.
+  const [params] = useSearchParams();
+  const linkedPlan = params.get("plan") ?? undefined;
+  const linkedItem = params.get("item") ?? undefined;
 
   if (board.loading) return <Loading />;
   if (board.error || !board.data) return <ErrorState error={board.error} onRetry={board.reload} />;
   const b = board.data;
+  // The board leaves abandoned plans out, and a search finds them anyway;
+  // such a plan is opened on its own, loaded by id.
+  const linkedOffBoard = linkedPlan !== undefined && !b.plans.some((p) => p.id === linkedPlan);
 
   return (
     <>
@@ -100,7 +109,22 @@ export function ProjectPlans() {
         )}
 
         <Phases board={b} onChanged={board.reload} />
-        <Plans board={b} onChanged={board.reload} />
+        {linkedOffBoard && linkedPlan && (
+          <Panel title={t("plans.linkedPlan")}>
+            <PlanDetail
+              planID={linkedPlan}
+              highlight={linkedItem}
+              board={b}
+              onChanged={board.reload}
+            />
+          </Panel>
+        )}
+        <Plans
+          board={b}
+          onChanged={board.reload}
+          linked={linkedOffBoard ? undefined : linkedPlan}
+          highlight={linkedItem}
+        />
         <Search />
       </Stack>
     </>
@@ -351,9 +375,24 @@ export function planStatusLabel(t: ReturnType<typeof useT>, s: PlanStatus) {
   }[s];
 }
 
-function Plans({ board, onChanged }: { board: Board; onChanged: () => void }) {
+function Plans({
+  board,
+  onChanged,
+  linked,
+  highlight,
+}: {
+  board: Board;
+  onChanged: () => void;
+  linked?: string;
+  highlight?: string;
+}) {
   const t = useT();
-  const [open, setOpen] = useState<string>();
+  const [open, setOpen] = useState<string | undefined>(linked);
+  // A second search result picked while this screen is showing changes the
+  // query string, not the component; the plan it names opens all the same.
+  useEffect(() => {
+    if (linked) setOpen(linked);
+  }, [linked]);
   const phaseTitle = (id?: string) => board.phases.find((p) => p.id === id)?.title;
 
   return (
@@ -377,6 +416,7 @@ function Plans({ board, onChanged }: { board: Board; onChanged: () => void }) {
                 key={p.id}
                 planID={p.id}
                 open={open === p.id}
+                highlight={p.id === linked ? highlight : undefined}
                 onToggle={() => setOpen(open === p.id ? undefined : p.id)}
                 board={board}
                 onChanged={onChanged}
@@ -439,6 +479,7 @@ function Plans({ board, onChanged }: { board: Board; onChanged: () => void }) {
 function PlanRows({
   planID,
   open,
+  highlight,
   onToggle,
   summary,
   board,
@@ -446,6 +487,7 @@ function PlanRows({
 }: {
   planID: string;
   open: boolean;
+  highlight?: string;
   onToggle: () => void;
   summary: ReactNode;
   board: Board;
@@ -465,7 +507,7 @@ function PlanRows({
       {open && (
         <tr>
           <td colSpan={4}>
-            <PlanDetail planID={planID} board={board} onChanged={onChanged} />
+            <PlanDetail planID={planID} highlight={highlight} board={board} onChanged={onChanged} />
           </td>
         </tr>
       )}
@@ -493,10 +535,13 @@ export function itemStatusOptions(
  */
 function PlanDetail({
   planID,
+  highlight,
   board,
   onChanged,
 }: {
   planID: string;
+  /** The step a search result pointed at: marked, and scrolled to once. */
+  highlight?: string;
   board: Board;
   onChanged: () => void;
 }) {
@@ -512,6 +557,13 @@ function PlanDetail({
   const [addKind, setAddKind] = useState<ItemKind>("task");
   const [addOpen, setAddOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const highlightRow = useRef<HTMLTableRowElement>(null);
+  const loaded = plan.data !== undefined;
+  // Once per step, not on every ten-second refresh: scrolling someone back
+  // to a row they have moved away from would make the screen unusable.
+  useEffect(() => {
+    if (loaded && highlight) highlightRow.current?.scrollIntoView?.({ block: "center" });
+  }, [loaded, highlight]);
 
   async function run(action: () => Promise<unknown>) {
     setBusy(true);
@@ -580,7 +632,12 @@ function PlanDetail({
           ]}
         >
           {p.items.map((it) => (
-            <tr key={it.id}>
+            <tr
+              key={it.id}
+              className={it.id === highlight ? "active" : undefined}
+              aria-current={it.id === highlight ? "true" : undefined}
+              ref={it.id === highlight ? highlightRow : undefined}
+            >
               <td>
                 <Cell
                   primary={

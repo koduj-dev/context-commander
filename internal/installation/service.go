@@ -226,6 +226,13 @@ func (s *Service) IssueCredentialFor(
 	var token string
 	var cred identity.ClientCredential
 	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+		// Checked rather than left to the foreign key, as SetUserPassword
+		// does: an agent's id passed where its principal_id belongs used to
+		// fail on client_credentials' constraint as an opaque 500. Unknown
+		// is identity.ErrNotFound — the id is the resource in the path.
+		if _, err := s.identity.GetPrincipal(ctx, tx, targetPrincipalID); err != nil {
+			return err
+		}
 		var err error
 		token, cred, err = s.identity.IssueCredential(ctx, tx, targetPrincipalID, clientType, expiresAt)
 		return err
@@ -244,6 +251,12 @@ func (s *Service) ListCredentialsFor(ctx context.Context, principalID, callerUse
 	}
 	var creds []identity.ClientCredential
 	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+		// An unknown principal is a 404, not an empty list: the same stray
+		// id that IssueCredentialFor rejects would otherwise read as "this
+		// agent has no tokens".
+		if _, err := s.identity.GetPrincipal(ctx, tx, targetPrincipalID); err != nil {
+			return err
+		}
 		var err error
 		// Unfiltered on purpose, unlike the token screen: this is the admin's
 		// credential view, and browser sessions are exactly what an incident

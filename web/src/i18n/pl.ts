@@ -34,6 +34,10 @@ export const pl: Partial<Record<MessageKey, string>> = {
   "find.placeholder": "Przejdź do projektu, skilla, ekranu…",
   "find.project": "Projekt",
   "find.skill": "Skill",
+  "find.plan": "Plan",
+  "find.plansTruncated":
+    "Wyszukiwanie planów zakończyło się przedwcześnie, więc może brakować niektórych planów. Otwórz kartę Plany w projekcie, aby przeszukać go w całości.",
+  "find.plansFailed": "Nie udało się przeszukać planów. Pozostałe wyniki są widoczne.",
   "find.screen": "Ekran",
   "find.nothing": "Nic nie pasuje",
   "find.hint": "{shortcut} otwiera to okno. ↑↓ przesuwa, Enter przechodzi, Esc zamyka.",
@@ -769,6 +773,7 @@ export const pl: Partial<Record<MessageKey, string>> = {
   "project.tab.plans": "Plany",
   "dashboard.workingNow": "Kto nad czym pracuje",
   "plans.title": "Plany",
+  "plans.linkedPlan": "Otwarty z wyszukiwania",
   "plans.lead":
     "Fazy, plany w nich i kto jest teraz na którym kroku — zarówno agenci, jak i ludzie.",
   "plans.stale":

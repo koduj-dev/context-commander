@@ -27,6 +27,27 @@ All notable changes to Context Commander are documented here. The format follows
   The Homebrew formula installs them, so `man ccd` works there as it does
   with the packages.
 
+- **Plan search across projects.** `GET /v1/me/plans/search?q=`, and
+  `plan.search` called without a `project`, search the plans of every project
+  you can read plans in and name the project of each hit. The quick finder
+  (Ctrl/⌘ K) shows them too and opens the plan and step that matched, even
+  one the board leaves out. It covers at most 50 projects and returns at
+  most 100 hits, and says when either bound cut the answer (ADR 0022).
+
+### Changed
+
+- **`plan.search` answers `{items, truncated}`** instead of a bare list, in
+  both modes, so an agent can tell a complete answer from a bounded one.
+
+### Fixed
+
+- **A wrong id is no longer a 500.** Adding a project member by an agent's
+  own id instead of its `principal_id`, issuing or listing an admin token
+  for such an id, or adding an organization member by a principal id instead
+  of a user id all failed on a foreign key and answered "internal error".
+  They are now a 400 (membership bodies) or a 404 (the token path), and
+  adding someone who is already a member is a 409.
+
 ## [0.1.0-beta.1] — 2026-10-27
 
 The first public release, and a beta. The server, MCP surface and web UI

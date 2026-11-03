@@ -126,3 +126,43 @@ func mustJSON(t *testing.T, raw []byte, v any) {
 		t.Fatalf("decode %s: %v", raw, err)
 	}
 }
+
+// TestSearchMyPlansAcrossProjects: GET /v1/me/plans/search covers every
+// project the caller can read plans in, names each hit's project, and leaves
+// out a project the caller is not a member of.
+func TestSearchMyPlansAcrossProjects(t *testing.T) {
+	f := newFixture(t)
+	alice := f.newUserWithToken("search-alice@example.test")
+	bob := f.newUserWithToken("search-bob@example.test")
+	f.createProject(alice, "search-alice/one", "One")
+	f.createProject(alice, "search-alice/two", "Two")
+	f.createProject(bob, "search-bob/own", "Own")
+	for path, token := range map[string]string{"search-alice/one": alice, "search-alice/two": alice, "search-bob/own": bob} {
+		f.mustDo(http.MethodPost, "/v1/projects/"+path+"/plans/", token,
+			[]byte(`{"title":"Upgrade Postgres","items":[{"text":"Take a backup"}]}`), http.StatusCreated, "create plan in "+path)
+	}
+
+	var res struct {
+		Items []struct {
+			Project     string `json:"project"`
+			ProjectName string `json:"project_name"`
+			PlanTitle   string `json:"plan_title"`
+		} `json:"items"`
+		Truncated bool `json:"truncated"`
+	}
+	mustJSON(t, f.mustDo(http.MethodGet, "/v1/me/plans/search?q=postgres", alice, nil, http.StatusOK, "search as alice"), &res)
+	seen := map[string]string{}
+	for _, h := range res.Items {
+		seen[h.Project] = h.ProjectName
+	}
+	if len(res.Items) != 2 || seen["search-alice/one"] != "One" || seen["search-alice/two"] != "Two" || res.Truncated {
+		t.Errorf("alice's hits %+v", res)
+	}
+
+	mustJSON(t, f.mustDo(http.MethodGet, "/v1/me/plans/search?q=postgres", bob, nil, http.StatusOK, "search as bob"), &res)
+	if len(res.Items) != 1 || res.Items[0].Project != "search-bob/own" {
+		t.Errorf("bob's hits %+v", res)
+	}
+
+	f.mustDo(http.MethodGet, "/v1/me/plans/search", alice, nil, http.StatusBadRequest, "search with no question")
+}

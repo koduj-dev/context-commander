@@ -2,9 +2,12 @@ package mcp_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	sdkmcp "github.com/modelcontextprotocol/go-sdk/mcp"
+
+	"github.com/koduj-dev/context-commander/internal/plans"
 )
 
 type planToolItem struct {
@@ -123,5 +126,68 @@ func TestAnAgentsPlanAndPositionAreVisibleToItsColleagues(t *testing.T) {
 	callTool[map[string]any](t, ctx, a, "plan.stop", map[string]any{"project": project})
 	if board = callTool[boardToolResult](t, ctx, b, "plan.board", map[string]any{"project": project}); len(board.Presence) != 0 {
 		t.Errorf("a stopped agent is still present: %+v", board.Presence)
+	}
+}
+
+// plan.search without a project searches every project the caller can read
+// plans in, and names each hit's project; a project the caller is not in
+// stays out even when its plans hold the same words.
+func TestPlanSearchWithoutAProjectCoversEveryProjectYouAreIn(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+
+	tokenA := f.newUserWithToken("searcher-a@example.test")
+	a, err := f.connect(ctx, tokenA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = a.Close() }()
+	tokenB := f.newUserWithToken("searcher-b@example.test")
+	b, err := f.connect(ctx, tokenB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = b.Close() }()
+
+	for _, p := range []string{"searcher-a/one", "searcher-a/two"} {
+		callTool[projectResult](t, ctx, a, "project.create", map[string]any{"project": p, "name": p})
+		callTool[planToolResult](t, ctx, a, "plan.create", map[string]any{"project": p, "title": "Rotate the keys in " + p})
+	}
+	callTool[projectResult](t, ctx, b, "project.create", map[string]any{"project": "searcher-b/own", "name": "Own"})
+	callTool[planToolResult](t, ctx, b, "plan.create", map[string]any{"project": "searcher-b/own", "title": "Rotate the keys too"})
+
+	type hit struct {
+		Project   string `json:"project"`
+		PlanTitle string `json:"plan_title"`
+	}
+	type result struct {
+		Items     []hit `json:"items"`
+		Truncated bool  `json:"truncated"`
+	}
+	res := callTool[result](t, ctx, a, "plan.search", map[string]any{"query": "rotate"})
+	projects := map[string]bool{}
+	for _, h := range res.Items {
+		projects[h.Project] = true
+	}
+	if len(res.Items) != 2 || !projects["searcher-a/one"] || !projects["searcher-a/two"] || res.Truncated {
+		t.Errorf("hits across projects: %+v", res)
+	}
+
+	// With a project, the search stays in it and names none.
+	res = callTool[result](t, ctx, a, "plan.search", map[string]any{"project": "searcher-a/one", "query": "rotate"})
+	if len(res.Items) != 1 || res.Items[0].Project != "" || res.Truncated {
+		t.Errorf("hits in one project: %+v", res)
+	}
+
+	// Past the hit bound, the answer says it was cut rather than passing
+	// a partial list off as the whole one.
+	items := make([]map[string]any, plans.MaxSearchHits+1)
+	for i := range items {
+		items[i] = map[string]any{"text": fmt.Sprintf("rotate step %d", i)}
+	}
+	callTool[planToolResult](t, ctx, a, "plan.create", map[string]any{"project": "searcher-a/one", "title": "Many", "items": items})
+	res = callTool[result](t, ctx, a, "plan.search", map[string]any{"query": "rotate"})
+	if len(res.Items) != plans.MaxSearchHits || !res.Truncated {
+		t.Errorf("over the bound: %d hits, truncated %v", len(res.Items), res.Truncated)
 	}
 }

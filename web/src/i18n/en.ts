@@ -32,6 +32,10 @@ export const en = {
   "find.placeholder": "Jump to a project, a skill, a screen…",
   "find.project": "Project",
   "find.skill": "Skill",
+  "find.plan": "Plan",
+  "find.plansTruncated":
+    "Plan search stopped early, so some plans may be missing. Open a project's Plans tab to search all of it.",
+  "find.plansFailed": "Plans could not be searched. The other results are shown.",
   "find.screen": "Screen",
   "find.nothing": "Nothing matches that",
   "find.hint": "{shortcut} opens this. ↑↓ to move, Enter to go, Esc to close.",
@@ -761,6 +765,7 @@ export const en = {
   "project.tab.plans": "Plans",
   "dashboard.workingNow": "Who is working where",
   "plans.title": "Plans",
+  "plans.linkedPlan": "Opened from search",
   "plans.lead":
     "Phases, the plans inside them, and who is on which step right now — agents and people alike.",
   "plans.stale":

@@ -437,6 +437,43 @@ func (d Deps) searchPlans(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, out)
 }
 
+// searchMyPlans is searchPlans across projects (plans.Service.SearchAll).
+// An object rather than a bare array, unlike the per-project search: it
+// says which project each hit is in, and whether a bound cut the answer.
+func (d Deps) searchMyPlans(w http.ResponseWriter, r *http.Request) {
+	res, err := d.Plans.SearchAll(r.Context(), principalIDFrom(r.Context()), r.URL.Query().Get("q"), r.URL.Query().Get("status"))
+	if err != nil {
+		writeDomainError(w, r, err)
+		return
+	}
+	type hitResponse struct {
+		Project     string     `json:"project"`
+		ProjectName string     `json:"project_name"`
+		PlanID      uuid.UUID  `json:"plan_id"`
+		PlanTitle   string     `json:"plan_title"`
+		PlanStatus  string     `json:"plan_status"`
+		ItemID      *uuid.UUID `json:"item_id,omitempty"`
+		Text        string     `json:"text"`
+		Status      string     `json:"status"`
+	}
+	refs := map[uuid.UUID]plans.ProjectRef{}
+	for _, p := range res.Projects {
+		refs[p.ID] = p
+	}
+	out := struct {
+		Items     []hitResponse `json:"items"`
+		Truncated bool          `json:"truncated"`
+	}{Items: []hitResponse{}, Truncated: res.Truncated}
+	for _, h := range res.Hits {
+		ref := refs[h.ProjectID]
+		out.Items = append(out.Items, hitResponse{
+			Project: ref.Path, ProjectName: ref.Name,
+			PlanID: h.PlanID, PlanTitle: h.PlanTitle, PlanStatus: h.PlanStatus, ItemID: h.ItemID, Text: h.Text, Status: h.Status,
+		})
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
 func (d Deps) reportPresence(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		usageRequest

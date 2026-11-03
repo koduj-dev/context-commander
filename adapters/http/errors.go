@@ -108,6 +108,8 @@ func writeDomainError(w http.ResponseWriter, r *http.Request, err error) {
 		// interface. Handlers that can say which field clashed answer before
 		// reaching here (createInstallationUser); this is the fallback.
 		writeError(w, http.StatusConflict, "conflict", "that already exists")
+	case errors.Is(err, members.ErrAlreadyMember), errors.Is(err, organizations.ErrAlreadyMember):
+		writeError(w, http.StatusConflict, "conflict", err.Error())
 	case errors.Is(err, plans.ErrConflict):
 		writeError(w, http.StatusConflict, "conflict", "version conflict: the plan was changed since your expected_version")
 	case errors.Is(err, plans.ErrInvalid), errors.Is(err, plans.ErrNoClient):
@@ -150,6 +152,7 @@ func writeDomainError(w http.ResponseWriter, r *http.Request, err error) {
 		writeError(w, http.StatusBadRequest, "invalid_request", "referenced conversation/session/derived_from object does not belong to this project/conversation")
 	case errors.Is(err, projects.ErrInvalidResolvePath), errors.Is(err, secrets.ErrInvalidName), errors.Is(err, identity.ErrInvalidExpiry),
 		errors.Is(err, members.ErrInvalidRole), errors.Is(err, organizations.ErrInvalidRole),
+		errors.Is(err, members.ErrUnknownPrincipal), errors.Is(err, organizations.ErrUnknownUser),
 		errors.Is(err, paging.ErrInvalidCursor), errors.Is(err, installation.ErrInvalidLimit):
 		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
 	default:
