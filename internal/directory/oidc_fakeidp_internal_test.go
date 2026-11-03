@@ -16,6 +16,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/coreos/go-oidc/v3/oidc"
 )
 
 // fakeIdP is a provider these tests can break on purpose — a key-set
@@ -213,6 +215,42 @@ func TestOIDC_KeyFetchFailureIsUnavailable(t *testing.T) {
 			t.Fatalf("want ErrSignInRejected alone, got %v", err)
 		}
 	})
+}
+
+// Google's tokens may spell the issuer with or without the scheme, and
+// go-oidc accepts both for https://accounts.google.com. The identity must
+// carry the configured issuer either way, or the link stored under one
+// spelling would read as an issuer change on the next sign-in.
+func TestOIDC_IdentityCarriesTheConfiguredIssuerNotTheTokensSpelling(t *testing.T) {
+	const google = "https://accounts.google.com"
+	idp := newFakeIdP(t)
+	o, err := NewOIDC(OIDCConfig{
+		Name: "google", IssuerURL: google, ClientID: "cc", ClientSecret: "s",
+		RedirectURL: "http://127.0.0.1:12001/v1/auth/oidc/callback",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Discovery would go to Google; wire this provider to the fake's
+	// endpoints instead, with the verifier built exactly as discover builds
+	// it — expecting Google's issuer.
+	fake := idp.oidc(t)
+	if _, _, _, err := fake.discover(); err != nil {
+		t.Fatal(err)
+	}
+	o.oauth = fake.oauth
+	o.verifier = o.newVerifier(oidc.ClientContext(context.Background(), o.client),
+		providerMetadata{JWKSURL: idp.srv.URL + "/jwks", SigningAlgs: []string{"RS256"}})
+
+	for _, spelling := range []string{google, "accounts.google.com"} {
+		id, err := idp.signIn(o, Callback{}, map[string]any{"iss": spelling})
+		if err != nil {
+			t.Fatalf("token issued as %q: %v", spelling, err)
+		}
+		if id.Issuer != google {
+			t.Fatalf("token issued as %q: identity issuer = %q, want the configured %q", spelling, id.Issuer, google)
+		}
+	}
 }
 
 // HS256 is advertised by this fake and must not be accepted: the filter

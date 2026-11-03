@@ -28,25 +28,43 @@ import (
 //
 // A cookie rather than a server-side table because the attempt belongs to the
 // browser, lives for minutes and has no business in a backup. HttpOnly, so the
-// page cannot read the verifier; scoped to /v1/auth/oidc, so it rides along
-// with nothing else.
+// page cannot read the verifier.
+//
+// Login CSRF through a sibling subdomain is what the cookie's NAME stops, not
+// its MAC. The attack: the attacker calls /start, signs in at the provider as
+// themselves, keeps the code unspent, and plants their own attempt cookie —
+// genuine, correctly signed — in the victim's browser from a subdomain, then
+// sends the victim to the callback. Every check passes and the victim is
+// working inside the attacker's account. The defence is the __Host- prefix:
+// a browser accepts a __Host- cookie only from this exact host, over a secure
+// connection, with Path=/ and no Domain, so no sibling and no parent domain
+// can set one. That forces Path=/ (the cookie rides along with every request
+// here; it is HttpOnly and a few hundred bytes) and requires Secure.
+//
+// Under --insecure-allow-cleartext a browser refuses __Host- cookies, so the
+// attempt is a plain cc_oidc_ cookie scoped to /v1/auth/oidc, and this one
+// defence is absent — the same trade the session cookie makes there. With the
+// prefix in force, a plain-named cookie is never read: it is exactly what a
+// sibling could have planted.
 //
 // Signed with an HMAC under a key derived from the root key for this purpose
-// alone (crypto.PurposeOIDCAttemptCookie, docs/adr/0023). Unsigned, a sibling
-// subdomain able to plant cookies on this host could pair a victim's browser
-// with an attempt the attacker started and finished at the provider as
-// themselves — login CSRF, the victim then working inside the attacker's
-// account. A planted cookie now has to carry a MAC only this server can make.
-// The MAC also covers the start time, so the lifetime is enforced here and
-// not only by the browser's obedience to Max-Age.
+// alone (crypto.PurposeOIDCAttemptCookie, docs/adr/0023), over the name and
+// the payload. That stops an attempt being forged or edited — a chosen
+// verifier, a provider swapped, a lifetime extended — and stops a signed
+// attempt being renamed out of the __Host- namespace or into another
+// attempt's slot. The MAC also covers the start time, so the lifetime is
+// enforced here and not only by the browser's obedience to Max-Age.
 //
 // One cookie per attempt, named after its state, so a second /start — another
 // tab, a double click, a cross-site link — does not overwrite the first and
 // turn its callback into "expired". At most oidcMaxAttempts are kept; the
 // oldest goes first.
 const (
-	oidcCookiePrefix = "cc_oidc_"
-	oidcCookiePath   = "/v1/auth/oidc"
+	oidcCookieBase = "cc_oidc_"
+	// What a sibling subdomain cannot set; see above.
+	oidcCookieHostPrefix = "__Host-"
+	// Only for the cleartext name: a __Host- cookie must be Path=/.
+	oidcCookieCleartextPath = "/v1/auth/oidc"
 	// Long enough to type a password and pass a second factor at the
 	// provider; short enough that an abandoned attempt is gone by lunch.
 	oidcAttemptLifetime = 10 * time.Minute
@@ -86,9 +104,25 @@ func signInFailed(w http.ResponseWriter, r *http.Request, code string) {
 // oidcCookieName is the cookie an attempt with this state lives in. A hash,
 // not the state itself: a cookie name has a narrower alphabet than a state a
 // provider echoes back, and the name needs only to be distinct.
-func oidcCookieName(state string) string {
+func (d Deps) oidcCookieName(state string) string {
 	sum := sha256.Sum256([]byte(state))
-	return oidcCookiePrefix + hex.EncodeToString(sum[:8])
+	return d.oidcCookiePrefix() + hex.EncodeToString(sum[:8])
+}
+
+// oidcCookiePrefix is __Host-cc_oidc_ whenever cookies are Secure, and
+// cc_oidc_ only under --insecure-allow-cleartext.
+func (d Deps) oidcCookiePrefix() string {
+	if d.SessionCookieSecure {
+		return oidcCookieHostPrefix + oidcCookieBase
+	}
+	return oidcCookieBase
+}
+
+func (d Deps) oidcCookiePath() string {
+	if d.SessionCookieSecure {
+		return "/"
+	}
+	return oidcCookieCleartextPath
 }
 
 // oidcMAC covers the cookie's name as well as its value, so a validly signed
@@ -147,7 +181,7 @@ func (d Deps) setOIDCCookie(w http.ResponseWriter, name, value string) {
 	http.SetCookie(w, &http.Cookie{ //nolint:gosec // G124: Secure is conditional for the reason setSessionCookie gives
 		Name:     name,
 		Value:    value,
-		Path:     oidcCookiePath,
+		Path:     d.oidcCookiePath(),
 		MaxAge:   int(oidcAttemptLifetime / time.Second),
 		HttpOnly: true,
 		Secure:   d.SessionCookieSecure,
@@ -162,7 +196,7 @@ func (d Deps) clearOIDCCookie(w http.ResponseWriter, name string) {
 	http.SetCookie(w, &http.Cookie{ //nolint:gosec // G124: same conditional Secure as above
 		Name:     name,
 		Value:    "",
-		Path:     oidcCookiePath,
+		Path:     d.oidcCookiePath(),
 		MaxAge:   -1,
 		HttpOnly: true,
 		Secure:   d.SessionCookieSecure,
@@ -170,10 +204,13 @@ func (d Deps) clearOIDCCookie(w http.ResponseWriter, name string) {
 	})
 }
 
-func oidcAttemptCookies(r *http.Request) []*http.Cookie {
+// oidcAttemptCookies are the attempt cookies this server reads: under the
+// __Host- prefix when it is in force, and nothing a sibling could have set.
+func (d Deps) oidcAttemptCookies(r *http.Request) []*http.Cookie {
+	prefix := d.oidcCookiePrefix()
 	var out []*http.Cookie
 	for _, c := range r.Cookies() {
-		if strings.HasPrefix(c.Name, oidcCookiePrefix) {
+		if strings.HasPrefix(c.Name, prefix) {
 			out = append(out, c)
 		}
 	}
@@ -189,7 +226,7 @@ func (d Deps) pruneOIDCAttempts(w http.ResponseWriter, r *http.Request) {
 		started int64
 	}
 	var keep []live
-	for _, c := range oidcAttemptCookies(r) {
+	for _, c := range d.oidcAttemptCookies(r) {
 		a, err := d.decodeOIDCAttempt(c)
 		if err != nil {
 			d.clearOIDCCookie(w, c.Name)
@@ -235,7 +272,7 @@ func (d Deps) startOIDCSignIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	name := oidcCookieName(attempt.State)
+	name := d.oidcCookieName(attempt.State)
 	value, err := d.encodeOIDCAttempt(name, attempt)
 	if err != nil {
 		internalError(w, r, err, "could not start sign-in")
@@ -256,7 +293,7 @@ func (d Deps) startOIDCSignIn(w http.ResponseWriter, r *http.Request) {
 // person; both are recorded.
 func (d Deps) readOIDCAttempt(w http.ResponseWriter, r *http.Request, state string) (a oidcAttempt, ok, forged, mismatched bool) {
 	if state != "" {
-		name := oidcCookieName(state)
+		name := d.oidcCookieName(state)
 		if c, err := r.Cookie(name); err == nil {
 			// Cleared whatever happens next, so a browser that comes back
 			// twice starts over. That is only as strong as the browser's
@@ -276,7 +313,7 @@ func (d Deps) readOIDCAttempt(w http.ResponseWriter, r *http.Request, state stri
 			return a, a.StateMatches(state), false, !a.StateMatches(state)
 		}
 	}
-	for _, c := range oidcAttemptCookies(r) {
+	for _, c := range d.oidcAttemptCookies(r) {
 		if _, err := d.decodeOIDCAttempt(c); err == nil {
 			return oidcAttempt{}, false, false, true
 		}

@@ -197,11 +197,13 @@ Only on top of a core loop people actually use:
         disable the local account as well.
       - Review findings (2026-10-27). All were low, and none was exploitable
         as configured:
-        - [x] ~~The `cc_oidc` cookie is unsigned~~ Closed 2026-11-03: each
-          attempt cookie carries an HMAC under a key derived from the root
-          key for that one purpose (HKDF, `crypto.DeriveKey`). The start time
-          is under the MAC too. A cookie that does not verify is refused and
-          recorded.
+        - [x] ~~The `cc_oidc` cookie is unsigned~~ Closed 2026-11-03: the
+          sibling-subdomain login CSRF is closed by a `__Host-` attempt
+          cookie, which no sibling can set (not under
+          `--insecure-allow-cleartext`, where browsers refuse the prefix).
+          The cookie also carries an HMAC under a key derived from the root
+          key for that one purpose (HKDF, `crypto.DeriveKey`), which stops
+          forged or edited attempts. The start time is under the MAC.
         - [x] ~~A key-fetch failure is reported as a rejected sign-in~~
           Closed 2026-11-03: a key set that cannot be fetched is now
           `ErrUnavailable`. The person sees "unavailable" and no security
@@ -222,8 +224,8 @@ Only on top of a core loop people actually use:
         - [ ] A mismatched state writes a security event with no limit of
           its own. A global bound was considered and rejected (ADR 0023): it
           would let anyone either lock everyone out of OIDC or silence the
-          security log. A mismatch now takes an attempt this server signed,
-          so a planted cookie cannot produce one. The per-IP limit that would bound this
+          security log. With Secure cookies a sibling can no longer plant
+          an attempt, but anyone can still call `/start`. The per-IP limit that would bound this
           and failed password sign-ins alike is still the backlog's
           trusted-proxy item.
       - Group-to-role mapping is a separate decision. A directory proves who

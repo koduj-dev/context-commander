@@ -135,7 +135,7 @@ func (n navigation) cookie(name string) *http.Cookie {
 // name is derived from the state.
 func (n navigation) attemptCookie() *http.Cookie {
 	for _, c := range n.cookies {
-		if strings.HasPrefix(c.Name, "cc_oidc_") && c.MaxAge > 0 {
+		if strings.Contains(c.Name, "cc_oidc_") && c.MaxAge > 0 {
 			return c
 		}
 	}
@@ -189,9 +189,15 @@ func beginOIDCResp(t *testing.T, f *fixture, p *fakeOIDC, held ...*http.Cookie) 
 	if c == nil {
 		t.Fatal("start set no cc_oidc_ cookie")
 	}
-	if !c.HttpOnly || c.Path != "/v1/auth/oidc" || c.SameSite != http.SameSiteLaxMode {
-		t.Errorf("attempt cookie: HttpOnly=%v Path=%q SameSite=%v, want HttpOnly, /v1/auth/oidc, Lax",
-			c.HttpOnly, c.Path, c.SameSite)
+	// A __Host- cookie must be Path=/ and Secure; the cleartext name is
+	// scoped to the OIDC endpoints.
+	wantPath, wantSecure := "/v1/auth/oidc", false
+	if strings.HasPrefix(c.Name, "__Host-") {
+		wantPath, wantSecure = "/", true
+	}
+	if !c.HttpOnly || c.Path != wantPath || c.Secure != wantSecure || c.Domain != "" || c.SameSite != http.SameSiteLaxMode {
+		t.Errorf("attempt cookie %s: HttpOnly=%v Path=%q Secure=%v Domain=%q SameSite=%v, want HttpOnly, %s, Secure=%v, no Domain, Lax",
+			c.Name, c.HttpOnly, c.Path, c.Secure, c.Domain, c.SameSite, wantPath, wantSecure)
 	}
 	return c, p.started.State, resp
 }

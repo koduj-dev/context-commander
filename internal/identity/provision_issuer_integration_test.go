@@ -3,7 +3,9 @@ package identity_test
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -93,6 +95,86 @@ func TestProvisionDirectoryUserRecordsAndChecksTheIssuer(t *testing.T) {
 		_, err = identity.ProvisionDirectoryUser(ctx, app, oidcIdentity("sub-legacy", "legacy@example.test", newIssuer))
 		if !errors.Is(err, identity.ErrIssuerMismatch) {
 			t.Fatalf("want ErrIssuerMismatch after adoption, got %v", err)
+		}
+	})
+
+	// Two sign-ins under different issuers both read the legacy NULL; the
+	// one that adopts second must lose, not be signed in under an issuer
+	// the link no longer has.
+	t.Run("a race to adopt a legacy link has one winner", func(t *testing.T) {
+		err := db.WithoutPrincipal(ctx, owner, func(tx pgx.Tx) error {
+			u, err := store.CreateUser(ctx, tx, "raced@example.test", "Raced")
+			if err != nil {
+				return err
+			}
+			return store.LinkDirectoryIdentity(ctx, tx, "oidc", "", "sub-raced", u.ID)
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		bothRead := make(chan struct{})
+		firstAdopted := make(chan struct{})
+		readNull := func(tx pgx.Tx) error {
+			link, err := store.DirectoryLink(ctx, tx, "oidc", "sub-raced")
+			if err == nil && link.Issuer != "" {
+				err = errors.New("the link already had an issuer")
+			}
+			return err
+		}
+		var wg sync.WaitGroup
+		var firstErr, secondErr error
+		ready := make(chan struct{}, 2)
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			firstErr = db.WithoutPrincipal(ctx, app, func(tx pgx.Tx) error {
+				if err := readNull(tx); err != nil {
+					return err
+				}
+				ready <- struct{}{}
+				<-bothRead
+				if err := store.AdoptDirectoryIssuer(ctx, tx, "oidc", "sub-raced", oldIssuer); err != nil {
+					return err
+				}
+				// Adopted but not committed: the second UPDATE starts now
+				// and has to wait on this row's lock.
+				close(firstAdopted)
+				time.Sleep(300 * time.Millisecond)
+				return nil
+			})
+		}()
+		go func() {
+			defer wg.Done()
+			secondErr = db.WithoutPrincipal(ctx, app, func(tx pgx.Tx) error {
+				if err := readNull(tx); err != nil {
+					return err
+				}
+				ready <- struct{}{}
+				<-firstAdopted
+				return store.AdoptDirectoryIssuer(ctx, tx, "oidc", "sub-raced", newIssuer)
+			})
+		}()
+		<-ready
+		<-ready
+		close(bothRead)
+		wg.Wait()
+
+		if firstErr != nil {
+			t.Fatalf("first adoption: %v", firstErr)
+		}
+		if !errors.Is(secondErr, identity.ErrIssuerMismatch) {
+			t.Fatalf("second adoption under another issuer: want ErrIssuerMismatch, got %v", secondErr)
+		}
+		if got := issuerOf("sub-raced"); got != oldIssuer {
+			t.Fatalf("issuer = %q, want the winner's %q", got, oldIssuer)
+		}
+		// The winner's issuer adopting again is a match, not a mismatch.
+		err = db.WithoutPrincipal(ctx, app, func(tx pgx.Tx) error {
+			return store.AdoptDirectoryIssuer(ctx, tx, "oidc", "sub-raced", oldIssuer)
+		})
+		if err != nil {
+			t.Fatalf("re-adopting the same issuer: %v", err)
 		}
 	})
 

@@ -658,17 +658,26 @@ func (s *Store) DirectoryLink(ctx context.Context, tx pgx.Tx, provider, subject 
 }
 
 // AdoptDirectoryIssuer records an issuer on a link that has none — an OIDC
-// link made before migrations/000034. Never overwrites one that is set: the
-// WHERE clause is the guard, so a race between two first sign-ins cannot
-// re-point a recorded issuer either.
+// link made before migrations/000034 — and confirms the link now carries
+// this issuer.
+//
+// The caller read NULL, but so may a concurrent sign-in under a different
+// issuer (an issuer change rolling across replicas). The row lock settles
+// it: the second UPDATE waits for the first, then re-evaluates its WHERE
+// against the committed row, matches nothing, and the loser gets
+// ErrIssuerMismatch rather than being signed in under an issuer the link
+// no longer has. A sign-in under the same issuer matches either way.
 func (s *Store) AdoptDirectoryIssuer(ctx context.Context, tx pgx.Tx, provider, subject, issuer string) error {
-	_, err := tx.Exec(ctx,
+	tag, err := tx.Exec(ctx,
 		`UPDATE user_identities SET issuer = $3
-		 WHERE provider = $1 AND subject = $2 AND issuer IS NULL`,
+		 WHERE provider = $1 AND subject = $2 AND (issuer IS NULL OR issuer = $3)`,
 		provider, subject, issuer,
 	)
 	if err != nil {
 		return fmt.Errorf("identity: adopt directory issuer: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrIssuerMismatch
 	}
 	return nil
 }

@@ -72,9 +72,13 @@ All notable changes to Context Commander are documented here. The format follows
 
 ### Security
 
-- **The OIDC attempt cookie is signed.** It uses an HMAC with a key derived
-  from the root key by HKDF, for this purpose only. Each attempt has its own
-  cookie (`cc_oidc_…`), so a second sign-in tab no longer expires the first.
+- **The OIDC attempt cookie is a `__Host-` cookie, and it is signed.** A
+  sibling subdomain can no longer plant an attempt, so it can no longer sign
+  a victim into the attacker's account. This does not apply under
+  `--insecure-allow-cleartext`, where browsers refuse the prefix. The HMAC
+  uses a key derived from the root key by HKDF, for this purpose only. Each
+  attempt has its own cookie (`__Host-cc_oidc_…`), so a second sign-in tab no
+  longer expires the first.
   At most three attempts are kept. A tampered cookie is refused and recorded.
   Attempts in flight during the upgrade must be started again.
 - **The OIDC callback defends against provider mix-up (RFC 9207).** A

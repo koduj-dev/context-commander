@@ -11,9 +11,11 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	cchttp "github.com/koduj-dev/context-commander/adapters/http"
 	"github.com/koduj-dev/context-commander/internal/db"
 	"github.com/koduj-dev/context-commander/internal/directory"
 	"github.com/koduj-dev/context-commander/internal/identity"
+	"github.com/koduj-dev/context-commander/internal/ratelimit"
 )
 
 // The attempt cookie is signed: one edited in the browser, or planted by a
@@ -52,6 +54,47 @@ func TestOIDCCallbackRefusesATamperedAttempt(t *testing.T) {
 	}
 	if n := f.securityEvents("oidc attempt cookie failed its signature check"); n != len(cases) {
 		t.Fatalf("%d tamper events recorded, want %d", n, len(cases))
+	}
+}
+
+// The sibling-subdomain login CSRF: the attacker starts an attempt, signs in
+// at the provider as themselves, and plants their own genuine, correctly
+// signed attempt cookie in the victim's browser. A sibling cannot set a
+// __Host- cookie — the browser enforces that, which no Go test can — so what
+// is tested here is the server's half: with Secure cookies the attempt lives
+// only under the __Host- name, and the same signed value under any name a
+// sibling could set is not read.
+func TestOIDCAttemptCookieCannotBeTransplantedFromASibling(t *testing.T) {
+	p := &fakeOIDC{signup: true, identity: directory.Identity{
+		Provider: "fake", Subject: "sub-attacker", Email: "attacker@example.test", DisplayName: "Attacker",
+	}}
+	f := newFixtureWithDeps(t, boolPtr(true), ratelimit.Limits{}, func(d *cchttp.Deps) {
+		d.OIDC = []directory.RedirectAuthenticator{p}
+		d.OIDCCookieKey = testCookieKey
+		d.SessionCookieSecure = true
+	})
+
+	// The attacker's own attempt; beginOIDC checks it is __Host-, Path=/,
+	// Secure and has no Domain.
+	attempt, state := beginOIDC(t, f, p)
+	if !strings.HasPrefix(attempt.Name, "__Host-cc_oidc_") {
+		t.Fatalf("attempt cookie %q is not __Host- prefixed with Secure cookies on", attempt.Name)
+	}
+
+	planted := &http.Cookie{Name: strings.TrimPrefix(attempt.Name, "__Host-"), Value: attempt.Value} //nolint:gosec // G124: a request cookie in a test
+	resp := f.navigate("/v1/auth/oidc/callback?state="+url.QueryEscape(state)+"&code="+fakeCode, planted)
+	if got := signInError(t, resp); got != "oidc_expired" {
+		t.Fatalf("sign_in_error = %q, want oidc_expired", got)
+	}
+	if resp.cookie("cc_session") != nil {
+		t.Fatal("an attempt cookie a sibling subdomain could set started a session")
+	}
+
+	// The genuine cookie, under its own name, still works: the code is
+	// unspent because the refusal never reached the provider.
+	resp = f.navigate("/v1/auth/oidc/callback?state="+url.QueryEscape(state)+"&code="+fakeCode, attempt)
+	if got := signInError(t, resp); got != "" {
+		t.Fatalf("the genuine attempt failed with %q", got)
 	}
 }
 

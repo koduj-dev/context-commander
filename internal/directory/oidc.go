@@ -380,16 +380,20 @@ func (o *OIDC) discover() (*oauth2.Config, *oidc.IDTokenVerifier, bool, error) {
 		Endpoint:     provider.Endpoint(),
 		Scopes:       o.cfg.Scopes,
 	}
-	// Built by hand rather than with provider.Verifier only so the key set
-	// can be wrapped (keyFetchSet). The same key set, on the same
-	// background context, and the same algorithms provider.Verifier uses.
+	o.verifier = o.newVerifier(ctx, meta)
+	o.requireIss = meta.IssParameterSupported
+	return o.oauth, o.verifier, o.requireIss, nil
+}
+
+// newVerifier is built by hand rather than with provider.Verifier only so the
+// key set can be wrapped (keyFetchSet). The same key set, on the same
+// background context, and the same algorithms provider.Verifier uses.
+func (o *OIDC) newVerifier(ctx context.Context, meta providerMetadata) *oidc.IDTokenVerifier {
 	keys := oidc.NewRemoteKeySet(ctx, meta.JWKSURL)
-	o.verifier = oidc.NewVerifier(o.cfg.IssuerURL, keyFetchSet{inner: keys}, &oidc.Config{
+	return oidc.NewVerifier(o.cfg.IssuerURL, keyFetchSet{inner: keys}, &oidc.Config{
 		ClientID:             o.cfg.ClientID,
 		SupportedSigningAlgs: signingAlgs(meta.SigningAlgs),
 	})
-	o.requireIss = meta.IssParameterSupported
-	return o.oauth, o.verifier, o.requireIss, nil
 }
 
 // providerMetadata is what discovery says beyond the endpoints go-oidc reads
@@ -606,6 +610,11 @@ func (o *OIDC) Exchange(ctx context.Context, cb Callback, req AuthRequest) (Iden
 		Subject:     idToken.Subject,
 		Email:       claims.Email,
 		DisplayName: name,
-		Issuer:      idToken.Issuer,
+		// The configured issuer, not the token's spelling of it: go-oidc
+		// accepts Google's tokens as either https://accounts.google.com or
+		// accounts.google.com, and a link keyed on whichever one a given
+		// token used would read as a different issuer on the next sign-in.
+		// Verification has already established they are the same.
+		Issuer: o.cfg.IssuerURL,
 	}, nil
 }

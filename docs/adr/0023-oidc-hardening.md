@@ -61,13 +61,47 @@ Rejected:
   tenants without it, and is a list rather than a statement about the address
   in `email`.
 
+### Sibling-subdomain login CSRF: a `__Host-` cookie, not the MAC
+
+The finding was that a sibling subdomain able to plant cookies could pair a
+victim's browser with an attempt the attacker controls. The attacker calls
+`/start`, signs in at the provider as themselves, keeps the code unspent, and
+plants the attempt cookie in the victim's browser, then sends the victim to
+the callback. The victim ends up working inside the attacker's account.
+
+**A MAC does not stop this,** and the first version of this ADR said it did
+(corrected in review, PR #19). The planted cookie is the attacker's own
+genuine attempt: its MAC, state, nonce and verifier are all valid.
+
+What stops it is the cookie's name. With Secure cookies, which is every
+deployment except `--insecure-allow-cleartext`, the attempt cookie is
+`__Host-cc_oidc_<…>` with `Path=/`, `Secure` and no `Domain`. Browsers accept
+a `__Host-` cookie only when this exact host sets it over a secure
+connection, so neither a sibling nor a parent domain can set one. A
+plain-named attempt cookie is never read in that mode, because it is exactly
+what a sibling could have planted. `Path=/` is required by the prefix, so the
+cookie is sent with every request to this host. It is HttpOnly, a few hundred
+bytes, and there are at most three of them.
+
+Under `--insecure-allow-cleartext`, browsers refuse `__Host-` cookies. The
+attempt then falls back to a plain `cc_oidc_<…>` cookie scoped to
+`/v1/auth/oidc`, and this defence is absent. That is the same trade the
+session cookie makes in that mode, which exists for loopback development.
+
+What is still not covered: anyone who can set cookies on this exact host, for
+example through script injection into the SPA, is already past this boundary.
+
 ### The attempt cookie is signed, with a key derived from the root key
 
 Each attempt cookie is `payload.mac`, where the MAC is HMAC-SHA256 over the
-cookie's name and payload. The payload now includes the start time, so the
-ten-minute lifetime is enforced by the server and not only by the browser's
-`Max-Age`. A cookie that does not verify is refused before it is parsed, and
-the refusal is recorded as a security event.
+cookie's name and payload. The MAC stops an attempt being forged or edited: a
+verifier the attacker chose, a different provider, a lifetime extended.
+Because the name is covered, it also stops a signed attempt being moved
+under another attempt's name or out of the `__Host-` namespace. The payload
+includes the start time, so the ten-minute lifetime is enforced by the
+server and not only by the browser's `Max-Age`. A cookie that does not
+verify is refused before it is parsed, and the refusal is recorded as a
+security event.
 
 The key is `HKDF-SHA256(root key, info = "context-commander/oidc-attempt-cookie/v1")`
 (`crypto.DeriveKey`). This is the first key derived from the root key. Until
@@ -89,7 +123,8 @@ Rejected:
 
 ### One cookie per attempt
 
-Each attempt has its own cookie, `cc_oidc_<first 8 bytes of SHA-256(state), hex>`.
+Each attempt has its own cookie, `__Host-cc_oidc_<first 8 bytes of SHA-256(state), hex>`
+(without `__Host-` under cleartext).
 A second `/start` no longer overwrites the first. At most three attempts are
 kept, and `/start` drops the oldest beyond that and any that fail to verify.
 The callback clears only its own cookie. If a callback's state matches none of
@@ -158,9 +193,8 @@ The cheap bound is a global one, and it was considered and rejected. Once it
 was exhausted it would either refuse callbacks, which lets anyone lock
 everyone out of OIDC, or skip recording events, which lets anyone silence the
 security log. `internal/security` rules out the second ("off-switch, not
-sampling"). A mismatch now requires an attempt this server signed, so a
-planted cookie can no longer produce one. Anyone can still produce them by
-calling `/start` first. A per-IP bound would cover them and failed password
+sampling"). With Secure cookies a sibling can no longer plant an attempt at
+all, but anyone can still produce mismatches by calling `/start` themselves. A per-IP bound would cover them and failed password
 sign-ins alike, and it waits on the trusted-proxy item in the backlog, as
 before.
 
@@ -179,3 +213,11 @@ before.
 - An attempt cookie from before this change is ignored. Its name no longer
   has the prefix the server looks for, and it expires on its own within ten
   minutes.
+- The issuer stored beside a link is the configured one, not the token's
+  spelling of it. go-oidc accepts Google's tokens as either
+  `https://accounts.google.com` or `accounts.google.com`, and storing the
+  token's form would turn the next sign-in into an issuer mismatch.
+- Two sign-ins racing to adopt a legacy link under different issuers have one
+  winner. The adopting `UPDATE` matches only `NULL` or the same issuer, and
+  the loser, which re-evaluates the row after the winner commits, gets
+  `ErrIssuerMismatch`.
