@@ -46,12 +46,14 @@ codex                               # the tools appear as context_commander.*
 
 The plans board (docs/adr/0022) shows the time spent on each step and, if the
 client sends them, the tokens. A model cannot see its own usage, so the
-tokens come from the client. Claude Code writes every response's usage to the
-session transcript, and
+tokens come from the client. Claude Code writes every response's usage and
+model to the session transcript, and
 [`claude-code-usage-hook.py`](claude-code-usage-hook.py) is a `Stop` hook
-that sends it after every turn. It counts fresh input, output, cache reads
-and cache writes separately, because they are billed differently. For an
-agent, almost all of the input is cache reads.
+that sends it after every turn, per model. It counts fresh input, output,
+cache reads and cache writes separately, because they are billed
+differently. For an agent, almost all of the input is cache reads.
+Subagents count too: the hook reads their transcripts, which Claude Code
+keeps in `<session>/subagents/` beside the session's own.
 
 Install it once per machine:
 
@@ -89,12 +91,79 @@ What to know:
 - **Each turn's report also counts as a heartbeat.** A turn shorter than 15
   minutes keeps the step's tracked time running even if the agent forgets to
   report.
-- **What is not counted yet:**
-  - Subagents' turns, unless they appear in the main transcript.
-  - Which model a token was for. Prices differ by model, so a cost estimate
-    needs that next.
-- **Codex CLI** logs token counts in its session files as well. There is no
-  hook for it here yet.
+- **Nothing is sent twice.** The hook remembers what it sent per session, in
+  `~/.local/state/context-commander/usage/` (or `$XDG_STATE_HOME`). It
+  records tokens as sent even when the server dropped them, so they are never
+  credited to a later step. A state file from the previous version, which
+  had no models, is honoured.
+- **A subagent's tokens arrive with the next `Stop`.** A subagent running in
+  the background may finish after the turn that started it. The hook sends
+  its tokens when the next turn ends.
+
+### Codex CLI
+
+Codex CLI writes each session to a rollout file under
+`~/.codex/sessions/YYYY/MM/DD/`. The file records the model of every turn
+and a running token total after every response.
+[`codex-usage-hook.py`](codex-usage-hook.py) reads it and sends the growth
+per model, with the same never-send-twice state. OpenAI counts cached input
+inside input, so the hook sends input minus cached input as fresh input, and
+the cached part as cache reads.
+
+Install it once per machine:
+
+```bash
+mkdir -p ~/.codex/hooks
+cp deploy/mcp-clients/codex-usage-hook.py ~/.codex/hooks/
+export CC_URL="http://127.0.0.1:8490"   # CC_TOKEN is already set for bearer_token_env_var
+```
+
+Then register it as a `Stop` hook in `~/.codex/hooks.json`. Merge it into an
+existing `hooks.Stop` list if there is one:
+
+```json
+{
+  "hooks": {
+    "Stop": [
+      { "hooks": [ { "type": "command", "command": "python3 ~/.codex/hooks/codex-usage-hook.py", "timeout": 10 } ] }
+    ]
+  }
+}
+```
+
+A Codex version without hooks can run the script as its `notify` program
+instead. Codex passes the event as the last argument, and the script finds
+the rollout by the thread id. Add this line to `~/.codex/config.toml`, at
+the top level, unless a `notify` program is already set:
+
+```toml
+notify = ["python3", "/home/you/.codex/hooks/codex-usage-hook.py"]
+```
+
+Use the same `CC_TOKEN` as the MCP connection (`bearer_token_env_var` in
+[`codex-config.toml`](codex-config.toml)), and have the agent call
+`plan.report`, as for Claude Code.
+
+### Cost estimate
+
+The server can show what the reported tokens would have cost on the API. That
+is how you compare API pricing with a subscription. Give it a price table:
+
+```bash
+cp deploy/usage-prices.example.json /etc/context-commander/usage-prices.json
+# check every price against the vendor's current price list, then
+ccd serve --usage-prices /etc/context-commander/usage-prices.json   # or CC_USAGE_PRICES
+```
+
+The table gives prices per million tokens, for each model and each of the
+four kinds. A key ending in `*` matches every model id that starts with the
+rest. The example's values were copied on the date in the file and are an
+example only. Codex models are left out of it; add them from OpenAI's price
+list. The Plans tab then shows an estimate next to the tokens of each item,
+plan and phase. Models the table does not price show "no price", and their
+tokens are left out of the estimate rather than counted as free. It is an
+estimate, not what was spent. One-hour cache writes are priced as
+five-minute ones.
 
 ## What to expect once connected
 

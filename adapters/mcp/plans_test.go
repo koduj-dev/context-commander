@@ -69,6 +69,25 @@ func TestAnAgentsPlanAndPositionAreVisibleToItsColleagues(t *testing.T) {
 	callTool[map[string]any](t, ctx, a, "plan.report", map[string]any{
 		"project": project, "item_id": plan.Items[0].ID, "activity": "handling quoted fields", "tokens_in": 1200,
 	})
+	callTool[map[string]any](t, ctx, a, "plan.report", map[string]any{
+		"project": project, "item_id": plan.Items[0].ID, "activity": "handling quoted fields", "tokens_in": 300, "model": "claude-opus-5-5",
+	})
+	// Tokens are kept per model; the first report named none.
+	type byModel struct {
+		Items []struct {
+			Effort struct {
+				TokensIn int64 `json:"tokens_in_reported"`
+				ByModel  []struct {
+					Model    string `json:"model"`
+					TokensIn int64  `json:"tokens_in"`
+				} `json:"by_model"`
+			} `json:"effort"`
+		} `json:"items"`
+	}
+	got := callTool[byModel](t, ctx, a, "plan.get", map[string]any{"project": project, "plan_id": plan.ID})
+	if e := got.Items[0].Effort; e.TokensIn != 1500 || fmt.Sprint(e.ByModel) != "[{ 1200} {claude-opus-5-5 300}]" {
+		t.Errorf("effort %+v", e)
+	}
 
 	tokenB := f.newUserWithToken("planner-b@example.test")
 	callTool[addMemberToolResult](t, ctx, a, "project.add_member", map[string]any{

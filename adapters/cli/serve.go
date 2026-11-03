@@ -57,6 +57,7 @@ const (
 	// The NAME of an environment variable, not a credential.
 	oidcClientSecretEnv = "CC_OIDC_CLIENT_SECRET" //nolint:gosec // G101: an env var name
 	storageQuotaEnv     = "CC_STORAGE_QUOTA"
+	usagePricesEnv      = "CC_USAGE_PRICES"
 )
 
 // isLoopbackAddr reports whether an http.Server.Addr binds only to the local
@@ -205,6 +206,22 @@ func newServeCmd() *cobra.Command {
 				slog.Info("storage quota per namespace", "default_bytes", storageQuota)
 			} else {
 				slog.Info("no default storage quota: namespaces are unlimited unless an administrator sets a limit")
+			}
+
+			// A price table turns reported tokens into a cost estimate
+			// (docs/adr/0022). Operator configuration only: a broken file
+			// stops startup rather than estimating from half a table.
+			pricesPath, _ := cmd.Flags().GetString("usage-prices")
+			if pricesPath == "" {
+				pricesPath = os.Getenv(usagePricesEnv)
+			}
+			if pricesPath != "" {
+				prices, err := plans.LoadPrices(pricesPath)
+				if err != nil {
+					return fmt.Errorf("serve: --usage-prices: %w", err)
+				}
+				plansSvc.SetPrices(prices)
+				slog.Info("token cost estimates enabled", "prices", pricesPath, "currency", prices.Currency, "as_of", prices.AsOf)
 			}
 
 			securityLog, _ := cmd.Flags().GetBool("security-log")
@@ -385,6 +402,8 @@ func newServeCmd() *cobra.Command {
 	cmd.Flags().String("log-format", "json", `structured log format: "json" or "text"`)
 	cmd.Flags().String("storage-quota", "",
 		fmt.Sprintf("default storage limit per user or organization, e.g. 10GB or 2GiB (defaults to $%s; empty means no limit — an administrator can still set one per namespace)", storageQuotaEnv))
+	cmd.Flags().String("usage-prices", "",
+		fmt.Sprintf("JSON price table per model, to show what reported tokens would cost on the API as an estimate (defaults to $%s; empty shows tokens without a cost; example: deploy/usage-prices.example.json)", usagePricesEnv))
 	cmd.Flags().Bool("security-log", true,
 		"record failed authentications, denied capabilities and rate-limit refusals to the security_events table "+
 			"(--security-log=false opts out; nothing is recorded and attacks become invisible)")

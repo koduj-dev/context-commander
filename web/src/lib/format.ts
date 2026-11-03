@@ -58,6 +58,20 @@ export function number(value: number, locale: string): string {
 }
 
 /**
+ * An amount of money in an ISO 4217 currency. Below one unit it keeps up to
+ * four decimals: a step that cost a fraction of a cent should not read as
+ * "$0.00", which says "free".
+ */
+export function money(value: number, currency: string, locale: string): string {
+  return new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: Math.abs(value) < 1 ? 4 : 2,
+  }).format(value);
+}
+
+/**
  * A length of time, in the one unit that reads best for its size: "45 min",
  * "3.5 h", "2 days". Not a breakdown ("3 h 27 min") — every figure this
  * formats is a median or a percentile, and precision past the first unit

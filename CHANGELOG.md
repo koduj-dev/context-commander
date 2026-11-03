@@ -60,6 +60,22 @@ All notable changes to Context Commander are documented here. The format follows
   with sections for Entra ID and Google. It includes the Google Workspace
   caveat: the domain check reads the address, not the `hd` claim.
 
+- **Tokens per model, and a cost estimate.** Reported tokens are now kept per
+  model as well as in total (migration 000033), so they can be priced.
+  `POST /v1/me/usage`, `plan.report` and `plan.stop` take an optional
+  `model`; reports without one count as "model not stated". Board and plan
+  responses carry the breakdown (`effort.models` over HTTP, `by_model` over
+  MCP). Give the server a price table with `--usage-prices FILE`
+  (`CC_USAGE_PRICES`) and it adds an estimate of what the tokens would have
+  cost on the API. The Plans tab shows it next to the tokens of each item,
+  plan and phase. A model missing from the table shows "no price", never
+  zero. The table is operator configuration; nothing is built in.
+  `deploy/usage-prices.example.json` is a dated example to check against the
+  vendor's current prices.
+- **Codex CLI usage hook**, `deploy/mcp-clients/codex-usage-hook.py`. It reads
+  the session rollout's `token_count` events and sends the deltas per model.
+  It runs as a Codex `Stop` hook or as the `notify` program.
+
 ### Changed
 
 - **`plan.search` answers `{items, truncated}`** instead of a bare list, in
@@ -73,6 +89,12 @@ All notable changes to Context Commander are documented here. The format follows
   session stayed valid until it expired.
 - `RedirectAuthenticator.Exchange` now takes a `directory.Callback` with the
   code and the `iss` response parameter.
+
+- **The Claude Code usage hook sends the model and counts subagents.** It
+  groups each turn's tokens by the model of each response and reads the
+  subagent transcripts beside the session transcript. Its state file keeps
+  the never-re-send rule across the upgrade: totals sent by the previous
+  version are not sent again.
 
 ### Fixed
 

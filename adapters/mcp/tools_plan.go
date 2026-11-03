@@ -22,13 +22,51 @@ type effortResult struct {
 	TokensOut        int64 `json:"tokens_out_reported,omitempty"`
 	CacheReadTokens  int64 `json:"cache_read_tokens_reported,omitempty"`
 	CacheWriteTokens int64 `json:"cache_write_tokens_reported,omitempty"`
+	// ByModel splits the tokens by the model the client named; "" is
+	// "not stated".
+	ByModel []modelTokensResult `json:"by_model,omitempty"`
+	// CostEstimate is what the tokens would have cost at the operator's
+	// prices, when the server has a price table. Never what was spent.
+	CostEstimate *estimateResult `json:"cost_estimate,omitempty"`
 }
 
-func toEffort(e plans.Effort) effortResult {
-	return effortResult{
+type modelTokensResult struct {
+	Model            string `json:"model"`
+	TokensIn         int64  `json:"tokens_in,omitempty"`
+	TokensOut        int64  `json:"tokens_out,omitempty"`
+	CacheReadTokens  int64  `json:"cache_read_tokens,omitempty"`
+	CacheWriteTokens int64  `json:"cache_write_tokens,omitempty"`
+	// EstimatedCost is absent when the model has no price.
+	EstimatedCost *float64 `json:"estimated_cost,omitempty"`
+}
+
+type estimateResult struct {
+	Currency string  `json:"currency"`
+	AsOf     string  `json:"prices_as_of,omitempty"`
+	Amount   float64 `json:"amount"`
+	// Unpriced are the models whose tokens the amount leaves out.
+	Unpriced []string `json:"unpriced_models,omitempty"`
+}
+
+func toEffort(e plans.Effort, prices *plans.Prices) effortResult {
+	r := effortResult{
 		Seconds: e.Seconds, TokensIn: e.TokensIn, TokensOut: e.TokensOut,
 		CacheReadTokens: e.CacheReadTokens, CacheWriteTokens: e.CacheWriteTokens,
 	}
+	for _, m := range e.Models {
+		mr := modelTokensResult{
+			Model: m.Model, TokensIn: m.TokensIn, TokensOut: m.TokensOut,
+			CacheReadTokens: m.CacheReadTokens, CacheWriteTokens: m.CacheWriteTokens,
+		}
+		if cost, ok := prices.Cost(m); ok {
+			mr.EstimatedCost = &cost
+		}
+		r.ByModel = append(r.ByModel, mr)
+	}
+	if est := prices.Estimate(e); est != nil {
+		r.CostEstimate = &estimateResult{Currency: est.Currency, AsOf: est.AsOf, Amount: est.Amount, Unpriced: est.Unpriced}
+	}
+	return r
 }
 
 type itemResult struct {
@@ -56,10 +94,10 @@ type planResult struct {
 	Items   []itemResult `json:"items"`
 }
 
-func toItem(it plans.Item, principalID uuid.UUID) itemResult {
+func toItem(it plans.Item, principalID uuid.UUID, prices *plans.Prices) itemResult {
 	r := itemResult{
 		ID: it.ID.String(), Position: it.Position, Kind: it.Kind, Status: it.Status,
-		Text: it.Text, Note: it.Note, Effort: toEffort(it.Effort),
+		Text: it.Text, Note: it.Note, Effort: toEffort(it.Effort, prices),
 	}
 	if it.Assignee != nil {
 		r.Assignee = it.Assignee.String()
@@ -71,13 +109,13 @@ func toItem(it plans.Item, principalID uuid.UUID) itemResult {
 	return r
 }
 
-func toPlan(p plans.Plan, principalID uuid.UUID) planResult {
+func toPlan(p plans.Plan, principalID uuid.UUID, prices *plans.Prices) planResult {
 	r := planResult{ID: p.ID.String(), Status: p.Status, Version: p.Version, Title: p.Title, Body: p.Body, Items: []itemResult{}}
 	if p.PhaseID != nil {
 		r.PhaseID = p.PhaseID.String()
 	}
 	for _, it := range p.Items {
-		r.Items = append(r.Items, toItem(it, principalID))
+		r.Items = append(r.Items, toItem(it, principalID, prices))
 	}
 	return r
 }
@@ -162,12 +200,12 @@ type boardResult struct {
 	Presence   []presenceResult    `json:"presence"`
 }
 
-func toBoard(b plans.Board, clientID uuid.UUID) boardResult {
+func toBoard(b plans.Board, clientID uuid.UUID, prices *plans.Prices) boardResult {
 	out := boardResult{Phases: []phaseResult{}, Plans: []planSummaryResult{}, InProgress: []activeItemResult{}, Blocked: []activeItemResult{}, Presence: []presenceResult{}}
 	for _, ph := range b.Phases {
 		out.Phases = append(out.Phases, phaseResult{
 			ID: ph.ID.String(), Position: ph.Position, Status: ph.Status, Title: ph.Title, Goal: ph.Goal,
-			Counts: toCounts(ph.Counts), Effort: toEffort(ph.Effort),
+			Counts: toCounts(ph.Counts), Effort: toEffort(ph.Effort, prices),
 		})
 	}
 	for _, p := range b.Plans {
@@ -245,7 +283,7 @@ func registerPlanTools(server *sdkmcp.Server, deps Deps, principalID, clientID u
 		if err != nil {
 			return nil, boardResult{}, err
 		}
-		return nil, toBoard(b, clientID), nil
+		return nil, toBoard(b, clientID, deps.Plans.Prices()), nil
 	})
 
 	type newItem struct {
@@ -284,7 +322,7 @@ func registerPlanTools(server *sdkmcp.Server, deps Deps, principalID, clientID u
 		if err != nil {
 			return nil, planResult{}, err
 		}
-		return nil, toPlan(p, principalID), nil
+		return nil, toPlan(p, principalID, deps.Plans.Prices()), nil
 	})
 
 	type planArgs struct {
@@ -307,7 +345,7 @@ func registerPlanTools(server *sdkmcp.Server, deps Deps, principalID, clientID u
 		if err != nil {
 			return nil, planResult{}, err
 		}
-		return nil, toPlan(p, principalID), nil
+		return nil, toPlan(p, principalID, deps.Plans.Prices()), nil
 	})
 
 	type addArgs struct {
@@ -331,7 +369,7 @@ func registerPlanTools(server *sdkmcp.Server, deps Deps, principalID, clientID u
 		if err != nil {
 			return nil, planResult{}, err
 		}
-		return nil, toPlan(p, principalID), nil
+		return nil, toPlan(p, principalID, deps.Plans.Prices()), nil
 	})
 
 	type updateItemArgs struct {
@@ -377,7 +415,7 @@ func registerPlanTools(server *sdkmcp.Server, deps Deps, principalID, clientID u
 		if err != nil {
 			return nil, itemResult{}, err
 		}
-		return nil, toItem(it, principalID), nil
+		return nil, toItem(it, principalID, deps.Plans.Prices()), nil
 	})
 
 	type updatePlanArgs struct {
@@ -415,7 +453,7 @@ func registerPlanTools(server *sdkmcp.Server, deps Deps, principalID, clientID u
 		if err != nil {
 			return nil, planResult{}, err
 		}
-		return nil, toPlan(p, principalID), nil
+		return nil, toPlan(p, principalID, deps.Plans.Prices()), nil
 	})
 
 	type searchArgs struct {
@@ -492,6 +530,7 @@ func registerPlanTools(server *sdkmcp.Server, deps Deps, principalID, clientID u
 		Activity  string `json:"activity,omitempty" jsonschema:"one line: what you are doing right now"`
 		TokensIn  int64  `json:"tokens_in,omitempty" jsonschema:"input tokens used since your previous report, if your client can tell you; never estimate"`
 		TokensOut int64  `json:"tokens_out,omitempty" jsonschema:"output tokens used since your previous report, if your client can tell you; never estimate"`
+		Model     string `json:"model,omitempty" jsonschema:"the model id the tokens were for, e.g. claude-opus-5-5, if you report tokens; letters, digits and . _ - : / @ +"`
 	}
 	type reportResult struct {
 		Since    string `json:"since"`
@@ -520,7 +559,7 @@ func registerPlanTools(server *sdkmcp.Server, deps Deps, principalID, clientID u
 		}
 		p, err := deps.Plans.Report(ctx, principalID, &clientID, projectID, plans.Report{
 			PlanID: planID, ItemID: itemID, Activity: args.Activity,
-			Usage: plans.Effort{TokensIn: args.TokensIn, TokensOut: args.TokensOut},
+			Usage: plans.Tokens{Model: args.Model, TokensIn: args.TokensIn, TokensOut: args.TokensOut},
 		})
 		if err != nil {
 			return nil, reportResult{}, err
@@ -532,6 +571,7 @@ func registerPlanTools(server *sdkmcp.Server, deps Deps, principalID, clientID u
 		Project   string `json:"project" jsonschema:"project path \"namespace/slug\""`
 		TokensIn  int64  `json:"tokens_in,omitempty" jsonschema:"input tokens used since your previous report, if known"`
 		TokensOut int64  `json:"tokens_out,omitempty" jsonschema:"output tokens used since your previous report, if known"`
+		Model     string `json:"model,omitempty" jsonschema:"the model id the tokens were for, if you report tokens"`
 	}
 	type stopResult struct {
 		Stopped bool `json:"stopped"`
@@ -544,7 +584,7 @@ func registerPlanTools(server *sdkmcp.Server, deps Deps, principalID, clientID u
 		if err != nil {
 			return nil, stopResult{}, err
 		}
-		if err := deps.Plans.ClearPresence(ctx, principalID, &clientID, projectID, plans.Effort{TokensIn: args.TokensIn, TokensOut: args.TokensOut}); err != nil {
+		if err := deps.Plans.ClearPresence(ctx, principalID, &clientID, projectID, plans.Tokens{Model: args.Model, TokensIn: args.TokensIn, TokensOut: args.TokensOut}); err != nil {
 			return nil, stopResult{}, err
 		}
 		return nil, stopResult{Stopped: true}, nil

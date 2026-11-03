@@ -646,6 +646,27 @@ export type Effort = {
   /** Billed apart from fresh input: reading the cache is cheaper, writing dearer. */
   cache_read_tokens: number;
   cache_write_tokens: number;
+  /** The same four counts by model; "" is "not stated". Adds up to the totals. */
+  models?: ModelTokens[];
+  /** Absent when the server has no price table or nothing to price. */
+  cost_estimate?: CostEstimate;
+};
+export type ModelTokens = {
+  model: string;
+  tokens_in: number;
+  tokens_out: number;
+  cache_read_tokens: number;
+  cache_write_tokens: number;
+  /** null: this model has no price in the operator's table — not zero. */
+  estimated_cost: number | null;
+};
+/** What the tokens would have cost at the operator's prices. Never "spent". */
+export type CostEstimate = {
+  currency: string;
+  prices_as_of?: string;
+  amount: number;
+  /** Models whose tokens `amount` leaves out. */
+  unpriced_models: string[];
 };
 export type Counts = {
   open: number;

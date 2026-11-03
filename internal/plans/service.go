@@ -27,6 +27,9 @@ type Service struct {
 	authz  *auth.AuthzService
 	// now is replaceable so a test can move time without sleeping.
 	now func() time.Time
+	// prices estimates what tokens would have cost; nil when the operator
+	// configured none (prices.go).
+	prices *Prices
 }
 
 func NewService(pool *db.Pool, cryptoProvider *crypto.Provider, authz *auth.AuthzService) *Service {
@@ -395,7 +398,8 @@ func (s *Service) loadPlan(ctx context.Context, tx pgx.Tx, projectID, planID uui
 	return p, blob, nil
 }
 
-// loadItems reads item metadata with each item's total effort. where is a
+// loadItems reads item metadata with each item's total effort and its
+// per-model breakdown. where is a
 // fixed clause from this package, never caller input.
 func loadItems(ctx context.Context, tx pgx.Tx, where string, args ...any) ([]Item, error) {
 	rows, err := tx.Query(ctx,
@@ -419,6 +423,37 @@ func loadItems(ctx context.Context, tx pgx.Tx, where string, args ...any) ([]Ite
 			return nil, err
 		}
 		out = append(out, it)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	// The per-model breakdown, read after the items are closed: pgx allows
+	// one open query per transaction. Same where clause, so the same items.
+	rows, err = tx.Query(ctx,
+		`SELECT m.item_id, m.model, sum(m.tokens_in)::bigint, sum(m.tokens_out)::bigint,
+		        sum(m.cache_read_tokens)::bigint, sum(m.cache_write_tokens)::bigint
+		 FROM plan_item_effort_models m
+		 JOIN plan_items i ON i.id = m.item_id
+		 `+where+` GROUP BY m.item_id, m.model`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	index := make(map[uuid.UUID]int, len(out))
+	for i, it := range out {
+		index[it.ID] = i
+	}
+	for rows.Next() {
+		var id uuid.UUID
+		var t Tokens
+		if err := rows.Scan(&id, &t.Model, &t.TokensIn, &t.TokensOut, &t.CacheReadTokens, &t.CacheWriteTokens); err != nil {
+			return nil, err
+		}
+		if i, ok := index[id]; ok {
+			out[i].Effort.addModel(t)
+		}
 	}
 	return out, rows.Err()
 }
