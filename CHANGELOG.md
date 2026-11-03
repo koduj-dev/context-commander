@@ -43,7 +43,6 @@ All notable changes to Context Commander are documented here. The format follows
   ships the pages as `ccd-man.tar.gz`, covered by the signed `SHA256SUMS`.
   The Homebrew formula installs them, so `man ccd` works there as it does
   with the packages.
-
 - **Plan search across projects.** `GET /v1/me/plans/search?q=`, and
   `plan.search` called without a `project`, search the plans of every project
   you can read plans in and name the project of each hit. The quick finder
@@ -59,7 +58,6 @@ All notable changes to Context Commander are documented here. The format follows
 - **[docs/oidc.md](docs/oidc.md)** explains how to configure single sign-on,
   with sections for Entra ID and Google. It includes the Google Workspace
   caveat: the domain check reads the address, not the `hd` claim.
-
 - **Tokens per model, and a cost estimate.** Reported tokens are now kept per
   model as well as in total (migration 000035), so they can be priced.
   `POST /v1/me/usage`, `plan.report` and `plan.stop` take an optional
@@ -75,6 +73,25 @@ All notable changes to Context Commander are documented here. The format follows
 - **Codex CLI usage hook**, `deploy/mcp-clients/codex-usage-hook.py`. It reads
   the session rollout's `token_count` events and sends the deltas per model.
   It runs as a Codex `Stop` hook or as the `notify` program.
+- **Reordering phases and plan steps**
+  ([ADR 0022](docs/adr/0022-plans-phases-and-presence.md#reordering-2026-11-03)).
+  A phase moves within its project and a step within its plan: `position`
+  (1 is first, past the end is last) on `PATCH …/phases/{id}` and
+  `PATCH …/plans/items/{id}`, and on the MCP `phase.update` and
+  `plan.update_item` tools. The Plans tab has move up / move down buttons on
+  every phase and step. Concurrent moves are serialized and leave the order
+  dense; a move alone does not count as an update of the step.
+- **The Plans tab and "Who is working where" update as soon as something
+  changes**
+  ([ADR 0022](docs/adr/0022-plans-phases-and-presence.md#push-instead-of-polling-2026-11-03)).
+  New Server-Sent Events streams, `GET /v1/projects/{ns}/{slug}/plans/events`
+  and `GET /v1/me/presence/events`, say "changed" and nothing else; the screen
+  re-reads through the ordinary endpoint. At most four streams per credential,
+  ten minutes per stream before a reconnect re-authorizes it, a heartbeat
+  every 25 seconds. Where no stream can be opened the screens poll every ten
+  seconds as before. **Behind a reverse proxy, turn response buffering off for
+  these paths** (nginx: `proxy_buffering off`); see
+  [docs/install.md](docs/install.md).
 
 ### Changed
 
@@ -89,7 +106,6 @@ All notable changes to Context Commander are documented here. The format follows
   session stayed valid until it expired.
 - `RedirectAuthenticator.Exchange` now takes a `directory.Callback` with the
   code and the `iss` response parameter.
-
 - **The Claude Code usage hook sends the model and counts subagents.** It
   groups each turn's tokens by the model of each response and reads the
   subagent transcripts beside the session transcript. Its state file keeps
@@ -104,6 +120,8 @@ All notable changes to Context Commander are documented here. The format follows
   of a user id all failed on a foreign key and answered "internal error".
   They are now a 400 (membership bodies) or a 404 (the token path), and
   adding someone who is already a member is a 409.
+- Two phases created at the same moment could get the same position.
+  Creating a phase now takes the same lock as moving one.
 
 ## [0.1.0-beta.1] — 2026-10-27
 

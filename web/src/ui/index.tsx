@@ -183,6 +183,12 @@ type BtnProps = {
   small?: boolean;
   disabled?: boolean;
   title?: string;
+  /**
+   * The accessible name, for a button whose visible content is a glyph: a
+   * screen reader would otherwise announce "up arrow" and nothing about what
+   * moves.
+   */
+  label?: string;
   onClick?: () => void;
   type?: "button" | "submit";
 };
@@ -193,12 +199,20 @@ export function Btn({
   small,
   disabled,
   title,
+  label,
   onClick,
   type = "button",
 }: BtnProps) {
   const cls = ["btn", kind && `btn-${kind}`, small && "btn-sm"].filter(Boolean).join(" ");
   return (
-    <button className={cls} disabled={disabled} title={title} onClick={onClick} type={type}>
+    <button
+      className={cls}
+      disabled={disabled}
+      title={title}
+      aria-label={label}
+      onClick={onClick}
+      type={type}
+    >
       {children}
     </button>
   );

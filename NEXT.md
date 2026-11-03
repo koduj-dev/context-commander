@@ -261,9 +261,8 @@ Only on top of a core loop people actually use:
       plans → items (task / check), live presence with tracked time and
       reported tokens, the MCP `plan.*` tools, the `context.bootstrap` work
       section, the project's Plans tab and "Who is working where" on the
-      dashboard. Raised by the maintainer's colleagues. Still open:
-      - **Reordering.** Phases and items keep their creation order; nothing
-        moves them yet.
+      dashboard. Raised by the maintainer's colleagues. Reordering and push
+      updates followed on 2026-11-03 (same ADR). Still open:
       - **Tokens come from clients.** Claude Code and Codex CLI have hooks
         (`deploy/mcp-clients/claude-code-usage-hook.py`,
         `codex-usage-hook.py`). Since 2026-11-03 they send the model per
@@ -275,8 +274,11 @@ Only on top of a core loop people actually use:
         priced as five-minute ones (Claude Code's transcripts split them,
         the counts do not), and whether Codex fires `Stop` for its subagents
         has not been checked against a real session.
-      - **Live updates are polling** every 10 s. Push comes with Phase 2's
-        subscriptions.
+      - **Board streams are in process.** Fine for the one `ccd` per
+        installation that is supported; a second process would need
+        `internal/plans/changes.go` on Postgres LISTEN/NOTIFY. Agents still
+        have no push (Phase 2's subscriptions); the streams serve the
+        interface.
       - [x] ~~**Search is per project.**~~ Closed 2026-11-03:
         `GET /v1/me/plans/search`, `plan.search` without a project and the
         quick finder search every project the caller can read plans in,

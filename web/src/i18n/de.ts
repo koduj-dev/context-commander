@@ -784,6 +784,7 @@ export const de: Partial<Record<MessageKey, string>> = {
     "Die letzte Aktualisierung ist fehlgeschlagen. Das Angezeigte ist vielleicht veraltet; es wird selbst erneut versucht.",
   "plans.workingNow": "Gerade aktiv",
   "plans.refreshes": "Aktualisiert sich alle 10 Sekunden",
+  "plans.live": "Aktualisiert sich, sobald sich etwas ändert",
   "plans.blockedTitle":
     "{count, plural, one {# blockierter Schritt} other {# blockierte Schritte}}",
   "plans.nobody": "niemand",
@@ -809,6 +810,7 @@ export const de: Partial<Record<MessageKey, string>> = {
   "plans.noPhasesBody":
     "Eine Phase ist ein Arbeitsabschnitt — „Migration“, „Release 1.2“. Pläne können auch außerhalb einer Phase stehen.",
   "plans.column.phase": "Phase",
+  "plans.column.order": "Reihenfolge",
   "plans.column.progress": "Fortschritt",
   "plans.column.effort": "Aufwand",
   "plans.column.status": "Status",
@@ -844,6 +846,8 @@ export const de: Partial<Record<MessageKey, string>> = {
   "plans.check": "Prüfung",
   "plans.task": "Aufgabe",
   "plans.statusFor": "Status von {item}",
+  "plans.moveUp": "„{name}“ nach oben verschieben",
+  "plans.moveDown": "„{name}“ nach unten verschieben",
   "plans.workOnThis": "Daran arbeiten",
   "plans.workOnThisHelp":
     "Diesen Schritt auf „In Arbeit“ setzen und Sie unter „Gerade aktiv“ daran zeigen",

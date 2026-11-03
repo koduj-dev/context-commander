@@ -379,11 +379,13 @@ func registerPlanTools(server *sdkmcp.Server, deps Deps, principalID, clientID u
 		Note     *string `json:"note,omitempty" jsonschema:"replace the item's note — why it is blocked, what was found"`
 		Text     *string `json:"text,omitempty" jsonschema:"replace the item's text"`
 		Assignee string  `json:"assignee,omitempty" jsonschema:"\"me\", \"none\", or a member's principal ID; omitted leaves it, and in_progress on an unassigned item assigns it to you"`
+		Position *int    `json:"position,omitempty" jsonschema:"move the step to this place in its plan: 1 is first, past the end is last"`
 	}
 	sdkmcp.AddTool(server, &sdkmcp.Tool{
 		Name: "plan.update_item",
 		Description: "Mark a step's progress: in_progress when you start it, done when it is finished, blocked with a " +
-			"note saying why. Only real status changes are recorded, so ticking an item twice costs nothing.",
+			"note saying why. Only real status changes are recorded, so ticking an item twice costs nothing. " +
+			"position moves the step within its plan.",
 	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, args updateItemArgs) (*sdkmcp.CallToolResult, itemResult, error) {
 		projectID, err := resolve(ctx, args.Project)
 		if err != nil {
@@ -393,7 +395,7 @@ func registerPlanTools(server *sdkmcp.Server, deps Deps, principalID, clientID u
 		if err != nil {
 			return nil, itemResult{}, err
 		}
-		u := plans.ItemUpdate{Note: args.Note, Text: args.Text}
+		u := plans.ItemUpdate{Note: args.Note, Text: args.Text, Position: args.Position}
 		if args.Status != "" {
 			u.Status = &args.Status
 		}
@@ -611,15 +613,16 @@ func registerPlanTools(server *sdkmcp.Server, deps Deps, principalID, clientID u
 	})
 
 	type phaseUpdateArgs struct {
-		Project string  `json:"project" jsonschema:"project path \"namespace/slug\""`
-		PhaseID string  `json:"phase_id" jsonschema:"phase ID"`
-		Status  string  `json:"status,omitempty" jsonschema:"planned, active or done"`
-		Title   *string `json:"title,omitempty" jsonschema:"replace the title"`
-		Goal    *string `json:"goal,omitempty" jsonschema:"replace the goal"`
+		Project  string  `json:"project" jsonschema:"project path \"namespace/slug\""`
+		PhaseID  string  `json:"phase_id" jsonschema:"phase ID"`
+		Status   string  `json:"status,omitempty" jsonschema:"planned, active or done"`
+		Title    *string `json:"title,omitempty" jsonschema:"replace the title"`
+		Goal     *string `json:"goal,omitempty" jsonschema:"replace the goal"`
+		Position *int    `json:"position,omitempty" jsonschema:"move the phase to this place in the project: 1 is first, past the end is last"`
 	}
 	sdkmcp.AddTool(server, &sdkmcp.Tool{
 		Name:        "phase.update",
-		Description: "Change a phase's status, title or goal.",
+		Description: "Change a phase's status, title or goal, or move it to another place in the project's order.",
 	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, args phaseUpdateArgs) (*sdkmcp.CallToolResult, phaseResult, error) {
 		projectID, err := resolve(ctx, args.Project)
 		if err != nil {
@@ -629,7 +632,7 @@ func registerPlanTools(server *sdkmcp.Server, deps Deps, principalID, clientID u
 		if err != nil {
 			return nil, phaseResult{}, err
 		}
-		u := plans.PhaseUpdate{Title: args.Title, Goal: args.Goal}
+		u := plans.PhaseUpdate{Title: args.Title, Goal: args.Goal, Position: args.Position}
 		if args.Status != "" {
 			u.Status = &args.Status
 		}

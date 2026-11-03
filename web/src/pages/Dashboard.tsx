@@ -5,8 +5,9 @@ import { useAuth } from "../app/auth";
 import { useFormat } from "../app/prefs";
 import { api, principalName, type MyProject, type WaitingHandoff } from "../lib/api";
 import { roleLabel } from "../lib/labels";
+import { useLive } from "../lib/live";
 import { usePolled, useResource } from "../lib/resource";
-import { BOARD_REFRESH_MS, PresenceTable } from "./ProjectPlans";
+import { BOARD_REFRESH_MS, LIVE_REFRESH_MS, PresenceTable } from "./ProjectPlans";
 import {
   Badge,
   Cell,
@@ -170,14 +171,24 @@ export function Dashboard() {
 
 /**
  * Who is working where, across every project the reader is in — the panel
- * for checking on an agent left running at home. Refreshes itself while
- * visible (docs/adr/0022).
+ * for checking on an agent left running at home. Re-reads when the server
+ * says someone moved, and polls while visible when it cannot (docs/adr/0022).
  */
 function WorkingNow() {
   const t = useT();
-  const presence = usePolled(() => api.myPresence(), [], BOARD_REFRESH_MS);
+  const live = useLive(api.myPresenceEvents());
+  const presence = usePolled(
+    () => api.myPresence(),
+    [],
+    live.live ? LIVE_REFRESH_MS : BOARD_REFRESH_MS,
+    live.pulse,
+  );
   return (
-    <Panel title={t("dashboard.workingNow")} sub={t("plans.refreshes")} tight>
+    <Panel
+      title={t("dashboard.workingNow")}
+      sub={live.live ? t("plans.live") : t("plans.refreshes")}
+      tight
+    >
       {presence.loading ? (
         <Loading />
       ) : presence.error || !presence.data ? (

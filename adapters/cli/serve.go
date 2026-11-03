@@ -364,6 +364,10 @@ func newServeCmd() *cobra.Command {
 				WriteTimeout:      60 * time.Second,
 				IdleTimeout:       120 * time.Second,
 			}
+			// Board streams (docs/adr/0022) would hold Shutdown until its
+			// deadline: it waits for handlers, and a stream's handler only
+			// returns when told to.
+			server.RegisterOnShutdown(plansSvc.CloseStreams)
 
 			serverErr := make(chan error, 1)
 			scheme := "http"

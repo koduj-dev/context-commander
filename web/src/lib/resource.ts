@@ -157,7 +157,11 @@ export function useDebounced<T>(value: T, ms = 250): T {
 
 /**
  * A read that keeps itself current: loaded once, then again every
- * `intervalMs` while the page is visible.
+ * `intervalMs` while the page is visible, and whenever `pulse` changes.
+ *
+ * `pulse` is how a push channel (lib/live.ts) says "re-read now". The
+ * interval may change while mounted — slower while a stream is live, the
+ * ten seconds it always was when it is not — without reloading.
  *
  * A refresh never goes back to "loading" — the rows on screen stay put while
  * the next answer is in flight, or a board someone is watching would blink
@@ -170,6 +174,7 @@ export function usePolled<T>(
   load: () => Promise<T>,
   deps: unknown[],
   intervalMs: number,
+  pulse = 0,
 ): Polled<T> {
   const [data, setData] = useState<T>();
   const [error, setError] = useState<unknown>();
@@ -207,15 +212,21 @@ export function usePolled<T>(
         });
     };
     refresh.current = fetchOnce;
-
     fetchOnce();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps);
+
+  useEffect(() => {
     const timer = setInterval(() => {
       if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
-      fetchOnce();
+      refresh.current();
     }, intervalMs);
     return () => clearInterval(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [...deps, intervalMs]);
+  }, [intervalMs]);
+
+  useEffect(() => {
+    if (pulse > 0) refresh.current();
+  }, [pulse]);
 
   const reload = useCallback(() => refresh.current(), []);
   return { data, error, loading, reload, stale };

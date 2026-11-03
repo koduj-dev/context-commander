@@ -770,6 +770,8 @@ export type ItemChange = {
   note?: string;
   /** null unassigns; absent leaves the assignee alone. */
   assignee?: string | null;
+  /** Moves the item to this 1-based place in its plan; past the end is last. */
+  position?: number;
 };
 
 /**
@@ -1017,7 +1019,7 @@ export const api = {
     ns: string,
     slug: string,
     id: string,
-    change: { status?: PhaseStatus; title?: string; goal?: string },
+    change: { status?: PhaseStatus; title?: string; goal?: string; position?: number },
   ) => request<Phase>(`${project(ns, slug)}/phases/${id}`, { method: "PATCH", body: change }),
   deletePhase: (ns: string, slug: string, id: string) =>
     request<void>(`${project(ns, slug)}/phases/${id}`, { method: "DELETE" }),
@@ -1034,6 +1036,10 @@ export const api = {
   /** Plan search across every project the caller can read plans in. */
   searchMyPlans: (q: string) =>
     request<{ items: MyPlanHit[]; truncated: boolean }>(withQuery("/me/plans/search", { q })),
+  // Server-Sent Events paths, for lib/live.ts. Each stream says only "the
+  // board changed"; the reader re-reads it with the calls above.
+  planBoardEvents: (ns: string, slug: string) => `${project(ns, slug)}/plans/events`,
+  myPresenceEvents: () => "/me/presence/events",
 
   gateBindings: (ns: string, slug: string) =>
     request<GateBinding[]>(`${project(ns, slug)}/gates/bindings`),

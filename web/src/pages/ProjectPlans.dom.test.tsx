@@ -129,7 +129,13 @@ const PLAN = {
 
 type Call = { url: string; method: string; body?: string };
 
-function stub(calls: Call[]) {
+type StubOptions = {
+  /** The board's event stream; absent, it is refused as a server without one would. */
+  events?: () => ReadableStream<Uint8Array>;
+  plan?: typeof PLAN;
+};
+
+function stub(calls: Call[], opts: StubOptions = {}) {
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string, init?: RequestInit) => {
@@ -154,8 +160,14 @@ function stub(calls: Call[]) {
           visibility: "private",
         });
       }
+      if (url.endsWith("/plans/events") && opts.events) {
+        return new Response(opts.events(), {
+          status: 200,
+          headers: { "Content-Type": "text/event-stream" },
+        });
+      }
       if (url.endsWith("/plans/board")) return json(BOARD);
-      if (url.endsWith("/plans/plan-1")) return json(PLAN);
+      if (url.endsWith("/plans/plan-1")) return json(opts.plan ?? PLAN);
       // Abandoned, so not on the board; reachable by id only.
       if (url.endsWith("/plans/plan-old"))
         return json({
@@ -165,6 +177,7 @@ function stub(calls: Call[]) {
           title: "Old approach",
           items: [{ ...PLAN.items[0], id: "it-old", plan_id: "plan-old", text: "Try the cache" }],
         });
+      if (url.includes("/phases/") && method === "PATCH") return json(BOARD.phases[0]);
       if (url.includes("/plans/items/") && method === "PATCH")
         return json({ ...PLAN.items[0], status: "in_progress" });
       if (url.endsWith("/plans/presence") && method === "POST") return json(BOARD.presence[0]);
@@ -272,6 +285,86 @@ describe("a link from search", () => {
     const step = await waitFor(() => screen.getByText("Try the cache"));
     expect(step.closest("tr")!.getAttribute("aria-current")).toBe("true");
     expect(calls.some((c) => c.url.endsWith("/plans/plan-old"))).toBe(true);
+  });
+});
+
+/** A stream the test writes Server-Sent Events frames into. */
+function eventStream() {
+  let push: (frame: string) => void = () => {};
+  const encoder = new TextEncoder();
+  const open = () =>
+    new ReadableStream<Uint8Array>({
+      start(controller) {
+        push = (frame) => controller.enqueue(encoder.encode(frame));
+      },
+    });
+  return { open, push: (frame: string) => push(frame) };
+}
+
+describe("the board, live", () => {
+  it("re-reads when the stream says it changed, and says it is live", async () => {
+    const calls: Call[] = [];
+    const events = eventStream();
+    stub(calls, { events: events.open });
+    render(wrap());
+    const boardReads = () => calls.filter((c) => c.url.endsWith("/plans/board")).length;
+
+    await waitFor(() => screen.getByText("Codex at home"));
+    expect(screen.getByText("Refreshes every 10 seconds")).toBeTruthy();
+
+    events.push("retry: 5000\nevent: ready\ndata: {}\n\n");
+    await waitFor(() => screen.getByText("Updates as soon as something changes"));
+    // "ready" re-reads once, to cover what changed before the stream opened.
+    await waitFor(() => expect(boardReads()).toBe(2));
+
+    events.push(": ping\n\n");
+    events.push("event: changed\ndata: {}\n\n");
+    await waitFor(() => expect(boardReads()).toBe(3));
+  });
+
+  it("keeps polling when the server offers no stream", async () => {
+    stub([]);
+    render(wrap());
+    await waitFor(() => screen.getByText("Codex at home"));
+    expect(screen.getByText("Refreshes every 10 seconds")).toBeTruthy();
+  });
+});
+
+describe("reordering", () => {
+  it("moves a step with the keyboard-reachable buttons, by 1-based place", async () => {
+    const calls: Call[] = [];
+    const second = { ...PLAN.items[0], id: "it-2", position: 2, kind: "task", text: "Tag" };
+    stub(calls, { plan: { ...PLAN, items: [PLAN.items[0], second] } });
+    render(wrap());
+
+    fireEvent.click(await waitFor(() => screen.getByText("Open")));
+    const up = await waitFor(() => screen.getByRole("button", { name: "Move “Tag” up" }));
+    expect(
+      (screen.getByRole("button", { name: "Move “Smoke test” up" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+    expect(
+      (screen.getByRole("button", { name: "Move “Tag” down" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+    fireEvent.click(up);
+
+    await waitFor(() =>
+      expect(calls.some((c) => c.method === "PATCH" && c.url.endsWith("/plans/items/it-2"))).toBe(
+        true,
+      ),
+    );
+    const patch = calls.find((c) => c.method === "PATCH" && c.url.endsWith("/plans/items/it-2"))!;
+    expect(JSON.parse(patch.body!)).toEqual({ position: 1 });
+  });
+
+  it("offers no move for the only phase", async () => {
+    stub([]);
+    render(wrap());
+    const up = await waitFor(() => screen.getByRole("button", { name: "Move “Release 1.2” up" }));
+    expect((up as HTMLButtonElement).disabled).toBe(true);
+    expect(
+      (screen.getByRole("button", { name: "Move “Release 1.2” down" }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
   });
 });
 

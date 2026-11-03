@@ -50,6 +50,7 @@ func (s *Service) Report(ctx context.Context, principalID uuid.UUID, clientID *u
 
 	now := s.now()
 	out := Presence{ClientID: *clientID, PrincipalID: principalID, ProjectID: projectID, Activity: r.Activity, LastBeat: now}
+	var prevProject *uuid.UUID
 	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
 		planID := r.PlanID
 		if r.ItemID != nil {
@@ -93,14 +94,18 @@ func (s *Service) Report(ctx context.Context, principalID uuid.UUID, clientID *u
 		if r.Activity != "" {
 			ct, nonce, dek, kv = e.ciphertext, e.nonce, e.wrappedDEK, &e.keyVersion
 		}
-		if _, err := tx.Exec(ctx,
-			`INSERT INTO work_presence (client_id, principal_id, project_id, plan_id, item_id, ciphertext, nonce, wrapped_dek, project_key_version, since, last_beat)
+		// The CTE reads the row as it was before the upsert, which is how a
+		// move between projects learns which board it left.
+		if err := tx.QueryRow(ctx,
+			`WITH prev AS (SELECT project_id FROM work_presence WHERE client_id = $1)
+			 INSERT INTO work_presence (client_id, principal_id, project_id, plan_id, item_id, ciphertext, nonce, wrapped_dek, project_key_version, since, last_beat)
 			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 			 ON CONFLICT (client_id) DO UPDATE SET principal_id = EXCLUDED.principal_id, project_id = EXCLUDED.project_id,
 			   plan_id = EXCLUDED.plan_id, item_id = EXCLUDED.item_id, ciphertext = EXCLUDED.ciphertext, nonce = EXCLUDED.nonce,
 			   wrapped_dek = EXCLUDED.wrapped_dek, project_key_version = EXCLUDED.project_key_version,
-			   since = EXCLUDED.since, last_beat = EXCLUDED.last_beat`,
-			*clientID, principalID, projectID, planID, r.ItemID, ct, nonce, dek, kv, since, now); err != nil {
+			   since = EXCLUDED.since, last_beat = EXCLUDED.last_beat
+			 RETURNING (SELECT project_id FROM prev)`,
+			*clientID, principalID, projectID, planID, r.ItemID, ct, nonce, dek, kv, since, now).Scan(&prevProject); err != nil {
 			return err
 		}
 		_, err = tx.Exec(ctx, `SELECT cc_prune_presence()`)
@@ -108,6 +113,11 @@ func (s *Service) Report(ctx context.Context, principalID uuid.UUID, clientID *u
 	})
 	if err != nil {
 		return Presence{}, fmt.Errorf("plans: report: %w", err)
+	}
+	s.changes.publish(projectID, true)
+	if prevProject != nil && *prevProject != projectID {
+		// It left another board, which changed as much as this one did.
+		s.changes.publish(*prevProject, true)
 	}
 	return out, nil
 }
@@ -220,6 +230,7 @@ func (s *Service) ReportUsage(ctx context.Context, principalID uuid.UUID, client
 	if err != nil {
 		return Presence{}, false, fmt.Errorf("plans: report usage: %w", err)
 	}
+	s.changes.publish(projectID, true)
 	return out, true, nil
 }
 
@@ -253,6 +264,7 @@ func (s *Service) ClearPresence(ctx context.Context, principalID uuid.UUID, clie
 	if err != nil {
 		return fmt.Errorf("plans: clear presence: %w", err)
 	}
+	s.changes.publish(projectID, true)
 	return nil
 }
 

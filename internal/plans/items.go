@@ -62,6 +62,7 @@ func (s *Service) AddItems(ctx context.Context, principalID, projectID, planID u
 	if err != nil {
 		return Plan{}, fmt.Errorf("plans: add items: %w", quota.Translate(err))
 	}
+	s.changes.publish(projectID, false)
 	return p, nil
 }
 
@@ -90,6 +91,9 @@ func (s *Service) UpdateItem(ctx context.Context, principalID uuid.UUID, clientI
 			return Item{}, err
 		}
 	}
+	if u.Position != nil && *u.Position < 1 {
+		return Item{}, invalid("position is 1-based")
+	}
 
 	var out Item
 	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
@@ -100,10 +104,12 @@ func (s *Service) UpdateItem(ctx context.Context, principalID uuid.UUID, clientI
 			}
 			return err
 		}
-		// The plan row is locked only when its text changes: a status tick
-		// must not queue behind someone else's edit of another item.
+		// The plan row is locked only when its text or its order changes: a
+		// status tick must not queue behind someone else's edit of another
+		// item. A move takes it because AddItems does too, and both assign
+		// positions.
 		textChange := u.Text != nil || u.Note != nil
-		p, blob, err := s.loadPlan(ctx, tx, projectID, planID, textChange)
+		p, blob, err := s.loadPlan(ctx, tx, projectID, planID, textChange || u.Position != nil)
 		if err != nil {
 			return err
 		}
@@ -141,6 +147,18 @@ func (s *Service) UpdateItem(ctx context.Context, principalID uuid.UUID, clientI
 			it.Text, it.Note = t.Text, t.Note
 			if err := s.rewritePlan(ctx, tx, &p, blob); err != nil {
 				return err
+			}
+		}
+
+		if u.Position != nil {
+			if it.Position, err = moveItem(ctx, tx, planID, itemID, *u.Position); err != nil {
+				return err
+			}
+			// A move alone is not progress: who touched the item and when
+			// stay as they were, and nothing is assigned.
+			if u.Status == nil && !u.AssigneeSet && !textChange {
+				out = *it
+				return nil
 			}
 		}
 
@@ -183,6 +201,8 @@ func (s *Service) UpdateItem(ctx context.Context, principalID uuid.UUID, clientI
 	if err != nil {
 		return Item{}, fmt.Errorf("plans: update item: %w", quota.Translate(err))
 	}
+	// Presence shows item text, so new text is news there too.
+	s.changes.publish(projectID, u.Text != nil)
 	return out, nil
 }
 

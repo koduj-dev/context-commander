@@ -780,6 +780,7 @@ export const pl: Partial<Record<MessageKey, string>> = {
     "Ostatnie odświeżenie się nie powiodło. Widok może być nieaktualny; ponowi się samo.",
   "plans.workingNow": "Teraz w pracy",
   "plans.refreshes": "Odświeża się co 10 sekund",
+  "plans.live": "Odświeża się, gdy tylko coś się zmieni",
   "plans.blockedTitle":
     "{count, plural, one {# zablokowany krok} few {# zablokowane kroki} many {# zablokowanych kroków} other {# zablokowanego kroku}}",
   "plans.nobody": "nikt",
@@ -806,6 +807,7 @@ export const pl: Partial<Record<MessageKey, string>> = {
   "plans.noPhasesBody":
     "Faza to odcinek pracy — „Migracja”, „Wydanie 1.2”. Plany mogą być poza fazami.",
   "plans.column.phase": "Faza",
+  "plans.column.order": "Kolejność",
   "plans.column.progress": "Postęp",
   "plans.column.effort": "Nakład",
   "plans.column.status": "Status",
@@ -840,6 +842,8 @@ export const pl: Partial<Record<MessageKey, string>> = {
   "plans.check": "Kontrola",
   "plans.task": "Zadanie",
   "plans.statusFor": "Status: {item}",
+  "plans.moveUp": "Przesuń „{name}” w górę",
+  "plans.moveDown": "Przesuń „{name}” w dół",
   "plans.workOnThis": "Pracuję nad tym",
   "plans.workOnThisHelp": "Oznacz ten krok jako w toku i pokaż się przy nim w „Teraz w pracy”",
   "plans.addItems": "Dodaj kroki — jeden na linię",

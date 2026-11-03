@@ -30,7 +30,7 @@ func (s *Service) loadProject(ctx context.Context, tx pgx.Tx, projectID uuid.UUI
 	}
 	rows, err := tx.Query(ctx,
 		`SELECT id, project_id, position, status, version, ciphertext, nonce, wrapped_dek, project_key_version, created_by_principal, created_at, updated_at
-		 FROM phases WHERE project_id = $1 ORDER BY position`, projectID)
+		 FROM phases WHERE project_id = $1 ORDER BY position, id`, projectID)
 	if err != nil {
 		return project{}, err
 	}

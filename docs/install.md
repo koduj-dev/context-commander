@@ -122,6 +122,23 @@ ExecStart=
 ExecStart=/usr/bin/ccd serve --addr 0.0.0.0:8490
 ```
 
+A reverse proxy must not buffer the board streams
+(`/v1/projects/{namespace}/{slug}/plans/events` and `/v1/me/presence/events`,
+Server-Sent Events): a buffered event waits in the proxy until the stream
+ends, and the Plans tab and the dashboard then update only on their slow
+fallback refresh. The server sends `X-Accel-Buffering: no`, which nginx
+honours; to be explicit, or for another proxy, turn buffering off for those
+paths and allow a read timeout above the 25-second heartbeat. For nginx:
+
+```nginx
+location ~ ^/v1/(projects/[^/]+/[^/]+/plans|me/presence)/events$ {
+    proxy_pass http://127.0.0.1:8490;
+    proxy_http_version 1.1;
+    proxy_buffering off;
+    proxy_read_timeout 1h;
+}
+```
+
 Other settings, such as OIDC or LDAP sign-in and the storage quota, are
 listed in `ccd.env` and in `ccd serve --help`.
 Single sign-on through OpenID Connect, including Microsoft Entra ID and

@@ -415,12 +415,14 @@ func (d Deps) updatePlanItem(w http.ResponseWriter, r *http.Request) {
 		Text     *string         `json:"text"`
 		Note     *string         `json:"note"`
 		Assignee json.RawMessage `json:"assignee"`
+		// Position moves the item to this 1-based place in its plan.
+		Position *int `json:"position"`
 	}
 	if err := decodeJSONBody(w, r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_request", "could not decode request body")
 		return
 	}
-	u := plans.ItemUpdate{Status: req.Status, Text: req.Text, Note: req.Note}
+	u := plans.ItemUpdate{Status: req.Status, Text: req.Text, Note: req.Note, Position: req.Position}
 	if len(req.Assignee) > 0 {
 		u.AssigneeSet = true
 		if err := json.Unmarshal(req.Assignee, &u.Assignee); err != nil {
@@ -605,13 +607,15 @@ func (d Deps) updatePhase(w http.ResponseWriter, r *http.Request) {
 		Title  *string `json:"title"`
 		Goal   *string `json:"goal"`
 		Status *string `json:"status"`
+		// Position moves the phase to this 1-based place in the project.
+		Position *int `json:"position"`
 	}
 	if err := decodeJSONBody(w, r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_request", "could not decode request body")
 		return
 	}
 	ph, err := d.Plans.UpdatePhase(r.Context(), principalIDFrom(r.Context()), projectFrom(r.Context()).ID, id,
-		plans.PhaseUpdate{Title: req.Title, Goal: req.Goal, Status: req.Status})
+		plans.PhaseUpdate{Title: req.Title, Goal: req.Goal, Status: req.Status, Position: req.Position})
 	if err != nil {
 		writeDomainError(w, r, err)
 		return
