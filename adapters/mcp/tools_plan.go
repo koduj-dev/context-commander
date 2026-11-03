@@ -432,6 +432,13 @@ func registerPlanTools(server *sdkmcp.Server, deps Deps, principalID, clientID u
 		Text      string `json:"text"`
 		Status    string `json:"status"`
 	}
+	// An object, not a bare array, so a bounded answer can say it was
+	// bounded: an agent that sees ten hits must be able to tell "that is
+	// all" from "that is all the search looked at".
+	type searchResult struct {
+		Items     []searchHit `json:"items"`
+		Truncated bool        `json:"truncated"`
+	}
 	toHit := func(h plans.SearchHit, project string) searchHit {
 		r := searchHit{Project: project, PlanID: h.PlanID.String(), PlanTitle: h.PlanTitle, Text: h.Text, Status: h.Status}
 		if h.ItemID != nil {
@@ -441,35 +448,40 @@ func registerPlanTools(server *sdkmcp.Server, deps Deps, principalID, clientID u
 	}
 	sdkmcp.AddTool(server, &sdkmcp.Tool{
 		Name: "plan.search",
-		Description: "Find plans and steps by their text, or every step in a status. Live plans come first. " +
-			"Without a project it searches every project you can read plans in, and each hit names its project.",
-	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, args searchArgs) (*sdkmcp.CallToolResult, []searchHit, error) {
-		out := []searchHit{}
+		Description: "Find plans and steps by their text, or every step in a status. Live plans come first; at most 100 hits. " +
+			"Without a project it searches every project you can read plans in (at most 50, your newest first), and each hit names its project. " +
+			"`truncated` true means a bound cut the answer and more may exist: search within one project, or narrow the query.",
+	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, args searchArgs) (*sdkmcp.CallToolResult, searchResult, error) {
+		out := searchResult{Items: []searchHit{}}
 		if args.Project == "" {
 			res, err := deps.Plans.SearchAll(ctx, principalID, args.Query, args.Status)
 			if err != nil {
-				return nil, nil, err
+				return nil, searchResult{}, err
 			}
 			paths := map[uuid.UUID]string{}
 			for _, p := range res.Projects {
 				paths[p.ID] = p.Path
 			}
 			for _, h := range res.Hits {
-				out = append(out, toHit(h, paths[h.ProjectID]))
+				out.Items = append(out.Items, toHit(h, paths[h.ProjectID]))
 			}
+			out.Truncated = res.Truncated
 			return nil, out, nil
 		}
 		projectID, err := resolve(ctx, args.Project)
 		if err != nil {
-			return nil, nil, err
+			return nil, searchResult{}, err
 		}
 		hits, err := deps.Plans.Search(ctx, principalID, projectID, args.Query, args.Status)
 		if err != nil {
-			return nil, nil, err
+			return nil, searchResult{}, err
 		}
 		for _, h := range hits {
-			out = append(out, toHit(h, ""))
+			out.Items = append(out.Items, toHit(h, ""))
 		}
+		// One project's search is capped at MaxSearchHits too; a full page
+		// is the only sign that the cap was reached.
+		out.Truncated = len(hits) >= plans.MaxSearchHits
 		return nil, out, nil
 	})
 

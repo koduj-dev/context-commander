@@ -87,13 +87,23 @@ export function QuickFind({ onClose }: { onClose: () => void }) {
       label: h.text,
       hint: h.item_id ? `${h.project} · ${h.plan_title}` : h.project,
       kind: t("find.plan"),
-      to: `/p/${h.project}/plans`,
+      // The plan and step ride along, so the Plans tab can open the one that
+      // was picked rather than leave the reader to find it again.
+      to: `/p/${h.project}/plans?${new URLSearchParams(
+        h.item_id ? { plan: h.plan_id, item: h.item_id } : { plan: h.plan_id },
+      ).toString()}`,
     }));
 
     const screenHits = screens.filter((s) => !q || s.label.toLowerCase().includes(q));
 
     return [...projectHits, ...skillHits, ...planHits, ...screenHits];
   }, [query, projects.data, skills.data, plans.data, screens, t]);
+
+  // Plans are the one source whose answer can be partial or fail on its own;
+  // either is said here rather than folded into "nothing matches", which
+  // would claim a search that did not happen or did not finish.
+  const plansFailed = Boolean(debounced) && plans.error !== undefined;
+  const plansTruncated = Boolean(debounced) && plans.data?.truncated === true;
 
   // A result list that shrank under the cursor must not leave it past the end.
   useEffect(() => setCursor(0), [query]);
@@ -137,25 +147,34 @@ export function QuickFind({ onClose }: { onClose: () => void }) {
         />
 
         <div className="palette-list" role="listbox" aria-label={t("find.open")}>
-          {results.length === 0 ? (
-            <div className="palette-empty">{t("find.nothing")}</div>
-          ) : (
-            results.map((r, i) => (
-              <button
-                key={r.id}
-                type="button"
-                role="option"
-                aria-selected={i === cursor}
-                onMouseEnter={() => setCursor(i)}
-                onClick={() => go(r)}
-              >
-                <span>{r.label}</span>
-                {r.hint && <span className="dim">{r.hint}</span>}
-                <span className="kind">{r.kind}</span>
-              </button>
-            ))
-          )}
+          {results.length === 0
+            ? !plansFailed &&
+              !plansTruncated && <div className="palette-empty">{t("find.nothing")}</div>
+            : results.map((r, i) => (
+                <button
+                  key={r.id}
+                  type="button"
+                  role="option"
+                  aria-selected={i === cursor}
+                  onMouseEnter={() => setCursor(i)}
+                  onClick={() => go(r)}
+                >
+                  <span>{r.label}</span>
+                  {r.hint && <span className="dim">{r.hint}</span>}
+                  <span className="kind">{r.kind}</span>
+                </button>
+              ))}
         </div>
+        {plansFailed && (
+          <div className="palette-empty" role="alert">
+            {t("find.plansFailed")}
+          </div>
+        )}
+        {plansTruncated && (
+          <div className="palette-empty" role="status">
+            {t("find.plansTruncated")}
+          </div>
+        )}
 
         <div className="palette-empty">{t("find.hint", { shortcut: modifierLabel("K") })}</div>
       </div>

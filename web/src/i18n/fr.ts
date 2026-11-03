@@ -37,6 +37,10 @@ export const fr: Partial<Record<MessageKey, string>> = {
   "find.project": "Projet",
   "find.skill": "Skill",
   "find.plan": "Plan",
+  "find.plansTruncated":
+    "La recherche de plans s’est arrêtée avant la fin : des plans peuvent manquer. Ouvrez l’onglet Plans d’un projet pour le parcourir en entier.",
+  "find.plansFailed":
+    "Impossible de rechercher dans les plans. Les autres résultats sont affichés.",
   "find.screen": "Écran",
   "find.nothing": "Aucun résultat",
   "find.hint":
@@ -765,6 +769,7 @@ export const fr: Partial<Record<MessageKey, string>> = {
   "project.tab.plans": "Plans",
   "dashboard.workingNow": "Qui travaille sur quoi",
   "plans.title": "Plans",
+  "plans.linkedPlan": "Ouvert depuis la recherche",
   "plans.lead":
     "Les phases, les plans qu’elles contiennent et qui est sur quelle étape en ce moment — agents comme personnes.",
   "plans.stale":

@@ -132,6 +132,15 @@ function stub(calls: Call[]) {
       }
       if (url.endsWith("/plans/board")) return json(BOARD);
       if (url.endsWith("/plans/plan-1")) return json(PLAN);
+      // Abandoned, so not on the board; reachable by id only.
+      if (url.endsWith("/plans/plan-old"))
+        return json({
+          ...PLAN,
+          id: "plan-old",
+          status: "abandoned",
+          title: "Old approach",
+          items: [{ ...PLAN.items[0], id: "it-old", plan_id: "plan-old", text: "Try the cache" }],
+        });
       if (url.includes("/plans/items/") && method === "PATCH")
         return json({ ...PLAN.items[0], status: "in_progress" });
       if (url.endsWith("/plans/presence") && method === "POST") return json(BOARD.presence[0]);
@@ -140,13 +149,13 @@ function stub(calls: Call[]) {
   );
 }
 
-function wrap() {
+function wrap(entry = "/p/acme/work/plans") {
   return (
     <I18nProvider>
       <PrefsProvider>
         <ThemeProvider>
           <AuthProvider>
-            <MemoryRouter initialEntries={["/p/acme/work/plans"]}>
+            <MemoryRouter initialEntries={[entry]}>
               <CrumbsProvider>
                 <Routes>
                   <Route path="/p/:namespace/:slug" element={<ProjectLayout />}>
@@ -199,6 +208,30 @@ describe("the plans board", () => {
     expect(JSON.parse(report.body!)).toEqual({ item_id: "it-1" });
     // The check is labelled as one.
     expect(screen.getAllByText("Check").length).toBeGreaterThan(0);
+  });
+});
+
+describe("a link from search", () => {
+  it("opens the plan it names and marks the step", async () => {
+    stub([]);
+    render(wrap("/p/acme/work/plans?plan=plan-1&item=it-1"));
+
+    // Open without a click: the detail is already there.
+    const step = await waitFor(() => screen.getByText("Smoke test", { selector: "td *" }));
+    const row = step.closest("tr")!;
+    expect(row.getAttribute("aria-current")).toBe("true");
+    expect(row.className).toContain("active");
+  });
+
+  it("loads a plan the board leaves out by its id", async () => {
+    const calls: Call[] = [];
+    stub(calls);
+    render(wrap("/p/acme/work/plans?plan=plan-old&item=it-old"));
+
+    expect(await waitFor(() => screen.getByText("Opened from search"))).toBeTruthy();
+    const step = await waitFor(() => screen.getByText("Try the cache"));
+    expect(step.closest("tr")!.getAttribute("aria-current")).toBe("true");
+    expect(calls.some((c) => c.url.endsWith("/plans/plan-old"))).toBe(true);
   });
 });
 

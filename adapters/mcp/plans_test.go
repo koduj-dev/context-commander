@@ -2,9 +2,12 @@ package mcp_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	sdkmcp "github.com/modelcontextprotocol/go-sdk/mcp"
+
+	"github.com/koduj-dev/context-commander/internal/plans"
 )
 
 type planToolItem struct {
@@ -157,18 +160,34 @@ func TestPlanSearchWithoutAProjectCoversEveryProjectYouAreIn(t *testing.T) {
 		Project   string `json:"project"`
 		PlanTitle string `json:"plan_title"`
 	}
-	hits := callTool[[]hit](t, ctx, a, "plan.search", map[string]any{"query": "rotate"})
+	type result struct {
+		Items     []hit `json:"items"`
+		Truncated bool  `json:"truncated"`
+	}
+	res := callTool[result](t, ctx, a, "plan.search", map[string]any{"query": "rotate"})
 	projects := map[string]bool{}
-	for _, h := range hits {
+	for _, h := range res.Items {
 		projects[h.Project] = true
 	}
-	if len(hits) != 2 || !projects["searcher-a/one"] || !projects["searcher-a/two"] {
-		t.Errorf("hits across projects: %+v", hits)
+	if len(res.Items) != 2 || !projects["searcher-a/one"] || !projects["searcher-a/two"] || res.Truncated {
+		t.Errorf("hits across projects: %+v", res)
 	}
 
 	// With a project, the search stays in it and names none.
-	hits = callTool[[]hit](t, ctx, a, "plan.search", map[string]any{"project": "searcher-a/one", "query": "rotate"})
-	if len(hits) != 1 || hits[0].Project != "" {
-		t.Errorf("hits in one project: %+v", hits)
+	res = callTool[result](t, ctx, a, "plan.search", map[string]any{"project": "searcher-a/one", "query": "rotate"})
+	if len(res.Items) != 1 || res.Items[0].Project != "" || res.Truncated {
+		t.Errorf("hits in one project: %+v", res)
+	}
+
+	// Past the hit bound, the answer says it was cut rather than passing
+	// a partial list off as the whole one.
+	items := make([]map[string]any, plans.MaxSearchHits+1)
+	for i := range items {
+		items[i] = map[string]any{"text": fmt.Sprintf("rotate step %d", i)}
+	}
+	callTool[planToolResult](t, ctx, a, "plan.create", map[string]any{"project": "searcher-a/one", "title": "Many", "items": items})
+	res = callTool[result](t, ctx, a, "plan.search", map[string]any{"query": "rotate"})
+	if len(res.Items) != plans.MaxSearchHits || !res.Truncated {
+		t.Errorf("over the bound: %d hits, truncated %v", len(res.Items), res.Truncated)
 	}
 }

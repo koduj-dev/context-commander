@@ -30,8 +30,14 @@ All notable changes to Context Commander are documented here. The format follows
 - **Plan search across projects.** `GET /v1/me/plans/search?q=`, and
   `plan.search` called without a `project`, search the plans of every project
   you can read plans in and name the project of each hit. The quick finder
-  (Ctrl/⌘ K) shows them too. It covers at most 50 projects and returns at
+  (Ctrl/⌘ K) shows them too and opens the plan and step that matched, even
+  one the board leaves out. It covers at most 50 projects and returns at
   most 100 hits, and says when either bound cut the answer (ADR 0022).
+
+### Changed
+
+- **`plan.search` answers `{items, truncated}`** instead of a bare list, in
+  both modes, so an agent can tell a complete answer from a bounded one.
 
 ### Fixed
 
