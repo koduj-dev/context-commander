@@ -6,6 +6,23 @@ All notable changes to Context Commander are documented here. The format follows
 
 ## [Unreleased]
 
+### Security
+
+- **The OIDC attempt cookie is a `__Host-` cookie, and it is signed.** A
+  sibling subdomain can no longer plant an attempt, so it can no longer sign
+  a victim into the attacker's account. This does not apply under
+  `--insecure-allow-cleartext`, where browsers refuse the prefix. The HMAC
+  uses a key derived from the root key by HKDF, for this purpose only. Each
+  attempt has its own cookie (`__Host-cc_oidc_…`), so a second sign-in tab no
+  longer expires the first.
+  At most three attempts are kept. A tampered cookie is refused and recorded.
+  Attempts in flight during the upgrade must be started again.
+- **The OIDC callback defends against provider mix-up (RFC 9207).** A
+  response naming another issuer is refused. A response with no `iss` is also
+  refused when the provider advertises the parameter.
+- **An OIDC provider whose signing keys cannot be fetched is reported as
+  unavailable.** It is no longer recorded as a rejected sign-in.
+
 ### Added
 
 - **Install script.** `scripts/install.sh` installs the release binary on
@@ -33,21 +50,6 @@ All notable changes to Context Commander are documented here. The format follows
   (Ctrl/⌘ K) shows them too and opens the plan and step that matched, even
   one the board leaves out. It covers at most 50 projects and returns at
   most 100 hits, and says when either bound cut the answer (ADR 0022).
-
-### Changed
-
-- **`plan.search` answers `{items, truncated}`** instead of a bare list, in
-  both modes, so an agent can tell a complete answer from a bounded one.
-
-### Fixed
-
-- **A wrong id is no longer a 500.** Adding a project member by an agent's
-  own id instead of its `principal_id`, issuing or listing an admin token
-  for such an id, or adding an organization member by a principal id instead
-  of a user id all failed on a foreign key and answered "internal error".
-  They are now a 400 (membership bodies) or a 404 (the token path), and
-  adding someone who is already a member is a 409.
-
 - **Microsoft Entra ID sign-in**
   ([ADR 0023](docs/adr/0023-oidc-hardening.md)). Entra sends no
   `email_verified`. With `--oidc-entra-verified-domain`, an address is
@@ -60,6 +62,8 @@ All notable changes to Context Commander are documented here. The format follows
 
 ### Changed
 
+- **`plan.search` answers `{items, truncated}`** instead of a bare list, in
+  both modes, so an agent can tell a complete answer from a bounded one.
 - **Migration 000034** adds `user_identities.issuer`. Each OIDC link records
   the issuer it was made under, and a sign-in through the same provider name
   from a different issuer is refused. A link made before this release adopts
@@ -70,22 +74,14 @@ All notable changes to Context Commander are documented here. The format follows
 - `RedirectAuthenticator.Exchange` now takes a `directory.Callback` with the
   code and the `iss` response parameter.
 
-### Security
+### Fixed
 
-- **The OIDC attempt cookie is a `__Host-` cookie, and it is signed.** A
-  sibling subdomain can no longer plant an attempt, so it can no longer sign
-  a victim into the attacker's account. This does not apply under
-  `--insecure-allow-cleartext`, where browsers refuse the prefix. The HMAC
-  uses a key derived from the root key by HKDF, for this purpose only. Each
-  attempt has its own cookie (`__Host-cc_oidc_…`), so a second sign-in tab no
-  longer expires the first.
-  At most three attempts are kept. A tampered cookie is refused and recorded.
-  Attempts in flight during the upgrade must be started again.
-- **The OIDC callback defends against provider mix-up (RFC 9207).** A
-  response naming another issuer is refused. A response with no `iss` is also
-  refused when the provider advertises the parameter.
-- **An OIDC provider whose signing keys cannot be fetched is reported as
-  unavailable.** It is no longer recorded as a rejected sign-in.
+- **A wrong id is no longer a 500.** Adding a project member by an agent's
+  own id instead of its `principal_id`, issuing or listing an admin token
+  for such an id, or adding an organization member by a principal id instead
+  of a user id all failed on a foreign key and answered "internal error".
+  They are now a 400 (membership bodies) or a 404 (the token path), and
+  adding someone who is already a member is a 409.
 
 ## [0.1.0-beta.1] — 2026-10-27
 
