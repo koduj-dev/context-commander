@@ -147,19 +147,56 @@ Pre-releases (`0.1.0-beta.1`) are tagged with their exact version only.
 `latest` and `0.1` move with stable releases. In production, pin an
 immutable digest (`...@sha256:…`) and verify it (see below).
 
-## Release binary and Homebrew
+## Release binary, install script and Homebrew
 
 On a developer machine you need the CLI half of `ccd`: `sync-skills`,
 `context` and `token`. The server runs elsewhere.
 
 ```bash
-brew install koduj-dev/tap/ccd        # macOS & Linux
+brew install koduj-dev/tap/ccd        # macOS & Linux, with the man pages
 ccd version
 ```
 
+Or use the install script (Linux and macOS, amd64 and arm64). Download it,
+read it, then run it:
+
+```bash
+curl -fsSLO https://raw.githubusercontent.com/koduj-dev/context-commander/main/scripts/install.sh
+sh install.sh                         # newest release into /usr/local/bin or ~/.local/bin
+```
+
+It verifies the binary against the release's `SHA256SUMS` before writing
+anything. If `cosign` is installed it also verifies the signature on
+`SHA256SUMS`, and requires that the signature was made by `release.yml` for
+that exact tag. Without cosign the checksum shows only that the download is
+intact, not who published it, and the script says so. `--require-signature`
+makes cosign mandatory. Options:
+
+| Option | Effect |
+|--------|--------|
+| *(none)* | the newest stable release, or the newest pre-release while there is no stable release yet |
+| `--pre` | the newest release, pre-releases included |
+| `--version v0.1.0-beta.1` | exactly this release |
+| `--bin-dir DIR` | install into `DIR`. Default: `/usr/local/bin` if you can write it (for example as root), otherwise `~/.local/bin`. The script never calls `sudo` itself |
+| `--man-dir DIR`, `--no-man` | where the manual pages go (default `../share/man/man1` next to the bin directory), or skip them. Releases after v0.1.0-beta.1 ship them |
+| `--require-signature` | fail unless cosign verifies `SHA256SUMS` |
+
 Or take the binary for your OS and architecture from the
 [Releases](https://github.com/koduj-dev/context-commander/releases) page:
-`ccd-linux-*`, `ccd-darwin-*` or `ccd-windows-*.exe`.
+`ccd-linux-*`, `ccd-darwin-*` or `ccd-windows-*.exe`, and check it as
+described under [Verifying a download](#verifying-a-download).
+
+**Updating** a binary you installed this way is `ccd self-update`.
+`ccd self-update --check` only reports whether a newer release exists. It
+picks a release the same way the install script does, `--pre` included. It
+checks the download against `SHA256SUMS`, and against the signature when
+cosign is installed (`--require-signature` makes cosign mandatory). Only then
+does it replace the binary, with an atomic rename in the binary's own
+directory. It never installs an older version than the one running. It
+refuses a binary that a package manager owns and tells you the command to use
+instead: `apt` or `dnf` for `/usr/bin/ccd` from the packages, and
+`brew upgrade ccd` for Homebrew. A running `ccd serve` keeps the old version
+until it is restarted.
 
 ## From source
 
@@ -176,7 +213,8 @@ VERSION=v0.1.0 make release   # every platform into dist-bin/, as CI does
 ## Verifying a download
 
 Every release ships a `SHA256SUMS` and a keyless **cosign** signature bundle
-(`SHA256SUMS.bundle`). Together they cover the binaries and the SPDX
+(`SHA256SUMS.bundle`). Together they cover the binaries, the manual pages
+(`ccd-man.tar.gz`, from the release after v0.1.0-beta.1) and the SPDX
 **SBOM**. Each binary and package also has its own build **provenance**:
 
 ```bash
@@ -218,4 +256,5 @@ created. Then `apt-publish.yml` adds the `.deb` to the APT repository.
 A tag with a suffix (`-beta.1`, `-rc.1`) becomes a GitHub pre-release. It
 updates the Homebrew formula and the APT repository only while there is no
 stable release yet. After 1.0, `apt upgrade` and `brew upgrade` never land on
-a release candidate.
+a release candidate. The install script and `ccd self-update` follow the same
+rule unless they are given `--pre`.
