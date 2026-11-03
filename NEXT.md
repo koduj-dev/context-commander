@@ -247,11 +247,17 @@ Only on top of a core loop people actually use:
       - **Live updates are polling** every 10 s. Push comes with Phase 2's
         subscriptions.
       - **Search is per project.**
-- [ ] **A wrong id in `POST /projects/{ns}/{slug}/members` or
-      `POST /installation/principals/{id}/tokens` is a 500.** Passing a service
-      principal's id where its *principal* id belongs fails on a foreign key and
-      surfaces as "internal error" instead of 400/404. Found while seeding an
-      E2E on 2026-10-27.
+- [x] ~~**A wrong id in `POST /projects/{ns}/{slug}/members` or
+      `POST /installation/principals/{id}/tokens` is a 500.**~~ Closed
+      2026-11-03: the services check the id before the insert. An unknown
+      principal in a membership body is a 400, an unknown principal in the
+      token path a 404 (listing too, instead of an empty list), and the same
+      mix-up in `POST /organizations/{id}/members` — a principal id where the
+      user id belongs — is a 400. Adding someone who is already a member, a
+      primary-key 500 on both, is a 409. Still open: the create response of
+      `POST /installation/service-principals` does not carry the agent's
+      `principal_id`, which is how the wrong id gets picked up in the first
+      place.
 
 ### UI — remaining spec surface
 

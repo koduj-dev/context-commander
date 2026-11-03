@@ -17,10 +17,12 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/koduj-dev/context-commander/internal/audit"
 	"github.com/koduj-dev/context-commander/internal/auth"
 	"github.com/koduj-dev/context-commander/internal/db"
+	"github.com/koduj-dev/context-commander/internal/identity"
 	"github.com/koduj-dev/context-commander/internal/projects"
 )
 
@@ -32,6 +34,15 @@ var (
 	// insert an unrecognized role that RoleCan would then silently map to
 	// no capabilities at all.
 	ErrInvalidRole = errors.New(`members: role must be one of OWNER, ADMIN, CONTRIBUTOR, READER`)
+	// ErrUnknownPrincipal is returned when the principal to add does not
+	// exist. The usual cause is an agent's own id passed where its
+	// principal_id belongs — two different UUIDs for the same agent — and
+	// before this check it reached the database and failed on the foreign
+	// key as an opaque 500.
+	ErrUnknownPrincipal = errors.New("members: principal_id does not name a principal (an agent is named by its principal_id, not its id)")
+	// ErrAlreadyMember is returned when the principal is already on the
+	// project. Changing an existing member's role is not what Add does.
+	ErrAlreadyMember = errors.New("members: principal is already a member of this project")
 )
 
 type Service struct {
@@ -42,6 +53,14 @@ type Service struct {
 
 func NewService(pool *db.Pool, projectStore *projects.Store, authz *auth.AuthzService) *Service {
 	return &Service{pool: pool, projects: projectStore, authz: authz}
+}
+
+// isUniqueViolation reports whether err is Postgres 23505 — here only ever
+// project_members' primary key, since the project and the principal were
+// both resolved before the insert.
+func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }
 
 func (s *Service) checkCapability(ctx context.Context, principalID, projectID uuid.UUID, cap auth.Capability) error {
@@ -81,7 +100,19 @@ func (s *Service) Add(ctx context.Context, principalID, projectID, targetPrincip
 	}
 
 	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+		// Checked rather than left to the foreign key, the same way
+		// installation.Service.SetUserPassword checks its user: a stray id
+		// is the caller's mistake and deserves to be named as one.
+		if _, err := identity.NewStore().GetPrincipal(ctx, tx, targetPrincipalID); err != nil {
+			if errors.Is(err, identity.ErrNotFound) {
+				return ErrUnknownPrincipal
+			}
+			return err
+		}
 		if _, err := s.projects.AddMember(ctx, tx, projectID, targetPrincipalID, role); err != nil {
+			if isUniqueViolation(err) {
+				return ErrAlreadyMember
+			}
 			return err
 		}
 		// In the same transaction as the insert, the pattern

@@ -27,6 +27,15 @@ All notable changes to Context Commander are documented here. The format follows
   The Homebrew formula installs them, so `man ccd` works there as it does
   with the packages.
 
+### Fixed
+
+- **A wrong id is no longer a 500.** Adding a project member by an agent's
+  own id instead of its `principal_id`, issuing or listing an admin token
+  for such an id, or adding an organization member by a principal id instead
+  of a user id all failed on a foreign key and answered "internal error".
+  They are now a 400 (membership bodies) or a 404 (the token path), and
+  adding someone who is already a member is a 409.
+
 ## [0.1.0-beta.1] — 2026-10-27
 
 The first public release, and a beta. The server, MCP surface and web UI

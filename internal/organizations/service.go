@@ -7,9 +7,11 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/koduj-dev/context-commander/internal/audit"
 	"github.com/koduj-dev/context-commander/internal/db"
+	"github.com/koduj-dev/context-commander/internal/identity"
 	"github.com/koduj-dev/context-commander/internal/paging"
 )
 
@@ -24,6 +26,16 @@ var ErrForbidden = errors.New("organizations: forbidden")
 // database, and RoleCan would later map it to no capabilities at all —
 // a member row nobody can reason about.
 var ErrInvalidRole = errors.New(`organizations: role must be one of OWNER, ADMIN, MEMBER`)
+
+// ErrUnknownUser is returned by AddMember for a user id that names no user.
+// A principal id passed where the user id belongs is the likely mistake —
+// a person has both — and before this check it failed on the foreign key
+// as an opaque 500.
+var ErrUnknownUser = errors.New("organizations: user_id does not name a user (a person is named here by their user id, not their principal_id)")
+
+// ErrAlreadyMember is returned by AddMember when the user is already in the
+// organization.
+var ErrAlreadyMember = errors.New("organizations: user is already a member of this organization")
 
 // Service is organizations' authorization chokepoint, mirroring every
 // other domain's Service (docs/adr/0014): every method checks membership
@@ -147,9 +159,21 @@ func (s *Service) AddMember(ctx context.Context, principalID, callerUserID, orga
 	}
 	var m Membership
 	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+		// Checked rather than left to the foreign key — see
+		// installation.Service.SetUserPassword.
+		if _, err := identity.NewStore().GetUser(ctx, tx, newUserID); err != nil {
+			if errors.Is(err, identity.ErrNotFound) {
+				return ErrUnknownUser
+			}
+			return err
+		}
 		var err error
 		m, err = s.store.AddMember(ctx, tx, organizationID, newUserID, role)
 		if err != nil {
+			var pgErr *pgconn.PgError
+			if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+				return ErrAlreadyMember
+			}
 			return err
 		}
 		// Organization-scoped (migrations/000023): this row has no project,
