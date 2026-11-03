@@ -125,3 +125,50 @@ func TestAnAgentsPlanAndPositionAreVisibleToItsColleagues(t *testing.T) {
 		t.Errorf("a stopped agent is still present: %+v", board.Presence)
 	}
 }
+
+// plan.search without a project searches every project the caller can read
+// plans in, and names each hit's project; a project the caller is not in
+// stays out even when its plans hold the same words.
+func TestPlanSearchWithoutAProjectCoversEveryProjectYouAreIn(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+
+	tokenA := f.newUserWithToken("searcher-a@example.test")
+	a, err := f.connect(ctx, tokenA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = a.Close() }()
+	tokenB := f.newUserWithToken("searcher-b@example.test")
+	b, err := f.connect(ctx, tokenB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = b.Close() }()
+
+	for _, p := range []string{"searcher-a/one", "searcher-a/two"} {
+		callTool[projectResult](t, ctx, a, "project.create", map[string]any{"project": p, "name": p})
+		callTool[planToolResult](t, ctx, a, "plan.create", map[string]any{"project": p, "title": "Rotate the keys in " + p})
+	}
+	callTool[projectResult](t, ctx, b, "project.create", map[string]any{"project": "searcher-b/own", "name": "Own"})
+	callTool[planToolResult](t, ctx, b, "plan.create", map[string]any{"project": "searcher-b/own", "title": "Rotate the keys too"})
+
+	type hit struct {
+		Project   string `json:"project"`
+		PlanTitle string `json:"plan_title"`
+	}
+	hits := callTool[[]hit](t, ctx, a, "plan.search", map[string]any{"query": "rotate"})
+	projects := map[string]bool{}
+	for _, h := range hits {
+		projects[h.Project] = true
+	}
+	if len(hits) != 2 || !projects["searcher-a/one"] || !projects["searcher-a/two"] {
+		t.Errorf("hits across projects: %+v", hits)
+	}
+
+	// With a project, the search stays in it and names none.
+	hits = callTool[[]hit](t, ctx, a, "plan.search", map[string]any{"project": "searcher-a/one", "query": "rotate"})
+	if len(hits) != 1 || hits[0].Project != "" {
+		t.Errorf("hits in one project: %+v", hits)
+	}
+}

@@ -78,6 +78,12 @@ A search reads the project's plans, decrypts them and matches in Go. That is
 bounded by one project's plans, which is hundreds, not millions. Searching
 across projects is not offered until something needs it.
 
+*2026-11-03:* it is now. `GET /v1/me/plans/search` and `plan.search` without a
+`project` search every project the caller can `plan.read`, each decrypted
+with its own project's key, read under the caller's RLS context like any
+other search. The bound moved from one project to at most 50 projects (the
+caller's newest) and 100 hits, and the answer says when either cut it.
+
 ### History that does not grow without bound
 
 - **Text edits keep no history.** A plan's text is its current text.

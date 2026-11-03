@@ -27,6 +27,12 @@ All notable changes to Context Commander are documented here. The format follows
   The Homebrew formula installs them, so `man ccd` works there as it does
   with the packages.
 
+- **Plan search across projects.** `GET /v1/me/plans/search?q=`, and
+  `plan.search` called without a `project`, search the plans of every project
+  you can read plans in and name the project of each hit. The quick finder
+  (Ctrl/⌘ K) shows them too. It covers at most 50 projects and returns at
+  most 100 hits, and says when either bound cut the answer (ADR 0022).
+
 ### Fixed
 
 - **A wrong id is no longer a 500.** Adding a project member by an agent's

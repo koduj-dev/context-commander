@@ -246,7 +246,10 @@ Only on top of a core loop people actually use:
         subscription.
       - **Live updates are polling** every 10 s. Push comes with Phase 2's
         subscriptions.
-      - **Search is per project.**
+      - [x] ~~**Search is per project.**~~ Closed 2026-11-03:
+        `GET /v1/me/plans/search`, `plan.search` without a project and the
+        quick finder search every project the caller can read plans in,
+        bounded at 50 projects and 100 hits.
 - [x] ~~**A wrong id in `POST /projects/{ns}/{slug}/members` or
       `POST /installation/principals/{id}/tokens` is a 500.**~~ Closed
       2026-11-03: the services check the id before the insert. An unknown

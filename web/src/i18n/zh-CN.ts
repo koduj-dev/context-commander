@@ -45,6 +45,7 @@ export const zhCN: Partial<Record<MessageKey, string>> = {
   "find.placeholder": "跳转到项目、skill 或页面…",
   "find.project": "项目",
   "find.skill": "Skill",
+  "find.plan": "计划",
   "find.screen": "页面",
   "find.nothing": "没有匹配项",
   "find.hint": "{shortcut} 打开此窗口。↑↓ 移动，Enter 前往，Esc 关闭。",

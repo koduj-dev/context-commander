@@ -34,6 +34,7 @@ export const pl: Partial<Record<MessageKey, string>> = {
   "find.placeholder": "Przejdź do projektu, skilla, ekranu…",
   "find.project": "Projekt",
   "find.skill": "Skill",
+  "find.plan": "Plan",
   "find.screen": "Ekran",
   "find.nothing": "Nic nie pasuje",
   "find.hint": "{shortcut} otwiera to okno. ↑↓ przesuwa, Enter przechodzi, Esc zamyka.",

@@ -419,21 +419,46 @@ func registerPlanTools(server *sdkmcp.Server, deps Deps, principalID, clientID u
 	})
 
 	type searchArgs struct {
-		Project string `json:"project" jsonschema:"project path \"namespace/slug\""`
+		Project string `json:"project,omitempty" jsonschema:"project path \"namespace/slug\"; leave it out to search every project you can read plans in"`
 		Query   string `json:"query,omitempty" jsonschema:"words to find in plan titles, bodies, items and notes"`
 		Status  string `json:"status,omitempty" jsonschema:"only items in this status"`
 	}
 	type searchHit struct {
+		// Project is set only when the search covered every project.
+		Project   string `json:"project,omitempty"`
 		PlanID    string `json:"plan_id"`
 		PlanTitle string `json:"plan_title"`
 		ItemID    string `json:"item_id,omitempty"`
 		Text      string `json:"text"`
 		Status    string `json:"status"`
 	}
+	toHit := func(h plans.SearchHit, project string) searchHit {
+		r := searchHit{Project: project, PlanID: h.PlanID.String(), PlanTitle: h.PlanTitle, Text: h.Text, Status: h.Status}
+		if h.ItemID != nil {
+			r.ItemID = h.ItemID.String()
+		}
+		return r
+	}
 	sdkmcp.AddTool(server, &sdkmcp.Tool{
-		Name:        "plan.search",
-		Description: "Find plans and steps by their text, or every step in a status. Live plans come first.",
+		Name: "plan.search",
+		Description: "Find plans and steps by their text, or every step in a status. Live plans come first. " +
+			"Without a project it searches every project you can read plans in, and each hit names its project.",
 	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, args searchArgs) (*sdkmcp.CallToolResult, []searchHit, error) {
+		out := []searchHit{}
+		if args.Project == "" {
+			res, err := deps.Plans.SearchAll(ctx, principalID, args.Query, args.Status)
+			if err != nil {
+				return nil, nil, err
+			}
+			paths := map[uuid.UUID]string{}
+			for _, p := range res.Projects {
+				paths[p.ID] = p.Path
+			}
+			for _, h := range res.Hits {
+				out = append(out, toHit(h, paths[h.ProjectID]))
+			}
+			return nil, out, nil
+		}
 		projectID, err := resolve(ctx, args.Project)
 		if err != nil {
 			return nil, nil, err
@@ -442,13 +467,8 @@ func registerPlanTools(server *sdkmcp.Server, deps Deps, principalID, clientID u
 		if err != nil {
 			return nil, nil, err
 		}
-		out := []searchHit{}
 		for _, h := range hits {
-			r := searchHit{PlanID: h.PlanID.String(), PlanTitle: h.PlanTitle, Text: h.Text, Status: h.Status}
-			if h.ItemID != nil {
-				r.ItemID = h.ItemID.String()
-			}
-			out = append(out, r)
+			out = append(out, toHit(h, ""))
 		}
 		return nil, out, nil
 	})

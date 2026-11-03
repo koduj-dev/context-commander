@@ -312,10 +312,26 @@ type Board struct {
 
 // SearchHit is a plan or one of its items that matched.
 type SearchHit struct {
+	ProjectID  uuid.UUID
 	PlanID     uuid.UUID
 	PlanTitle  string
 	PlanStatus string
 	ItemID     *uuid.UUID
 	Text       string
 	Status     string
+}
+
+// ProjectSearch is SearchAll's answer: the hits, and the projects they came
+// from, so an adapter can name them without a second read.
+type ProjectSearch struct {
+	Hits      []SearchHit
+	Projects  []ProjectRef
+	Truncated bool
+}
+
+// ProjectRef names a project a hit came from.
+type ProjectRef struct {
+	ID   uuid.UUID
+	Path string // "namespace/slug"
+	Name string
 }

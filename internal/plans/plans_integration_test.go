@@ -465,6 +465,101 @@ func TestSearchFindsTextThatIsStoredEncrypted(t *testing.T) {
 	}
 }
 
+// TestSearchAllCoversEveryProjectTheCallerReadsAndNoOther: a search across
+// projects decrypts each project's plans with its own key, names the project
+// of every hit, and returns nothing from a project the caller is not in —
+// the plans of a non-member's project share the words and still stay out.
+func TestSearchAllCoversEveryProjectTheCallerReadsAndNoOther(t *testing.T) {
+	f := newFixture(t)
+	alice := f.join(f.projectID, "Alice", projects.RoleContributor)
+	second, secondNS := f.newProject("second")
+	if err := db.WithoutPrincipal(f.ctx, f.ownerPool, func(tx pgx.Tx) error {
+		return f.addMember(tx, second, alice, projects.RoleReader)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	foreign, _ := f.newProject("foreign")
+	bob := f.join(foreign, "Bob", projects.RoleOwner)
+
+	f.plan(alice, "Migrate the database", "Dump")
+	writer := f.join(second, "Wendy", projects.RoleContributor)
+	if _, err := f.svc.CreatePlan(f.ctx, writer.principalID, &writer.clientID, second, nil, "Release", "", []plans.NewItem{{Text: "Migrate the queue"}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.svc.CreatePlan(f.ctx, bob.principalID, &bob.clientID, foreign, nil, "Migrate secrets", "", nil); err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := f.svc.SearchAll(f.ctx, alice.principalID, "migrate", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[uuid.UUID]string{}
+	for _, h := range res.Hits {
+		got[h.ProjectID] = h.Text
+	}
+	if len(res.Hits) != 2 || got[f.projectID] != "Migrate the database" || got[second] != "Migrate the queue" {
+		t.Errorf("alice's hits: %+v", res.Hits)
+	}
+	if _, ok := got[foreign]; ok {
+		t.Errorf("a project alice is not in was searched: %+v", res.Hits)
+	}
+	paths := map[uuid.UUID]string{}
+	for _, p := range res.Projects {
+		paths[p.ID] = p.Path
+	}
+	if paths[second] != secondNS+"/second" || len(res.Projects) != 2 || res.Truncated {
+		t.Errorf("projects %+v truncated %v", res.Projects, res.Truncated)
+	}
+
+	// The other way round: bob sees only his own project's plan.
+	res, err = f.svc.SearchAll(f.ctx, bob.principalID, "migrate", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Hits) != 1 || res.Hits[0].ProjectID != foreign {
+		t.Errorf("bob's hits: %+v", res.Hits)
+	}
+	if _, err := f.svc.SearchAll(f.ctx, bob.principalID, "", ""); !errors.Is(err, plans.ErrInvalid) {
+		t.Errorf("an empty search returned %v", err)
+	}
+}
+
+// TestSearchAllIsBounded: past MaxSearchProjects projects, or past
+// MaxSearchHits hits, the answer says it was cut.
+func TestSearchAllIsBounded(t *testing.T) {
+	f := newFixture(t)
+	alice := f.join(f.projectID, "Alice", projects.RoleContributor)
+	texts := make([]string, plans.MaxSearchHits+1)
+	for i := range texts {
+		texts[i] = fmt.Sprintf("step %d", i)
+	}
+	f.plan(alice, "Many steps", texts...)
+	res, err := f.svc.SearchAll(f.ctx, alice.principalID, "step", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Hits) != plans.MaxSearchHits || !res.Truncated {
+		t.Errorf("hits %d truncated %v, want %d and true", len(res.Hits), res.Truncated, plans.MaxSearchHits)
+	}
+
+	for i := 0; i < plans.MaxSearchProjects; i++ {
+		id, _ := f.newProject(fmt.Sprintf("p%d", i))
+		if err := db.WithoutPrincipal(f.ctx, f.ownerPool, func(tx pgx.Tx) error {
+			return f.addMember(tx, id, alice, projects.RoleReader)
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	res, err = f.svc.SearchAll(f.ctx, alice.principalID, "nothing matches this", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Hits) != 0 || !res.Truncated {
+		t.Errorf("over the project bound: hits %d truncated %v, want 0 and true", len(res.Hits), res.Truncated)
+	}
+}
+
 func TestPlanTextCountsAgainstTheQuota(t *testing.T) {
 	f := newFixture(t)
 	alice := f.join(f.projectID, "Alice", projects.RoleContributor)

@@ -8,12 +8,15 @@ import { modifierLabel } from "../lib/platform";
 /**
  * Getting somewhere without navigating there.
  *
- * Three sources, and they are not the same kind of thing:
+ * Four sources, and they are not the same kind of thing:
  *
  *  - Screens are a fixed list this file knows.
  *  - Projects are filtered in the browser, because `/me/projects` already
  *    returned all of them and they are bounded by membership.
  *  - Skills are searched on the server, because the catalogue is not.
+ *  - Plans are searched on the server across every project the caller can
+ *    read plans in, because their text is encrypted and only the server can
+ *    decrypt it (docs/adr/0022).
  *
  * There is no cross-domain search endpoint and this does not pretend to be
  * one: it says which kind each result is, so a reader is never left wondering
@@ -32,6 +35,12 @@ export function QuickFind({ onClose }: { onClose: () => void }) {
   const projects = useResource(() => api.myProjects(), []);
   const skills = useResource(
     () => (debounced ? api.searchSkills(debounced, undefined, 5) : Promise.resolve({ items: [] })),
+    [debounced],
+  );
+
+  const plans = useResource(
+    () =>
+      debounced ? api.searchMyPlans(debounced) : Promise.resolve({ items: [], truncated: false }),
     [debounced],
   );
 
@@ -73,10 +82,18 @@ export function QuickFind({ onClose }: { onClose: () => void }) {
       to: `/registry/${s.skill_id}`,
     }));
 
+    const planHits: Result[] = (plans.data?.items ?? []).slice(0, 5).map((h) => ({
+      id: `l:${h.plan_id}:${h.item_id ?? ""}`,
+      label: h.text,
+      hint: h.item_id ? `${h.project} · ${h.plan_title}` : h.project,
+      kind: t("find.plan"),
+      to: `/p/${h.project}/plans`,
+    }));
+
     const screenHits = screens.filter((s) => !q || s.label.toLowerCase().includes(q));
 
-    return [...projectHits, ...skillHits, ...screenHits];
-  }, [query, projects.data, skills.data, screens, t]);
+    return [...projectHits, ...skillHits, ...planHits, ...screenHits];
+  }, [query, projects.data, skills.data, plans.data, screens, t]);
 
   // A result list that shrank under the cursor must not leave it past the end.
   useEffect(() => setCursor(0), [query]);

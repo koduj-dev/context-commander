@@ -740,6 +740,9 @@ export type PlanHit = {
   status: string;
 };
 
+/** A hit from `GET /me/plans/search`: a PlanHit that names its project. */
+export type MyPlanHit = PlanHit & { project: string; project_name: string };
+
 export type ItemChange = {
   status?: ItemStatus;
   text?: string;
@@ -1007,6 +1010,9 @@ export const api = {
   clearPresence: (ns: string, slug: string) =>
     request<void>(`${project(ns, slug)}/plans/presence`, { method: "DELETE" }),
   myPresence: () => request<{ items: Presence[]; people: Record<string, Person> }>("/me/presence"),
+  /** Plan search across every project the caller can read plans in. */
+  searchMyPlans: (q: string) =>
+    request<{ items: MyPlanHit[]; truncated: boolean }>(withQuery("/me/plans/search", { q })),
 
   gateBindings: (ns: string, slug: string) =>
     request<GateBinding[]>(`${project(ns, slug)}/gates/bindings`),

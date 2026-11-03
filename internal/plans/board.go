@@ -11,6 +11,7 @@ import (
 
 	"github.com/koduj-dev/context-commander/internal/auth"
 	"github.com/koduj-dev/context-commander/internal/db"
+	"github.com/koduj-dev/context-commander/internal/projects"
 )
 
 // project is everything a project's board is made of, decrypted. Read in one
@@ -59,27 +60,39 @@ func (s *Service) loadProject(ctx context.Context, tx pgx.Tx, projectID uuid.UUI
 		out.phases = append(out.phases, ph)
 	}
 
-	rows, err = tx.Query(ctx, `SELECT `+planColumns+` FROM plans WHERE project_id = $1 ORDER BY updated_at DESC`, projectID)
+	out.plans, err = s.loadPlans(ctx, tx, projectID)
 	if err != nil {
 		return project{}, err
 	}
+	return out, nil
+}
+
+// loadPlans reads and decrypts a project's plans with their items, newest
+// first. Separate from loadProject so a search does not decrypt phases it
+// never looks at.
+func (s *Service) loadPlans(ctx context.Context, tx pgx.Tx, projectID uuid.UUID) ([]Plan, error) {
+	rows, err := tx.Query(ctx, `SELECT `+planColumns+` FROM plans WHERE project_id = $1 ORDER BY updated_at DESC`, projectID)
+	if err != nil {
+		return nil, err
+	}
+	var out []Plan
 	var planRows []planRow
 	for rows.Next() {
 		var r planRow
 		if err := scanPlan(rows, &r); err != nil {
 			rows.Close()
-			return project{}, err
+			return nil, err
 		}
 		planRows = append(planRows, r)
 	}
 	rows.Close()
 	if err := rows.Err(); err != nil {
-		return project{}, err
+		return nil, err
 	}
 
 	items, err := loadItems(ctx, tx, `WHERE i.project_id = $1`, projectID)
 	if err != nil {
-		return project{}, err
+		return nil, err
 	}
 	byPlan := map[uuid.UUID][]Item{}
 	for _, it := range items {
@@ -89,7 +102,7 @@ func (s *Service) loadProject(ctx context.Context, tx pgx.Tx, projectID uuid.UUI
 	for _, r := range planRows {
 		var b planBlob
 		if err := s.open(ctx, tx, projectID, "plan", r.ID, r.Version, r.e, &b); err != nil {
-			return project{}, err
+			return nil, err
 		}
 		p := r.Plan
 		p.Title, p.Body = b.Title, b.Body
@@ -98,7 +111,7 @@ func (s *Service) loadProject(ctx context.Context, tx pgx.Tx, projectID uuid.UUI
 			t := b.Items[p.Items[i].ID]
 			p.Items[i].Text, p.Items[i].Note = t.Text, t.Note
 		}
-		out.plans = append(out.plans, p)
+		out = append(out, p)
 	}
 	return out, nil
 }
@@ -193,6 +206,73 @@ func (s *Service) Board(ctx context.Context, principalID, projectID uuid.UUID) (
 // MaxSearchHits bounds one search's answer.
 const MaxSearchHits = 100
 
+// MaxSearchProjects bounds how many projects one SearchAll decrypts. Each
+// costs a decrypt of every plan in it, so without a bound the price of a
+// search would grow with the caller's membership list rather than with the
+// question.
+const MaxSearchProjects = 50
+
+// matcher is one search's question, validated once and applied to every
+// project it covers.
+type matcher struct {
+	q, status string
+}
+
+func newMatcher(query, statusFilter string) (matcher, error) {
+	m := matcher{q: strings.ToLower(strings.TrimSpace(query)), status: statusFilter}
+	if m.q == "" && m.status == "" {
+		return matcher{}, invalid("search needs a query or a status")
+	}
+	if m.status != "" && !validItemStatus(m.status) {
+		return matcher{}, invalid("item status %q is not one of open, in_progress, done, blocked, skipped", m.status)
+	}
+	return m, nil
+}
+
+func (m matcher) text(texts ...string) bool {
+	if m.q == "" {
+		return true
+	}
+	for _, t := range texts {
+		if strings.Contains(strings.ToLower(t), m.q) {
+			return true
+		}
+	}
+	return false
+}
+
+// hits is every plan and item in list that matches.
+func (m matcher) hits(list []Plan) []SearchHit {
+	var hits []SearchHit
+	for _, p := range list {
+		if m.status == "" && m.text(p.Title, p.Body) {
+			hits = append(hits, SearchHit{ProjectID: p.ProjectID, PlanID: p.ID, PlanTitle: p.Title, PlanStatus: p.Status, Text: p.Title, Status: p.Status})
+		}
+		for _, it := range p.Items {
+			if m.status != "" && it.Status != m.status {
+				continue
+			}
+			if m.text(it.Text, it.Note) {
+				id := it.ID
+				hits = append(hits, SearchHit{ProjectID: p.ProjectID, PlanID: p.ID, PlanTitle: p.Title, PlanStatus: p.Status, ItemID: &id, Text: it.Text, Status: it.Status})
+			}
+		}
+	}
+	return hits
+}
+
+// rankHits puts live work first — a hit in an active plan is more likely the
+// one wanted than the same words in a plan finished months ago — and caps
+// the answer at MaxSearchHits. It reports whether anything was cut.
+func rankHits(hits []SearchHit) ([]SearchHit, bool) {
+	rank := map[string]int{PlanActive: 0, PlanDraft: 1, PlanDone: 2, PlanAbandoned: 3}
+	sort.SliceStable(hits, func(i, j int) bool { return rank[hits[i].PlanStatus] < rank[hits[j].PlanStatus] })
+	if len(hits) > MaxSearchHits {
+		return hits[:MaxSearchHits], true
+	}
+	return hits, false
+}
+
 // Search finds plans and items whose text contains query, case-insensitively.
 // The text is encrypted (docs/adr/0011), so this decrypts the project's plans
 // and matches in Go; a project's plans are hundreds, not millions.
@@ -201,56 +281,77 @@ func (s *Service) Search(ctx context.Context, principalID, projectID uuid.UUID, 
 	if err := s.checkCapability(ctx, principalID, projectID, auth.CapPlanRead); err != nil {
 		return nil, err
 	}
-	q := strings.ToLower(strings.TrimSpace(query))
-	if q == "" && statusFilter == "" {
-		return nil, invalid("search needs a query or a status")
+	m, err := newMatcher(query, statusFilter)
+	if err != nil {
+		return nil, err
 	}
-	if statusFilter != "" && !validItemStatus(statusFilter) {
-		return nil, invalid("item status %q is not one of open, in_progress, done, blocked, skipped", statusFilter)
-	}
-	match := func(texts ...string) bool {
-		if q == "" {
-			return true
-		}
-		for _, t := range texts {
-			if strings.Contains(strings.ToLower(t), q) {
-				return true
-			}
-		}
-		return false
-	}
-
 	var hits []SearchHit
-	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
-		proj, err := s.loadProject(ctx, tx, projectID)
+	err = db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+		list, err := s.loadPlans(ctx, tx, projectID)
 		if err != nil {
 			return err
 		}
-		for _, p := range proj.plans {
-			if statusFilter == "" && match(p.Title, p.Body) {
-				hits = append(hits, SearchHit{PlanID: p.ID, PlanTitle: p.Title, PlanStatus: p.Status, Text: p.Title, Status: p.Status})
-			}
-			for _, it := range p.Items {
-				if statusFilter != "" && it.Status != statusFilter {
-					continue
-				}
-				if match(it.Text, it.Note) {
-					id := it.ID
-					hits = append(hits, SearchHit{PlanID: p.ID, PlanTitle: p.Title, PlanStatus: p.Status, ItemID: &id, Text: it.Text, Status: it.Status})
-				}
-			}
-		}
+		hits = m.hits(list)
 		return nil
 	})
 	if err != nil {
 		return nil, fmt.Errorf("plans: search: %w", err)
 	}
-	// Live work first: a hit in an active plan is more likely the one wanted
-	// than the same words in a plan finished months ago.
-	rank := map[string]int{PlanActive: 0, PlanDraft: 1, PlanDone: 2, PlanAbandoned: 3}
-	sort.SliceStable(hits, func(i, j int) bool { return rank[hits[i].PlanStatus] < rank[hits[j].PlanStatus] })
-	if len(hits) > MaxSearchHits {
-		hits = hits[:MaxSearchHits]
-	}
+	hits, _ = rankHits(hits)
 	return hits, nil
+}
+
+// SearchAll is Search across every project the caller can read plans in,
+// each project's plans decrypted with that project's own key. Which projects
+// those are is decided the way auth.AuthzService.Can decides it for one —
+// the caller's membership role through auth.RoleCan — and the memberships
+// and plans are both read under the caller's RLS context, so a project the
+// caller is not in is neither listed nor readable even if the Go check
+// were wrong.
+//
+// It covers at most MaxSearchProjects projects, the caller's newest first,
+// and answers at most MaxSearchHits hits. Truncated reports that either
+// bound cut something, so a caller can tell "nothing else" from "narrow it
+// down".
+func (s *Service) SearchAll(ctx context.Context, principalID uuid.UUID, query, statusFilter string) (ProjectSearch, error) {
+	m, err := newMatcher(query, statusFilter)
+	if err != nil {
+		return ProjectSearch{}, err
+	}
+	var out ProjectSearch
+	err = db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+		memberships, err := projects.NewStore().ListForPrincipal(ctx, tx, principalID)
+		if err != nil {
+			return err
+		}
+		searched := 0
+		for _, ms := range memberships {
+			if !auth.RoleCan(ms.Role, auth.CapPlanRead) {
+				continue
+			}
+			if searched == MaxSearchProjects {
+				out.Truncated = true
+				break
+			}
+			searched++
+			list, err := s.loadPlans(ctx, tx, ms.Project.ID)
+			if err != nil {
+				return err
+			}
+			if hits := m.hits(list); len(hits) > 0 {
+				out.Hits = append(out.Hits, hits...)
+				out.Projects = append(out.Projects, ProjectRef{
+					ID: ms.Project.ID, Path: ms.NamespaceSlug + "/" + ms.Project.Slug, Name: ms.Project.Name,
+				})
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return ProjectSearch{}, fmt.Errorf("plans: search all: %w", err)
+	}
+	var cut bool
+	out.Hits, cut = rankHits(out.Hits)
+	out.Truncated = out.Truncated || cut
+	return out, nil
 }

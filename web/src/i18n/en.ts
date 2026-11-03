@@ -32,6 +32,7 @@ export const en = {
   "find.placeholder": "Jump to a project, a skill, a screen…",
   "find.project": "Project",
   "find.skill": "Skill",
+  "find.plan": "Plan",
   "find.screen": "Screen",
   "find.nothing": "Nothing matches that",
   "find.hint": "{shortcut} opens this. ↑↓ to move, Enter to go, Esc to close.",

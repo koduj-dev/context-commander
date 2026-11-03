@@ -602,6 +602,7 @@ export const es: Partial<Record<MessageKey, string>> = {
   "find.placeholder": "Ir a un proyecto, un skill, una pantalla…",
   "find.project": "Proyecto",
   "find.skill": "Skill",
+  "find.plan": "Plan",
   "find.screen": "Pantalla",
   "find.nothing": "Nada coincide con eso",
   "find.hint": "{shortcut} abre esto. ↑↓ se mueve, Intro va, Esc cierra.",
