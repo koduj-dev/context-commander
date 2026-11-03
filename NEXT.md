@@ -400,22 +400,31 @@ the screen rather than showing a control that would fail.
 - [ ] Project templates — agreed in the mockups (`templates.html`), no
   schema and no endpoint.
 
-### CI/pipeline hardening (blocked on going public)
+### CI/pipeline hardening
 
-`ci` (`lint`/`test`/`gitleaks`) is green as of 2026-09-02. Left over, blocked
-on the planned move to a public repo:
+The repository went public with v0.1.0-beta.1, and everything that was
+blocked on that is done:
 
-- [ ] **Branch protection / rulesets on `main`** — `koduj-dev` is on GitHub
-  Free; branch protection on a *private* repo 403s ("Upgrade to Pro"). Free
-  once public. Add required status checks (`lint`, `test`, `gitleaks`) then.
-- [ ] **Native GitHub secret scanning / push protection** — same story,
-  requires Advanced Security while private, free on public. `gitleaks` covers
-  the gap meanwhile.
-- [ ] **Restrict `allowed_actions` from `all`** — any Action from any source
-  can currently run here; narrow to verified creators once public.
+- [x] ~~Rulesets on `main`~~ Closed 2026-11-03: ruleset "Protect main".
+  Every change goes through a pull request; `gitleaks`, `lint`, `test` and
+  `web` must pass; review threads must be resolved; no force-push, no
+  deletion, squash or rebase merges only. Nobody bypasses it, the
+  maintainer included. Approvals are not required while there is one
+  maintainer, since GitHub does not let an author approve their own PR.
+  Workflows from forks wait for approval for every outside contributor.
+- [x] ~~Secret scanning and push protection~~ Both on since 2026-11-03.
+  `gitleaks` stays in CI for history and for what GitHub's patterns miss.
+- [x] ~~Restrict `allowed_actions` from `all`~~ Closed 2026-11-03: only
+  GitHub's own actions and the ones the workflows use (`anchore/sbom-action`,
+  the `docker/*` actions, `golangci/golangci-lint-action`,
+  `sigstore/cosign-installer`) may run. A workflow that adds another action
+  fails until it is added to the list in the repository's Actions settings.
+  Every action is pinned by commit SHA (`ci.yml` was the last one on tags),
+  and the repository requires it, so Dependabot's `github-actions` updates
+  are how pins move.
 - [x] ~~`CODEOWNERS`~~ Added 2026-10-27 (`.github/CODEOWNERS`, everything to
-  the sole maintainer). It only assigns review until branch protection can
-  require it.
+  the sole maintainer). It assigns review; requiring code-owner review waits
+  for a second maintainer, for the same reason as approvals.
 
 ### Packaging and distribution
 
@@ -424,10 +433,9 @@ on the planned move to a public repo:
 - [x] `release.yml` + `apt-publish.yml`, step for step docker-commander's:
   binaries for 3 OS × 2 arch, SHA256SUMS, SBOM, cosign, provenance, packages,
   signed ghcr image, Homebrew tap, shared APT repo. See docs/install.md.
-- [ ] **The repository must be public before the first tag.** Attestations
-  are unavailable to private repos on the Free plan (the step fails), and the
-  Homebrew formula and APT repo point at release assets anonymous users must
-  be able to download.
+- [x] ~~The repository must be public before the first tag.~~ Done
+  2026-10-27; v0.1.0-beta.1 shipped with attestations, the Homebrew formula
+  and the APT repository working for anonymous users.
 - [x] The shared APT repo is labelled `koduj-dev` (koduj-dev/apt c36e965,
   2026-10-27). It takes effect at the next publish from either project, and
   existing dockercmd users then accept the change once with
@@ -704,5 +712,4 @@ Independent of the above and pickable any time, but none of it is free of a
 decision any more (the cheap ones — the `docs/README.md` index, organization
 member lists, `GET .../conversations` — shipped): the two agent items under
 "UI" above (an admin will not see an agent's projects — decided; unique
-names — done) and project templates. CI hardening unblocks itself the day the
-repo goes public.
+names — done) and project templates.
