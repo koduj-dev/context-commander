@@ -852,6 +852,12 @@ func TestChangesAreToldToTheStreamsThatMayReadThem(t *testing.T) {
 	expectChange(t, board, "a presence report reached no board stream")
 	expectNoChange(t, theirs, "an outsider's presence stream was told about this project")
 
+	// Tokens credited by a client hook change the board's effort figures.
+	if _, ok, err := f.svc.ReportUsage(f.ctx, alice.principalID, &alice.clientID, plans.Tokens{Model: "claude-opus-5-5", TokensOut: 3}); err != nil || !ok {
+		t.Fatalf("ReportUsage: ok=%v err=%v", ok, err)
+	}
+	expectChange(t, board, "a usage report reached no board stream")
+
 	if _, err := f.svc.SubscribeBoard(f.ctx, outsider.principalID, outsider.clientID, f.projectID); !errors.Is(err, plans.ErrForbidden) {
 		t.Errorf("an outsider subscribed to the board: %v", err)
 	}
