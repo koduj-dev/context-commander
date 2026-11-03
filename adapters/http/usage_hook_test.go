@@ -203,8 +203,10 @@ func TestTheClaudeCodeUsageHookSendsEachResponseOncePerModel(t *testing.T) {
 	}
 }
 
-// A state file written before the hook sent models holds one flat total.
-// Those tokens were sent; upgrading the hook must not send them again.
+// A state file written before the hook sent models holds one flat total of
+// the session transcript. Those tokens were sent; upgrading the hook must
+// not send them again, and the tokens it never sent must go out under their
+// own model — not under whichever model sorts first.
 func TestTheClaudeCodeUsageHookDoesNotResendAfterAnUpgrade(t *testing.T) {
 	f := newFixture(t)
 	b := newHookBench(t, f, "upgrade")
@@ -212,19 +214,31 @@ func TestTheClaudeCodeUsageHookDoesNotResendAfterAnUpgrade(t *testing.T) {
 	if err := os.WriteFile(transcript, nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	appendLines(t, transcript,
-		assistantLine("msg_1", "claude-opus-5-5", 3, 100, 5000, 700),
-		assistantLine("msg_2", "claude-opus-5-5", 1, 50, 6000, 0))
+	stdin := fmt.Sprintf(`{"session_id":"s-old","transcript_path":%q}`, transcript)
+	// The old hook sent exactly msg_1. Since then: nothing, at first.
+	appendLines(t, transcript, assistantLine("msg_1", "claude-opus-5-5", 100, 0, 0, 0))
 	state := filepath.Join(b.dir, "context-commander", "usage", "s-old.json")
 	if err := os.MkdirAll(filepath.Dir(state), 0o750); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(state, []byte(`{"tokens_in":3,"tokens_out":100,"cache_read_tokens":5000,"cache_write_tokens":700}`), 0o600); err != nil {
+	if err := os.WriteFile(state, []byte(`{"tokens_in":100,"tokens_out":0,"cache_read_tokens":0,"cache_write_tokens":0}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	b.run("claude-code-usage-hook.py", fmt.Sprintf(`{"session_id":"s-old","transcript_path":%q}`, transcript))
-	if got := b.effort().byModel(); fmt.Sprint(got) != fmt.Sprint(map[string][4]int64{"claude-opus-5-5": {1, 50, 6000, 0}}) {
-		t.Errorf("after the upgrade: %v, want only msg_2", got)
+	b.run("claude-code-usage-hook.py", stdin)
+	if got := b.effort().byModel(); len(got) != 0 {
+		t.Fatalf("the first run after the upgrade sent %v, want nothing", got)
+	}
+	// The conversion was saved although nothing was posted.
+	saved, err := os.ReadFile(state) //nolint:gosec // a path in t.TempDir()
+	if err != nil || !strings.Contains(string(saved), `"models"`) {
+		t.Fatalf("state after a run with nothing to send: %s %v", saved, err)
+	}
+
+	// A later Haiku response sorts before Opus; it must still be sent as Haiku.
+	appendLines(t, transcript, assistantLine("msg_2", "claude-haiku-5-5", 25, 0, 0, 0))
+	b.run("claude-code-usage-hook.py", stdin)
+	if got := b.effort().byModel(); fmt.Sprint(got) != fmt.Sprint(map[string][4]int64{"claude-haiku-5-5": {25, 0, 0, 0}}) {
+		t.Errorf("after the upgrade: %v, want only msg_2, as Haiku", got)
 	}
 }
 

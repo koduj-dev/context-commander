@@ -1,11 +1,10 @@
 {
-  "_comment": "EXAMPLE ONLY, taken 2026-11-03 from Anthropic's published first-party API list prices; verify every number against the vendor's current price list before relying on it. Prices are per million tokens. cache_write is the 5-minute cache write price (1.25x input); one-hour cache writes cost more and are not distinguished in the counts. Codex/OpenAI models are deliberately absent: add them from OpenAI's price list (cache_write 0 if the vendor does not charge for it). A key ending in * matches every model id starting with the rest. Used by ccd serve --usage-prices (docs/adr/0022); the interface shows the result as an estimate, never as spent.",
+  "_comment": "EXAMPLE ONLY - verify every number against the vendor's current price list before relying on it. Copied 2026-11-03 from Anthropic's first-party API list prices, per million tokens. input and output are list prices; cache_read is the listed rate for claude-opus-5-5 and claude-sonnet-5-5 and 0.1x input for claude-opus-5; cache_write is the 5-minute cache write at 1.25x input (one-hour writes cost more and are not told apart in the counts). Models with tiered or context-dependent pricing are left out, and so are Codex/OpenAI models: add those from the vendor's price list, with 0 for a kind it does not charge. Every model needs all four rates. A key ending in * matches every model id that starts with the rest. Used by ccd serve --usage-prices (docs/adr/0022); the result is shown as an estimate, never as spent.",
   "currency": "USD",
   "as_of": "2026-11-03",
   "models": {
     "claude-opus-5-5": { "input": 4.00, "output": 20.00, "cache_read": 0.20, "cache_write": 5.00 },
     "claude-opus-5": { "input": 5.00, "output": 25.00, "cache_read": 0.50, "cache_write": 6.25 },
-    "claude-sonnet-5-5": { "input": 2.00, "output": 10.00, "cache_read": 0.20, "cache_write": 2.50 },
-    "claude-haiku-5-5": { "input": 0.10, "output": 0.50, "cache_read": 0.01, "cache_write": 0.125 }
+    "claude-sonnet-5-5": { "input": 2.00, "output": 10.00, "cache_read": 0.20, "cache_write": 2.50 }
   }
 }

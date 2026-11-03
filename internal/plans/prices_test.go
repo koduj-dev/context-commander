@@ -68,17 +68,23 @@ func TestAnEstimatePricesOnlyWhatHasAPrice(t *testing.T) {
 func TestABrokenPriceTableIsRefused(t *testing.T) {
 	for name, body := range map[string]string{
 		"typo in a field":  `{"currency":"USD","models":{"m":{"input":1,"cache-read":1}}}`,
-		"no currency":      `{"models":{"m":{"input":1}}}`,
-		"not a currency":   `{"currency":"dollars","models":{"m":{"input":1}}}`,
+		"no currency":      `{"models":{"m":{"input":1,"output":1,"cache_read":1,"cache_write":1}}}`,
+		"not a currency":   `{"currency":"dollars","models":{"m":{"input":1,"output":1,"cache_read":1,"cache_write":1}}}`,
 		"nothing priced":   `{"currency":"USD","models":{}}`,
-		"negative price":   `{"currency":"USD","models":{"m":{"input":-1}}}`,
-		"not a model id":   `{"currency":"USD","models":{"a model":{"input":1}}}`,
-		"a bare wildcard":  `{"currency":"USD","models":{"*":{"input":1}}}`,
+		"negative price":   `{"currency":"USD","models":{"m":{"input":-1,"output":1,"cache_read":1,"cache_write":1}}}`,
+		"not a model id":   `{"currency":"USD","models":{"a model":{"input":1,"output":1,"cache_read":1,"cache_write":1}}}`,
+		"a bare wildcard":  `{"currency":"USD","models":{"*":{"input":1,"output":1,"cache_read":1,"cache_write":1}}}`,
 		"not even JSON":    `currency: USD`,
-		"an unknown field": `{"currency":"USD","per":1000,"models":{"m":{"input":1}}}`,
+		"a missing rate":   `{"currency":"USD","models":{"m":{"input":1,"output":1,"cache_read":1}}}`,
+		"a null rate":      `{"currency":"USD","models":{"m":{"input":1,"output":1,"cache_read":1,"cache_write":null}}}`,
+		"an unknown field": `{"currency":"USD","per":1000,"models":{"m":{"input":1,"output":1,"cache_read":1,"cache_write":1}}}`,
 	} {
 		if _, err := plans.ParsePrices([]byte(body)); err == nil {
 			t.Errorf("%s: accepted", name)
 		}
+	}
+	// A kind the vendor does not charge for is an explicit zero, and fine.
+	if _, err := plans.ParsePrices([]byte(`{"currency":"USD","models":{"m":{"input":1,"output":1,"cache_read":0.1,"cache_write":0}}}`)); err != nil {
+		t.Errorf("an explicit zero was refused: %v", err)
 	}
 }

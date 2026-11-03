@@ -1,7 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { bytes, calendarDate, date, duration, stamp, time, utcStamp } from "./format";
+import { bytes, calendarDate, date, duration, money, stamp, time, utcStamp } from "./format";
 
 const SAMPLE = "2026-09-13T12:05:22Z";
+
+describe("money", () => {
+  it("never rounds a positive cost down to a free-looking zero", () => {
+    // 1,000 cache-read tokens at $0.01 per million.
+    expect(money(0.00001, "USD", "en")).toBe("$0.00001");
+    expect(money(0.0064, "USD", "en")).toBe("$0.0064");
+    expect(money(0.0123, "USD", "en")).toBe("$0.0123");
+    expect(money(12.345, "USD", "en")).toBe("$12.35");
+    expect(money(0, "USD", "en")).toBe("$0.00");
+  });
+});
 
 describe("date", () => {
   it("writes the reader's chosen order regardless of language", () => {

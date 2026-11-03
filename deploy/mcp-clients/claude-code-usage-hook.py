@@ -61,12 +61,13 @@ def transcripts(transcript: Path) -> list:
     return out
 
 
-def totals(files: list) -> dict:
-    """Sum usage over the transcripts' distinct responses, by model.
+def responses(files: list) -> dict:
+    """The transcripts' distinct responses: id -> (model, counts).
 
     One response is written several times as it streams, each copy carrying
     the same message id and the same usage; counting copies would multiply
-    the total. The last copy of each id wins, across all the files.
+    the total. The last copy of each id wins, across all the files, and the
+    order is the order in which each id first appeared.
     """
     by_id = {}
     for path in files:
@@ -86,17 +87,26 @@ def totals(files: list) -> dict:
                 if not isinstance(message, dict) or not isinstance(message.get("usage"), dict):
                     continue
                 key = message.get("id") or entry.get("uuid")
-                if key:
-                    model = message.get("model")
-                    by_id[key] = (model if isinstance(model, str) and MODEL.fullmatch(model) else "", message["usage"])
+                if not key:
+                    continue
+                model = message.get("model")
+                usage = message["usage"]
+                counts = {}
+                for field, source in FIELDS.items():
+                    value = usage.get(source)
+                    counts[field] = value if isinstance(value, int) and value > 0 else 0
+                by_id[key] = (model if isinstance(model, str) and MODEL.fullmatch(model) else "", counts)
+    return by_id
+
+
+def totals(files: list) -> dict:
+    """Sum usage over the transcripts' distinct responses, by model."""
     out = {}
-    for model, usage in by_id.values():
-        counts = out.setdefault(model, {field: 0 for field in FIELDS})
-        for field, source in FIELDS.items():
-            value = usage.get(source)
-            if isinstance(value, int) and value > 0:
-                counts[field] += value
-    return {model: counts for model, counts in out.items() if any(counts.values())}
+    for model, counts in responses(files).values():
+        acc = out.setdefault(model, {field: 0 for field in FIELDS})
+        for field in FIELDS:
+            acc[field] += counts[field]
+    return {model: acc for model, acc in out.items() if any(acc.values())}
 
 
 def state_file(session_id: str) -> Path:
@@ -105,12 +115,18 @@ def state_file(session_id: str) -> Path:
     return Path(base) / "context-commander" / "usage" / f"{safe}.json"
 
 
-def read_sent(state: Path, now: dict) -> dict:
+def read_sent(state: Path, transcript: Path) -> dict:
     """What was already sent, by model.
 
-    A state file from before models were sent holds one flat total. Those
-    tokens were sent; which model they were for was not. They are taken off
-    this session's models in order, so none of them is sent a second time.
+    A state file from before models were sent holds one flat total, of the
+    session transcript only: that version read no subagent transcripts. The
+    transcript is append-only, so what it sent was its responses up to some
+    point, in order. Walking them in that order and taking each one's counts
+    off the old total recovers which models those tokens were for: tokens it
+    sent are not sent again, and tokens it never saw (a later response, a
+    subagent) are sent under their own model. The recovered baseline is
+    saved at once, so the conversion happens exactly once even if nothing is
+    posted this turn.
     """
     try:
         raw = json.loads(state.read_text(encoding="utf-8"))
@@ -120,13 +136,17 @@ def read_sent(state: Path, now: dict) -> dict:
         return {}
     if isinstance(raw.get("models"), dict):
         return {m: {f: int(c.get(f, 0)) for f in FIELDS} for m, c in raw["models"].items() if isinstance(c, dict)}
+    left = {f: int(raw.get(f, 0) or 0) for f in FIELDS}
     sent = {}
-    for field in FIELDS:
-        left = int(raw.get(field, 0) or 0)
-        for model in sorted(now):
-            take = min(left, now[model][field])
-            sent.setdefault(model, {f: 0 for f in FIELDS})[field] = take
-            left -= take
+    for model, counts in responses([transcript]).values():
+        if not any(left.values()):
+            break
+        acc = sent.setdefault(model, {f: 0 for f in FIELDS})
+        for f in FIELDS:
+            take = min(left[f], counts[f])
+            acc[f] += take
+            left[f] -= take
+    write_sent(state, sent)
     return sent
 
 
@@ -157,7 +177,7 @@ def main() -> None:
 
     now = totals(transcripts(Path(transcript)))
     state = state_file(session_id)
-    sent = read_sent(state, now)
+    sent = read_sent(state, Path(transcript))
     dropped = False
     for model in sorted(now):
         before = sent.get(model, {f: 0 for f in FIELDS})

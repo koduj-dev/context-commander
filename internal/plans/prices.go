@@ -70,15 +70,22 @@ func LoadPrices(path string) (*Prices, error) {
 
 // ParsePrices parses a price table. Unknown fields are refused, so a typo
 // such as "cache-read" fails at startup instead of silently pricing cache
-// reads at zero. A model key ending in "*" matches every model starting with
+// reads at zero. For the same reason every model must give all four rates:
+// a missing one is an error, and a kind the vendor does not charge for is an
+// explicit 0. A model key ending in "*" matches every model starting with
 // what precedes it ("claude-opus-5*"); an exact key beats a prefix, and a
 // longer prefix beats a shorter one.
 func ParsePrices(b []byte) (*Prices, error) {
 	var raw struct {
-		Comment  string           `json:"_comment"`
-		Currency string           `json:"currency"`
-		AsOf     string           `json:"as_of"`
-		Models   map[string]Price `json:"models"`
+		Comment  string `json:"_comment"`
+		Currency string `json:"currency"`
+		AsOf     string `json:"as_of"`
+		Models   map[string]struct {
+			Input      *float64 `json:"input"`
+			Output     *float64 `json:"output"`
+			CacheRead  *float64 `json:"cache_read"`
+			CacheWrite *float64 `json:"cache_write"`
+		} `json:"models"`
 	}
 	dec := json.NewDecoder(bytes.NewReader(b))
 	dec.DisallowUnknownFields()
@@ -92,7 +99,11 @@ func ParsePrices(b []byte) (*Prices, error) {
 		return nil, fmt.Errorf("no models priced")
 	}
 	p := &Prices{Currency: raw.Currency, AsOf: raw.AsOf, exact: map[string]Price{}}
-	for key, price := range raw.Models {
+	for key, rates := range raw.Models {
+		if rates.Input == nil || rates.Output == nil || rates.CacheRead == nil || rates.CacheWrite == nil {
+			return nil, fmt.Errorf("model %q: give all four rates (input, output, cache_read, cache_write); use 0 for a kind that is not charged", key)
+		}
+		price := Price{Input: *rates.Input, Output: *rates.Output, CacheRead: *rates.CacheRead, CacheWrite: *rates.CacheWrite}
 		for _, v := range []float64{price.Input, price.Output, price.CacheRead, price.CacheWrite} {
 			if v < 0 {
 				return nil, fmt.Errorf("model %q: a price cannot be negative", key)

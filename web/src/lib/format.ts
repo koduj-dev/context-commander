@@ -59,15 +59,24 @@ export function number(value: number, locale: string): string {
 
 /**
  * An amount of money in an ISO 4217 currency. Below one unit it keeps up to
- * four decimals: a step that cost a fraction of a cent should not read as
- * "$0.00", which says "free".
+ * four decimals, and below a cent two significant digits however many
+ * decimals that takes: a step that cost a fraction of a cent must not read
+ * as "$0.00", which says "free".
  */
 export function money(value: number, currency: string, locale: string): string {
+  const abs = Math.abs(value);
+  if (abs > 0 && abs < 0.01) {
+    return new Intl.NumberFormat(locale, {
+      style: "currency",
+      currency,
+      maximumSignificantDigits: 2,
+    }).format(value);
+  }
   return new Intl.NumberFormat(locale, {
     style: "currency",
     currency,
     minimumFractionDigits: 2,
-    maximumFractionDigits: Math.abs(value) < 1 ? 4 : 2,
+    maximumFractionDigits: abs < 1 ? 4 : 2,
   }).format(value);
 }
 
