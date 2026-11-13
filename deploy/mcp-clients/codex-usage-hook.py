@@ -32,6 +32,9 @@ Configuration, from the environment Codex runs in:
              one: presence is per credential.
   CC_URL     the server, e.g. https://cc.example.com (default
              http://127.0.0.1:8490).
+  CC_PROJECT optional, the project path ("namespace/slug") this session
+             works in. With it, a session that never reported a step is
+             still counted in the project's usage instead of dropped.
 
 Standard library only, and it never fails the turn: any problem is written to
 stderr and the script exits 0.
@@ -42,6 +45,7 @@ See deploy/mcp-clients/README.md, "Token usage".
 import json
 import os
 import re
+import subprocess
 import sys
 import urllib.error
 import urllib.request
@@ -153,6 +157,32 @@ def post(url: str, token: str, body: dict) -> dict:
         return json.load(response)
 
 
+def work_context(cwd) -> dict:
+    """The branch the turn ran on and the project this hook is set up for.
+
+    The branch is read from the repository in the session's working
+    directory, so the server can group usage by it (docs/adr/0027). A
+    directory that is not a repository, a detached HEAD, or no git at all
+    leave it out. CC_PROJECT ("namespace/slug") lets the server count a
+    session that never reported a step instead of dropping its tokens.
+    """
+    out = {}
+    project = os.environ.get("CC_PROJECT", "").strip()
+    if project:
+        out["project"] = project
+    if cwd:
+        try:
+            branch = subprocess.run(
+                ["git", "-C", str(cwd), "branch", "--show-current"],
+                capture_output=True, text=True, timeout=2, check=False,
+            ).stdout.strip()
+        except (OSError, subprocess.SubprocessError):
+            branch = ""
+        if branch:
+            out["branch"] = branch[:200]
+    return out
+
+
 def hook_input() -> dict:
     """The event, from notify's last argument or a hook's stdin."""
     if len(sys.argv) > 1:
@@ -175,6 +205,7 @@ def main() -> None:
     rollout = Path(event["transcript_path"]) if event.get("transcript_path") else find_rollout(session_id)
     if rollout is None or not rollout.is_file():
         return
+    context = work_context(event.get("cwd"))
     now = totals(rollout, label(event.get("model")))
     state = state_file(session_id)
     sent = read_sent(state)
@@ -184,14 +215,14 @@ def main() -> None:
         delta = {f: max(0, now[model][f] - before.get(f, 0)) for f in FIELDS}
         if not any(delta.values()):
             continue
-        answer = post(url, token, {"model": model, **delta})
+        answer = post(url, token, {"model": model, **delta, **context})
         # Recorded as sent even when dropped for want of a step, and after
         # every model: the same never-re-send rule as the Claude Code hook.
         sent[model] = {f: max(before.get(f, 0), now[model][f]) for f in FIELDS}
         write_sent(state, sent)
         dropped = dropped or not answer.get("credited")
     if dropped:
-        print("context-commander: usage not credited — this client has not reported a step (plan.report)", file=sys.stderr)
+        print("context-commander: usage not credited — this client has not reported a step (plan.report) and CC_PROJECT is not set", file=sys.stderr)
 
 
 if __name__ == "__main__":

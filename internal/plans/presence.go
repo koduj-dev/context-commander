@@ -47,11 +47,15 @@ func (s *Service) Report(ctx context.Context, principalID uuid.UUID, clientID *u
 	if err := r.Usage.check(); err != nil {
 		return Presence{}, err
 	}
+	var err error
+	if r.Branch, r.TicketKey, err = checkWorkContext(r.Branch, r.TicketKey); err != nil {
+		return Presence{}, err
+	}
 
 	now := s.now()
 	out := Presence{ClientID: *clientID, PrincipalID: principalID, ProjectID: projectID, Activity: r.Activity, LastBeat: now}
 	var prevProject *uuid.UUID
-	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+	err = db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
 		planID := r.PlanID
 		if r.ItemID != nil {
 			var itemPlan uuid.UUID
@@ -77,7 +81,8 @@ func (s *Service) Report(ctx context.Context, principalID uuid.UUID, clientID *u
 		}
 		out.PlanID, out.ItemID = planID, r.ItemID
 
-		since, err := s.creditPrevious(ctx, tx, principalID, *clientID, now, r.ItemID, r.Usage)
+		since, err := s.creditPrevious(ctx, tx, principalID, *clientID, now, r.ItemID, r.Usage,
+			workContext{projectID: projectID, branch: r.Branch, ticketKey: r.TicketKey})
 		if err != nil {
 			return err
 		}
@@ -97,15 +102,23 @@ func (s *Service) Report(ctx context.Context, principalID uuid.UUID, clientID *u
 		// The CTE reads the row as it was before the upsert, which is how a
 		// move between projects learns which board it left.
 		if err := tx.QueryRow(ctx,
+			// A report that names no branch or ticket keeps the ones the
+			// client gave before — typically the usage hook, which knows the
+			// branch and not the step — unless it moved to another project,
+			// where they would describe someone else's repository.
 			`WITH prev AS (SELECT project_id FROM work_presence WHERE client_id = $1)
-			 INSERT INTO work_presence (client_id, principal_id, project_id, plan_id, item_id, ciphertext, nonce, wrapped_dek, project_key_version, since, last_beat)
-			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+			 INSERT INTO work_presence (client_id, principal_id, project_id, plan_id, item_id, ciphertext, nonce, wrapped_dek, project_key_version, since, last_beat, branch, ticket_key)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 			 ON CONFLICT (client_id) DO UPDATE SET principal_id = EXCLUDED.principal_id, project_id = EXCLUDED.project_id,
 			   plan_id = EXCLUDED.plan_id, item_id = EXCLUDED.item_id, ciphertext = EXCLUDED.ciphertext, nonce = EXCLUDED.nonce,
 			   wrapped_dek = EXCLUDED.wrapped_dek, project_key_version = EXCLUDED.project_key_version,
-			   since = EXCLUDED.since, last_beat = EXCLUDED.last_beat
+			   since = EXCLUDED.since, last_beat = EXCLUDED.last_beat,
+			   branch = CASE WHEN EXCLUDED.branch <> '' THEN EXCLUDED.branch
+			                 WHEN work_presence.project_id = EXCLUDED.project_id THEN work_presence.branch ELSE '' END,
+			   ticket_key = CASE WHEN EXCLUDED.ticket_key <> '' THEN EXCLUDED.ticket_key
+			                 WHEN work_presence.project_id = EXCLUDED.project_id THEN work_presence.ticket_key ELSE '' END
 			 RETURNING (SELECT project_id FROM prev)`,
-			*clientID, principalID, projectID, planID, r.ItemID, ct, nonce, dek, kv, since, now).Scan(&prevProject); err != nil {
+			*clientID, principalID, projectID, planID, r.ItemID, ct, nonce, dek, kv, since, now, r.Branch, r.TicketKey).Scan(&prevProject); err != nil {
 			return err
 		}
 		_, err = tx.Exec(ctx, `SELECT cc_prune_presence()`)
@@ -122,31 +135,53 @@ func (s *Service) Report(ctx context.Context, principalID uuid.UUID, clientID *u
 	return out, nil
 }
 
+// workContext is where a credit lands in the usage ledger when the client
+// had no presence to say so: the project it is reporting in, and the branch
+// and ticket it named.
+type workContext struct {
+	projectID uuid.UUID
+	branch    string
+	ticketKey string
+	// override makes branch win over the previous presence row's. Set by
+	// the usage hook, which reads the branch from the repository at the
+	// moment the tokens were spent. It knows no ticket, so the row's stays.
+	override bool
+}
+
 // creditPrevious adds the time since the client's previous report, and the
-// reported tokens, to the item that report was on. Returns when the client
-// arrived where it now is: unchanged if it stayed on the same item.
+// reported tokens, to the item that report was on and to the usage ledger.
+// Returns when the client arrived where it now is: unchanged if it stayed on
+// the same item.
 //
 // The tokens go to the totals and to the model's row of the breakdown in
 // the same transaction, so the breakdown always adds up to the totals.
-func (s *Service) creditPrevious(ctx context.Context, tx pgx.Tx, principalID, clientID uuid.UUID, now time.Time, nextItem *uuid.UUID, tokens Tokens) (time.Time, error) {
+func (s *Service) creditPrevious(ctx context.Context, tx pgx.Tx, principalID, clientID uuid.UUID, now time.Time, nextItem *uuid.UUID, tokens Tokens, next workContext) (time.Time, error) {
 	var prevItem *uuid.UUID
 	var prevProject uuid.UUID
+	var prevBranch, prevTicket string
 	var since, lastBeat time.Time
 	err := tx.QueryRow(ctx,
-		`SELECT item_id, project_id, since, last_beat FROM work_presence WHERE client_id = $1 FOR UPDATE`, clientID,
-	).Scan(&prevItem, &prevProject, &since, &lastBeat)
+		`SELECT item_id, project_id, since, last_beat, branch, ticket_key FROM work_presence WHERE client_id = $1 FOR UPDATE`, clientID,
+	).Scan(&prevItem, &prevProject, &since, &lastBeat, &prevBranch, &prevTicket)
 	found := err == nil
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return time.Time{}, err
+	}
+
+	// Time is time present, step or no step: the ledger counts it even when
+	// the client never said which step it was on.
+	var present int64
+	if found {
+		if gap := now.Sub(lastBeat); gap > 0 && gap <= IdleAfter {
+			present = int64(gap / time.Second)
+		}
 	}
 
 	target := nextItem
 	var seconds int64
 	if found && prevItem != nil {
 		target = prevItem
-		if gap := now.Sub(lastBeat); gap > 0 && gap <= IdleAfter {
-			seconds = int64(gap / time.Second)
-		}
+		seconds = present
 	}
 	if target != nil && (seconds > 0 || tokens.any()) {
 		if _, err := tx.Exec(ctx,
@@ -176,10 +211,34 @@ func (s *Service) creditPrevious(ctx context.Context, tx pgx.Tx, principalID, cl
 		}
 	}
 
+	// The ledger. What was spent belongs to where the client was, which is
+	// the previous row when there is one.
+	key := ledgerKey{project: next.projectID, branch: next.branch, ticketKey: next.ticketKey}
+	if found {
+		key.project, key.ticketKey = prevProject, prevTicket
+		if !next.override {
+			key.branch = prevBranch
+		}
+	}
+	if err := creditLedger(ctx, tx, key, principalID, now, present, tokens); err != nil {
+		return time.Time{}, err
+	}
+
 	if found && sameItem(prevItem, nextItem) {
 		return since, nil
 	}
 	return now, nil
+}
+
+// UsageContext is what a client hook knows besides the tokens.
+type UsageContext struct {
+	// Branch is the git branch the turn ran on, read by the hook from the
+	// repository. Empty when the hook could not tell.
+	Branch string
+	// ProjectID is the project the hook is configured for. Used only when
+	// the client has no presence yet, so its first turn is counted rather
+	// than dropped.
+	ProjectID *uuid.UUID
 }
 
 // ReportUsage credits token deltas to wherever the client currently is,
@@ -187,10 +246,11 @@ func (s *Service) creditPrevious(ctx context.Context, tx pgx.Tx, principalID, cl
 // hook calls after every turn (deploy/mcp-clients/README.md): the hook knows
 // the tokens and not the step, and the presence row already knows the step.
 //
-// Returns the presence it credited, or ok=false when the client has none —
-// it never reported where it is, so there is nothing to attach the tokens
-// to, and they are dropped rather than guessed onto some item.
-func (s *Service) ReportUsage(ctx context.Context, principalID uuid.UUID, clientID *uuid.UUID, usage Tokens) (Presence, bool, error) {
+// A client with no presence is placed in uc.ProjectID, on no step, when the
+// hook names one: the tokens then reach the ledger (docs/adr/0027) and no
+// step. Without a project they are dropped, ok=false, rather than guessed
+// onto some item.
+func (s *Service) ReportUsage(ctx context.Context, principalID uuid.UUID, clientID *uuid.UUID, usage Tokens, uc UsageContext) (Presence, bool, error) {
 	if clientID == nil {
 		return Presence{}, false, ErrNoClient
 	}
@@ -198,16 +258,23 @@ func (s *Service) ReportUsage(ctx context.Context, principalID uuid.UUID, client
 	if err := usage.check(); err != nil {
 		return Presence{}, false, err
 	}
+	branch, _, err := checkWorkContext(uc.Branch, "")
+	if err != nil {
+		return Presence{}, false, err
+	}
 	var projectID uuid.UUID
 	var planID, itemID *uuid.UUID
-	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+	err = db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
 		return tx.QueryRow(ctx, `SELECT project_id, plan_id, item_id FROM work_presence WHERE client_id = $1`, *clientID).
 			Scan(&projectID, &planID, &itemID)
 	})
-	if errors.Is(err, pgx.ErrNoRows) {
+	placed := false
+	switch {
+	case errors.Is(err, pgx.ErrNoRows) && uc.ProjectID != nil:
+		projectID, placed = *uc.ProjectID, true
+	case errors.Is(err, pgx.ErrNoRows):
 		return Presence{}, false, nil
-	}
-	if err != nil {
+	case err != nil:
 		return Presence{}, false, fmt.Errorf("plans: report usage: %w", err)
 	}
 	if err := s.checkCapability(ctx, principalID, projectID, auth.CapPlanWrite); err != nil {
@@ -215,16 +282,32 @@ func (s *Service) ReportUsage(ctx context.Context, principalID uuid.UUID, client
 	}
 
 	now := s.now()
-	out := Presence{ClientID: *clientID, PrincipalID: principalID, ProjectID: projectID, PlanID: planID, ItemID: itemID, LastBeat: now}
+	out := Presence{ClientID: *clientID, PrincipalID: principalID, ProjectID: projectID, PlanID: planID, ItemID: itemID, LastBeat: now, Since: now}
 	err = db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
-		since, err := s.creditPrevious(ctx, tx, principalID, *clientID, now, itemID, usage)
+		if placed {
+			// ON CONFLICT DO NOTHING: a plan.report racing this one already
+			// placed the client, and its row wins.
+			if _, err := tx.Exec(ctx,
+				`INSERT INTO work_presence (client_id, principal_id, project_id, since, last_beat, branch)
+				 VALUES ($1, $2, $3, $4, $4, $5) ON CONFLICT (client_id) DO NOTHING`,
+				*clientID, principalID, projectID, now, branch); err != nil {
+				return err
+			}
+			// The row now exists with last_beat = now, so creditPrevious
+			// adds no time for this turn — only its tokens.
+		}
+		since, err := s.creditPrevious(ctx, tx, principalID, *clientID, now, itemID, usage,
+			workContext{projectID: projectID, branch: branch, override: branch != ""})
 		if err != nil {
 			return err
 		}
 		out.Since = since
 		// The activity line is left as the client last wrote it: a hook does
-		// not know what the agent is doing, only what it cost.
-		_, err = tx.Exec(ctx, `UPDATE work_presence SET last_beat = $2 WHERE client_id = $1`, *clientID, now)
+		// not know what the agent is doing, only what it cost. The branch it
+		// does know, and it is what the next stretch of time is spent on.
+		_, err = tx.Exec(ctx,
+			`UPDATE work_presence SET last_beat = $2, branch = CASE WHEN $3 <> '' THEN $3 ELSE branch END WHERE client_id = $1`,
+			*clientID, now, branch)
 		return err
 	})
 	if err != nil {
@@ -259,7 +342,7 @@ func (s *Service) ClearPresence(ctx context.Context, principalID uuid.UUID, clie
 	// board is the one that changed.
 	var cleared *uuid.UUID
 	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
-		if _, err := s.creditPrevious(ctx, tx, principalID, *clientID, s.now(), nil, tokens); err != nil {
+		if _, err := s.creditPrevious(ctx, tx, principalID, *clientID, s.now(), nil, tokens, workContext{projectID: projectID}); err != nil {
 			return err
 		}
 		err := tx.QueryRow(ctx, `DELETE FROM work_presence WHERE client_id = $1 RETURNING project_id`, *clientID).Scan(&cleared)

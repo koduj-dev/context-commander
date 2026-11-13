@@ -23,6 +23,9 @@ Configuration, from the environment Claude Code runs in:
              token would be a different client that is nowhere.
   CC_URL     the server, e.g. https://cc.example.com (default
              http://127.0.0.1:8490).
+  CC_PROJECT optional, the project path ("namespace/slug") this session
+             works in. With it, a session that never reported a step is
+             still counted in the project's usage instead of dropped.
 
 Standard library only, and it never fails the turn: any problem is written to
 stderr and the script exits 0, because a hook that breaks Claude Code to
@@ -34,6 +37,7 @@ See deploy/mcp-clients/README.md, "Token usage".
 import json
 import os
 import re
+import subprocess
 import sys
 import urllib.error
 import urllib.request
@@ -166,6 +170,32 @@ def post(url: str, token: str, body: dict) -> dict:
         return json.load(response)
 
 
+def work_context(cwd) -> dict:
+    """The branch the turn ran on and the project this hook is set up for.
+
+    The branch is read from the repository in the session's working
+    directory, so the server can group usage by it (docs/adr/0027). A
+    directory that is not a repository, a detached HEAD, or no git at all
+    leave it out. CC_PROJECT ("namespace/slug") lets the server count a
+    session that never reported a step instead of dropping its tokens.
+    """
+    out = {}
+    project = os.environ.get("CC_PROJECT", "").strip()
+    if project:
+        out["project"] = project
+    if cwd:
+        try:
+            branch = subprocess.run(
+                ["git", "-C", str(cwd), "branch", "--show-current"],
+                capture_output=True, text=True, timeout=2, check=False,
+            ).stdout.strip()
+        except (OSError, subprocess.SubprocessError):
+            branch = ""
+        if branch:
+            out["branch"] = branch[:200]
+    return out
+
+
 def main() -> None:
     hook = json.load(sys.stdin)
     transcript = hook.get("transcript_path")
@@ -175,6 +205,7 @@ def main() -> None:
         return
     url = os.environ.get("CC_URL", "http://127.0.0.1:8490").rstrip("/") + "/v1/me/usage"
 
+    context = work_context(hook.get("cwd"))
     now = totals(transcripts(Path(transcript)))
     state = state_file(session_id)
     sent = read_sent(state, Path(transcript))
@@ -184,7 +215,7 @@ def main() -> None:
         delta = {f: max(0, now[model][f] - before.get(f, 0)) for f in FIELDS}
         if not any(delta.values()):
             continue
-        answer = post(url, token, {"model": model, **delta})
+        answer = post(url, token, {"model": model, **delta, **context})
         # Recorded as sent even when the server dropped it for want of a
         # step: sending the same tokens again on the next turn would credit
         # them to whatever step comes next, which is the guess this is built
@@ -194,7 +225,7 @@ def main() -> None:
         write_sent(state, sent)
         dropped = dropped or not answer.get("credited")
     if dropped:
-        print("context-commander: usage not credited — this client has not reported a step (plan.report)", file=sys.stderr)
+        print("context-commander: usage not credited — this client has not reported a step (plan.report) and CC_PROJECT is not set", file=sys.stderr)
 
 
 if __name__ == "__main__":

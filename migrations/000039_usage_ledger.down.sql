@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS usage_ledger;
+ALTER TABLE work_presence DROP COLUMN IF EXISTS ticket_key, DROP COLUMN IF EXISTS branch;

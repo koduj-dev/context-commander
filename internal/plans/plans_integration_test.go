@@ -601,7 +601,7 @@ func TestAHooksUsageLandsWhereTheClientSaidItWas(t *testing.T) {
 	p := f.plan(agent, "Steps", "the step")
 	item := p.Items[0].ID
 
-	if _, ok, err := f.svc.ReportUsage(f.ctx, agent.principalID, &agent.clientID, plans.Tokens{TokensIn: 5}); err != nil || ok {
+	if _, ok, err := f.svc.ReportUsage(f.ctx, agent.principalID, &agent.clientID, plans.Tokens{TokensIn: 5}, plans.UsageContext{}); err != nil || ok {
 		t.Fatalf("usage before any presence: ok=%v err=%v, want dropped", ok, err)
 	}
 
@@ -611,7 +611,7 @@ func TestAHooksUsageLandsWhereTheClientSaidItWas(t *testing.T) {
 	}
 	f.clock = f.clock.Add(4 * time.Minute)
 	usage := plans.Tokens{TokensIn: 12, TokensOut: 3400, CacheReadTokens: 2_500_000, CacheWriteTokens: 40_000}
-	pr, ok, err := f.svc.ReportUsage(f.ctx, agent.principalID, &agent.clientID, usage)
+	pr, ok, err := f.svc.ReportUsage(f.ctx, agent.principalID, &agent.clientID, usage, plans.UsageContext{})
 	if err != nil || !ok || pr.ItemID == nil || *pr.ItemID != item {
 		t.Fatalf("ReportUsage: %+v ok=%v err=%v", pr, ok, err)
 	}
@@ -629,7 +629,7 @@ func TestAHooksUsageLandsWhereTheClientSaidItWas(t *testing.T) {
 	if len(b.Presence) != 1 || b.Presence[0].Activity != "editing the parser" || *b.Presence[0].ItemID != item {
 		t.Errorf("the hook moved or blanked the presence: %+v", b.Presence)
 	}
-	if _, _, err := f.svc.ReportUsage(f.ctx, agent.principalID, &agent.clientID, plans.Tokens{CacheReadTokens: -1}); !errors.Is(err, plans.ErrInvalid) {
+	if _, _, err := f.svc.ReportUsage(f.ctx, agent.principalID, &agent.clientID, plans.Tokens{CacheReadTokens: -1}, plans.UsageContext{}); !errors.Is(err, plans.ErrInvalid) {
 		t.Errorf("a negative count returned %v", err)
 	}
 }
@@ -652,12 +652,12 @@ func TestTokensAreKeptPerModel(t *testing.T) {
 		{Model: " claude-opus-5-5 ", TokensOut: 5},
 		{TokensIn: 7},
 	} {
-		if _, ok, err := f.svc.ReportUsage(f.ctx, agent.principalID, &agent.clientID, u); err != nil || !ok {
+		if _, ok, err := f.svc.ReportUsage(f.ctx, agent.principalID, &agent.clientID, u, plans.UsageContext{}); err != nil || !ok {
 			t.Fatalf("ReportUsage(%+v): ok=%v err=%v", u, ok, err)
 		}
 	}
 	for _, bad := range []string{"<synthetic>", "claude opus", strings.Repeat("m", plans.MaxModel+1), "a\\b"} {
-		if _, _, err := f.svc.ReportUsage(f.ctx, agent.principalID, &agent.clientID, plans.Tokens{Model: bad, TokensIn: 1}); !errors.Is(err, plans.ErrInvalid) {
+		if _, _, err := f.svc.ReportUsage(f.ctx, agent.principalID, &agent.clientID, plans.Tokens{Model: bad, TokensIn: 1}, plans.UsageContext{}); !errors.Is(err, plans.ErrInvalid) {
 			t.Errorf("model %q returned %v, want ErrInvalid", bad, err)
 		}
 	}
@@ -853,7 +853,7 @@ func TestChangesAreToldToTheStreamsThatMayReadThem(t *testing.T) {
 	expectNoChange(t, theirs, "an outsider's presence stream was told about this project")
 
 	// Tokens credited by a client hook change the board's effort figures.
-	if _, ok, err := f.svc.ReportUsage(f.ctx, alice.principalID, &alice.clientID, plans.Tokens{Model: "claude-opus-5-5", TokensOut: 3}); err != nil || !ok {
+	if _, ok, err := f.svc.ReportUsage(f.ctx, alice.principalID, &alice.clientID, plans.Tokens{Model: "claude-opus-5-5", TokensOut: 3}, plans.UsageContext{}); err != nil || !ok {
 		t.Fatalf("ReportUsage: ok=%v err=%v", ok, err)
 	}
 	expectChange(t, board, "a usage report reached no board stream")
