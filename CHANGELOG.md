@@ -6,6 +6,15 @@ All notable changes to Context Commander are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.0-beta.2] — 2026-11-13
+
+The team release: Context Commander as an agent dashboard for a small team.
+Google sign-in limited to your domains and addresses, project invitations,
+memories with branch and ticket metadata and search by words or by meaning,
+an idea stack for a planning agent, a usage ledger with statistics, and a
+dashboard that shows who is working where and what it costs. See
+[docs/team-deployment.md](docs/team-deployment.md).
+
 ### Added
 
 - **Project invitations**
@@ -1504,5 +1513,6 @@ database forward. Install it as described in
   by `Create`/`Delete` (`internal/secrets/reference.go`,
   `internal/secrets/service.go`).
 
-[Unreleased]: https://github.com/koduj-dev/context-commander/compare/v0.1.0-beta.1...HEAD
+[Unreleased]: https://github.com/koduj-dev/context-commander/compare/v0.1.0-beta.2...HEAD
+[0.1.0-beta.2]: https://github.com/koduj-dev/context-commander/compare/v0.1.0-beta.1...v0.1.0-beta.2
 [0.1.0-beta.1]: https://github.com/koduj-dev/context-commander/releases/tag/v0.1.0-beta.1
