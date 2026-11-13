@@ -8,6 +8,7 @@ one of them is wrong.
 | Document | Answers |
 |---|---|
 | [`quickstart.md`](quickstart.md) | How do I run this and get two agents handing work to each other? |
+| [`team-deployment.md`](team-deployment.md) | How do I run this for a team — Google sign-in limited to our domain, invitations, every developer's agents, the planning agent? |
 | [`install.md`](install.md) | How do I install a release for real — packages, image, Homebrew — and verify what I downloaded? |
 | [`oidc.md`](oidc.md) | How do I set up single sign-on — Keycloak, Microsoft Entra ID, Google? |
 | [`AGENT-GUIDE.md`](AGENT-GUIDE.md) | **For agents, not people:** how to actually drive this — what to call first, what the answers mean, which mistakes are expensive. Point a coding agent at it. |
