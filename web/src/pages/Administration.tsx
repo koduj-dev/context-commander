@@ -27,6 +27,7 @@ import {
   Tabs,
   TextField,
 } from "../ui";
+import { EmbeddingsCard } from "./AdminEmbeddings";
 
 /**
  * The installation, for whoever administers it.
@@ -120,6 +121,7 @@ export function AdminOverview() {
         </Stack>
 
         <Stack top>
+          <EmbeddingsCard />
           <Panel title={t("admin.security")} tight>
             {recent.loading ? (
               <Loading />

@@ -1039,6 +1039,31 @@ export type InstallationTrends = {
   };
 };
 
+/**
+ * Semantic search's configuration and health (GET /installation/embeddings,
+ * docs/adr/0028). Absent fields are unset; `configured: false` alone means no
+ * provider. `pending` is -1 when the count could not be read.
+ */
+export type EmbeddingsStatus = {
+  configured: boolean;
+  provider?: string;
+  model?: string;
+  endpoint?: string;
+  store?: string;
+  dimensions?: number;
+  /** Absent until the provider has been asked at least once. */
+  reachable?: boolean;
+  last_success?: string;
+  last_error?: string;
+  last_error_at?: string;
+  queue: number;
+  queue_capacity?: number;
+  dropped: number;
+  pending: number;
+  cache_bytes?: number;
+  cache_limit_bytes?: number;
+};
+
 export type InstallationAdmin = {
   user_id: string;
   role: string;
@@ -1432,6 +1457,7 @@ export const api = {
     request<Page<AuditRecord>>(withQuery(`/organizations/${id}/audit`, { cursor, limit })),
 
   installationAdmins: () => request<InstallationAdmin[]>("/installation/admins"),
+  embeddingsStatus: () => request<EmbeddingsStatus>("/installation/embeddings"),
   installationStats: () => request<InstallationStats>("/installation/stats"),
   installationTrends: (weeks?: number) =>
     request<InstallationTrends>(withQuery("/installation/trends", { weeks })),

@@ -5,6 +5,7 @@ import {
   api,
   type Memory,
   type MemoryFilter,
+  type MemoryChange,
   type MemoryHit,
   type MemoryKind,
   type Person,
@@ -15,13 +16,13 @@ import {
   Badge,
   Btn,
   Cell,
-  Code,
   DataTable,
   Def,
   Defs,
   EmptyState,
   ErrorState,
   Loading,
+  Markdown,
   Mono,
   Note,
   PageHead,
@@ -570,6 +571,7 @@ function MemoryDetail({
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<unknown>();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [editing, setEditing] = useState(false);
 
   async function run(action: () => Promise<unknown>) {
     setBusy(true);
@@ -589,6 +591,26 @@ function MemoryDetail({
     return <ErrorState error={memory.error} onRetry={memory.reload} />;
   const m = memory.data;
   const link = safeTicketURL(m.ticket_url);
+
+  if (editing) {
+    return (
+      <MemoryForm
+        title={t("memories.edit")}
+        initial={draftOf(m)}
+        submitLabel={t("memories.saveChanges")}
+        onCancel={() => setEditing(false)}
+        onSubmit={async (d) => {
+          const change = memoryChange(m, d);
+          if (Object.keys(change).length > 1) {
+            await api.updateMemory(namespace, slug, m.id, change);
+          }
+          setEditing(false);
+          memory.reload();
+          onChanged();
+        }}
+      />
+    );
+  }
 
   return (
     <Stack gap="sm">
@@ -628,10 +650,13 @@ function MemoryDetail({
           </Def>
         )}
       </Defs>
-      {m.body ? <Code>{m.body}</Code> : <span className="dim">{t("memories.noBody")}</span>}
+      {m.body ? <Markdown source={m.body} /> : <span className="dim">{t("memories.noBody")}</span>}
       {semantic && <Related id={m.id} />}
       {failure !== undefined && <ErrorState error={failure} />}
       <Row gap="sm">
+        <Btn small disabled={busy} onClick={() => setEditing(true)}>
+          {t("memories.editAction")}
+        </Btn>
         {m.status === "active" ? (
           <Btn
             small
@@ -719,36 +744,94 @@ function Related({ id }: { id: string }) {
   );
 }
 
-function NewMemoryForm({ onCreated }: { onCreated: () => void }) {
+/** What the memory form edits, as the inputs hold it. */
+type MemoryDraft = {
+  kind: MemoryKind;
+  title: string;
+  body: string;
+  branch: string;
+  ticketKey: string;
+  ticketURL: string;
+  tags: string;
+};
+
+const EMPTY_DRAFT: MemoryDraft = {
+  kind: "note",
+  title: "",
+  body: "",
+  branch: "",
+  ticketKey: "",
+  ticketURL: "",
+  tags: "",
+};
+
+function draftOf(m: Memory): MemoryDraft {
+  return {
+    kind: m.kind,
+    title: m.title,
+    body: m.body,
+    branch: m.branch ?? "",
+    ticketKey: m.ticket_key ?? "",
+    ticketURL: m.ticket_url ?? "",
+    tags: m.tags.join(", "),
+  };
+}
+
+function tagList(raw: string): string[] {
+  return raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+/**
+ * Only what the form changed, so an edit does not rewrite fields it never
+ * touched. An emptied branch or ticket is sent as "" — the server reads that
+ * as "clear it" — and the version the form was opened at guards the whole
+ * change: if an agent updated the memory meanwhile the server answers 409
+ * and nothing is overwritten.
+ */
+export function memoryChange(before: Memory, d: MemoryDraft): MemoryChange {
+  const was = draftOf(before);
+  const change: MemoryChange = { expected_version: before.version };
+  if (d.kind !== was.kind) change.kind = d.kind;
+  if (d.title.trim() !== was.title) change.title = d.title.trim();
+  if (d.body !== was.body) change.body = d.body;
+  if (d.branch.trim() !== was.branch) change.branch = d.branch.trim();
+  if (d.ticketKey.trim() !== was.ticketKey) change.ticket_key = d.ticketKey.trim();
+  if (d.ticketURL.trim() !== was.ticketURL) change.ticket_url = d.ticketURL.trim();
+  const tags = tagList(d.tags);
+  if (tags.join("\u0000") !== before.tags.join("\u0000")) change.tags = tags;
+  return change;
+}
+
+function MemoryForm({
+  title,
+  initial,
+  submitLabel,
+  onSubmit,
+  onCancel,
+}: {
+  title: string;
+  initial: MemoryDraft;
+  submitLabel: string;
+  onSubmit: (d: MemoryDraft) => Promise<unknown>;
+  onCancel?: () => void;
+}) {
   const t = useT();
-  const { namespace, slug } = useProject();
-  const [kind, setKind] = useState<MemoryKind>("note");
-  const [title, setTitle] = useState("");
-  const [body, setBody] = useState("");
-  const [branch, setBranch] = useState("");
-  const [ticketKey, setTicketKey] = useState("");
-  const [ticketURL, setTicketURL] = useState("");
-  const [tags, setTags] = useState("");
+  const [d, setD] = useState<MemoryDraft>(initial);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<unknown>();
+  const set =
+    <K extends keyof MemoryDraft>(k: K) =>
+    (v: MemoryDraft[K]) =>
+      setD((cur) => ({ ...cur, [k]: v }));
 
   async function save() {
     setBusy(true);
     setFailure(undefined);
     try {
-      await api.createMemory(namespace, slug, {
-        kind,
-        title: title.trim(),
-        body,
-        branch: branch.trim() || undefined,
-        ticket_key: ticketKey.trim() || undefined,
-        ticket_url: ticketURL.trim() || undefined,
-        tags: tags
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean),
-      });
-      onCreated();
+      await onSubmit(d);
     } catch (err) {
       setFailure(err);
     } finally {
@@ -757,50 +840,89 @@ function NewMemoryForm({ onCreated }: { onCreated: () => void }) {
   }
 
   return (
-    <Panel title={t("memories.new")}>
+    <Panel title={title}>
       <Stack gap="sm">
         <SelectField
           label={t("memories.field.kind")}
-          value={kind}
-          onChange={setKind}
+          value={d.kind}
+          onChange={set("kind")}
           options={KINDS.map((k) => ({ value: k, label: kindLabel(t, k) }))}
         />
-        <TextField labelled label={t("memories.field.title")} value={title} onChange={setTitle} />
+        <TextField
+          labelled
+          label={t("memories.field.title")}
+          value={d.title}
+          onChange={set("title")}
+        />
         <TextArea
           labelled
           label={t("memories.field.body")}
-          value={body}
-          onChange={setBody}
-          rows={6}
+          value={d.body}
+          onChange={set("body")}
+          rows={8}
         />
         <Row gap="sm">
           <TextField
             labelled
             label={t("memories.field.branch")}
-            value={branch}
-            onChange={setBranch}
+            value={d.branch}
+            onChange={set("branch")}
           />
           <TextField
             labelled
             label={t("memories.field.ticketKey")}
-            value={ticketKey}
-            onChange={setTicketKey}
+            value={d.ticketKey}
+            onChange={set("ticketKey")}
           />
           <TextField
             labelled
             label={t("memories.field.ticketURL")}
-            value={ticketURL}
-            onChange={setTicketURL}
+            value={d.ticketURL}
+            onChange={set("ticketURL")}
           />
         </Row>
-        <TextField labelled label={t("memories.field.tagsInput")} value={tags} onChange={setTags} />
+        <TextField
+          labelled
+          label={t("memories.field.tagsInput")}
+          value={d.tags}
+          onChange={set("tags")}
+        />
         {failure !== undefined && <ErrorState error={failure} />}
         <Row gap="sm">
-          <Btn kind="primary" disabled={busy || !title.trim()} onClick={save}>
-            {t("memories.save")}
+          <Btn kind="primary" disabled={busy || !d.title.trim()} onClick={save}>
+            {submitLabel}
           </Btn>
+          {onCancel && (
+            <Btn disabled={busy} onClick={onCancel}>
+              {t("common.cancel")}
+            </Btn>
+          )}
         </Row>
       </Stack>
     </Panel>
+  );
+}
+
+function NewMemoryForm({ onCreated }: { onCreated: () => void }) {
+  const t = useT();
+  const { namespace, slug } = useProject();
+  return (
+    <MemoryForm
+      title={t("memories.new")}
+      initial={EMPTY_DRAFT}
+      submitLabel={t("memories.save")}
+      onSubmit={async (d) => {
+        await api.createMemory(namespace, slug, {
+          kind: d.kind,
+          title: d.title.trim(),
+          body: d.body,
+          branch: d.branch.trim() || undefined,
+          ticket_key: d.ticketKey.trim() || undefined,
+          ticket_url: d.ticketURL.trim() || undefined,
+          tags: tagList(d.tags),
+        });
+        onCreated();
+      }}
+    />
   );
 }

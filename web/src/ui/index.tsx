@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { copyToClipboard } from "../lib/clipboard";
 import { useT } from "../i18n";
 import { ApiError } from "../lib/api";
+import { parseMarkdown, type Block, type Inline } from "../lib/markdown";
 
 /**
  * The component kit.
@@ -838,4 +839,113 @@ export function Pref({
 
 export function Code({ children }: { children: ReactNode }) {
   return <div className="code mono">{children}</div>;
+}
+
+/**
+ * Markdown an agent or a person wrote, rendered as elements — never as an
+ * HTML string, so nothing in the source can become markup (lib/markdown.ts).
+ */
+export function Markdown({ source }: { source: string }) {
+  const blocks = parseMarkdown(source);
+  return <div className="prose">{renderBlocks(blocks)}</div>;
+}
+
+function renderInline(nodes: Inline[]): ReactNode[] {
+  return nodes.map((n, k) => {
+    switch (n.t) {
+      case "text":
+        return n.v;
+      case "code":
+        return (
+          <code key={k} className="mono">
+            {n.v}
+          </code>
+        );
+      case "strong":
+        return <strong key={k}>{renderInline(n.c)}</strong>;
+      case "em":
+        return <em key={k}>{renderInline(n.c)}</em>;
+      case "del":
+        return <del key={k}>{renderInline(n.c)}</del>;
+      case "link":
+        return (
+          <a key={k} href={n.href} target="_blank" rel="noopener noreferrer nofollow">
+            {renderInline(n.c)}
+          </a>
+        );
+      case "br":
+        return <br key={k} />;
+    }
+  });
+}
+
+const ALIGN_CLASS = { l: undefined, c: "c", r: "r" } as const;
+// One step below the page's own headings: an agent's "# Plan" is a section of
+// a panel, not a second page title.
+const HEADING_TAG = { 1: "h3", 2: "h4", 3: "h5", 4: "h6" } as const;
+
+function renderBlocks(blocks: Block[]): ReactNode[] {
+  return blocks.map((b, k) => {
+    switch (b.t) {
+      case "h": {
+        const H = HEADING_TAG[b.level];
+        return <H key={k}>{renderInline(b.c)}</H>;
+      }
+      case "p":
+        return <p key={k}>{renderInline(b.c)}</p>;
+      case "ul":
+      case "ol": {
+        const items = b.items.map((it, j) => (
+          <li key={j}>
+            {renderInline(it.c)}
+            {it.sub && renderBlocks([it.sub])}
+          </li>
+        ));
+        return b.t === "ul" ? (
+          <ul key={k}>{items}</ul>
+        ) : (
+          <ol key={k} start={b.start}>
+            {items}
+          </ol>
+        );
+      }
+      case "pre":
+        return (
+          <pre key={k} className="mono">
+            {b.v}
+          </pre>
+        );
+      case "quote":
+        return <blockquote key={k}>{renderBlocks(b.c)}</blockquote>;
+      case "hr":
+        return <hr key={k} />;
+      case "table":
+        return (
+          <div key={k} className="prose-table">
+            <table>
+              <thead>
+                <tr>
+                  {b.head.map((c, j) => (
+                    <th key={j} className={ALIGN_CLASS[b.align[j] ?? "l"]}>
+                      {renderInline(c)}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {b.rows.map((r, i) => (
+                  <tr key={i}>
+                    {r.map((c, j) => (
+                      <td key={j} className={ALIGN_CLASS[b.align[j] ?? "l"]}>
+                        {renderInline(c)}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+    }
+  });
 }

@@ -25,6 +25,18 @@ All notable changes to Context Commander are documented here. The format follows
   keeps them forever. The application role still cannot delete a ledger
   row; the purge runs through a `SECURITY DEFINER` function that deletes
   only rows older than the retention.
+- **Editing memories in the interface.** A memory's detail has an Edit form
+  for kind, title, body, branch, ticket and tags. It sends only the fields
+  that changed, guarded by the version the form was opened at, so an agent's
+  update in the meantime is a conflict rather than a silent overwrite.
+- **Markdown rendering** for memory bodies, idea descriptions and a planning
+  agent's proposals: headings, lists, code, quotes, tables and links. The
+  source is parsed into a tree and rendered as elements, never as an HTML
+  string; raw HTML stays text and only http(s) and mailto links become links.
+- **A semantic search card in Administration → Overview**: the provider,
+  model and the endpoint memory text is sent to, where vectors are stored,
+  whether the provider answers, the last error, the queue and the memories
+  still waiting.
 
 ## [0.1.0-beta.2] — 2026-11-13
 
