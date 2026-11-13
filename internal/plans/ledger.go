@@ -58,7 +58,7 @@ type ledgerKey struct {
 }
 
 // creditLedger adds seconds and tokens to the day's rows. Seconds go to the
-// model = '' row, because time is not spent per model; tokens to their
+// model = ” row, because time is not spent per model; tokens to their
 // model's row, which is the same row when the model was not stated.
 func creditLedger(ctx context.Context, tx pgx.Tx, key ledgerKey, principalID uuid.UUID, now time.Time, seconds int64, tokens Tokens) error {
 	if key.project == uuid.Nil {
