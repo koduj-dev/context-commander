@@ -3,11 +3,19 @@ import { useT } from "../i18n";
 import { useCrumbs } from "../app/crumbs";
 import { useAuth } from "../app/auth";
 import { useFormat } from "../app/prefs";
-import { api, principalName, type MyProject, type WaitingHandoff } from "../lib/api";
+import {
+  api,
+  principalName,
+  type MyProject,
+  type ProjectIdeaCounts,
+  type UsageSummary,
+  type WaitingHandoff,
+} from "../lib/api";
 import { roleLabel } from "../lib/labels";
 import { useLive } from "../lib/live";
 import { usePolled, useResource } from "../lib/resource";
 import { BOARD_REFRESH_MS, LIVE_REFRESH_MS, PresenceTable } from "./ProjectPlans";
+import { lastDays, UsageFooter, UsageTable } from "./Usage";
 import {
   Badge,
   Cell,
@@ -15,6 +23,7 @@ import {
   EmptyState,
   ErrorState,
   Grid,
+  Kpi,
   Loading,
   Mono,
   PageHead,
@@ -65,6 +74,11 @@ export function Dashboard() {
   // in sequence is the whole point of the change.
   const handoffs = useResource(() => api.myHandoffs(), []);
   const waiting = withProjects(handoffs.data ?? [], mine);
+  const ideas = useResource(() => api.myIdeaCounts(), []);
+  const week = lastDays(7);
+  const fortnight = lastDays(14);
+  const weekUsage = useResource(() => api.myUsage({ ...week, group: ["principal"] }), [week.from]);
+  const daily = useResource(() => api.myUsage({ ...fortnight, group: ["day"] }), [fortnight.from]);
 
   return (
     <>
@@ -72,6 +86,12 @@ export function Dashboard() {
         title={t("dashboard.title")}
         lead={t("dashboard.lead")}
         actions={<span className="dim">{t("auth.signedInAs", { name: principalName(me) })}</span>}
+      />
+
+      <WeekKpis
+        usage={weekUsage.data}
+        proposals={(ideas.data?.items ?? []).reduce((n, c) => n + c.proposed, 0)}
+        queued={(ideas.data?.items ?? []).reduce((n, c) => n + c.open, 0)}
       />
 
       <Grid cols="2-1">
@@ -123,7 +143,42 @@ export function Dashboard() {
               </DataTable>
             )}
           </Panel>
+          <IdeasWaiting
+            loading={ideas.loading}
+            error={ideas.error}
+            reload={ideas.reload}
+            items={ideas.data?.items ?? []}
+          />
           <WorkingNow />
+          <Panel
+            title={t("dashboard.usageDaily", { count: 14 })}
+            tight
+            footer={daily.data && <UsageFooter summary={daily.data} />}
+          >
+            {daily.loading ? (
+              <Loading />
+            ) : daily.error || !daily.data ? (
+              <ErrorState error={daily.error} onRetry={daily.reload} />
+            ) : (
+              <UsageTable
+                summary={{ ...daily.data, rows: [...daily.data.rows].reverse() }}
+                group="day"
+              />
+            )}
+          </Panel>
+          <Panel
+            title={t("dashboard.usageByPerson", { count: 7 })}
+            tight
+            footer={weekUsage.data && <UsageFooter summary={weekUsage.data} />}
+          >
+            {weekUsage.loading ? (
+              <Loading />
+            ) : weekUsage.error || !weekUsage.data ? (
+              <ErrorState error={weekUsage.error} onRetry={weekUsage.reload} />
+            ) : (
+              <UsageTable summary={weekUsage.data} group="principal" />
+            )}
+          </Panel>
         </Stack>
 
         <Stack top>
@@ -195,6 +250,110 @@ function WorkingNow() {
         <ErrorState error={presence.error} onRetry={presence.reload} />
       ) : (
         <PresenceTable items={presence.data.items} people={presence.data.people} showProject />
+      )}
+    </Panel>
+  );
+}
+
+/**
+ * The week in four numbers: time agents and people were present, what they
+ * produced in output tokens, what it would have cost at the operator's
+ * prices (or how many turns it took, without a price table), and how many
+ * idea proposals wait for a person to decide.
+ */
+function WeekKpis({
+  usage,
+  proposals,
+  queued,
+}: {
+  usage?: UsageSummary;
+  proposals: number;
+  queued: number;
+}) {
+  const t = useT();
+  const f = useFormat();
+  const total = usage?.total;
+  const dash = "—";
+  return (
+    <Grid cols={4}>
+      <Kpi value={total ? f.duration(total.seconds) : dash} label={t("dashboard.kpi.time")} />
+      <Kpi value={total ? f.number(total.tokens_out) : dash} label={t("dashboard.kpi.output")} />
+      {usage?.currency && total?.cost !== undefined ? (
+        <Kpi value={f.money(total.cost, usage.currency)} label={t("dashboard.kpi.cost")} />
+      ) : (
+        <Kpi value={total ? f.number(total.turns) : dash} label={t("dashboard.kpi.turns")} />
+      )}
+      <Kpi
+        value={f.number(proposals)}
+        label={t("dashboard.kpi.proposals", { queued: f.number(queued) })}
+        tone={proposals > 0 ? "warn" : undefined}
+      />
+    </Grid>
+  );
+}
+
+/**
+ * Ideas that wait for something, per project: a proposal for a person to
+ * accept or reject comes first, then the queue a planning agent takes from
+ * (docs/adr/0026).
+ */
+function IdeasWaiting({
+  loading,
+  error,
+  reload,
+  items,
+}: {
+  loading: boolean;
+  error: unknown;
+  reload: () => void;
+  items: ProjectIdeaCounts[];
+}) {
+  const t = useT();
+  return (
+    <Panel
+      title={t("dashboard.ideas")}
+      tight
+      footer={<span className="dim">{t("dashboard.ideasLead")}</span>}
+    >
+      {loading ? (
+        <Loading />
+      ) : error ? (
+        <ErrorState error={error} onRetry={reload} />
+      ) : items.length === 0 ? (
+        <EmptyState title={t("dashboard.noIdeas")} body={t("dashboard.noIdeasBody")} />
+      ) : (
+        <DataTable
+          columns={[
+            { key: "project", label: t("projects.column.project") },
+            { key: "proposed", label: t("dashboard.ideasProposed"), align: "r" },
+            { key: "open", label: t("dashboard.ideasOpen"), align: "r" },
+            { key: "claimed", label: t("dashboard.ideasClaimed"), align: "r" },
+          ]}
+        >
+          {items.map((c) => (
+            <tr key={c.project}>
+              <td>
+                <Cell
+                  primary={<Link to={`/p/${c.project}/ideas`}>{c.name}</Link>}
+                  secondary={<Mono dim>{c.project}</Mono>}
+                />
+              </td>
+              <td className="r">
+                {c.proposed > 0 ? (
+                  <Badge tone="warn">{t("dashboard.ideasDecide", { count: c.proposed })}</Badge>
+                ) : (
+                  <span className="dim">0</span>
+                )}
+              </td>
+              <td className="r">
+                <span className="num">{c.open}</span>
+              </td>
+              <td className="r">
+                <span className="num">{c.claimed}</span>
+              </td>
+            </tr>
+          ))}
+        </DataTable>
       )}
     </Panel>
   );

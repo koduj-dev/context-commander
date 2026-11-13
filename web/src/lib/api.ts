@@ -904,6 +904,57 @@ export type NamespaceStorage = {
   override?: "default" | "custom" | "unlimited";
 };
 
+/**
+ * The usage ledger, summed (adapters/http/usage.go, docs/adr/0027). Only the
+ * dimensions grouped by are present on a row; "" for model, branch or ticket
+ * means "not stated", which is a group of its own.
+ */
+export type UsageGroup = "project" | "day" | "principal" | "model" | "branch" | "ticket";
+export type UsageRow = {
+  project_id?: string;
+  project_path?: string;
+  day?: string;
+  principal_id?: string;
+  principal_kind?: string;
+  principal_name?: string;
+  model?: string;
+  branch?: string;
+  ticket_key?: string;
+  seconds: number;
+  tokens_in: number;
+  tokens_out: number;
+  cache_read_tokens: number;
+  cache_write_tokens: number;
+  turns: number;
+  cost?: number;
+};
+export type UsageSummary = {
+  from: string;
+  to: string;
+  group: UsageGroup[];
+  rows: UsageRow[];
+  total: UsageRow;
+  currency?: string;
+  as_of?: string;
+  unpriced?: string[];
+  truncated: boolean;
+};
+export type UsageQuery = { from?: string; to?: string; group?: UsageGroup[] };
+
+/** What waits in one project's idea stack (GET /me/ideas/counts). */
+export type ProjectIdeaCounts = {
+  project: string;
+  name: string;
+  open: number;
+  claimed: number;
+  lapsed: number;
+  proposed: number;
+};
+
+function usageParams(q: UsageQuery) {
+  return { from: q.from, to: q.to, group: q.group?.join(",") };
+}
+
 /** An organization a sign-in rule can grant (adapters/http/signin.go). */
 export type SignInOrganization = { id: string; name: string };
 
@@ -1345,6 +1396,11 @@ export const api = {
   // Every namespace's storage, oldest first. Installation-admin only.
   installationStorage: (cursor?: string, limit?: number) =>
     request<Page<NamespaceStorage>>(withQuery("/installation/storage", { cursor, limit })),
+  // Usage across every project the caller reads plans in, or one project.
+  myUsage: (q: UsageQuery) => request<UsageSummary>(withQuery("/me/usage/summary", usageParams(q))),
+  projectUsage: (ns: string, slug: string, q: UsageQuery) =>
+    request<UsageSummary>(withQuery(`${project(ns, slug)}/usage`, usageParams(q))),
+  myIdeaCounts: () => request<Page<ProjectIdeaCounts>>("/me/ideas/counts"),
   // The sign-in allowlist. Installation-admin only.
   signInRules: () => request<Page<SignInRule>>("/installation/signin-rules"),
   signInOrganizations: () => request<Page<SignInOrganization>>("/installation/organizations"),

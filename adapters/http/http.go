@@ -171,6 +171,7 @@ func NewHandler(deps Deps) http.Handler {
 			r.Get("/me/presence", deps.getMyPresence)
 			// Plan search across every project the caller can read plans in.
 			r.Get("/me/plans/search", deps.searchMyPlans)
+			r.Get("/me/ideas/counts", deps.myIdeaCounts)
 			// Memory search across every project the caller can read (docs/adr/0025).
 			r.Get("/me/memories/search", deps.searchMyMemories)
 			// The same, pushed: "something changed", never what (docs/adr/0022).

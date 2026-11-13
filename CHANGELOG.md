@@ -33,6 +33,15 @@ All notable changes to Context Commander are documented here. The format follows
 
 ### Added
 
+- **The dashboard shows what agents are doing and what it costs.** At the
+  top are this week's time present, output tokens, estimated cost (or turns,
+  without a price table) and the idea proposals waiting for a decision. Below
+  are the ideas waiting in every project, usage per day for the last 14 days,
+  and usage per person for the last 7. Each project has a new Usage tab that
+  groups the usage ledger by day, person, branch, ticket or model over 7, 30
+  or 90 days. `GET /v1/me/ideas/counts` returns, in one request, what waits
+  in every project's idea stack.
+
 - **The idea stack** (docs/adr/0026). People and agents drop ideas into a
   project; a planning agent takes them one at a time, proposes a solution
   with a draft plan, and a person accepts or rejects it. Context Commander

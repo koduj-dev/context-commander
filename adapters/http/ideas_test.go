@@ -96,3 +96,38 @@ func TestTheIdeaLoopOverHTTP(t *testing.T) {
 	// Nothing left: 204, not an error.
 	f.mustDo(http.MethodPost, base+"/claim-next", owner, nil, http.StatusNoContent, "claim next on an empty stack")
 }
+
+// The dashboard's one read of what waits in every idea stack: only projects
+// with something waiting, proposals first, nothing from a project the caller
+// is not in.
+func TestMyIdeaCountsAcrossProjects(t *testing.T) {
+	f := newFixture(t)
+	alice := f.newUserWithToken("counts-alice@example.test")
+	bob := f.newUserWithToken("counts-bob@example.test")
+	for _, p := range []string{"counts-alice/quiet", "counts-alice/busy"} {
+		body, _ := json.Marshal(map[string]string{"project": p, "name": p})
+		f.mustDo(http.MethodPost, "/v1/projects", alice, body, http.StatusCreated, "create "+p)
+	}
+	other, _ := json.Marshal(map[string]string{"project": "counts-bob/secret", "name": "Secret"})
+	f.mustDo(http.MethodPost, "/v1/projects", bob, other, http.StatusCreated, "create bob's")
+	f.mustDo(http.MethodPost, "/v1/projects/counts-bob/secret/ideas/", bob, []byte(`{"title":"hidden"}`), http.StatusCreated, "bob's idea")
+
+	base := "/v1/projects/counts-alice/busy/ideas"
+	f.mustDo(http.MethodPost, base+"/", alice, []byte(`{"title":"one"}`), http.StatusCreated, "idea one")
+	var second ideaBody
+	mustJSON(t, f.mustDo(http.MethodPost, base+"/", alice, []byte(`{"title":"two","priority":"high"}`), http.StatusCreated, "idea two"), &second)
+	f.mustDo(http.MethodPost, base+"/claim-next", alice, nil, http.StatusOK, "claim")
+	f.mustDo(http.MethodPost, base+"/"+second.ID+"/propose", alice, []byte(`{"proposal":"do it"}`), http.StatusOK, "propose")
+
+	var counts struct {
+		Items []struct {
+			Project  string `json:"project"`
+			Open     int    `json:"open"`
+			Proposed int    `json:"proposed"`
+		} `json:"items"`
+	}
+	mustJSON(t, f.mustDo(http.MethodGet, "/v1/me/ideas/counts", alice, nil, http.StatusOK, "counts"), &counts)
+	if len(counts.Items) != 1 || counts.Items[0].Project != "counts-alice/busy" || counts.Items[0].Open != 1 || counts.Items[0].Proposed != 1 {
+		t.Fatalf("counts = %+v, want only counts-alice/busy with 1 open and 1 proposed", counts.Items)
+	}
+}

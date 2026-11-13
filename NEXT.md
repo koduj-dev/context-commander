@@ -283,9 +283,10 @@ Only on top of a core loop people actually use:
       - [x] ~~**Usage by branch, ticket and day; tokens from unplaced clients
         dropped.**~~ Closed 2026-11-13
         ([ADR 0027](docs/adr/0027-usage-ledger-by-branch-and-ticket.md)): the
-        usage ledger, `usage.summary`, and `CC_PROJECT` in the hooks. Still
-        open: a screen for it (the dashboard work), and retention for old
-        ledger rows.
+        usage ledger, `usage.summary`, and `CC_PROJECT` in the hooks. The
+        dashboard and the project Usage tab show it (2026-11-13). Still
+        open: retention for old ledger rows, and a real chart if a table
+        with bars stops being enough.
       - **Board streams are in process.** Fine for the one `ccd` per
         installation that is supported; a second process would need
         `internal/plans/changes.go` on Postgres LISTEN/NOTIFY. Agents still

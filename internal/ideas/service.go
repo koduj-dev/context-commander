@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/url"
 	"slices"
+	"sort"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -21,6 +22,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/identity"
 	"github.com/koduj-dev/context-commander/internal/paging"
 	"github.com/koduj-dev/context-commander/internal/plans"
+	"github.com/koduj-dev/context-commander/internal/projects"
 	"github.com/koduj-dev/context-commander/internal/quota"
 )
 
@@ -970,4 +972,70 @@ func (s *Service) move(ctx context.Context, tx pgx.Tx, i Idea, to int) (int, err
 		 FROM unnest($1::uuid[]) WITH ORDINALITY AS o(id, n)
 		 WHERE t.id = o.id AND t.position <> o.n`, ids)
 	return at + 1, err
+}
+
+// ProjectCounts is one project's waiting ideas, for a cross-project read.
+type ProjectCounts struct {
+	ProjectID uuid.UUID
+	Path      string
+	Name      string
+	Counts
+}
+
+// CountsAll is Counts for every project whose role may read ideas, leaving
+// out projects with nothing waiting. One query: the dashboard asks it on
+// every load, and a person in thirty projects must not pay thirty round trips.
+func (s *Service) CountsAll(ctx context.Context, principalID uuid.UUID) ([]ProjectCounts, error) {
+	out := []ProjectCounts{}
+	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+		memberships, err := projects.NewStore().ListForPrincipal(ctx, tx, principalID)
+		if err != nil {
+			return err
+		}
+		refs := map[uuid.UUID]ProjectCounts{}
+		var ids []uuid.UUID
+		for _, ms := range memberships {
+			if !auth.RoleCan(ms.Role, auth.CapIdeaRead) {
+				continue
+			}
+			ids = append(ids, ms.Project.ID)
+			refs[ms.Project.ID] = ProjectCounts{ProjectID: ms.Project.ID, Path: ms.NamespaceSlug + "/" + ms.Project.Slug, Name: ms.Project.Name}
+		}
+		if len(ids) == 0 {
+			return nil
+		}
+		rows, err := tx.Query(ctx,
+			`SELECT project_id,
+			        count(*) FILTER (WHERE status = 'open'),
+			        count(*) FILTER (WHERE status = 'claimed'),
+			        count(*) FILTER (WHERE status = 'claimed' AND claim_expires_at <= $2),
+			        count(*) FILTER (WHERE status = 'proposed')
+			 FROM ideas WHERE project_id = ANY($1) AND status IN ('open', 'claimed', 'proposed')
+			 GROUP BY project_id`, ids, s.now())
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var id uuid.UUID
+			var c Counts
+			if err := rows.Scan(&id, &c.Open, &c.Claimed, &c.Lapsed, &c.Proposed); err != nil {
+				return err
+			}
+			r := refs[id]
+			r.Counts = c
+			out = append(out, r)
+		}
+		return rows.Err()
+	})
+	if err != nil {
+		return nil, fmt.Errorf("ideas: counts all: %w", err)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Proposed != out[j].Proposed {
+			return out[i].Proposed > out[j].Proposed
+		}
+		return out[i].Path < out[j].Path
+	})
+	return out, nil
 }
