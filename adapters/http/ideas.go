@@ -262,3 +262,28 @@ func (d Deps) rejectIdea(w http.ResponseWriter, r *http.Request) {
 	}
 	d.writeIdea(w, r, http.StatusOK, i)
 }
+
+type projectIdeaCountsResponse struct {
+	Project  string `json:"project"`
+	Name     string `json:"name"`
+	Open     int    `json:"open"`
+	Claimed  int    `json:"claimed"`
+	Lapsed   int    `json:"lapsed"`
+	Proposed int    `json:"proposed"`
+}
+
+// myIdeaCounts is what waits in every project's idea stack: proposals for a
+// person to decide first, then the queue. Projects with nothing waiting are
+// left out.
+func (d Deps) myIdeaCounts(w http.ResponseWriter, r *http.Request) {
+	list, err := d.Ideas.CountsAll(r.Context(), principalIDFrom(r.Context()))
+	if err != nil {
+		writeDomainError(w, r, err)
+		return
+	}
+	out := make([]projectIdeaCountsResponse, len(list))
+	for i, c := range list {
+		out[i] = projectIdeaCountsResponse{Project: c.Path, Name: c.Name, Open: c.Open, Claimed: c.Claimed, Lapsed: c.Lapsed, Proposed: c.Proposed}
+	}
+	writeList(w, out, "")
+}
