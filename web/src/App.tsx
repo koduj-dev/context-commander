@@ -27,6 +27,7 @@ import { AdminUsage } from "./pages/AdminUsage";
 import { AdminStorage } from "./pages/AdminStorage";
 import { AdminSignIn } from "./pages/AdminSignIn";
 import { ProjectPlans } from "./pages/ProjectPlans";
+import { ProjectMemories } from "./pages/ProjectMemories";
 import {
   Administration,
   AdminPeople,
@@ -91,6 +92,7 @@ export function App() {
           <Route index element={<ProjectOverview />} />
           <Route path="context" element={<ProjectContext />} />
           <Route path="plans" element={<ProjectPlans />} />
+          <Route path="memories" element={<ProjectMemories />} />
           <Route path="artifacts" element={<ProjectArtifacts />} />
           <Route path="skills" element={<ProjectSkills />} />
           <Route path="policies" element={<ProjectPolicies />} />
