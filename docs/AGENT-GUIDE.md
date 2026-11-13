@@ -65,7 +65,37 @@ request — it is the answer. Re-read with `handoff.current` and check
 Status `claimed` on arrival means the same thing: read it to understand where
 things stand, then find something else to do.
 
-### 3. Do the work, and write down what outlives it
+### 3. Say what you are doing, and keep saying it
+
+Your team cannot see your conversation. The plan board is how they learn
+what you are doing, how far you are, and what not to start themselves.
+
+- **Read `plan.board` before you plan.** It shows the phases, the plans in
+  flight, what is in progress or blocked and by whom, and where every other
+  client is right now. If someone is already on it, do not start it again.
+- **Record your plan with `plan.create`** as soon as you have one: a title,
+  a short description, and the steps as items. Use `check` items for things
+  to verify rather than produce ("tests pass", "migration runs on staging").
+  A plan is not a commitment you cannot change. Add steps with
+  `plan.add_items` as they appear.
+- **Mark progress with `plan.update_item`:** `in_progress` when you start a
+  step, `done` when it is finished, `blocked` with a note saying why. Setting
+  a status a step already has costs nothing, so do not hesitate.
+- **Report where you are with `plan.report`** when you move to a step, and
+  every few minutes while you stay on it. Time is counted only while reports
+  keep coming, and a gap over 15 minutes counts as idle. The one-line
+  description is what your colleagues see next to your name, so make it
+  specific: "rewriting the invoice export query", not "working".
+- **Call `plan.stop` when you finish or stop.** Otherwise you show as present
+  until you go idle.
+
+Do not put token counts in `plan.report` unless your client gives you exact
+numbers. You cannot see your own usage. The usage hook in
+`deploy/mcp-clients/README.md` reports it exactly and credits it to the step
+you last reported, so the project's usage figures depend on your reports
+being current.
+
+### 4. Do the work, and write down what outlives it
 
 Put in **artifacts** anything the next agent or person would otherwise have
 to reconstruct: decisions and why, findings, generated documents, the
@@ -81,13 +111,16 @@ Write with `expected_version`. If you get a conflict, someone changed the
 artifact since you read it: re-read, merge, retry. Never retry with a bumped
 number to make the error go away — that is how you silently delete their work.
 
-### 4. Leave before you leave
+### 5. Leave before you leave
 
 When you stop, one of two things must be true, or the next agent starts blind:
 
 - the work is finished and the handoff is **closed**, or
 - there is a **new handoff** saying what is done, what is not, and what comes
   next.
+
+Either way, the plan's steps say where things stand, and you have called
+`plan.stop`.
 
 A handoff is explicit continuation state, not a transcript. Write what
 someone who never saw your reasoning needs in order to continue. Reference
@@ -128,8 +161,9 @@ around it by writing somewhere you can.
 it when you next need to know what happened. There is no push, and a tight
 polling loop will meet the rate limiter.
 
-**Do not invent structure.** No task objects, no conversation lineage you
-inferred from timestamps, no relationships you guessed. If the evidence is
+**Do not invent structure.** Plans are where tasks live. Do not build task
+lists inside artifacts, do not infer conversation lineage from timestamps,
+and do not guess at relationships. If the evidence is
 not explicit, the relationship is unknown and should stay that way.
 
 **Do not format for humans.** Values come back machine-readable — RFC3339
@@ -153,6 +187,7 @@ them according to that person's preferences. Pass them along as they are.
 
 ## A short version
 
-Bootstrap. Claim. Work. Write down what outlives you. Close or hand over.
+Bootstrap. Read the board. Claim. Record your plan and report as you go.
+Work. Write down what outlives you. Close or hand over, then stop.
 Read the skills. Check `budget.truncated`. Never guess at structure, never
 carry a secret, never route around a refusal.
