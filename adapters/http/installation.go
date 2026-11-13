@@ -135,6 +135,7 @@ func (d Deps) createServicePrincipal(w http.ResponseWriter, r *http.Request) {
 	}
 	created := servicePrincipalResponse{
 		ID: sp.ID.String(), Name: sp.Name, Description: sp.Description, CreatedAt: sp.CreatedAt.Format(time.RFC3339),
+		PrincipalID: sp.PrincipalID.String(),
 	}
 	// The id only, not the email: the caller is the person it names, so
 	// resolving it here would be a lookup to tell them something they

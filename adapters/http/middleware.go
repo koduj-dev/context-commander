@@ -147,3 +147,29 @@ func credentialFrom(r *http.Request) (token string, fromCookie, ok bool) {
 	}
 	return "", false, false
 }
+
+// limitUnauthenticated bounds how fast one client address may call the
+// public endpoints — sign-in, OIDC, first-run (docs/adr/0029). The address
+// is the TCP peer, or X-Forwarded-For when the peer is a proxy the operator
+// named. A loopback peer with no trusted proxies configured is the reverse
+// proxy every request comes through, and limiting it would put everyone in
+// one bucket, so it is let through.
+func (d Deps) limitUnauthenticated(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ip := d.ClientIP.Client(r)
+		behindUnnamedProxy := ip.IsLoopback() && !d.ClientIP.Configured()
+		if ip.IsValid() && !behindUnnamedProxy && !d.ClientIP.Trusts(ip) {
+			if !d.Limiter.AllowIP(ip) {
+				d.Security.Record(r.Context(), security.Event{
+					Kind:      security.KindRateLimited,
+					Reason:    "unauthenticated requests from one address exceeded their rate limit",
+					RequestID: middleware.GetReqID(r.Context()),
+				})
+				w.Header().Set("Retry-After", "10")
+				writeError(w, http.StatusTooManyRequests, "rate_limited", "too many requests from this address")
+				return
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
+}

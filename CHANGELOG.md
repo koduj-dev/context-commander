@@ -37,6 +37,14 @@ All notable changes to Context Commander are documented here. The format follows
 
 ### Security
 
+- **Per-IP limits on the sign-in endpoints, behind a trusted proxy**
+  ([ADR 0029](docs/adr/0029-trusted-proxies-and-per-ip-limits.md)).
+  `--trusted-proxies` (`CC_TRUSTED_PROXIES`) names the reverse proxies whose
+  `X-Forwarded-For` is believed, read from the right. Sign-in, single sign-on
+  and setup are limited per client address, 60 a minute with a burst of 30 by
+  default. Without trusted proxies, the proxy's loopback address is not
+  limited.
+
 - **Google sign-in checks the Workspace.** For Google's issuer, a listed
   domain now admits an account only when the ID token's `hd` claim is listed
   too. A personal Google account registered under a work address, which
@@ -70,6 +78,9 @@ All notable changes to Context Commander are documented here. The format follows
   groups the usage ledger by day, person, branch, ticket or model over 7, 30
   or 90 days. `GET /v1/me/ideas/counts` returns, in one request, what waits
   in every project's idea stack.
+- **Registering an agent returns its `principal_id`**, over HTTP and MCP.
+  That is the id a token and a project membership take, so it no longer has
+  to be looked up separately.
 
 - **The idea stack** (docs/adr/0026). People and agents drop ideas into a
   project; a planning agent takes them one at a time, proposes a solution

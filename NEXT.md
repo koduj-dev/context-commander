@@ -328,10 +328,9 @@ Only on top of a core loop people actually use:
       token path a 404 (listing too, instead of an empty list), and the same
       mix-up in `POST /organizations/{id}/members` — a principal id where the
       user id belongs — is a 400. Adding someone who is already a member, a
-      primary-key 500 on both, is a 409. Still open: the create response of
-      `POST /installation/service-principals` does not carry the agent's
-      `principal_id`, which is how the wrong id gets picked up in the first
-      place.
+      primary-key 500 on both, is a 409. Since 2026-11-13 the create response
+      of `POST /installation/service-principals` (and the MCP tool) carries
+      `principal_id` too, which is how the wrong id got picked up.
 
 ### UI — remaining spec surface
 
@@ -525,17 +524,9 @@ blocked on that is done:
     with no record of where it came from is how two projects start quietly
     diverging from the same text with nobody owning either. Record the
     template and its version on what it creates.
-- **[security] Per-IP rate limiting needs a trusted-proxy configuration.**
-  `internal/ratelimit` limits per credential and bounds authentications in
-  flight, which is everything that can be done correctly today. Per-IP
-  limiting cannot: `serve` deliberately does not trust `X-Forwarded-For`
-  (no trusted-proxy config exists, and the header is spoofable without
-  one), while the supported deployment is a loopback bind behind a reverse
-  proxy — so every request carries the proxy's address and a per-IP bucket
-  would be one shared bucket that any caller could exhaust to lock out the
-  rest. Needs `--trusted-proxies` (a CIDR allowlist) plus
-  `middleware.RealIP` gated on it, and only then a per-IP limit on
-  unauthenticated traffic.
+- ~~**[security] Per-IP rate limiting needs a trusted-proxy configuration.**~~
+  Closed 2026-11-13 ([ADR 0029](docs/adr/0029-trusted-proxies-and-per-ip-limits.md)):
+  `--trusted-proxies` and a per-IP limit on the public route group.
 - **Serving artifact content as a rendered page.** Observed while scoping
   the UI: the store is content-type aware and holds arbitrary bytes, so
   "give any LLM a tool to publish an HTML page" is already most of the way

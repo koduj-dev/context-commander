@@ -25,6 +25,9 @@ type servicePrincipalResult struct {
 	Name        string `json:"name"`
 	Description string `json:"description,omitempty"`
 	CreatedAt   string `json:"created_at"`
+	// PrincipalID is what installation.issue_token and project.add_member
+	// take; the agent's own id is not.
+	PrincipalID string `json:"principal_id,omitempty"`
 }
 
 type issuedTokenResult struct {
@@ -133,7 +136,10 @@ func registerInstallationTools(server *sdkmcp.Server, deps Deps, principalID, _ 
 		if err != nil {
 			return nil, servicePrincipalResult{}, err
 		}
-		return nil, servicePrincipalResult{ID: sp.ID.String(), Name: sp.Name, Description: sp.Description, CreatedAt: sp.CreatedAt.Format(time.RFC3339)}, nil
+		return nil, servicePrincipalResult{
+			ID: sp.ID.String(), Name: sp.Name, Description: sp.Description, CreatedAt: sp.CreatedAt.Format(time.RFC3339),
+			PrincipalID: sp.PrincipalID.String(),
+		}, nil
 	})
 
 	type issueTokenForArgs struct {

@@ -19,6 +19,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/artifacts"
 	"github.com/koduj-dev/context-commander/internal/audit"
 	"github.com/koduj-dev/context-commander/internal/auth"
+	"github.com/koduj-dev/context-commander/internal/clientip"
 	"github.com/koduj-dev/context-commander/internal/contextpack"
 	"github.com/koduj-dev/context-commander/internal/db"
 	"github.com/koduj-dev/context-commander/internal/directory"
@@ -70,8 +71,11 @@ type Deps struct {
 	// leave nil — a nil *security.Recorder records nothing and a nil
 	// *ratelimit.Limiter allows everything, which is what the CLI and the
 	// tests that don't exercise either one get.
-	Security       *security.Recorder
-	Limiter        *ratelimit.Limiter
+	Security *security.Recorder
+	Limiter  *ratelimit.Limiter
+	// ClientIP says which address a request came from; nil trusts no proxy
+	// (docs/adr/0029).
+	ClientIP       *clientip.Resolver
 	SecurityEvents *security.Service
 	// Directory authenticates against LDAP when one is configured, and is nil
 	// otherwise — which is what closes the path rather than opening it. It is
@@ -115,8 +119,8 @@ func NewHandler(deps Deps) http.Handler {
 	r.Use(middleware.RequestID)
 	// No middleware.RealIP: it trusts X-Forwarded-For/X-Real-IP unconditionally,
 	// which is spoofable unless a reverse proxy is known to set it and strip
-	// client-supplied copies first — not something this handler can assume
-	// (GHSA-3fxj-6jh8-hvhx). Add it only alongside an explicit trusted-proxy config.
+	// client-supplied copies first (GHSA-3fxj-6jh8-hvhx). internal/clientip
+	// reads the header only from a proxy named in --trusted-proxies.
 	r.Use(middleware.Recoverer)
 
 	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
@@ -130,6 +134,7 @@ func NewHandler(deps Deps) http.Handler {
 		// authentication middleware — where one typo is an auth bypass and
 		// nothing fails until someone finds it.
 		r.Group(func(r chi.Router) {
+			r.Use(deps.limitUnauthenticated)
 			// What sign-in methods this installation actually offers, so the
 			// UI renders those and not a promise (docs/adr/0019).
 			r.Get("/auth/methods", deps.listAuthMethods)

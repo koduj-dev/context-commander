@@ -4,6 +4,10 @@ import (
 	"encoding/json"
 	"net/http"
 	"testing"
+
+	cchttp "github.com/koduj-dev/context-commander/adapters/http"
+	"github.com/koduj-dev/context-commander/internal/clientip"
+	"github.com/koduj-dev/context-commander/internal/ratelimit"
 )
 
 // TestFailedAuthenticationIsRecordedAndReadableByAdmin walks the whole
@@ -97,5 +101,52 @@ func TestRateLimitedCredentialGets429(t *testing.T) {
 	_ = resp2.Body.Close()
 	if resp2.StatusCode != http.StatusOK {
 		t.Fatalf("a second credential got status=%d after the first exhausted its budget", resp2.StatusCode)
+	}
+}
+
+// Behind a trusted proxy, the public endpoints are limited per client
+// address read from X-Forwarded-For; a spoofed entry to the left of the
+// proxy's own does not buy a fresh bucket, and another client is unaffected.
+func TestUnauthenticatedEndpointsAreLimitedPerClientBehindATrustedProxy(t *testing.T) {
+	proxies, err := clientip.Parse([]string{"127.0.0.1", "::1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	f := newFixtureWithDeps(t, boolPtr(true), ratelimit.Limits{PerIP: 0.001, IPBurst: 2}, func(d *cchttp.Deps) {
+		d.ClientIP = proxies
+	})
+	get := func(xff string) int {
+		req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, f.server.URL+"/v1/auth/methods", nil)
+		req.Header.Set("X-Forwarded-For", xff)
+		resp, err := f.server.Client().Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = resp.Body.Close()
+		return resp.StatusCode
+	}
+	if get("198.51.100.7") != http.StatusOK || get("6.6.6.6, 198.51.100.7") != http.StatusOK {
+		t.Fatal("the burst was refused")
+	}
+	if got := get("1.1.1.1, 198.51.100.7"); got != http.StatusTooManyRequests {
+		t.Fatalf("third request from the same client: %d, want 429", got)
+	}
+	if got := get("198.51.100.8"); got != http.StatusOK {
+		t.Fatalf("another client: %d, want 200", got)
+	}
+	if f.securityEvents("unauthenticated requests from one address exceeded their rate limit") != 1 {
+		t.Fatal("the refusal was not recorded")
+	}
+}
+
+// Without trusted proxies, the loopback peer is the reverse proxy, and it is
+// not limited per address: one bucket for everyone would let any caller lock
+// out the rest.
+func TestTheProxyIsNotLimitedWithoutTrustedProxies(t *testing.T) {
+	f := newFixtureWith(t, nil, ratelimit.Limits{PerIP: 0.001, IPBurst: 1})
+	for i := 0; i < 3; i++ {
+		if r := f.get("/v1/auth/methods"); r.status != http.StatusOK {
+			t.Fatalf("request %d: %d", i, r.status)
+		}
 	}
 }

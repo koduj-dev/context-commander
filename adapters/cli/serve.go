@@ -22,6 +22,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/artifacts"
 	"github.com/koduj-dev/context-commander/internal/audit"
 	"github.com/koduj-dev/context-commander/internal/auth"
+	"github.com/koduj-dev/context-commander/internal/clientip"
 	"github.com/koduj-dev/context-commander/internal/contextpack"
 	"github.com/koduj-dev/context-commander/internal/crypto"
 	"github.com/koduj-dev/context-commander/internal/db"
@@ -60,6 +61,7 @@ const (
 	oidcClientSecretEnv = "CC_OIDC_CLIENT_SECRET" //nolint:gosec // G101: an env var name
 	storageQuotaEnv     = "CC_STORAGE_QUOTA"
 	usagePricesEnv      = "CC_USAGE_PRICES"
+	trustedProxiesEnv   = "CC_TRUSTED_PROXIES"
 )
 
 // isLoopbackAddr reports whether an http.Server.Addr binds only to the local
@@ -285,6 +287,21 @@ func newServeCmd() *cobra.Command {
 			signInsPerMinute, _ := cmd.Flags().GetFloat64("rate-limit-signin-per-minute")
 			signInBurst, _ := cmd.Flags().GetInt("rate-limit-signin-burst")
 			maxHash, _ := cmd.Flags().GetInt("max-concurrent-password-hash")
+			perIPPerMinute, _ := cmd.Flags().GetFloat64("rate-limit-unauthenticated-per-minute")
+			ipBurst, _ := cmd.Flags().GetInt("rate-limit-unauthenticated-burst")
+			proxies, _ := cmd.Flags().GetStringSlice("trusted-proxies")
+			if len(proxies) == 0 {
+				if env := os.Getenv(trustedProxiesEnv); env != "" {
+					proxies = strings.Split(env, ",")
+				}
+			}
+			clientIPs, err := clientip.Parse(proxies)
+			if err != nil {
+				return err
+			}
+			if clientIPs.Configured() {
+				slog.Info("trusting X-Forwarded-For from these proxies", "trusted_proxies", proxies)
+			}
 			limiter := ratelimit.New(ratelimit.Limits{
 				PerCredential:     perCredential,
 				Burst:             burst,
@@ -295,6 +312,8 @@ func newServeCmd() *cobra.Command {
 				PerSignIn:                 signInsPerMinute / 60,
 				SignInBurst:               signInBurst,
 				MaxConcurrentPasswordHash: maxHash,
+				PerIP:                     perIPPerMinute / 60,
+				IPBurst:                   ipBurst,
 			})
 
 			// LDAP, when an operator configured one. Built before the
@@ -381,7 +400,7 @@ func newServeCmd() *cobra.Command {
 				Handoffs: handoffsSvc, History: historySvc,
 				Skills: skillsSvc, Gates: gatesAdmin, Secrets: secretsSvc,
 				Installation: installationSvc, ContextPack: contextSvc, Plans: plansSvc, Memories: memoriesSvc, Ideas: ideasSvc,
-				Security: securityRec, Limiter: limiter, SecurityEvents: securitySvc,
+				Security: securityRec, Limiter: limiter, SecurityEvents: securitySvc, ClientIP: clientIPs,
 				FirstRun: firstRunCode, Embeddings: embeddingsStatus,
 				// Nil unless --ldap-url was given, and a nil Directory is what
 				// closes the path rather than opening it.
@@ -454,8 +473,13 @@ func newServeCmd() *cobra.Command {
 			"(--security-log=false opts out; nothing is recorded and attacks become invisible)")
 	cmd.Flags().Float64("rate-limit-per-credential", 100,
 		"sustained requests per second allowed per credential (0 disables) — deliberately per credential, not per IP: "+
-			"X-Forwarded-For is not trusted, so behind a reverse proxy every caller would share one bucket")
+			"per IP is limited only on unauthenticated endpoints, see --trusted-proxies")
 	cmd.Flags().Int("rate-limit-burst", 200, "how far above the sustained per-credential rate a short spike may go")
+	cmd.Flags().StringSlice("trusted-proxies", nil,
+		fmt.Sprintf("reverse proxies whose X-Forwarded-For is believed, as addresses or CIDRs, e.g. 127.0.0.1,::1 (defaults to $%s; empty trusts none)", trustedProxiesEnv))
+	cmd.Flags().Float64("rate-limit-unauthenticated-per-minute", 60,
+		"sustained requests per minute one client address may make to the sign-in and setup endpoints (0 disables); behind a proxy it needs --trusted-proxies, without which the proxy is not limited")
+	cmd.Flags().Int("rate-limit-unauthenticated-burst", 30, "how many unauthenticated requests one address may make together")
 	// LDAP (docs/adr/0019). --ldap-url is the switch: everything else is
 	// ignored without it.
 	cmd.Flags().String("ldap-url", "",

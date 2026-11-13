@@ -201,7 +201,8 @@ func (s *Service) CreateServicePrincipal(ctx context.Context, principalID, calle
 		if err != nil {
 			return err
 		}
-		_, err = s.identity.CreatePrincipalForService(ctx, tx, sp.ID)
+		p, err := s.identity.CreatePrincipalForService(ctx, tx, sp.ID)
+		sp.PrincipalID = p.ID
 		return err
 	})
 	if err != nil {
