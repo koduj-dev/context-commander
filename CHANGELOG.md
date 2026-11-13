@@ -8,6 +8,14 @@ All notable changes to Context Commander are documented here. The format follows
 
 ### Security
 
+- **Google sign-in checks the Workspace.** For Google's issuer, a listed
+  domain now admits an account only when the ID token's `hd` claim is listed
+  too. A personal Google account registered under a work address, which
+  Google keeps reporting as verified after its owner leaves the Workspace, is
+  no longer admitted by the domain. `--oidc-google-ignore-hosted-domain` turns
+  the check off
+  ([ADR 0024](docs/adr/0024-sign-in-rules-managed-by-an-administrator.md)).
+
 - **The OIDC attempt cookie is a `__Host-` cookie, and it is signed.** A
   sibling subdomain can no longer plant an attempt, so it can no longer sign
   a victim into the attacker's account. This does not apply under
@@ -24,6 +32,16 @@ All notable changes to Context Commander are documented here. The format follows
   unavailable.** It is no longer recorded as a rejected sign-in.
 
 ### Added
+
+- **Sign-in rules, managed in the interface**
+  ([ADR 0024](docs/adr/0024-sign-in-rules-managed-by-an-administrator.md)).
+  Under Administration → Sign-in, an installation administrator lists the
+  domains and individual addresses that may sign in through OIDC, and for
+  each one the organizations a new account joins. A matching rule creates the
+  account, even with `--oidc-allow-signup` off, and makes it a member of those
+  organizations in the same transaction. The rules extend
+  `--oidc-allowed-domains`; the first rule closes sign-in to everything not
+  listed. Also over HTTP under `/v1/installation/signin-rules`.
 
 - **Install script.** `scripts/install.sh` installs the release binary on
   Linux and macOS. It checks the download against `SHA256SUMS` before writing

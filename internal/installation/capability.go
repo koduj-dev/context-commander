@@ -33,6 +33,12 @@ const (
 	// CapStorageManage sets a namespace's storage limit, an exception to the
 	// server default (docs/adr/0021). Reading usage is CapAdminRead.
 	CapStorageManage Capability = "installation.storage_manage"
+	// CapSignInManage reads and changes who may sign in through OIDC and
+	// which organizations a new account joins (docs/adr/0024). Granting
+	// organization membership through a rule is the reason it is its own
+	// capability: no other installation power reaches inside an
+	// organization.
+	CapSignInManage Capability = "installation.signin_manage"
 )
 
 // roleCapabilities holds one role today (RoleAdmin has everything) — kept
@@ -42,6 +48,7 @@ var roleCapabilities = map[Role]map[Capability]bool{
 	RoleAdmin: setOf(
 		CapAdminRead, CapUserCreate, CapServicePrincipalCreate,
 		CapCredentialManage, CapSkillManage, CapGateManage, CapStorageManage,
+		CapSignInManage,
 	),
 }
 

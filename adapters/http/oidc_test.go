@@ -41,13 +41,16 @@ type fakeOIDC struct {
 	// signup is what AllowsSignup reports. The existing tests are about the
 	// flow, not the policy, so they opt in; the policy has its own tests.
 	signup bool
+	// admission is what Admission reports: the operator's domain list.
+	admission directory.Admission
 }
 
 const fakeCode = "code-the-provider-issued"
 
-func (p *fakeOIDC) Provider() string   { return "fake" }
-func (p *fakeOIDC) Label() string      { return "Fake SSO" }
-func (p *fakeOIDC) AllowsSignup() bool { return p.signup }
+func (p *fakeOIDC) Provider() string               { return "fake" }
+func (p *fakeOIDC) Label() string                  { return "Fake SSO" }
+func (p *fakeOIDC) AllowsSignup() bool             { return p.signup }
+func (p *fakeOIDC) Admission() directory.Admission { return p.admission }
 
 func (p *fakeOIDC) AuthCodeURL(req directory.AuthRequest) (string, error) {
 	p.started = req

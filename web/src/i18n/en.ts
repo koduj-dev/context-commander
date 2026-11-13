@@ -756,6 +756,36 @@ export const en = {
   "admin.storage.amount": "Amount",
   "admin.storage.unit": "Unit",
   "admin.storage.save": "Save limit",
+  "admin.tab.signin": "Sign-in",
+  "admin.signin.title": "Sign-in",
+  "admin.signin.lead":
+    "Who may sign in through single sign-on, and which organizations a new account joins. While no rule exists, anyone the provider verifies may sign in. The first rule changes that: from then on only the domains and addresses listed here, and those in the server's configuration, are let in.",
+  "admin.signin.add": "Add a rule",
+  "admin.signin.value": "Domain or address",
+  "admin.signin.valuePlaceholder": "example.com or someone@example.com",
+  "admin.signin.grant": "A new account joins these organizations",
+  "admin.signin.noOrganizations":
+    "There are no organizations yet. Create one first to have new accounts join it.",
+  "admin.signin.addButton": "Add rule",
+  "admin.signin.rules": "Rules",
+  "admin.signin.help":
+    "A domain admits every verified address in it, but not its subdomains. Rules are checked at every sign-in, so removing one locks out the people it admitted. With Google, a domain admits only accounts in a Google Workspace whose domain is listed too.",
+  "admin.signin.none": "No rules",
+  "admin.signin.noneBody":
+    "Anyone the single sign-on provider verifies may sign in, and accounts are created only if the server allows sign-up.",
+  "admin.signin.who": "Domain or address",
+  "admin.signin.organizations": "Organizations",
+  "admin.signin.actions": "Actions",
+  "admin.signin.kindDomain": "Domain",
+  "admin.signin.kindAddress": "Address",
+  "admin.signin.grantsNothing": "None",
+  "admin.signin.change": "Change organizations",
+  "admin.signin.changeNote":
+    "This applies to accounts created from now on. People who already joined keep their membership.",
+  "admin.signin.save": "Save",
+  "admin.signin.delete": "Remove",
+  "admin.signin.confirmDelete":
+    "Remove the rule for {value}? People it admitted will no longer be able to sign in through single sign-on unless another rule admits them.",
   "prefs.storage.title": "Storage",
   "prefs.storage.help":
     "Artifact versions, conversation history and skill packages. Deleting an artifact frees its space.",

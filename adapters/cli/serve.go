@@ -456,7 +456,12 @@ func newServeCmd() *cobra.Command {
 	cmd.Flags().Bool("oidc-allow-signup", false,
 		"let a first sign-in create a local account; without it OIDC reaches only accounts that exist (linked already, or created by an administrator under the same address)")
 	cmd.Flags().StringSlice("oidc-allowed-domains", nil,
-		"accept OIDC sign-in only from verified addresses in these domains, e.g. example.com — checked on every sign-in, exact match, no subdomains")
+		"accept OIDC sign-in only from verified addresses in these domains, e.g. example.com — checked on every sign-in, exact match, no subdomains; administrators can extend the list with sign-in rules in the interface")
+	// On by default for Google (docs/adr/0024): a personal Google account
+	// stays verified under a work address after its owner leaves the
+	// Workspace, so the address alone does not prove membership.
+	cmd.Flags().Bool("oidc-google-ignore-hosted-domain", false,
+		"Google only: admit a listed domain from the address alone, without requiring the ID token's hd claim (the Workspace) to be listed too — this readmits personal accounts registered under a work address")
 	// Named for the provider on purpose (docs/adr/0023): it is not a way to
 	// stop checking email_verified, and NewOIDC refuses it for any issuer
 	// that is not Entra's.
@@ -571,13 +576,14 @@ func oidcFromFlags(cmd *cobra.Command) (directory.RedirectAuthenticator, error) 
 	allowSignup, _ := cmd.Flags().GetBool("oidc-allow-signup")
 	domains, _ := cmd.Flags().GetStringSlice("oidc-allowed-domains")
 	entra, _ := cmd.Flags().GetBool("oidc-entra-verified-domain")
+	ignoreHD, _ := cmd.Flags().GetBool("oidc-google-ignore-hosted-domain")
 
 	oidcDir, err := directory.NewOIDC(directory.OIDCConfig{
 		Name: name, Label: label, IssuerURL: issuer,
 		ClientID: clientID, ClientSecret: secret, RedirectURL: redirect,
 		Scopes: scopes, CACertFile: caCert, Timeout: timeout,
 		AllowSignup: allowSignup, AllowedDomains: domains,
-		EntraVerifiedDomain: entra,
+		EntraVerifiedDomain: entra, IgnoreGoogleHostedDomain: ignoreHD,
 	})
 	if err != nil {
 		return nil, err

@@ -251,6 +251,16 @@ func TestOIDC_IdentityCarriesTheConfiguredIssuerNotTheTokensSpelling(t *testing.
 			t.Fatalf("token issued as %q: identity issuer = %q, want the configured %q", spelling, id.Issuer, google)
 		}
 	}
+
+	// Google's hd claim is carried, lowercased, so the caller can tell a
+	// Workspace account from a personal one under the same address.
+	id, err := idp.signIn(o, Callback{}, map[string]any{"iss": google, "hd": "Example.TEST"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if id.HostedDomain != "example.test" {
+		t.Fatalf("HostedDomain = %q, want example.test", id.HostedDomain)
+	}
 }
 
 // HS256 is advertised by this fake and must not be accepted: the filter

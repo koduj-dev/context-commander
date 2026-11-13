@@ -760,6 +760,36 @@ export const fr: Partial<Record<MessageKey, string>> = {
   "admin.storage.amount": "Quantité",
   "admin.storage.unit": "Unité",
   "admin.storage.save": "Enregistrer la limite",
+  "admin.tab.signin": "Connexion",
+  "admin.signin.title": "Connexion",
+  "admin.signin.lead":
+    "Qui peut se connecter par authentification unique, et quelles organisations rejoint un nouveau compte. Tant qu'aucune règle n'existe, toute personne vérifiée par le fournisseur peut se connecter. La première règle change cela : dès lors, seuls les domaines et adresses listés ici, ainsi que ceux de la configuration du serveur, sont admis.",
+  "admin.signin.add": "Ajouter une règle",
+  "admin.signin.value": "Domaine ou adresse",
+  "admin.signin.valuePlaceholder": "example.com ou quelquun@example.com",
+  "admin.signin.grant": "Un nouveau compte rejoint ces organisations",
+  "admin.signin.noOrganizations":
+    "Il n'y a encore aucune organisation. Créez-en une d'abord pour que les nouveaux comptes la rejoignent.",
+  "admin.signin.addButton": "Ajouter la règle",
+  "admin.signin.rules": "Règles",
+  "admin.signin.help":
+    "Un domaine admet toutes ses adresses vérifiées, mais pas ses sous-domaines. Les règles sont vérifiées à chaque connexion : en supprimer une exclut les personnes qu'elle admettait. Avec Google, un domaine n'admet que les comptes d'un Google Workspace dont le domaine est lui aussi listé.",
+  "admin.signin.none": "Aucune règle",
+  "admin.signin.noneBody":
+    "Toute personne vérifiée par le fournisseur d'authentification unique peut se connecter, et les comptes ne sont créés que si le serveur autorise l'inscription.",
+  "admin.signin.who": "Domaine ou adresse",
+  "admin.signin.organizations": "Organisations",
+  "admin.signin.actions": "Actions",
+  "admin.signin.kindDomain": "Domaine",
+  "admin.signin.kindAddress": "Adresse",
+  "admin.signin.grantsNothing": "Aucune",
+  "admin.signin.change": "Modifier les organisations",
+  "admin.signin.changeNote":
+    "S'applique aux comptes créés à partir de maintenant. Les personnes déjà membres le restent.",
+  "admin.signin.save": "Enregistrer",
+  "admin.signin.delete": "Supprimer",
+  "admin.signin.confirmDelete":
+    "Supprimer la règle pour {value} ? Les personnes qu'elle admettait ne pourront plus se connecter par authentification unique, sauf si une autre règle les admet.",
   "prefs.storage.title": "Stockage",
   "prefs.storage.help":
     "Versions d’artefacts, historique des conversations et paquets de skills. Supprimer un artefact libère sa place.",

@@ -25,6 +25,7 @@ import { Organizations } from "./pages/Organizations";
 import { Tokens } from "./pages/Tokens";
 import { AdminUsage } from "./pages/AdminUsage";
 import { AdminStorage } from "./pages/AdminStorage";
+import { AdminSignIn } from "./pages/AdminSignIn";
 import { ProjectPlans } from "./pages/ProjectPlans";
 import {
   Administration,
@@ -108,6 +109,7 @@ export function App() {
           <Route path="agents" element={<AdminAgents />} />
           <Route path="usage" element={<AdminUsage />} />
           <Route path="storage" element={<AdminStorage />} />
+          <Route path="signin" element={<AdminSignIn />} />
           <Route path="security" element={<AdminSecurityLog />} />
         </Route>
         <Route path="tokens" element={<Tokens />} />

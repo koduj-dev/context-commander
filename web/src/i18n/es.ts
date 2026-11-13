@@ -753,6 +753,36 @@ export const es: Partial<Record<MessageKey, string>> = {
   "admin.storage.amount": "Cantidad",
   "admin.storage.unit": "Unidad",
   "admin.storage.save": "Guardar límite",
+  "admin.tab.signin": "Inicio de sesión",
+  "admin.signin.title": "Inicio de sesión",
+  "admin.signin.lead":
+    "Quién puede iniciar sesión con inicio de sesión único y a qué organizaciones se une una cuenta nueva. Mientras no exista ninguna regla, puede entrar cualquiera que el proveedor verifique. La primera regla cambia eso: a partir de entonces solo entran los dominios y direcciones indicados aquí y los de la configuración del servidor.",
+  "admin.signin.add": "Añadir una regla",
+  "admin.signin.value": "Dominio o dirección",
+  "admin.signin.valuePlaceholder": "example.com o alguien@example.com",
+  "admin.signin.grant": "Una cuenta nueva se une a estas organizaciones",
+  "admin.signin.noOrganizations":
+    "Todavía no hay organizaciones. Cree una primero para que las cuentas nuevas se unan a ella.",
+  "admin.signin.addButton": "Añadir regla",
+  "admin.signin.rules": "Reglas",
+  "admin.signin.help":
+    "Un dominio admite todas sus direcciones verificadas, pero no sus subdominios. Las reglas se comprueban en cada inicio de sesión, así que eliminar una deja fuera a las personas que admitía. Con Google, un dominio solo admite cuentas de un Google Workspace cuyo dominio también figure en la lista.",
+  "admin.signin.none": "No hay reglas",
+  "admin.signin.noneBody":
+    "Puede entrar cualquiera que el proveedor de inicio de sesión único verifique, y solo se crean cuentas si el servidor permite el registro.",
+  "admin.signin.who": "Dominio o dirección",
+  "admin.signin.organizations": "Organizaciones",
+  "admin.signin.actions": "Acciones",
+  "admin.signin.kindDomain": "Dominio",
+  "admin.signin.kindAddress": "Dirección",
+  "admin.signin.grantsNothing": "Ninguna",
+  "admin.signin.change": "Cambiar organizaciones",
+  "admin.signin.changeNote":
+    "Se aplica a las cuentas creadas a partir de ahora. Quienes ya se unieron conservan su pertenencia.",
+  "admin.signin.save": "Guardar",
+  "admin.signin.delete": "Eliminar",
+  "admin.signin.confirmDelete":
+    "¿Eliminar la regla de {value}? Las personas que admitía ya no podrán iniciar sesión con inicio de sesión único salvo que otra regla las admita.",
   "prefs.storage.title": "Almacenamiento",
   "prefs.storage.help":
     "Versiones de artefactos, historial de conversaciones y paquetes de skills. Eliminar un artefacto libera su espacio.",

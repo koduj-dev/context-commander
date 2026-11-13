@@ -57,8 +57,10 @@ var ErrIssuerMismatch = errors.New("identity: directory identity is linked under
 // are — it is what configuring one means — but it is the reason the link is
 // keyed on the subject afterwards and never re-derived from the email.
 //
-// No role, no membership, no admin grant is given here. A directory proves who
-// someone is, not what they may do (docs/adr/0019).
+// No role, no membership, no admin grant is decided here. A directory proves
+// who someone is, not what they may do (docs/adr/0019). The one grant a new
+// account can receive is the one an administrator wrote down in advance as a
+// sign-in rule, passed in as ProvisionPolicy.AfterCreate (docs/adr/0024).
 func ProvisionDirectoryUser(ctx context.Context, pool *db.Pool, id DirectoryIdentity) (Principal, error) {
 	return ProvisionDirectoryUserWith(ctx, pool, id, ProvisionPolicy{CreateMissing: true})
 }
@@ -77,6 +79,14 @@ type ProvisionPolicy struct {
 	// self-registration. Without it, cases 1 and 2 still work: an existing
 	// link, or an account an administrator created under the same address.
 	CreateMissing bool
+
+	// AfterCreate, when set, runs in the same transaction right after case 3
+	// created a user, and only then. It is how an administrator's sign-in
+	// rule grants organization membership (docs/adr/0024) without an
+	// account ever existing for a moment without it. Not run for cases 1
+	// and 2: a rule applies to accounts it creates, and an account that
+	// already existed already has whatever its administrators gave it.
+	AfterCreate func(ctx context.Context, tx pgx.Tx, userID uuid.UUID) error
 }
 
 // ProvisionDirectoryUserWith is ProvisionDirectoryUser under an explicit
@@ -170,6 +180,11 @@ func linkOrCreate(ctx context.Context, tx pgx.Tx, store *Store, id DirectoryIden
 	}
 	if err := store.LinkDirectoryIdentity(ctx, tx, id.Provider, id.Issuer, id.Subject, created.ID); err != nil {
 		return uuid.Nil, err
+	}
+	if policy.AfterCreate != nil {
+		if err := policy.AfterCreate(ctx, tx, created.ID); err != nil {
+			return uuid.Nil, err
+		}
 	}
 	return created.ID, nil
 }

@@ -34,8 +34,10 @@ var (
 	// that colleague here.
 	ErrEmailNotVerified = errors.New("directory: provider has not verified the email address")
 
-	// ErrDomainNotAllowed means the address is verified but its domain is
-	// not one this installation accepts from the provider (docs/adr/0020).
+	// ErrDomainNotAllowed means the address is verified but neither its
+	// domain nor the address itself is one this installation accepts
+	// (docs/adr/0020, docs/adr/0024). Returned by the caller that applies
+	// the allowlist, not by Exchange.
 	ErrDomainNotAllowed = errors.New("directory: email domain is not allowed to sign in")
 )
 
@@ -95,7 +97,16 @@ type OIDCConfig struct {
 	// sign-in, not only the first, so narrowing the list takes effect for
 	// people already linked. Exact match on the part after @, no
 	// subdomains: "example.com" does not admit "mail.example.com".
+	// An administrator's rules (internal/signin) extend the same list; the
+	// caller applies both, through Admission.
 	AllowedDomains []string
+
+	// IgnoreGoogleHostedDomain turns off the Workspace check for a Google
+	// issuer. On by default there: Google keeps a personal account verified
+	// under a work address after its owner leaves the Workspace, so for a
+	// Google issuer a listed domain admits only accounts whose `hd` claim is
+	// also listed (docs/adr/0024). Meaningless for any other issuer.
+	IgnoreGoogleHostedDomain bool
 
 	// EntraVerifiedDomain accepts Microsoft Entra ID's `xms_edov` claim in
 	// place of `email_verified`, which Entra never sends. True means the
@@ -297,24 +308,20 @@ func (o *OIDC) Label() string { return o.cfg.Label }
 // AllowsSignup reports whether a first sign-in may create a local account.
 func (o *OIDC) AllowsSignup() bool { return o.cfg.AllowSignup }
 
-// domainAllowed reports whether email's domain is admitted. Everything is
-// admitted when no list is configured.
-func (o *OIDC) domainAllowed(email string) bool {
-	if len(o.cfg.AllowedDomains) == 0 {
-		return true
+// Admission reports the configured domains and whether the Workspace check
+// applies.
+func (o *OIDC) Admission() Admission {
+	return Admission{
+		Domains:             append([]string(nil), o.cfg.AllowedDomains...),
+		RequireHostedDomain: o.isGoogle() && !o.cfg.IgnoreGoogleHostedDomain,
 	}
-	at := strings.LastIndexByte(email, '@')
-	if at < 0 {
-		return false
-	}
-	domain := strings.ToLower(email[at+1:])
-	for _, d := range o.cfg.AllowedDomains {
-		if domain == d {
-			return true
-		}
-	}
-	return false
 }
+
+// googleIssuer is the only issuer whose `hd` claim is read. go-oidc also
+// accepts tokens naming "accounts.google.com" for it.
+const googleIssuer = "https://accounts.google.com"
+
+func (o *OIDC) isGoogle() bool { return o.cfg.IssuerURL == googleIssuer }
 
 // AuthRequest is the per-attempt secret state of one sign-in: the state that
 // ties the callback to the browser that started it, the nonce that ties the
@@ -478,6 +485,8 @@ type idClaims struct {
 	// Entra ID's "email domain owner verified" (docs/adr/0023). Read only
 	// under OIDCConfig.EntraVerifiedDomain.
 	XMSEdov any `json:"xms_edov"`
+	// Google's hosted domain. Read only for Google's issuer.
+	HD string `json:"hd"`
 }
 
 // emailVerified decides whether the address may be trusted. email_verified,
@@ -595,10 +604,11 @@ func (o *OIDC) Exchange(ctx context.Context, cb Callback, req AuthRequest) (Iden
 		return Identity{}, fmt.Errorf("%w: subject %s at provider %s", ErrEmailNotVerified, idToken.Subject, o.cfg.Name)
 	}
 
-	// After the verification check, never before: an unverified address
-	// could claim any domain it likes.
-	if !o.domainAllowed(claims.Email) {
-		return Identity{}, fmt.Errorf("%w: subject %s at provider %s", ErrDomainNotAllowed, idToken.Subject, o.cfg.Name)
+	// The domain is checked by the caller, after this verification, never
+	// before: an unverified address could claim any domain it likes.
+	hd := ""
+	if o.isGoogle() {
+		hd = strings.ToLower(claims.HD)
 	}
 
 	name := claims.Name
@@ -615,6 +625,7 @@ func (o *OIDC) Exchange(ctx context.Context, cb Callback, req AuthRequest) (Iden
 		// accounts.google.com, and a link keyed on whichever one a given
 		// token used would read as a different issuer on the next sign-in.
 		// Verification has already established they are the same.
-		Issuer: o.cfg.IssuerURL,
+		Issuer:       o.cfg.IssuerURL,
+		HostedDomain: hd,
 	}, nil
 }
