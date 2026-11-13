@@ -122,6 +122,12 @@ ExecStart=
 ExecStart=/usr/bin/ccd serve --addr 0.0.0.0:8490
 ```
 
+Behind a reverse proxy, add `CC_TRUSTED_PROXIES=127.0.0.1,::1` to `ccd.env`
+(the proxy's addresses as the server sees them). The sign-in endpoints are
+then limited per client, read from the proxy's `X-Forwarded-For`. The proxy
+must overwrite or append to that header, never pass a client's copy through
+unchanged. nginx's `$proxy_add_x_forwarded_for` appends, which is right.
+
 A reverse proxy must not buffer the board streams
 (`/v1/projects/{namespace}/{slug}/plans/events` and `/v1/me/presence/events`,
 Server-Sent Events): a buffered event waits in the proxy until the stream

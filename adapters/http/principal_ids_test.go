@@ -20,7 +20,8 @@ func (f *fixture) registerAgent(adminToken, name string) (agentID, principalID s
 	f.t.Helper()
 	body, _ := json.Marshal(map[string]string{"name": name})
 	var sp struct {
-		ID string `json:"id"`
+		ID          string `json:"id"`
+		PrincipalID string `json:"principal_id"`
 	}
 	f.mustDecode(http.MethodPost, "/v1/installation/service-principals", adminToken, body, http.StatusCreated, "register agent", &sp)
 	ctx := context.Background()
@@ -29,6 +30,11 @@ func (f *fixture) registerAgent(adminToken, name string) (agentID, principalID s
 	})
 	if err != nil {
 		f.t.Fatalf("register agent: principal for %s: %v", sp.ID, err)
+	}
+	// The create response carries the principal, so nobody has to guess
+	// which of the two ids a membership or a token takes.
+	if sp.PrincipalID != principalID {
+		f.t.Fatalf("register agent: response principal_id = %q, want %q", sp.PrincipalID, principalID)
 	}
 	return sp.ID, principalID
 }

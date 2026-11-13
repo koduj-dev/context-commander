@@ -1,15 +1,12 @@
 // Package ratelimit bounds what one caller, and what the unauthenticated
 // world as a whole, can make this server do.
 //
-// It deliberately does NOT limit per IP address. adapters/cli/serve.go
-// refuses to trust X-Forwarded-For (there is no trusted-proxy
-// configuration, and the header is spoofable without one), while the
-// supported deployment is a loopback bind behind a TLS-terminating reverse
-// proxy — so every request arrives with the proxy's address. A per-IP
-// bucket would therefore put every user in ONE bucket, which is worse than
-// no limit at all: any caller could lock out all the others by tripping the
-// shared ceiling. Per-IP limiting becomes possible the day a trusted-proxy
-// configuration exists, and not before.
+// Per-IP limiting applies only to unauthenticated endpoints, and only to an
+// address that means something (docs/adr/0029). Behind a reverse proxy every
+// request arrives from the proxy, and one bucket for everyone would let any
+// caller lock out all the others. internal/clientip reads the client from
+// X-Forwarded-For only when the operator named the proxy (--trusted-proxies);
+// without that, a loopback peer is the proxy and is not limited per IP.
 //
 // What is limited instead:
 //
@@ -26,6 +23,7 @@ package ratelimit
 
 import (
 	"crypto/sha256"
+	"net/netip"
 	"strings"
 	"sync"
 	"time"
@@ -66,6 +64,13 @@ type Limits struct {
 	// database are an amplifier pointed at the live server, and the answer
 	// is to let only a few run at once rather than to weaken them.
 	MaxConcurrentPasswordHash int
+
+	// PerIP is the sustained unauthenticated requests per second allowed for
+	// one client address; IPBurst is how many may arrive together. Zero
+	// disables. IPv6 addresses share a bucket per /64, the block one host is
+	// usually given, so rotating within it buys nothing.
+	PerIP   float64
+	IPBurst int
 }
 
 // idleEviction is how long an unused credential's bucket is kept. Long
@@ -87,6 +92,9 @@ type Limiter struct {
 	// tried to sign in with, sitting in memory and in any core dump.
 	signIns map[[32]byte]*bucket
 
+	// ips holds the per-address buckets for unauthenticated traffic.
+	ips map[netip.Prefix]*bucket
+
 	// authGate is a counting semaphore. Buffered channel rather than
 	// sync.Cond or x/sync/semaphore: acquiring must be able to give up
 	// immediately when full, which a channel select does in one line.
@@ -107,6 +115,7 @@ func New(limits Limits) *Limiter {
 		limits:  limits,
 		buckets: make(map[uuid.UUID]*bucket),
 		signIns: make(map[[32]byte]*bucket),
+		ips:     make(map[netip.Prefix]*bucket),
 	}
 	if limits.MaxConcurrentAuth > 0 {
 		l.authGate = make(chan struct{}, limits.MaxConcurrentAuth)
@@ -237,4 +246,41 @@ func (l *Limiter) evictIdleSignInsLocked() {
 			delete(l.signIns, key)
 		}
 	}
+}
+
+// AllowIP reports whether one more unauthenticated request may come from
+// this address now.
+func (l *Limiter) AllowIP(a netip.Addr) bool {
+	if l == nil || l.limits.PerIP <= 0 || !a.IsValid() {
+		return true
+	}
+	a = a.Unmap()
+	key := netip.PrefixFrom(a, a.BitLen())
+	if a.Is6() {
+		key, _ = a.Prefix(64)
+	}
+
+	l.mu.Lock()
+	b, ok := l.ips[key]
+	if !ok {
+		burst := l.limits.IPBurst
+		if burst <= 0 {
+			burst = 1
+		}
+		b = &bucket{limiter: rate.NewLimiter(rate.Limit(l.limits.PerIP), burst)}
+		l.ips[key] = b
+		// Attacker-chosen key space, like sign-ins: sweep early.
+		if len(l.ips) >= 1024 {
+			cutoff := time.Now().Add(-idleEviction)
+			for k, old := range l.ips {
+				if old.lastSeen.Before(cutoff) {
+					delete(l.ips, k)
+				}
+			}
+		}
+	}
+	b.lastSeen = time.Now()
+	limiter := b.limiter
+	l.mu.Unlock()
+	return limiter.Allow()
 }

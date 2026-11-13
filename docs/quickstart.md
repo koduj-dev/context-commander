@@ -247,7 +247,12 @@ afterwards; the rest of the server behaves identically.
 **Rate limits.** Defaults are 100 requests/second sustained per credential with
 a burst of 200, and at most 64 authentications in flight at once. Tune with
 `--rate-limit-per-credential`, `--rate-limit-burst` and `--max-concurrent-auth`
-(`0` disables either mechanism). Limits are **per credential, not per IP**:
-`X-Forwarded-For` is not trusted, so behind a reverse proxy a per-IP bucket
-would put every caller in one shared bucket, where any one of them could lock
-out the rest.
+(`0` disables either mechanism). Authenticated requests are limited **per
+credential**. The unauthenticated endpoints (sign-in, single sign-on, first-run
+setup) are also limited **per client address**, 60 a minute with a burst of 30
+by default (`--rate-limit-unauthenticated-per-minute`,
+`--rate-limit-unauthenticated-burst`). Behind a reverse proxy, name the proxy
+with `--trusted-proxies 127.0.0.1,::1` (or `CC_TRUSTED_PROXIES`), so the
+client is read from its `X-Forwarded-For`. Without that, the proxy's loopback
+address is not limited, because one bucket for everyone would let any caller
+lock out the rest ([ADR 0029](adr/0029-trusted-proxies-and-per-ip-limits.md)).

@@ -45,6 +45,11 @@ type ServicePrincipal struct {
 	// provenance and grants nothing: an agent's access comes from its own
 	// project memberships (docs/adr/0004), never from this user's.
 	CreatedBy *uuid.UUID
+	// PrincipalID is the principal this agent acts as, set by the paths that
+	// create or resolve it and uuid.Nil where it was not looked up. It is
+	// what a token is issued for and what a project membership names, and
+	// a caller handed only ID used to pick the wrong one.
+	PrincipalID uuid.UUID
 }
 
 // ClientCredential is a PAT — see docs/adr/0009-pat-format-and-bootstrap.md

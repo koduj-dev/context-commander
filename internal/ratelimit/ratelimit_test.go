@@ -1,6 +1,7 @@
 package ratelimit_test
 
 import (
+	"net/netip"
 	"sync"
 	"testing"
 
@@ -194,5 +195,31 @@ func TestAcquirePasswordHashDisabledByZero(t *testing.T) {
 			t.Fatalf("acquire %d refused although the gate is disabled", i)
 		}
 		defer release()
+	}
+}
+
+func TestAllowIPIsPerAddressAndPerSlash64(t *testing.T) {
+	l := ratelimit.New(ratelimit.Limits{PerIP: 0.001, IPBurst: 2})
+	a := netip.MustParseAddr("198.51.100.7")
+	for i := 0; i < 2; i++ {
+		if !l.AllowIP(a) {
+			t.Fatalf("request %d of the burst was refused", i+1)
+		}
+	}
+	if l.AllowIP(a) {
+		t.Fatal("a third request inside the burst window was allowed")
+	}
+	if !l.AllowIP(netip.MustParseAddr("198.51.100.8")) {
+		t.Fatal("another address shared the first one's bucket")
+	}
+	v6 := ratelimit.New(ratelimit.Limits{PerIP: 0.001, IPBurst: 1})
+	if !v6.AllowIP(netip.MustParseAddr("2001:db8:1:2::1")) {
+		t.Fatal("first v6 request refused")
+	}
+	if v6.AllowIP(netip.MustParseAddr("2001:db8:1:2::ffff")) {
+		t.Fatal("a second address in the same /64 got a fresh bucket")
+	}
+	if !ratelimit.New(ratelimit.Limits{}).AllowIP(a) {
+		t.Fatal("the zero value limited")
 	}
 }
