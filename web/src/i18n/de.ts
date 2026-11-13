@@ -190,6 +190,15 @@ export const de: Partial<Record<MessageKey, string>> = {
   "members.column.role": "Rolle",
   "members.column.added": "Hinzugefügt",
   "members.add": "Principal hinzufügen",
+  "members.invite": "Per E-Mail einladen",
+  "members.inviteHelp":
+    "Die Person tritt mit dieser Rolle bei, sobald sie sich das nächste Mal anmeldet, oder bei ihrer ersten Anmeldung, wenn sie noch kein Konto hat. Bei Single Sign-on lässt eine Einladung diese Adresse auch dann zu, wenn die Anmelderegeln es nicht täten. Einladungen laufen nach 14 Tagen ab.",
+  "members.inviteEmail": "E-Mail",
+  "members.inviteButton": "Einladen",
+  "members.noInvitations": "Keine offenen Einladungen",
+  "members.inviteExpires": "Läuft ab",
+  "members.inviteActions": "Aktionen",
+  "members.inviteRevoke": "Widerrufen",
   "members.count": "{count, plural, one {# Mitglied} other {# Mitglieder}}",
 
   "skills.title": "Skills",

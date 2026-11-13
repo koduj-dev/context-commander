@@ -102,6 +102,11 @@ func TestDecide(t *testing.T) {
 			want: Decision{Admitted: true, ByRule: true},
 		},
 		{
+			name: "an invitation admits its address past a closed list, and permits the account",
+			in:   Input{Email: "guest@elsewhere.test", Rules: []Rule{domain}, Invited: true},
+			want: Decision{Admitted: true, ByRule: true, DomainTrusted: true},
+		},
+		{
 			name: "Google without the check: the address decides, as for any issuer",
 			in:   Input{Email: "ana@4net.tv", Rules: []Rule{domain}},
 			want: Decision{Admitted: true, ByRule: true, DomainTrusted: true},

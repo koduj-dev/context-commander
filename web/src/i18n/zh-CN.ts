@@ -207,6 +207,15 @@ export const zhCN: Partial<Record<MessageKey, string>> = {
   "members.column.role": "角色",
   "members.column.added": "加入时间",
   "members.add": "添加 principal",
+  "members.invite": "通过邮箱邀请",
+  "members.inviteHelp":
+    "此人下次登录时以该角色加入；如果还没有账户，则在首次登录时加入。使用单点登录时，即使登录规则不允许，邀请也会放行该地址。邀请在 14 天后过期。",
+  "members.inviteEmail": "邮箱",
+  "members.inviteButton": "邀请",
+  "members.noInvitations": "没有待处理的邀请",
+  "members.inviteExpires": "过期时间",
+  "members.inviteActions": "操作",
+  "members.inviteRevoke": "撤销",
   "members.count": "{count, plural, other {# 名成员}}",
   "members.addHelp":
     "项目角色属于某个 principal — 可以是人，也可以是 agent。如果你管理这个安装实例，两者都可以在这里选择；否则此处需要填 principal 的 ID，它与账号 ID 不是一回事。",

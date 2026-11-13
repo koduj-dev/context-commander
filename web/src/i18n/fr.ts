@@ -208,6 +208,15 @@ export const fr: Partial<Record<MessageKey, string>> = {
   "members.column.role": "Rôle",
   "members.column.added": "Ajouté",
   "members.add": "Ajouter un principal",
+  "members.invite": "Inviter par e-mail",
+  "members.inviteHelp":
+    "La personne rejoint le projet avec ce rôle à sa prochaine connexion, ou à sa première si elle n'a pas encore de compte. Avec l'authentification unique, une invitation admet aussi cette adresse même si les règles de connexion ne le feraient pas. Les invitations expirent après 14 jours.",
+  "members.inviteEmail": "E-mail",
+  "members.inviteButton": "Inviter",
+  "members.noInvitations": "Aucune invitation en attente",
+  "members.inviteExpires": "Expire",
+  "members.inviteActions": "Actions",
+  "members.inviteRevoke": "Révoquer",
   "members.count": "{count, plural, one {# membre} other {# membres}}",
   "members.addHelp":
     "Un rôle de projet appartient à un principal — une personne ou un agent. Les deux sont proposés ici si vous administrez cette installation ; sinon le champ prend l’identifiant du principal, qui n’est pas celui du compte.",

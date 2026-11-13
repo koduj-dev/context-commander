@@ -205,6 +205,15 @@ export const pl: Partial<Record<MessageKey, string>> = {
   "members.column.role": "Rola",
   "members.column.added": "Dodano",
   "members.add": "Dodaj principala",
+  "members.invite": "Zaproś e-mailem",
+  "members.inviteHelp":
+    "Osoba dołączy z tą rolą przy następnym logowaniu albo przy pierwszym, jeśli nie ma jeszcze konta. Przy logowaniu jednokrotnym zaproszenie wpuszcza ten adres nawet wtedy, gdy reguły logowania by go nie wpuściły. Zaproszenia wygasają po 14 dniach.",
+  "members.inviteEmail": "E-mail",
+  "members.inviteButton": "Zaproś",
+  "members.noInvitations": "Brak oczekujących zaproszeń",
+  "members.inviteExpires": "Wygasa",
+  "members.inviteActions": "Działania",
+  "members.inviteRevoke": "Odwołaj",
   "members.count":
     "{count, plural, one {# członek} few {# członkowie} many {# członków} other {# członka}}",
   "members.addHelp":

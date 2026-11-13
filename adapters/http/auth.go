@@ -17,6 +17,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/directory"
 	"github.com/koduj-dev/context-commander/internal/identity"
 	"github.com/koduj-dev/context-commander/internal/installation"
+	"github.com/koduj-dev/context-commander/internal/members"
 	"github.com/koduj-dev/context-commander/internal/security"
 )
 
@@ -290,6 +291,17 @@ func (d Deps) startSession(w http.ResponseWriter, r *http.Request, principalID u
 	}
 	d.endPreviousSession(r)
 	d.setSessionCookie(w, token, expires)
+	// Every browser sign-in accepts the invitations waiting for this
+	// person's address (docs/adr/0030): a new account on its first sign-in,
+	// an existing one on its next. Best-effort: an invitation that could not
+	// be accepted now is accepted next time, and must not cost the sign-in.
+	if joined, err := members.AcceptInvitations(r.Context(), d.Pool, principalID); err != nil {
+		slog.ErrorContext(r.Context(), "could not accept project invitations", "err", err,
+			"request_id", middleware.GetReqID(r.Context()))
+	} else if len(joined) > 0 {
+		slog.InfoContext(r.Context(), "accepted project invitations", "projects", len(joined),
+			"request_id", middleware.GetReqID(r.Context()))
+	}
 	return expires, nil
 }
 

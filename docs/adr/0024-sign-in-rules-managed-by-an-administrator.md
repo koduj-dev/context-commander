@@ -23,8 +23,8 @@ not give them:
    this, a new account was an empty account until an organization owner
    added it by hand. Note that organization membership does not reach the
    organization's projects: project access is project membership only
-   (ADR 0006), so a project owner still adds the person. Granting projects
-   through a rule is a separate, open decision (NEXT.md).
+   (ADR 0006), so a project owner still adds the person. Projects are reached
+   through invitations instead (ADR 0030).
 
 Google brought a fourth. `--oidc-allowed-domains` compares the domain of the
 address. A person who leaves a Google Workspace can keep a *personal* Google

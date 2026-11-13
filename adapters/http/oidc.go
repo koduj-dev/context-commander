@@ -24,6 +24,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/db"
 	"github.com/koduj-dev/context-commander/internal/directory"
 	"github.com/koduj-dev/context-commander/internal/identity"
+	"github.com/koduj-dev/context-commander/internal/members"
 	"github.com/koduj-dev/context-commander/internal/security"
 	"github.com/koduj-dev/context-commander/internal/signin"
 )
@@ -513,11 +514,16 @@ func (d Deps) admit(r *http.Request, adm directory.Admission, id directory.Ident
 	if err != nil {
 		return signin.Decision{}, err
 	}
+	invited, err := members.HasPendingInvitation(r.Context(), d.Pool, id.Email)
+	if err != nil {
+		return signin.Decision{}, err
+	}
 	return signin.Decide(signin.Input{
 		Email:               id.Email,
 		HostedDomain:        id.HostedDomain,
 		RequireHostedDomain: adm.RequireHostedDomain,
 		FlagDomains:         adm.Domains,
 		Rules:               rules,
+		Invited:             invited,
 	}), nil
 }

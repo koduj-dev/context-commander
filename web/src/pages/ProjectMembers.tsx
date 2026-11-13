@@ -20,6 +20,7 @@ import {
   Panel,
   Row,
   SelectField,
+  TextField,
 } from "../ui";
 import { PrincipalPicker } from "../ui/PrincipalPicker";
 import { useProject } from "./ProjectLayout";
@@ -103,6 +104,11 @@ export function ProjectMembers() {
 
       {canAdd && (
         <div className="mt">
+          <Invitations canGrantOwner={myRole === "OWNER"} />
+        </div>
+      )}
+      {canAdd && (
+        <div className="mt">
           <AddMember onAdded={reload} />
         </div>
       )}
@@ -171,6 +177,117 @@ function AddMember({ onAdded }: { onAdded: () => void }) {
       <div className="mt">
         <Note tone="info">{t("members.noRemoval")}</Note>
       </div>
+    </Panel>
+  );
+}
+
+/**
+ * Inviting someone by email (docs/adr/0030). The invitation is accepted the
+ * next time a person with that address signs in through the browser — on
+ * their first sign-in if they have no account yet — so nobody has to know a
+ * principal id, or wait for the person to exist. The screen never says
+ * whether the address already has an account: the server does not tell it.
+ */
+function Invitations({ canGrantOwner }: { canGrantOwner: boolean }) {
+  const t = useT();
+  const f = useFormat();
+  const { namespace, slug } = useProject();
+  const list = useResource(() => api.invitations(namespace, slug), [namespace, slug]);
+
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState<(typeof ROLES)[number]>("CONTRIBUTOR");
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState<unknown>();
+  const roles = canGrantOwner ? ROLES : ROLES.filter((r) => r !== "OWNER");
+
+  async function run(action: () => Promise<unknown>, after?: () => void) {
+    setBusy(true);
+    setFailure(undefined);
+    try {
+      await action();
+      after?.();
+      list.reload();
+    } catch (err) {
+      setFailure(err);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const items = list.data?.items ?? [];
+  return (
+    <Panel title={t("members.invite")} tight>
+      <div className="stack">
+        <p className="sec lead-out">{t("members.inviteHelp")}</p>
+        <Row gap="sm">
+          <TextField
+            label={t("members.inviteEmail")}
+            placeholder="someone@example.com"
+            value={email}
+            onChange={setEmail}
+            labelled
+          />
+          <SelectField
+            label={t("members.column.role")}
+            value={role}
+            onChange={setRole}
+            options={roles.map((r) => ({ value: r, label: roleLabel(t, r) }))}
+          />
+          <Btn
+            kind="primary"
+            disabled={busy || !email.trim()}
+            onClick={() =>
+              void run(
+                () => api.invite(namespace, slug, email.trim(), role),
+                () => setEmail(""),
+              )
+            }
+          >
+            {busy ? t("common.loading") : t("members.inviteButton")}
+          </Btn>
+        </Row>
+        {failure !== undefined && <ErrorState error={failure} />}
+      </div>
+      {list.loading ? (
+        <Loading />
+      ) : list.error ? (
+        <ErrorState error={list.error} onRetry={list.reload} />
+      ) : items.length === 0 ? (
+        <EmptyState title={t("members.noInvitations")} />
+      ) : (
+        <DataTable
+          columns={[
+            { key: "email", label: t("members.inviteEmail") },
+            { key: "role", label: t("members.column.role") },
+            { key: "expires", label: t("members.inviteExpires") },
+            { key: "actions", label: t("members.inviteActions"), align: "r" },
+          ]}
+        >
+          {items.map((i) => (
+            <tr key={i.id}>
+              <td>
+                <Mono>{i.email}</Mono>
+              </td>
+              <td>
+                <Badge>{roleLabel(t, i.role)}</Badge>
+              </td>
+              <td>
+                <span className="dim">{f.date(i.expires_at)}</span>
+              </td>
+              <td className="r">
+                <Btn
+                  small
+                  kind="danger"
+                  disabled={busy}
+                  onClick={() => void run(() => api.revokeInvitation(namespace, slug, i.id))}
+                >
+                  {t("members.inviteRevoke")}
+                </Btn>
+              </td>
+            </tr>
+          ))}
+        </DataTable>
+      )}
     </Panel>
   );
 }
