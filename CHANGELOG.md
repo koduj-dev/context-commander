@@ -6,6 +6,25 @@ All notable changes to Context Commander are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Semantic search of memories.** Off by default. With an embedding
+  provider configured, memories can also be found by meaning, in Czech and
+  English alike. A local Ollama model (`bge-m3`) is the default provider,
+  and an OpenAI-compatible API is opt-in. `memory.search` and the HTTP
+  search endpoints take `mode` (`text`, `semantic`, `hybrid`; hybrid fuses
+  both rankings and is the default when a provider is configured).
+  `memory.related` and `GET .../memories/{id}/related` return the closest
+  memories. The Memories tab gets a mode switch and a "Related memories"
+  panel, both shown only when the server has it. Vectors are encrypted with
+  the project key by default. Plaintext `pgvector` storage is an explicit
+  opt-in with its own migration set (`ccd migrate --pgvector`). Memories are
+  embedded in the background, without slowing a write, and `ccd embeddings
+  reindex` backfills. `GET /v1/installation/embeddings` shows administrators
+  the provider's health. Migration 000040. See
+  [docs/semantic-search.md](docs/semantic-search.md) and
+  [ADR 0028](docs/adr/0028-semantic-search.md).
+
 ### Security
 
 - **Google sign-in checks the Workspace.** For Google's issuer, a listed

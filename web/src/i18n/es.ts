@@ -1004,6 +1004,18 @@ export const es: Partial<Record<MessageKey, string>> = {
   "memories.delete": "Eliminar",
   "memories.deleteConfirm": "Eliminar definitivamente",
   "memories.save": "Guardar memoria",
+  "memories.mode": "Buscar por",
+  "memories.mode.text": "Palabras",
+  "memories.mode.semantic": "Significado similar",
+  "memories.mode.hybrid": "Ambos",
+  "memories.searchPlaceholderMeaning": "Palabras, o describe lo que buscas",
+  "memories.degraded":
+    "La búsqueda por significado no está disponible ahora mismo, así que estos resultados solo coinciden con tus palabras.",
+  "memories.match.semantic": "Significado similar",
+  "memories.related": "Memorias relacionadas",
+  "memories.relatedLead":
+    "Memorias activas más cercanas en significado a esta, comparadas por su embedding.",
+  "memories.relatedEmpty": "Ninguna otra memoria tiene un significado cercano a esta.",
   "project.tab.ideas": "Ideas",
   "ideas.title": "Ideas",
   "ideas.lead":

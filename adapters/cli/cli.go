@@ -47,6 +47,7 @@ func NewCommand() []*cobra.Command {
 		newGateCmd(),
 		newSecretCmd(),
 		newInstallationCmd(),
+		newEmbeddingsCmd(),
 		newServeCmd(),
 	}
 }
@@ -78,9 +79,21 @@ func newMigrateCmd() *cobra.Command {
 				return err
 			}
 			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "migrations applied")
+			// The optional set for plaintext pgvector storage
+			// (docs/adr/0028): only when asked, because it needs an
+			// extension plain Postgres does not have and it creates the one
+			// plaintext copy of what memories mean.
+			if pgv, _ := cmd.Flags().GetBool("pgvector"); pgv {
+				if err := db.MigratePgvector(cmd.Context(), dsn); err != nil {
+					return err
+				}
+				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "pgvector migrations applied")
+			}
 			return nil
 		},
 	}
+	cmd.Flags().Bool("pgvector", false,
+		"also apply the optional pgvector migrations, for --embeddings-store=pgvector (needs the vector extension, created by a superuser; docs/semantic-search.md)")
 	databaseURLFlag(cmd)
 	return cmd
 }

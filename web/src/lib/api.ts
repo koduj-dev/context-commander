@@ -798,8 +798,28 @@ export type MemoryHit = Memory & {
   /** Set only on `GET /me/memories/search`. */
   project?: string;
   project_name?: string;
-  match: "title" | "body";
+  /** "semantic": found by meaning, not by the words (docs/adr/0028). */
+  match: "title" | "body" | "semantic";
   snippet: string;
+  /** Similarity or fused rank score; absent on a text hit. */
+  score?: number;
+};
+
+/**
+ * How a search ranks (docs/adr/0028). The server lists the modes it can
+ * answer in the facets; "semantic" and "hybrid" exist only where an operator
+ * configured an embedding provider.
+ */
+export type SearchMode = "text" | "semantic" | "hybrid";
+
+export type MemorySearchResult = {
+  items: MemoryHit[];
+  truncated: boolean;
+  /** The mode that answered, after the server's default was applied. */
+  mode: SearchMode;
+  /** A hybrid search fell back to words because the provider failed. */
+  degraded?: boolean;
+  people: Record<string, Person>;
 };
 
 /** Metadata filters, as the list and search endpoints read them. */
@@ -821,6 +841,8 @@ export type MemoryFacets = {
   tags: string[];
   assignees: string[];
   people: Record<string, Person>;
+  search_modes: SearchMode[];
+  default_search_mode: SearchMode;
 };
 
 export type NewMemory = {
@@ -1265,9 +1287,13 @@ export const api = {
     request<Memory>(`${project(ns, slug)}/memories/${id}`),
   memoryFacets: (ns: string, slug: string) =>
     request<MemoryFacets>(`${project(ns, slug)}/memories/facets`),
-  searchMemories: (ns: string, slug: string, q: string, filter: MemoryFilter) =>
-    request<{ items: MemoryHit[]; truncated: boolean; people: Record<string, Person> }>(
-      withQuery(`${project(ns, slug)}/memories/search`, { q, ...filter }),
+  searchMemories: (ns: string, slug: string, q: string, filter: MemoryFilter, mode?: SearchMode) =>
+    request<MemorySearchResult>(
+      withQuery(`${project(ns, slug)}/memories/search`, { q, mode, ...filter }),
+    ),
+  relatedMemories: (ns: string, slug: string, id: string, limit = 5) =>
+    request<MemorySearchResult>(
+      withQuery(`${project(ns, slug)}/memories/${id}/related`, { limit: String(limit) }),
     ),
   createMemory: (ns: string, slug: string, memory: NewMemory) =>
     request<Memory>(`${project(ns, slug)}/memories/`, { method: "POST", body: memory }),

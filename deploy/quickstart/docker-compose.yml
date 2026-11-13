@@ -75,6 +75,21 @@ services:
       - "127.0.0.1:8490:8490"
     volumes:
       - cc_app_storage:/data
+    # Semantic search of memories (docs/semantic-search.md) — optional. To turn
+    # it on with a local model, uncomment the `ollama` service below, add these
+    # two lines to app's environment above, then pull the model once:
+    #   docker compose exec ollama ollama pull bge-m3
+    # (and `docker compose run --rm app embeddings reindex` with the same
+    # variables to embed memories written before.)
+    #   CC_EMBEDDINGS_PROVIDER: ollama
+    #   CC_EMBEDDINGS_URL: http://ollama:11434
+
+  # ollama:
+  #   image: ollama/ollama:0.12.6
+  #   restart: unless-stopped
+  #   # No published port: only `app` talks to it, over the compose network.
+  #   volumes:
+  #     - cc_ollama_models:/root/.ollama
 
 volumes:
   # Artifact and skill content lives in cc_app_storage; everything else is in
@@ -82,3 +97,4 @@ volumes:
   # docs/quickstart.md.
   cc_postgres_data:
   cc_app_storage:
+  # cc_ollama_models:   # uncomment with the ollama service

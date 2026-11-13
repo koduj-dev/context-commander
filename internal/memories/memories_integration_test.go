@@ -372,7 +372,7 @@ func TestSearchRanksTitleHitsFirstAndCombinesWithFilters(t *testing.T) {
 	f.create(alice, f.projectID, memories.NewMemory{Title: "Unrelated", Body: "nothing here"})
 	f.create(alice, f.projectID, memories.NewMemory{Title: "Newer webhook gotcha", Branch: "main"})
 
-	res, err := f.svc.Search(f.ctx, alice.principalID, f.projectID, "webhook", memories.Filter{})
+	res, err := f.svc.Search(f.ctx, alice.principalID, f.projectID, "webhook", "", memories.Filter{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -385,11 +385,11 @@ func TestSearchRanksTitleHitsFirstAndCombinesWithFilters(t *testing.T) {
 	if res.People[alice.principalID].Name != "Alice" {
 		t.Errorf("people: %+v", res.People)
 	}
-	res, _ = f.svc.Search(f.ctx, alice.principalID, f.projectID, "webhook", memories.Filter{Branch: "main"})
+	res, _ = f.svc.Search(f.ctx, alice.principalID, f.projectID, "webhook", "", memories.Filter{Branch: "main"})
 	if got := fmt.Sprint(hitTitles(res.Hits)); got != "[Newer webhook gotcha Billing notes]" {
 		t.Errorf("with a branch filter: %s", got)
 	}
-	if _, err := f.svc.Search(f.ctx, alice.principalID, f.projectID, " ", memories.Filter{}); !errors.Is(err, memories.ErrInvalid) {
+	if _, err := f.svc.Search(f.ctx, alice.principalID, f.projectID, " ", "", memories.Filter{}); !errors.Is(err, memories.ErrInvalid) {
 		t.Errorf("an empty query: %v", err)
 	}
 }
@@ -400,7 +400,7 @@ func TestSearchSaysWhenABoundCutTheAnswer(t *testing.T) {
 	for i := range memories.MaxSearchHits + 1 {
 		f.create(alice, f.projectID, memories.NewMemory{Title: fmt.Sprintf("needle %d", i)})
 	}
-	res, err := f.svc.Search(f.ctx, alice.principalID, f.projectID, "needle", memories.Filter{})
+	res, err := f.svc.Search(f.ctx, alice.principalID, f.projectID, "needle", "", memories.Filter{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -429,7 +429,7 @@ func TestSearchAllCoversEveryProjectTheCallerReadsAndNoOther(t *testing.T) {
 	f.create(wendy, second, memories.NewMemory{Title: "Second project", Body: "cache keys are per tenant"})
 	f.create(bob, foreign, memories.NewMemory{Title: "Foreign cache secret"})
 
-	res, err := f.svc.SearchAll(f.ctx, alice.principalID, "cache", memories.Filter{})
+	res, err := f.svc.SearchAll(f.ctx, alice.principalID, "cache", "", memories.Filter{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -443,7 +443,7 @@ func TestSearchAllCoversEveryProjectTheCallerReadsAndNoOther(t *testing.T) {
 	if _, ok := got[foreign]; ok {
 		t.Errorf("a project alice is not in was searched")
 	}
-	res, err = f.svc.SearchAll(f.ctx, bob.principalID, "cache", memories.Filter{})
+	res, err = f.svc.SearchAll(f.ctx, bob.principalID, "cache", "", memories.Filter{})
 	if err != nil || len(res.Hits) != 1 || res.Hits[0].Memory.ProjectID != foreign {
 		t.Errorf("bob's hits %+v, %v", res.Hits, err)
 	}

@@ -8,6 +8,7 @@ import {
   type MemoryHit,
   type MemoryKind,
   type Person,
+  type SearchMode,
 } from "../lib/api";
 import { useList, useResource } from "../lib/resource";
 import {
@@ -27,6 +28,7 @@ import {
   Pager,
   Panel,
   Row,
+  Seg,
   SelectField,
   Stack,
   TextArea,
@@ -110,6 +112,11 @@ function personName(people: Record<string, Person>, id: string | undefined, fall
  * without decrypting anything; the search box matches the encrypted text,
  * which the server decrypts to answer, and is combined with whatever filters
  * are set.
+ *
+ * Where the server has semantic search (docs/adr/0028) the facets say so,
+ * and only then does the mode switch appear and the detail view offer
+ * related memories: a control for a mode the server would refuse is a
+ * promise this screen cannot keep.
  */
 export function ProjectMemories() {
   const t = useT();
@@ -119,7 +126,10 @@ export function ProjectMemories() {
   const [submitted, setSubmitted] = useState("");
   const [creating, setCreating] = useState(false);
   const [nonce, setNonce] = useState(0);
+  const [mode, setMode] = useState<SearchMode>();
   const facets = useResource(() => api.memoryFacets(namespace, slug), [namespace, slug, nonce]);
+  const semantic = facets.data?.search_modes?.includes("semantic") ?? false;
+  const activeMode: SearchMode = mode ?? facets.data?.default_search_mode ?? "text";
 
   const set = (key: keyof MemoryFilter, value: string) =>
     setFilter((f) => ({ ...f, [key]: value || undefined }));
@@ -178,7 +188,11 @@ export function ProjectMemories() {
               <TextField
                 label={t("memories.search")}
                 type="search"
-                placeholder={t("memories.searchPlaceholder")}
+                placeholder={
+                  semantic && activeMode !== "text"
+                    ? t("memories.searchPlaceholderMeaning")
+                    : t("memories.searchPlaceholder")
+                }
                 value={query}
                 onChange={(v) => {
                   setQuery(v);
@@ -192,6 +206,21 @@ export function ProjectMemories() {
                 {t("memories.searchButton")}
               </Btn>
             </Row>
+            {semantic && (
+              <Row gap="sm">
+                <span className="dim">{t("memories.mode")}</span>
+                <Seg<SearchMode>
+                  label={t("memories.mode")}
+                  value={activeMode}
+                  onChange={setMode}
+                  options={[
+                    { value: "text", label: t("memories.mode.text") },
+                    { value: "semantic", label: t("memories.mode.semantic") },
+                    { value: "hybrid", label: t("memories.mode.hybrid") },
+                  ]}
+                />
+              </Row>
+            )}
             <Row gap="sm">
               <SelectField
                 label={t("memories.filter.kind")}
@@ -273,9 +302,16 @@ export function ProjectMemories() {
           </Stack>
         </Panel>
         {submitted ? (
-          <Results query={submitted} filter={filter} nonce={nonce} onChanged={changed} />
+          <Results
+            query={submitted}
+            filter={filter}
+            mode={semantic ? activeMode : undefined}
+            semantic={semantic}
+            nonce={nonce}
+            onChanged={changed}
+          />
         ) : (
-          <List filter={filter} nonce={nonce} onChanged={changed} />
+          <List filter={filter} semantic={semantic} nonce={nonce} onChanged={changed} />
         )}
       </Stack>
     </>
@@ -284,10 +320,12 @@ export function ProjectMemories() {
 
 function List({
   filter,
+  semantic,
   nonce,
   onChanged,
 }: {
   filter: MemoryFilter;
+  semantic: boolean;
   nonce: number;
   onChanged: () => void;
 }) {
@@ -324,7 +362,7 @@ function List({
       ) : list.items.length === 0 ? (
         <EmptyState title={t("memories.empty")} body={t("memories.emptyBody")} />
       ) : (
-        <MemoryTable rows={list.items} people={people} onChanged={onChanged} />
+        <MemoryTable rows={list.items} people={people} semantic={semantic} onChanged={onChanged} />
       )}
     </Panel>
   );
@@ -333,11 +371,15 @@ function List({
 function Results({
   query,
   filter,
+  mode,
+  semantic,
   nonce,
   onChanged,
 }: {
   query: string;
   filter: MemoryFilter;
+  mode?: SearchMode;
+  semantic: boolean;
   nonce: number;
   onChanged: () => void;
 }) {
@@ -345,8 +387,8 @@ function Results({
   const { namespace, slug } = useProject();
   const key = JSON.stringify(filter);
   const hits = useResource(
-    () => api.searchMemories(namespace, slug, query, filter),
-    [namespace, slug, query, key, nonce],
+    () => api.searchMemories(namespace, slug, query, filter, mode),
+    [namespace, slug, query, key, mode, nonce],
   );
 
   return (
@@ -359,12 +401,22 @@ function Results({
         <EmptyState title={t("memories.noHits", { query })} />
       ) : (
         <>
+          {hits.data.degraded && (
+            <div className="body">
+              <Note tone="warn">{t("memories.degraded")}</Note>
+            </div>
+          )}
           {hits.data.truncated && (
             <div className="body">
               <Note tone="info">{t("memories.truncated")}</Note>
             </div>
           )}
-          <MemoryTable rows={hits.data.items} people={hits.data.people} onChanged={onChanged} />
+          <MemoryTable
+            rows={hits.data.items}
+            people={hits.data.people}
+            semantic={semantic}
+            onChanged={onChanged}
+          />
         </>
       )}
     </Panel>
@@ -374,10 +426,12 @@ function Results({
 function MemoryTable({
   rows,
   people,
+  semantic,
   onChanged,
 }: {
   rows: (Memory | MemoryHit)[];
   people: Record<string, Person>;
+  semantic: boolean;
   onChanged: () => void;
 }) {
   const t = useT();
@@ -395,6 +449,7 @@ function MemoryTable({
     >
       {rows.map((m) => {
         const snippet = "snippet" in m ? m.snippet : "";
+        const byMeaning = "match" in m && m.match === "semantic";
         return (
           <MemoryRows
             key={m.id}
@@ -402,6 +457,7 @@ function MemoryTable({
             open={open === m.id}
             onToggle={() => setOpen(open === m.id ? undefined : m.id)}
             people={people}
+            semantic={semantic}
             onChanged={onChanged}
             summary={
               <>
@@ -411,6 +467,11 @@ function MemoryTable({
                     secondary={
                       <>
                         <Badge tone={kindTone(m.kind)}>{kindLabel(t, m.kind)}</Badge>{" "}
+                        {byMeaning && (
+                          <>
+                            <Badge tone="info">{t("memories.match.semantic")}</Badge>{" "}
+                          </>
+                        )}
                         {m.status !== "active" && (
                           <>
                             <Badge>{statusLabel(t, m.status)}</Badge>{" "}
@@ -449,6 +510,7 @@ function MemoryRows({
   onToggle,
   summary,
   people,
+  semantic,
   onChanged,
 }: {
   memory: Memory;
@@ -456,6 +518,7 @@ function MemoryRows({
   onToggle: () => void;
   summary: ReactNode;
   people: Record<string, Person>;
+  semantic: boolean;
   onChanged: () => void;
 }) {
   const t = useT();
@@ -472,7 +535,12 @@ function MemoryRows({
       {open && (
         <tr>
           <td colSpan={4}>
-            <MemoryDetail id={memory.id} people={people} onChanged={onChanged} />
+            <MemoryDetail
+              id={memory.id}
+              people={people}
+              semantic={semantic}
+              onChanged={onChanged}
+            />
           </td>
         </tr>
       )}
@@ -487,10 +555,12 @@ function MemoryRows({
 function MemoryDetail({
   id,
   people,
+  semantic,
   onChanged,
 }: {
   id: string;
   people: Record<string, Person>;
+  semantic: boolean;
   onChanged: () => void;
 }) {
   const t = useT();
@@ -559,6 +629,7 @@ function MemoryDetail({
         )}
       </Defs>
       {m.body ? <Code>{m.body}</Code> : <span className="dim">{t("memories.noBody")}</span>}
+      {semantic && <Related id={m.id} />}
       {failure !== undefined && <ErrorState error={failure} />}
       <Row gap="sm">
         {m.status === "active" ? (
@@ -599,6 +670,52 @@ function MemoryDetail({
         )}
       </Row>
     </Stack>
+  );
+}
+
+/**
+ * The memories closest in meaning to one memory (docs/adr/0028). Shown only
+ * where the server has semantic search; the server compares the stored
+ * embeddings, and a memory not embedded yet is embedded on the spot.
+ */
+function Related({ id }: { id: string }) {
+  const t = useT();
+  const { namespace, slug } = useProject();
+  const related = useResource(
+    () => api.relatedMemories(namespace, slug, id),
+    [namespace, slug, id],
+  );
+  return (
+    <Panel title={t("memories.related")} tight>
+      <div className="body">
+        <span className="dim">{t("memories.relatedLead")}</span>
+      </div>
+      {related.loading ? (
+        <Loading />
+      ) : related.error || !related.data ? (
+        <ErrorState error={related.error} onRetry={related.reload} />
+      ) : related.data.items.length === 0 ? (
+        <EmptyState title={t("memories.relatedEmpty")} />
+      ) : (
+        <DataTable columns={[{ key: "memory", label: t("memories.column.memory") }]}>
+          {related.data.items.map((h) => (
+            <tr key={h.id}>
+              <td>
+                <Cell
+                  primary={h.title}
+                  secondary={
+                    <>
+                      <Badge tone={kindTone(h.kind)}>{kindLabel(t, h.kind)}</Badge>{" "}
+                      {h.snippet && <span className="dim">{h.snippet}</span>}
+                    </>
+                  }
+                />
+              </td>
+            </tr>
+          ))}
+        </DataTable>
+      )}
+    </Panel>
   );
 }
 

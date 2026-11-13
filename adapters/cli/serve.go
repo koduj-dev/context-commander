@@ -183,6 +183,13 @@ func newServeCmd() *cobra.Command {
 			ideasSvc := ideas.NewService(pool, cryptoProvider, authz, plansSvc)
 			contextSvc.WithIdeas(ideasSvc)
 
+			// Read before the logger is set up and before anything listens,
+			// so a typo is a refusal to start.
+			embeddingsCfg, err := embeddingsFromFlags(cmd)
+			if err != nil {
+				return fmt.Errorf("serve: %w", err)
+			}
+
 			// Structured logs to stderr. JSON by default: these lines are
 			// meant to be shipped and queried (CRA Annex I expects security
 			// information to be recordable and monitorable), and a human
@@ -228,6 +235,34 @@ func newServeCmd() *cobra.Command {
 				}
 				plansSvc.SetPrices(prices)
 				slog.Info("token cost estimates enabled", "prices", pricesPath, "currency", prices.Currency, "as_of", prices.AsOf)
+			}
+
+			// Semantic search (docs/adr/0028). Off unless a provider is
+			// configured. The index runs until shutdown; a provider that is
+			// down at startup is logged, not fatal — hybrid search falls
+			// back to text and the sweep catches up when it returns.
+			announceEmbeddings(embeddingsCfg)
+			var embeddingsStatus cchttp.EmbeddingsStatus
+			indexCtx, stopIndex := context.WithCancel(context.Background())
+			defer stopIndex()
+			if embeddingsCfg.provider != nil {
+				ix, err := newIndex(cmd.Context(), embeddingsCfg, pool, cryptoProvider, memoriesSvc)
+				if err != nil {
+					return fmt.Errorf("serve: %w", err)
+				}
+				go func() {
+					probeCtx, cancel := context.WithTimeout(indexCtx, 30*time.Second)
+					defer cancel()
+					if err := ix.Probe(probeCtx); err != nil {
+						slog.Warn("embedding provider did not answer; semantic search will fall back to text until it does",
+							"endpoint", embeddingsCfg.provider.Endpoint(), "error", err)
+						return
+					}
+					slog.Info("embedding provider answered", "model", embeddingsCfg.provider.Model(), "dimensions", embeddingsCfg.provider.Dimensions())
+				}()
+				go ix.Run(indexCtx)
+				memoriesSvc.EnableSemantic(ix)
+				embeddingsStatus = ix
 			}
 
 			securityLog, _ := cmd.Flags().GetBool("security-log")
@@ -347,7 +382,7 @@ func newServeCmd() *cobra.Command {
 				Skills: skillsSvc, Gates: gatesAdmin, Secrets: secretsSvc,
 				Installation: installationSvc, ContextPack: contextSvc, Plans: plansSvc, Memories: memoriesSvc, Ideas: ideasSvc,
 				Security: securityRec, Limiter: limiter, SecurityEvents: securitySvc,
-				FirstRun: firstRunCode,
+				FirstRun: firstRunCode, Embeddings: embeddingsStatus,
 				// Nil unless --ldap-url was given, and a nil Directory is what
 				// closes the path rather than opening it.
 				Directory:     ldapDir,
@@ -482,6 +517,7 @@ func newServeCmd() *cobra.Command {
 	cmd.Flags().Int("max-concurrent-auth", 64,
 		"maximum authentication attempts in flight at once (0 disables) — bounds the database work an "+
 			"unauthenticated caller can trigger")
+	embeddingsFlags(cmd)
 	databaseURLFlag(cmd)
 	return cmd
 }

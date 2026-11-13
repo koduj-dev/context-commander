@@ -31,17 +31,33 @@ type Service struct {
 	pool   *db.Pool
 	crypto *crypto.Provider
 	authz  *auth.AuthzService
-	// ranker orders search candidates (search.go). Replaceable so a
-	// semantic ranker can be plugged in without changing any caller.
+	// ranker orders search candidates in text mode (search.go).
 	ranker Ranker
+	// semantic is the embedding index, nil unless an operator configured a
+	// provider (docs/adr/0028). It ranks the semantic and hybrid modes,
+	// answers Related, and is told about every write of a memory's text.
+	semantic Semantic
 }
 
 func NewService(pool *db.Pool, cryptoProvider *crypto.Provider, authz *auth.AuthzService) *Service {
 	return &Service{pool: pool, crypto: cryptoProvider, authz: authz, ranker: TextRanker{}}
 }
 
-// SetRanker replaces how search ranks candidates (search.go).
+// SetRanker replaces how text-mode search ranks candidates (search.go).
 func (s *Service) SetRanker(r Ranker) { s.ranker = r }
+
+// EnableSemantic turns on the semantic and hybrid modes and Related, and
+// makes hybrid the default mode. Call it at startup, before the service
+// serves anything: it is not synchronized.
+func (s *Service) EnableSemantic(sem Semantic) { s.semantic = sem }
+
+// reindex tells the embedding index that a memory's text changed. Called
+// after the transaction committed, so a rolled-back write is never embedded.
+func (s *Service) reindex(projectID, id, principalID uuid.UUID) {
+	if s.semantic != nil {
+		s.semantic.Enqueue(projectID, id, principalID)
+	}
+}
 
 func (s *Service) checkCapability(ctx context.Context, principalID, projectID uuid.UUID, cap auth.Capability) error {
 	allowed, err := s.authz.Can(ctx, principalID, projectID, cap)
@@ -332,6 +348,7 @@ func (s *Service) Create(ctx context.Context, principalID uuid.UUID, clientID *u
 	if err != nil {
 		return Memory{}, fmt.Errorf("memories: create: %w", quota.Translate(err))
 	}
+	s.reindex(projectID, m.ID, principalID)
 	return m, nil
 }
 
@@ -411,6 +428,7 @@ func (s *Service) Update(ctx context.Context, principalID, projectID, id uuid.UU
 	if err != nil {
 		return Memory{}, fmt.Errorf("memories: update: %w", quota.Translate(err))
 	}
+	s.reindex(projectID, m.ID, principalID)
 	return m, nil
 }
 

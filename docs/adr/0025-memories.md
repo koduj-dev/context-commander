@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted, 2026-11-13.
+Accepted, 2026-11-13. Refined by [ADR 0028](0028-semantic-search.md), which
+adds semantic search through the Ranker seam described below.
 
 Revises the "not memory for AI" stance in NEXT.md ("Positioning", the
 strategy table and "Deliberately not doing") for this one primitive. It does

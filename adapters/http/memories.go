@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -131,16 +132,22 @@ func (d Deps) getMemoryFacets(w http.ResponseWriter, r *http.Request) {
 		}
 		return s
 	}
+	// search_modes says what the server can answer, so the interface offers
+	// a mode switch only when semantic search is configured rather than a
+	// control that would fail (docs/adr/0028).
 	out := struct {
-		Kinds     []string                  `json:"kinds"`
-		Branches  []string                  `json:"branches"`
-		Tickets   []string                  `json:"tickets"`
-		Tags      []string                  `json:"tags"`
-		Assignees []uuid.UUID               `json:"assignees"`
-		People    map[string]personResponse `json:"people"`
+		Kinds             []string                  `json:"kinds"`
+		Branches          []string                  `json:"branches"`
+		Tickets           []string                  `json:"tickets"`
+		Tags              []string                  `json:"tags"`
+		Assignees         []uuid.UUID               `json:"assignees"`
+		People            map[string]personResponse `json:"people"`
+		SearchModes       []string                  `json:"search_modes"`
+		DefaultSearchMode string                    `json:"default_search_mode"`
 	}{
 		Kinds: memories.Kinds, Branches: nonNil(fc.Branches), Tickets: nonNil(fc.Tickets), Tags: nonNil(fc.Tags),
 		Assignees: fc.Assignees, People: memoryPeopleFrom(fc.People),
+		SearchModes: d.Memories.Modes(), DefaultSearchMode: d.Memories.DefaultMode(),
 	}
 	if out.Assignees == nil {
 		out.Assignees = []uuid.UUID{}
@@ -150,10 +157,11 @@ func (d Deps) getMemoryFacets(w http.ResponseWriter, r *http.Request) {
 
 type memoryHitResponse struct {
 	memoryResponse
-	Project     string `json:"project,omitempty"`
-	ProjectName string `json:"project_name,omitempty"`
-	Match       string `json:"match"`
-	Snippet     string `json:"snippet"`
+	Project     string  `json:"project,omitempty"`
+	ProjectName string  `json:"project_name,omitempty"`
+	Match       string  `json:"match"`
+	Snippet     string  `json:"snippet"`
+	Score       float64 `json:"score,omitempty"`
 }
 
 // writeMemorySearch answers both searches: an object, so it can say which
@@ -164,16 +172,23 @@ func writeMemorySearch(w http.ResponseWriter, res memories.SearchResult) {
 	for _, p := range res.Projects {
 		refs[p.ID] = p
 	}
+	// mode is the mode that answered, so a caller that sent none learns
+	// the default; degraded says a hybrid search fell back to text because
+	// the embedding provider failed (docs/adr/0028).
 	out := struct {
 		Items     []memoryHitResponse       `json:"items"`
 		Truncated bool                      `json:"truncated"`
+		Mode      string                    `json:"mode"`
+		Degraded  bool                      `json:"degraded,omitempty"`
 		People    map[string]personResponse `json:"people"`
-	}{Items: []memoryHitResponse{}, Truncated: res.Truncated, People: memoryPeopleFrom(res.People)}
+	}{Items: []memoryHitResponse{}, Truncated: res.Truncated, Mode: res.Mode, Degraded: res.Degraded, People: memoryPeopleFrom(res.People)}
 	for _, h := range res.Hits {
 		m := memoryFrom(h.Memory)
 		m.Body = ""
 		ref := refs[h.Memory.ProjectID]
-		out.Items = append(out.Items, memoryHitResponse{memoryResponse: m, Project: ref.Path, ProjectName: ref.Name, Match: h.Match, Snippet: h.Snippet})
+		out.Items = append(out.Items, memoryHitResponse{
+			memoryResponse: m, Project: ref.Path, ProjectName: ref.Name, Match: h.Match, Snippet: h.Snippet, Score: h.Score,
+		})
 	}
 	writeJSON(w, http.StatusOK, out)
 }
@@ -183,7 +198,8 @@ func (d Deps) searchMemories(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	res, err := d.Memories.Search(r.Context(), principalIDFrom(r.Context()), projectFrom(r.Context()).ID, r.URL.Query().Get("q"), f)
+	q := r.URL.Query()
+	res, err := d.Memories.Search(r.Context(), principalIDFrom(r.Context()), projectFrom(r.Context()).ID, q.Get("q"), q.Get("mode"), f)
 	if err != nil {
 		writeDomainError(w, r, err)
 		return
@@ -198,7 +214,33 @@ func (d Deps) searchMyMemories(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	res, err := d.Memories.SearchAll(r.Context(), principalIDFrom(r.Context()), r.URL.Query().Get("q"), f)
+	q := r.URL.Query()
+	res, err := d.Memories.SearchAll(r.Context(), principalIDFrom(r.Context()), q.Get("q"), q.Get("mode"), f)
+	if err != nil {
+		writeDomainError(w, r, err)
+		return
+	}
+	writeMemorySearch(w, res)
+}
+
+// relatedMemories is the memories most similar in meaning to one memory
+// (docs/adr/0028), shaped like a search answer. A 400 when the server has
+// no embedding provider.
+func (d Deps) relatedMemories(w http.ResponseWriter, r *http.Request) {
+	id, ok := uuidParam(w, r, "memoryID")
+	if !ok {
+		return
+	}
+	limit := 0
+	if raw := r.URL.Query().Get("limit"); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil || n < 1 {
+			writeError(w, http.StatusBadRequest, "invalid_request", "?limit= must be a positive integer")
+			return
+		}
+		limit = n
+	}
+	res, err := d.Memories.Related(r.Context(), principalIDFrom(r.Context()), projectFrom(r.Context()).ID, id, limit)
 	if err != nil {
 		writeDomainError(w, r, err)
 		return

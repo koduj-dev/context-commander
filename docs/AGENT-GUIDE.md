@@ -126,7 +126,11 @@ who solved it. That metadata is how your colleagues find them.
 
 - **Before you start a task**, run `memory.search` with the ticket key or
   the branch if you have one, and a few words about the problem. A known
-  gotcha costs one call to read and an afternoon to rediscover.
+  gotcha costs one call to read and an afternoon to rediscover. Where the
+  server has semantic search, the default search also matches by meaning,
+  in any language, so describe the problem in your own words; the answer's
+  `mode` says which search ran. After `memory.get` on a relevant memory,
+  `memory.related` finds what else was recorded about the same thing.
 - **When you decide, find a cause or hit a gotcha**, call `memory.create`.
   Put the finding in the title, so it reads well in a list, and the
   evidence in the body. Fill in `branch` (`git branch --show-current`) and
