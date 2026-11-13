@@ -25,3 +25,6 @@
 
 # Local review notes
 /code-review.md
+
+# Python bytecode from running the hooks locally.
+__pycache__/

@@ -19,9 +19,12 @@ not give them:
 2. **Domains and individual addresses.** A whole company domain, plus a
    contractor whose address is in nobody's domain.
 3. **Each entry names the organizations a new account joins.** Someone from
-   the company domain should arrive in the company's organization and see its
-   projects. Before this, a new account was an empty account until an
-   organization owner added it by hand.
+   the company domain should arrive in the company's organization. Before
+   this, a new account was an empty account until an organization owner
+   added it by hand. Note that organization membership does not reach the
+   organization's projects: project access is project membership only
+   (ADR 0006), so a project owner still adds the person. Granting projects
+   through a rule is a separate, open decision (NEXT.md).
 
 Google brought a fourth. `--oidc-allowed-domains` compares the domain of the
 address. A person who leaves a Google Workspace can keep a *personal* Google

@@ -144,7 +144,9 @@ An installation administrator can manage who may sign in under
   in it but not its subdomains) or one **address** (`someone@example.com`).
 - Each rule names the **organizations a new account joins**. Someone whose
   first sign-in a rule allows gets an account and becomes a member of those
-  organizations, so they see the organizations' projects straight away. A
+  organizations. Organization membership does **not** give access to the
+  organization's projects: a project is reached only through its own
+  members list (docs/adr/0006), so a project owner still adds the person. A
   rule creates accounts even with `--oidc-allow-signup` off.
 - Rules and `--oidc-allowed-domains` form one list. While neither lists
   anything, everyone the provider verifies may sign in. **The first rule
