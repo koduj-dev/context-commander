@@ -269,7 +269,9 @@ func (p *Provider) unwrapProjectKey(ctx context.Context, row projectKeyRow) ([Ke
 	}
 	if row.RootKeyRef != currentRef {
 		return [KeySize]byte{}, fmt.Errorf(
-			"crypto: project key was wrapped under root key %q, current root key is %q — RotateRootKey did not complete for this row",
+			"crypto: project key was wrapped under root key %q, but the current root key is %q — the wrong CC_ROOT_KEY "+
+				"(for example a restore started with a different key than the backup was taken under), "+
+				"or a RotateRootKey that did not complete for this row",
 			row.RootKeyRef, currentRef)
 	}
 
