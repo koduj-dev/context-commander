@@ -17,6 +17,26 @@ All notable changes to Context Commander are documented here. The format follows
   backup's and refuses a wrong key before anything is changed. A new
   integration test dumps and restores a migrated database with encrypted
   content and reads it back.
+- **Messages to agents mid-work** ([ADR 0032](docs/adr/0032-agent-inbox.md)).
+  A person watching the board can send a running agent a message:
+  "Message" on any agent session under **Working now** (the Plans tab and
+  the dashboard), or **Message everyone** working on the project. The
+  message waits in that session's inbox, encrypted with the project key, at
+  most 8 KiB, and expires after a day unless the sender chose otherwise.
+  Agents read it with the new MCP tools `inbox.next` and `inbox.ack`, and
+  every other MCP tool result carries a one-line notice while something is
+  waiting. That costs one cached, indexed count and never changes the
+  tool's own result. The new Claude Code hook
+  `deploy/mcp-clients/claude-code-inbox-hook.py` (`PostToolUse` and
+  `UserPromptSubmit`) puts messages straight into the agent's context and
+  acknowledges them. It is rate limited and fails silent. Only a person
+  signed in to the interface can send. A token, including an agent's, gets
+  `403 needs_person`, so agents cannot instruct each other in a person's
+  name. "Messages you sent" under the board shows which sessions received
+  and acknowledged each message, live over the board stream. HTTP:
+  `POST`/`GET /v1/projects/{ns}/{slug}/messages`, `GET /v1/me/inbox`,
+  `POST /v1/me/inbox/ack`. Sends are audited (`message.send`).
+  Migration 000043.
 - **One-hour cache writes counted and priced apart**
   ([ADR 0031](docs/adr/0031-one-hour-cache-writes-and-ledger-retention.md)).
   Anthropic bills a one-hour cache write at 2x input and a five-minute one

@@ -1137,4 +1137,30 @@ export const pl: Partial<Record<MessageKey, string>> = {
   "ideas.branch": "Gałąź",
   "ideas.decidedBy": "Rozstrzygnięto",
   "ideas.decidedByWhen": "{name}, {when}",
+  // Messages to agents mid-work (docs/adr/0032).
+  "messages.message": "Wiadomość",
+  "messages.messageLabel": "Wyślij wiadomość do tego agenta",
+  "messages.everyone": "Napisz do wszystkich",
+  "messages.toSession": "Do: {name} ({client})",
+  "messages.toEveryone": "Do wszystkich, którzy pracują nad tym projektem",
+  "messages.body": "Wiadomość",
+  "messages.hint":
+    "Agent otrzyma ją przy następnej czynności i potraktuje jako polecenie od ciebie. Wiadomość, której nikt nie przeczyta, wygasa po dniu.",
+  "messages.send": "Wyślij",
+  "messages.cancel": "Anuluj",
+  "messages.sentNote": "Wysłano. Agent otrzyma ją przy następnej czynności.",
+  "messages.sentTitle": "Wysłane przez ciebie wiadomości",
+  "messages.sentAt": "Wysłano {when}",
+  "messages.column.message": "Wiadomość",
+  "messages.column.to": "Do",
+  "messages.column.state": "Stan",
+  "messages.to.session": "{name} · jedna sesja",
+  "messages.to.principal": "{name} · wszystkie sesje",
+  "messages.to.project": "Wszyscy w projekcie",
+  "messages.state.waiting": "Czeka",
+  "messages.state.expired": "Wygasła",
+  "messages.state.delivered":
+    "Doręczono: {count, plural, one {# sesja} few {# sesje} many {# sesji} other {# sesji}}",
+  "messages.state.acked":
+    "Potwierdzono: {count, plural, one {# sesja} few {# sesje} many {# sesji} other {# sesji}}",
 };

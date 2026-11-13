@@ -169,3 +169,9 @@ func (s *Service) SubscribePresence(ctx context.Context, principalID, credential
 	}
 	return s.changes.subscribe(credentialID, ids, true)
 }
+
+// Notify tells the project's board streams that something they show
+// changed outside this service — a message to an agent sent, delivered or
+// acknowledged (internal/messages). The presence streams are not told:
+// the dashboard shows no messages.
+func (s *Service) Notify(projectID uuid.UUID) { s.changes.publish(projectID, false) }

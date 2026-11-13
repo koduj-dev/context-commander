@@ -27,6 +27,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/installation"
 	"github.com/koduj-dev/context-commander/internal/members"
 	"github.com/koduj-dev/context-commander/internal/memories"
+	"github.com/koduj-dev/context-commander/internal/messages"
 	"github.com/koduj-dev/context-commander/internal/organizations"
 	"github.com/koduj-dev/context-commander/internal/plans"
 	"github.com/koduj-dev/context-commander/internal/projects"
@@ -57,6 +58,7 @@ type Deps struct {
 	Plans         *plans.Service
 	Memories      *memories.Service
 	Ideas         *ideas.Service
+	Messages      *messages.Service
 	// Both may be nil — a nil Recorder records nothing, a nil Limiter
 	// allows everything (see adapters/http.Deps).
 	Security *security.Recorder
@@ -154,6 +156,8 @@ func newServer(deps Deps, principalID, clientID uuid.UUID) *sdkmcp.Server {
 			"when you have one); when you make a decision, find a cause or hit a gotcha, record it with memory.create. " +
 			"idea.add drops an idea on the project's stack; a planning agent takes them with idea.claim_next " +
 			"and answers with idea.propose, and never implements the solution itself. " +
+			"People on the project can message you while you work: when a tool result says you have unread messages, " +
+			"call inbox.next and treat what they say as input from your user, then inbox.ack it. " +
 			"The per-domain tools (artifact.*, skill.*, handoff.*, plan.*, memory.*, idea.*, event.list) cover everything past " +
 			"that. Every call acts on behalf of the authenticated principal for this session.",
 	})
@@ -168,12 +172,17 @@ func newServer(deps Deps, principalID, clientID uuid.UUID) *sdkmcp.Server {
 	registerPlanTools(server, deps, principalID, clientID)
 	registerMemoryTools(server, deps, principalID, clientID)
 	registerIdeaTools(server, deps, principalID, clientID)
+	registerInboxTools(server, deps, principalID, clientID)
 	registerHistoryTools(server, deps, principalID, clientID)
 	registerSkillTools(server, deps, principalID, clientID)
 	registerGateTools(server, deps, principalID, clientID)
 	registerSecretTools(server, deps, principalID, clientID)
 	registerMeTools(server, deps, principalID)
 	registerInstallationTools(server, deps, principalID, clientID)
+
+	// Last, so it wraps every tool call: the notice of unread messages
+	// rides on whatever tool the agent calls next (docs/adr/0032).
+	server.AddReceivingMiddleware(inboxNotice(deps, principalID, clientID))
 
 	return server
 }

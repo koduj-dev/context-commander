@@ -1121,6 +1121,30 @@ export const en = {
   "ideas.branch": "Branch",
   "ideas.decidedBy": "Decided",
   "ideas.decidedByWhen": "{name}, {when}",
+  // Messages to agents mid-work (docs/adr/0032).
+  "messages.message": "Message",
+  "messages.messageLabel": "Send a message to this agent",
+  "messages.everyone": "Message everyone",
+  "messages.toSession": "To {name} ({client})",
+  "messages.toEveryone": "To everyone working on this project",
+  "messages.body": "Message",
+  "messages.hint":
+    "The agent receives it with its next action and weighs it as input from you. A message nobody reads expires after a day.",
+  "messages.send": "Send",
+  "messages.cancel": "Cancel",
+  "messages.sentNote": "Sent. The agent receives it with its next action.",
+  "messages.sentTitle": "Messages you sent",
+  "messages.sentAt": "Sent {when}",
+  "messages.column.message": "Message",
+  "messages.column.to": "To",
+  "messages.column.state": "State",
+  "messages.to.session": "{name} · one session",
+  "messages.to.principal": "{name} · all sessions",
+  "messages.to.project": "Everyone on the project",
+  "messages.state.waiting": "Waiting",
+  "messages.state.expired": "Expired",
+  "messages.state.delivered": "Delivered: {count, plural, one {# session} other {# sessions}}",
+  "messages.state.acked": "Acknowledged: {count, plural, one {# session} other {# sessions}}",
 } as const;
 
 export type MessageKey = keyof typeof en;

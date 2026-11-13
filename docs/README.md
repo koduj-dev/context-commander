@@ -76,6 +76,7 @@ supersedes it, so the trail of what was believed when stays readable.
 | [0029](adr/0029-trusted-proxies-and-per-ip-limits.md) | Trusted proxies, and per-IP limits on unauthenticated endpoints |
 | [0030](adr/0030-project-invitations.md) | Project invitations, accepted at sign-in |
 | [0031](adr/0031-one-hour-cache-writes-and-ledger-retention.md) | One-hour cache writes counted and priced apart; retention for the usage ledger |
+| [0032](adr/0032-agent-inbox.md) | Messages to agents mid-work: an inbox per session |
 
 ## Not documentation
 
