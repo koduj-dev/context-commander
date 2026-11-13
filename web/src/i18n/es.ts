@@ -184,6 +184,15 @@ export const es: Partial<Record<MessageKey, string>> = {
   "members.column.role": "Rol",
   "members.column.added": "Añadido",
   "members.add": "Añadir un principal",
+  "members.invite": "Invitar por correo",
+  "members.inviteHelp":
+    "La persona se une con este rol la próxima vez que inicie sesión, o en su primer inicio de sesión si aún no tiene cuenta. Con inicio de sesión único, una invitación también deja entrar a esa dirección aunque las reglas de inicio de sesión no lo hagan. Las invitaciones caducan a los 14 días.",
+  "members.inviteEmail": "Correo",
+  "members.inviteButton": "Invitar",
+  "members.noInvitations": "No hay invitaciones pendientes",
+  "members.inviteExpires": "Caduca",
+  "members.inviteActions": "Acciones",
+  "members.inviteRevoke": "Revocar",
   "members.count": "{count, plural, one {# miembro} other {# miembros}}",
 
   "skills.title": "Skills",

@@ -205,6 +205,15 @@ export const en = {
   "members.column.role": "Role",
   "members.column.added": "Added",
   "members.add": "Add principal",
+  "members.invite": "Invite by email",
+  "members.inviteHelp":
+    "The person joins with this role the next time they sign in, or on their first sign-in if they have no account yet. With single sign-on, an invitation also lets that address in when the sign-in rules would not. Invitations expire after 14 days.",
+  "members.inviteEmail": "Email",
+  "members.inviteButton": "Invite",
+  "members.noInvitations": "No pending invitations",
+  "members.inviteExpires": "Expires",
+  "members.inviteActions": "Actions",
+  "members.inviteRevoke": "Revoke",
   "members.count": "{count, plural, one {# member} other {# members}}",
   "members.addHelp":
     "A project role belongs to a principal — a person or an agent. Both are offered here if you administer this installation; otherwise it takes the principal id, which is not the same as a user id.",

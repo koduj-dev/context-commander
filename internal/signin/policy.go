@@ -17,15 +17,19 @@ type Input struct {
 	FlagDomains []string
 	// Rules is every rule an administrator set.
 	Rules []Rule
+	// Invited is whether the address holds a live project invitation
+	// (docs/adr/0030). An invitation names one address, like an address
+	// rule, and is the inviter's consent to an account for it.
+	Invited bool
 }
 
 // Decision is the outcome of one sign-in.
 type Decision struct {
 	// Admitted is whether the sign-in may proceed at all.
 	Admitted bool
-	// ByRule is whether an administrator's rule matched. A rule is consent
-	// to accounts for what it names, so it permits creating one even when
-	// --oidc-allow-signup is off.
+	// ByRule is whether an administrator's rule matched or the address was
+	// invited to a project. Either is consent to an account for what it
+	// names, so it permits creating one even when --oidc-allow-signup is off.
 	ByRule bool
 	// DomainTrusted is whether the address may stand for its domain when
 	// organizations are granted. False for a Google account outside any
@@ -77,8 +81,8 @@ func Decide(in Input) Decision {
 
 	open := len(domains) == 0 && !hasAddressRules(in.Rules)
 	return Decision{
-		Admitted:      open || ruleAddress || domainMatch,
-		ByRule:        ruleAddress || (domainMatch && ruleDomain),
+		Admitted:      open || ruleAddress || domainMatch || in.Invited,
+		ByRule:        ruleAddress || (domainMatch && ruleDomain) || in.Invited,
 		DomainTrusted: trusted,
 	}
 }

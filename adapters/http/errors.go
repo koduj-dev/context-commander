@@ -129,6 +129,10 @@ func writeDomainError(w http.ResponseWriter, r *http.Request, err error) {
 		writeError(w, http.StatusConflict, "conflict", "that already exists")
 	case errors.Is(err, members.ErrAlreadyMember), errors.Is(err, organizations.ErrAlreadyMember):
 		writeError(w, http.StatusConflict, "conflict", err.Error())
+	case errors.Is(err, members.ErrInvitationNotFound):
+		writeError(w, http.StatusNotFound, "not_found", "not found")
+	case errors.Is(err, members.ErrInvalidEmail):
+		writeError(w, http.StatusBadRequest, "invalid_request", members.ErrInvalidEmail.Error())
 	case errors.Is(err, signin.ErrDuplicate):
 		writeError(w, http.StatusConflict, "conflict", "a rule for this domain or address already exists")
 	case errors.Is(err, signin.ErrInvalidValue):

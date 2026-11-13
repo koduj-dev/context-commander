@@ -963,6 +963,16 @@ export type UsageSummary = {
 };
 export type UsageQuery = { from?: string; to?: string; group?: UsageGroup[] };
 
+/** A pending project invitation (adapters/http/invitations.go). */
+export type Invitation = {
+  id: string;
+  email: string;
+  role: "OWNER" | "ADMIN" | "CONTRIBUTOR" | "READER";
+  invited_by: string;
+  created_at: string;
+  expires_at: string;
+};
+
 /** What waits in one project's idea stack (GET /me/ideas/counts). */
 export type ProjectIdeaCounts = {
   project: string;
@@ -1426,6 +1436,15 @@ export const api = {
   myUsage: (q: UsageQuery) => request<UsageSummary>(withQuery("/me/usage/summary", usageParams(q))),
   projectUsage: (ns: string, slug: string, q: UsageQuery) =>
     request<UsageSummary>(withQuery(`${project(ns, slug)}/usage`, usageParams(q))),
+  invitations: (ns: string, slug: string) =>
+    request<Page<Invitation>>(`${project(ns, slug)}/invitations`),
+  invite: (ns: string, slug: string, email: string, role: Invitation["role"]) =>
+    request<Invitation>(`${project(ns, slug)}/invitations`, {
+      method: "POST",
+      body: { email, role },
+    }),
+  revokeInvitation: (ns: string, slug: string, id: string) =>
+    request<void>(`${project(ns, slug)}/invitations/${id}`, { method: "DELETE" }),
   myIdeaCounts: () => request<Page<ProjectIdeaCounts>>("/me/ideas/counts"),
   // The sign-in allowlist. Installation-admin only.
   signInRules: () => request<Page<SignInRule>>("/installation/signin-rules"),

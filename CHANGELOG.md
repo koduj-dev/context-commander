@@ -8,6 +8,16 @@ All notable changes to Context Commander are documented here. The format follows
 
 ### Added
 
+- **Project invitations**
+  ([ADR 0030](docs/adr/0030-project-invitations.md)). In a project's Members
+  tab (or `POST /v1/projects/{ns}/{slug}/invitations`), anyone who may
+  manage members invites an email address with a role. The invitation is
+  accepted the next time that person signs in through the browser: on their
+  first sign-in if they have no account yet. With single sign-on, an
+  invitation admits its address and creates the account even when the
+  sign-in rules would not. Invitations expire after 14 days and can be
+  revoked.
+
 - **Semantic search of memories.** Off by default. With an embedding
   provider configured, memories can also be found by meaning, in Czech and
   English alike. A local Ollama model (`bge-m3`) is the default provider,
