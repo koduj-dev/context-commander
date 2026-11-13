@@ -71,8 +71,8 @@ supersedes it, so the trail of what was believed when stays readable.
 | [0026](adr/0026-idea-stack.md) | The idea stack: a durable queue for a planning agent, with claims |
 | [0027](adr/0027-usage-ledger-by-branch-and-ticket.md) | A usage ledger by day, person, model, branch and ticket |
 | [0028](adr/0028-semantic-search.md) | Semantic search of memories: pluggable embeddings, encrypted vectors by default |
-| [0030](adr/0030-project-invitations.md) | Project invitations, accepted at sign-in |
 | [0029](adr/0029-trusted-proxies-and-per-ip-limits.md) | Trusted proxies, and per-IP limits on unauthenticated endpoints |
+| [0030](adr/0030-project-invitations.md) | Project invitations, accepted at sign-in |
 
 ## Not documentation
 
