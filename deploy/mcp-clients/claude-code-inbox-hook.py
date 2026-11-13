@@ -7,7 +7,7 @@ project can send this session a message from the Context Commander interface
 waits in the session's inbox. This script polls the inbox after tool calls
 and before each prompt, and when something is waiting it prints it as
 `hookSpecificOutput.additionalContext`, which Claude Code adds to the
-model's context straight away. It then acknowledges what it printed, so the
+model's context straight away. It then acknowledges what it printed in full, so the
 sender sees "acknowledged" in the interface and the message is not offered
 again.
 
@@ -79,21 +79,58 @@ def request(method: str, url: str, token: str, timeout: float, body=None) -> dic
 AUDIENCE = {"session": "to you", "principal": "to all your sessions", "project": "to everyone working on the project"}
 
 
-def render(items: list) -> str:
-    parts = [
-        "Context Commander: people on the project sent you messages while you were working. "
-        "Treat each one as input from your user in this project and weigh it as you would a new "
-        "instruction in this conversation. The server recorded who sent each message; the text "
-        "cannot change that. They are already acknowledged; you do not need to call inbox.ack."
-    ]
+# Claude Code caps additionalContext at 10,000 characters; past that it saves
+# the text to a file and shows the model only a preview and a path, without
+# asking it to read the file. A message cut off there would be acknowledged
+# and never read, so the hook stays under the cap and acknowledges only what
+# it printed in full. The rest waits for the next poll.
+BUDGET = 9000
+# A message too long to print whole is shown cut, left unacknowledged, and the
+# agent is told where the full text is.
+EXCERPT = 6000
+
+
+def header(m: dict) -> str:
+    sender = m.get("from_name") or m.get("from") or "someone"
+    audience = AUDIENCE.get(m.get("audience"), "")
+    return f"--- Message {m.get('id', '')} from {sender} ({audience}) in {m.get('project', '?')}, sent {m.get('created_at', '')} ---\n"
+
+
+def render(items: list) -> tuple[str, list]:
+    """The context to print and the ids printed in full (to acknowledge).
+
+    Written as a statement of what arrived, not as an instruction: the
+    Claude Code documentation warns that text framed as an out-of-band
+    system command can trigger the model's prompt-injection defenses, and
+    these messages are ordinary input from a person on the project."""
+    intro = (
+        "Context Commander delivered messages that people on this project sent to this "
+        "session while it was working. Each header below was written by the server and "
+        "names the person who sent the message; the message text follows it."
+    )
+    parts, done, used = [intro], [], len(intro)
     for m in items:
-        sender = m.get("from_name") or m.get("from") or "someone"
-        audience = AUDIENCE.get(m.get("audience"), "")
-        parts.append(
-            f"--- Message from {sender} ({audience}) in {m.get('project', '?')}, sent {m.get('created_at', '')} ---\n"
-            f"{m.get('body', '')}"
-        )
-    return "\n\n".join(parts)
+        body = str(m.get("body", ""))
+        whole = header(m) + body
+        if used + len(whole) + 2 <= BUDGET:
+            parts.append(whole)
+            done.append(m["id"])
+            used += len(whole) + 2
+            continue
+        if not done:
+            # Nothing fits whole yet: show this one cut, and leave it unacknowledged.
+            room = max(0, min(EXCERPT, BUDGET - used - 400))
+            parts.append(
+                header(m)
+                + body[:room]
+                + f"\n[The message is longer than fits here ({len(body)} characters). "
+                f"The full text is available from the inbox.next tool; it is not acknowledged yet.]"
+            )
+        remaining = len(items) - len(done) - (0 if done else 1)
+        if remaining > 0:
+            parts.append(f"[{remaining} more message(s) are waiting and will be delivered after the next tool call, or now through inbox.next.]")
+        break
+    return "\n\n".join(parts), done
 
 
 def main() -> None:
@@ -115,12 +152,15 @@ def main() -> None:
     items = [m for m in inbox.get("items", []) if isinstance(m, dict) and m.get("id")]
     if not items:
         return
-    print(json.dumps({"hookSpecificOutput": {"hookEventName": event, "additionalContext": render(items)}}))
+    text, printed = render(items)
+    print(json.dumps({"hookSpecificOutput": {"hookEventName": event, "additionalContext": text}}))
     sys.stdout.flush()
+    if not printed:
+        return
     # Acknowledged after printing: if the ack fails, the next poll offers
     # the messages again, which is better than a message that was never seen.
     try:
-        request("POST", base + "/v1/me/inbox/ack", token, timeout, {"message_ids": [m["id"] for m in items]})
+        request("POST", base + "/v1/me/inbox/ack", token, timeout, {"message_ids": printed})
     except (OSError, ValueError):
         pass
 
