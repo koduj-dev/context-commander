@@ -15,7 +15,8 @@ What every installation needs:
   be recovered. Back it up somewhere other than the server before you write
   anything into it.
 - **A directory for content.** Artifact and skill bytes live on the
-  filesystem and the rest lives in Postgres. Back up both together.
+  filesystem and the rest lives in Postgres. Back up both together, the
+  database first ([backup-restore.md](backup-restore.md)).
 
 ## Debian / Ubuntu & Fedora packages (.deb / .rpm)
 

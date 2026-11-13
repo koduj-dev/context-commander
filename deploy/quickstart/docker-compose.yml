@@ -93,8 +93,8 @@ services:
 
 volumes:
   # Artifact and skill content lives in cc_app_storage; everything else is in
-  # Postgres. Those two volumes together ARE the backup surface — see
-  # docs/quickstart.md.
+  # Postgres. Those two volumes, plus CC_ROOT_KEY kept elsewhere, ARE the
+  # backup surface — see docs/backup-restore.md and deploy/backup/.
   cc_postgres_data:
   cc_app_storage:
   # cc_ollama_models:   # uncomment with the ollama service

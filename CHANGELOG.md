@@ -8,6 +8,15 @@ All notable changes to Context Commander are documented here. The format follows
 
 ### Added
 
+- **Backup and restore** ([docs/backup-restore.md](docs/backup-restore.md)).
+  What a full restore needs (`CC_ROOT_KEY`, the database and the object
+  store), why the database is dumped before storage is copied, why
+  `pg_restore` must keep owners, and how to verify a restore.
+  `deploy/backup/backup.sh` and `restore.sh` do it for the compose
+  deployment; `restore.sh` compares the root key's fingerprint with the
+  backup's and refuses a wrong key before anything is changed. A new
+  integration test dumps and restores a migrated database with encrypted
+  content and reads it back.
 - **One-hour cache writes counted and priced apart**
   ([ADR 0031](docs/adr/0031-one-hour-cache-writes-and-ledger-retention.md)).
   Anthropic bills a one-hour cache write at 2x input and a five-minute one
@@ -37,6 +46,12 @@ All notable changes to Context Commander are documented here. The format follows
   model and the endpoint memory text is sent to, where vectors are stored,
   whether the provider answers, the last error, the queue and the memories
   still waiting.
+
+### Changed
+
+- The error for a project key wrapped under another root key now says it is
+  most likely the wrong `CC_ROOT_KEY`, as after a restore with a different
+  key, instead of only blaming an unfinished rotation.
 
 ## [0.1.0-beta.2] — 2026-11-13
 

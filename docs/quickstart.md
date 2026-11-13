@@ -166,25 +166,18 @@ curl -fsS -X POST http://127.0.0.1:8490/v1/projects/you/first-project/members \
 
 ## Backup and restore
 
-Two things hold state, and both must be captured together — an artifact's
-row in Postgres and its bytes in storage are useless apart:
+Three things hold state: `CC_ROOT_KEY`, the database (`cc_postgres_data`)
+and the artifact and skill storage (`cc_app_storage`). Without the key, the
+other two are unreadable ciphertext, so keep it somewhere other than the
+backups. From this directory:
 
 ```bash
-# Back up
-docker compose exec -T postgres pg_dump -U postgres context_commander | gzip > cc-db.sql.gz
-docker run --rm -v context-commander-quickstart_cc_app_storage:/data -v "$PWD:/backup" \
-  alpine tar czf /backup/cc-storage.tar.gz -C /data .
-
-# Restore into a fresh stack (with the SAME CC_ROOT_KEY — without it the
-# backup is unreadable ciphertext)
-docker compose up -d postgres
-gunzip -c cc-db.sql.gz | docker compose exec -T postgres psql -U postgres context_commander
-docker run --rm -v context-commander-quickstart_cc_app_storage:/data -v "$PWD:/backup" \
-  alpine tar xzf /backup/cc-storage.tar.gz -C /data
-docker compose up -d
+../backup/backup.sh ./cc-backup          # database first, then storage
+../backup/restore.sh ./cc-backup         # into a fresh stack, same CC_ROOT_KEY
 ```
 
-Store `CC_ROOT_KEY` somewhere other than alongside the backup.
+[backup-restore.md](backup-restore.md) explains what is in a backup, the
+order, and how to verify a restore.
 
 ## What this quickstart is and isn't
 

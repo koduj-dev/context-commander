@@ -171,7 +171,20 @@ unless you choose an external provider. See
   `CC_USAGE_LEDGER_RETENTION` names a number of days.
 - **Administration → Security log:** refused sign-ins and rate limits.
 
-Back up the two Docker volumes and keep `CC_ROOT_KEY`; see "Backup and
-restore" in [quickstart.md](quickstart.md). To upgrade, pull the new release
-and run `docker compose up -d --build`. Migrations run before the server
-starts.
+To upgrade, pull the new release and run `docker compose up -d --build`.
+Migrations run before the server starts.
+
+## 8. Backups
+
+Before the team writes anything that matters, put `CC_ROOT_KEY` in a
+password manager or vault, away from the server: without it, no backup can
+be decrypted. Then back up the database and the storage volume every night,
+and restore one into a separate compose project once to prove it works:
+
+```bash
+cd deploy/quickstart
+../backup/backup.sh /srv/backups/cc-$(date -u +%F)
+```
+
+See [backup-restore.md](backup-restore.md) for what is in a backup, why the
+database comes first, and how to restore and verify it.

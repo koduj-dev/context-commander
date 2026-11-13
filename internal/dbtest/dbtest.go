@@ -23,11 +23,15 @@ package dbtest
 import (
 	"context"
 	"fmt"
+	"io"
+	"net/url"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
+	tcexec "github.com/testcontainers/testcontainers-go/exec"
 	tcpostgres "github.com/testcontainers/testcontainers-go/modules/postgres"
 
 	"github.com/koduj-dev/context-commander/internal/db"
@@ -62,6 +66,9 @@ const (
 type cluster struct {
 	host string
 	port string
+	// container runs pg_dump/pg_restore for DumpAndRestore: the client
+	// tools that match the server are the ones inside its image.
+	container *tcpostgres.PostgresContainer
 }
 
 var (
@@ -117,7 +124,7 @@ func startCluster(ctx context.Context, image string, initScripts []string, migra
 	if err != nil {
 		return cluster{}, fmt.Errorf("container port: %w", err)
 	}
-	c := cluster{host: host, port: port.Port()}
+	c := cluster{host: host, port: port.Port(), container: container}
 
 	// Migrate the template once, as cc_owner — the same role a real
 	// deployment migrates as (docs/adr/0002), so the per-migration GRANTs
@@ -263,4 +270,70 @@ func dropDatabase(ctx context.Context, c cluster, name string) error {
 	// a reason to leave a database behind for every later test to trip over.
 	_, err = conn.Exec(ctx, fmt.Sprintf(`DROP DATABASE IF EXISTS %s WITH (FORCE)`, pgx.Identifier{name}.Sanitize()))
 	return err
+}
+
+// DumpAndRestore backs up the database behind from and restores it into a
+// new, empty one, the way docs/backup-restore.md says to: pg_dump as the
+// superuser in the custom format, then pg_restore as the superuser with
+// owners kept, into a database that belongs to cc_owner. It returns DSNs
+// for the restored copy, which is dropped when the test ends.
+//
+// The target is created empty (from template1), not cloned from the
+// migrated template, so everything in it comes from the dump.
+func DumpAndRestore(t *testing.T, from DSNs) DSNs {
+	t.Helper()
+	ctx := context.Background()
+
+	// Only the shared cluster: from must come from New, whose startOnce
+	// is what makes reading shared here safe.
+	c := shared
+	if c.container == nil || !strings.Contains(from.Owner, ":"+c.port+"/") {
+		t.Fatal("dbtest: DumpAndRestore needs a database from New")
+	}
+	u, err := url.Parse(from.Owner)
+	if err != nil {
+		t.Fatalf("dbtest: parse DSN: %v", err)
+	}
+	source := strings.TrimPrefix(u.Path, "/")
+	target := fmt.Sprintf("cc_restored_%d", dbSequence.Add(1))
+	dump := "/tmp/" + source + ".dump"
+
+	run := func(cmd ...string) {
+		t.Helper()
+		code, out, err := c.container.Exec(ctx, cmd, tcexec.Multiplexed())
+		if err != nil {
+			t.Fatalf("dbtest: %s: %v", cmd[0], err)
+		}
+		if code != 0 {
+			msg, _ := io.ReadAll(out)
+			t.Fatalf("dbtest: %s exited %d: %s", strings.Join(cmd, " "), code, msg)
+		}
+	}
+
+	run("pg_dump", "-U", superuser, "-d", source, "--format=custom", "-f", dump)
+
+	// Under createMu like cloneTemplate: one CREATE DATABASE at a time.
+	createMu.Lock()
+	conn, err := pgx.Connect(ctx, adminDSN(c))
+	if err == nil {
+		_, err = conn.Exec(ctx, fmt.Sprintf(`CREATE DATABASE %s OWNER cc_owner`, pgx.Identifier{target}.Sanitize()))
+		_ = conn.Close(ctx)
+	}
+	createMu.Unlock()
+	if err != nil {
+		t.Fatalf("dbtest: create %s: %v", target, err)
+	}
+	t.Cleanup(func() {
+		if err := dropDatabase(context.Background(), c, target); err != nil {
+			t.Logf("dbtest: drop %s: %v", target, err)
+		}
+	})
+
+	run("pg_restore", "-U", superuser, "-d", target, "--exit-on-error", "--single-transaction", dump)
+	run("rm", "-f", dump)
+
+	return DSNs{
+		Owner: fmt.Sprintf("postgres://cc_owner:cc_owner_dev_password@%s:%s/%s?sslmode=disable", c.host, c.port, target),
+		App:   fmt.Sprintf("postgres://cc_app:cc_app_dev_password@%s:%s/%s?sslmode=disable", c.host, c.port, target),
+	}
 }
