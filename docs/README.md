@@ -69,6 +69,7 @@ supersedes it, so the trail of what was believed when stays readable.
 | [0024](adr/0024-sign-in-rules-managed-by-an-administrator.md) | Sign-in rules managed by an administrator: domains and addresses, organizations granted on creation, Google's `hd` checked |
 | [0025](adr/0025-memories.md) | Memories: what agents learned, with the branch and ticket it belongs to |
 | [0026](adr/0026-idea-stack.md) | The idea stack: a durable queue for a planning agent, with claims |
+| [0027](adr/0027-usage-ledger-by-branch-and-ticket.md) | A usage ledger by day, person, model, branch and ticket |
 
 ## Not documentation
 

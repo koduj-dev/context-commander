@@ -83,6 +83,17 @@ All notable changes to Context Commander are documented here. The format follows
   - `context.bootstrap` lists the newest titles.
   - The interface has a **Memories** tab with filters, search and a detail
     view.
+- **Usage ledger and statistics**
+  ([ADR 0027](docs/adr/0027-usage-ledger-by-branch-and-ticket.md)). Time
+  present and the four token counts are summed per project, UTC day, person,
+  model, branch and ticket, whether or not the client is on a plan step.
+  Summaries are available at `GET /v1/projects/{ns}/{slug}/usage`,
+  `GET /v1/me/usage/summary` and the MCP tool `usage.summary`, priced at
+  `--usage-prices` when it is set. `plan.report` takes `branch` and
+  `ticket_key`. The usage hooks send the git branch of the session's working
+  directory. With `CC_PROJECT` set, they also count a session that never
+  reported a step, instead of dropping its tokens.
+
 - **Install script.** `scripts/install.sh` installs the release binary on
   Linux and macOS. It checks the download against `SHA256SUMS` before writing
   anything, and verifies the cosign signature on `SHA256SUMS` when cosign is

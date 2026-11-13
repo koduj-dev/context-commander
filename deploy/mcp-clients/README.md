@@ -69,6 +69,7 @@ Install it once per machine:
 mkdir -p ~/.claude/hooks
 cp deploy/mcp-clients/claude-code-usage-hook.py ~/.claude/hooks/
 export CC_URL="http://127.0.0.1:8490"   # the server; CC_TOKEN is already set for MCP
+export CC_PROJECT="team/app"            # optional: count sessions that never reported a step
 ```
 
 Then add this to `~/.claude/settings.json`. Merge it into an existing
@@ -93,9 +94,16 @@ What to know:
 - **Use the same `CC_TOKEN` as the MCP connection.** The tokens go to the
   step that this credential last reported with `plan.report`. A different
   token is a different client, and that client is nowhere on the board.
-- **Tokens are only recorded while the agent is on a step.** If it never called
-  `plan.report`, the server drops the tokens rather than guessing a step. The
-  hook says so on stderr, which Claude Code shows in verbose mode.
+- **Tokens land on the step the agent last reported, and always in the
+  project's usage ledger** (docs/adr/0027). If the agent never called
+  `plan.report`, the tokens reach no step. Set `CC_PROJECT=namespace/slug` and
+  the hook counts them in that project's usage anyway. Without it the server
+  drops them, and the hook says so on stderr (Claude Code shows that in
+  verbose mode).
+- **The branch comes from the repository.** The hook runs
+  `git branch --show-current` in the session's working directory and sends
+  the result, so usage can be grouped by branch. A ticket key comes from the
+  agent's `plan.report` (`ticket_key`), because no hook can know it.
 - **Each turn's report also counts as a heartbeat.** A turn shorter than 15
   minutes keeps the step's tracked time running even if the agent forgets to
   report.
