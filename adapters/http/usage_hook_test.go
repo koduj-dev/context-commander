@@ -282,3 +282,64 @@ func TestTheCodexUsageHookSendsGrowthPerModel(t *testing.T) {
 		t.Errorf("a run with nothing new sent something: %v", got)
 	}
 }
+
+// The hook reads the branch from the session's working directory and sends
+// it with the tokens, and CC_PROJECT places a client that never reported a
+// step, so its turn is counted rather than dropped (docs/adr/0027).
+func TestTheUsageHookSendsTheBranchAndCountsAnUnplacedClient(t *testing.T) {
+	git, err := exec.LookPath("git")
+	if err != nil {
+		t.Skip("git not installed")
+	}
+	python, err := exec.LookPath("python3")
+	if err != nil {
+		t.Skip("python3 not installed")
+	}
+	f := newFixture(t)
+	token := f.newUserWithToken("ledger@example.test")
+	createBody, _ := json.Marshal(map[string]string{"project": "ledger/work", "name": "Work"})
+	f.mustDo(http.MethodPost, "/v1/projects", token, createBody, http.StatusCreated, "create project")
+
+	dir := t.TempDir()
+	repo := filepath.Join(dir, "repo")
+	for _, args := range [][]string{{"init", "-q", "-b", "feature/ledger", repo}} {
+		if out, err := exec.CommandContext(t.Context(), git, args...).CombinedOutput(); err != nil { //nolint:gosec // git from PATH on a temp dir
+			t.Fatalf("git %v: %v %s", args, err, out)
+		}
+	}
+	copyTree(t, filepath.Join("testdata", "usage-hooks", "claude-code"), dir)
+	stdin := fmt.Sprintf(`{"session_id":"s-ledger","transcript_path":%q,"cwd":%q}`, filepath.Join(dir, "session.jsonl"), repo)
+
+	cmd := exec.CommandContext(t.Context(), python, "-I", filepath.Join("..", "..", "deploy", "mcp-clients", "claude-code-usage-hook.py")) //nolint:gosec // the repo's own script
+	cmd.Env = append(os.Environ(), "CC_TOKEN="+token, "CC_URL="+f.server.URL, "XDG_STATE_HOME="+dir, "CC_PROJECT=ledger/work")
+	cmd.Stdin = strings.NewReader(stdin)
+	if out, err := cmd.CombinedOutput(); err != nil || len(out) > 0 {
+		t.Fatalf("hook: %v %s", err, out)
+	}
+
+	var usage struct {
+		Rows []struct {
+			Branch    *string `json:"branch"`
+			TokensOut int64   `json:"tokens_out"`
+			Turns     int64   `json:"turns"`
+		} `json:"rows"`
+		Total struct {
+			TokensOut int64 `json:"tokens_out"`
+		} `json:"total"`
+	}
+	mustJSON(t, f.mustDo(http.MethodGet, "/v1/projects/ledger/work/usage?group=branch", token, nil, http.StatusOK, "project usage"), &usage)
+	if len(usage.Rows) != 1 || usage.Rows[0].Branch == nil || *usage.Rows[0].Branch != "feature/ledger" || usage.Rows[0].TokensOut == 0 {
+		t.Fatalf("project usage = %+v, want one feature/ledger row with tokens", usage)
+	}
+	var mine struct {
+		Rows []struct {
+			ProjectPath string `json:"project_path"`
+		} `json:"rows"`
+	}
+	mustJSON(t, f.mustDo(http.MethodGet, "/v1/me/usage/summary?group=project", token, nil, http.StatusOK, "my usage"), &mine)
+	if len(mine.Rows) != 1 || mine.Rows[0].ProjectPath != "ledger/work" {
+		t.Fatalf("my usage = %+v", mine)
+	}
+	f.wantStatus(http.MethodGet, "/v1/me/usage/summary?group=nope", token, nil, http.StatusBadRequest, "unknown group")
+	f.wantStatus(http.MethodGet, "/v1/me/usage/summary?from=yesterday", token, nil, http.StatusBadRequest, "bad day")
+}

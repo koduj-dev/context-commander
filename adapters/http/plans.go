@@ -7,8 +7,11 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 
+	"github.com/koduj-dev/context-commander/internal/db"
 	"github.com/koduj-dev/context-commander/internal/plans"
+	"github.com/koduj-dev/context-commander/internal/projects"
 )
 
 // Plans, phases and presence (docs/adr/0022). The shapes mirror the MCP
@@ -526,9 +529,11 @@ func (d Deps) searchMyPlans(w http.ResponseWriter, r *http.Request) {
 func (d Deps) reportPresence(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		usageRequest
-		PlanID   *uuid.UUID `json:"plan_id"`
-		ItemID   *uuid.UUID `json:"item_id"`
-		Activity string     `json:"activity"`
+		PlanID    *uuid.UUID `json:"plan_id"`
+		ItemID    *uuid.UUID `json:"item_id"`
+		Activity  string     `json:"activity"`
+		Branch    string     `json:"branch"`
+		TicketKey string     `json:"ticket_key"`
 	}
 	if err := decodeJSONBody(w, r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_request", "could not decode request body")
@@ -537,6 +542,7 @@ func (d Deps) reportPresence(w http.ResponseWriter, r *http.Request) {
 	clientID := clientIDFrom(r.Context())
 	p, err := d.Plans.Report(r.Context(), principalIDFrom(r.Context()), clientID, projectFrom(r.Context()).ID, plans.Report{
 		PlanID: req.PlanID, ItemID: req.ItemID, Activity: req.Activity, Usage: req.tokens(),
+		Branch: req.Branch, TicketKey: req.TicketKey,
 	})
 	if err != nil {
 		writeDomainError(w, r, err)
@@ -548,16 +554,37 @@ func (d Deps) reportPresence(w http.ResponseWriter, r *http.Request) {
 // reportUsage is where a client hook sends what a turn cost
 // (deploy/mcp-clients/README.md). Not project-scoped: the hook knows its
 // credential and its tokens, and the server knows where that credential last
-// said it was. credited=false means it never said, and the tokens were
-// dropped rather than attached to a guess.
+// said it was. A hook may also send the branch it read from the repository
+// and the project it is configured for, which places a client that never
+// reported anywhere (docs/adr/0027). credited=false means neither was
+// known, and the tokens were dropped rather than attached to a guess.
 func (d Deps) reportUsage(w http.ResponseWriter, r *http.Request) {
-	var req usageRequest
+	var req struct {
+		usageRequest
+		Branch  string `json:"branch"`
+		Project string `json:"project"`
+	}
 	if err := decodeJSONBody(w, r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_request", "could not decode request body")
 		return
 	}
+	principalID := principalIDFrom(r.Context())
+	uc := plans.UsageContext{Branch: req.Branch}
+	if req.Project != "" {
+		var project projects.Project
+		err := db.WithPrincipal(r.Context(), d.Pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+			var err error
+			project, err = d.Projects.Resolve(r.Context(), tx, req.Project)
+			return err
+		})
+		if err != nil {
+			writeDomainError(w, r, err)
+			return
+		}
+		uc.ProjectID = &project.ID
+	}
 	clientID := clientIDFrom(r.Context())
-	p, ok, err := d.Plans.ReportUsage(r.Context(), principalIDFrom(r.Context()), clientID, req.tokens())
+	p, ok, err := d.Plans.ReportUsage(r.Context(), principalID, clientID, req.tokens(), uc)
 	if err != nil {
 		writeDomainError(w, r, err)
 		return

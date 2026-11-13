@@ -177,6 +177,7 @@ func NewHandler(deps Deps) http.Handler {
 			r.Get("/me/presence/events", deps.streamMyPresence)
 			// What a turn cost, from a client hook (deploy/mcp-clients).
 			r.Post("/me/usage", deps.reportUsage)
+			r.Get("/me/usage/summary", deps.myUsage)
 			r.Delete("/me/sessions/{id}", deps.revokeOwnSession)
 			r.Delete("/me/tokens/{id}", deps.revokeToken)
 
@@ -257,6 +258,9 @@ func NewHandler(deps Deps) http.Handler {
 					r.Post("/{handoffID}/claim", deps.claimHandoff)
 					r.Post("/{handoffID}/close", deps.closeHandoff)
 				})
+
+				// The usage ledger, summed (docs/adr/0027).
+				r.Get("/usage", deps.projectUsage)
 
 				// Plans, phases and presence (docs/adr/0022). Static segments
 				// ("board", "events", "search", "items", "presence") are registered

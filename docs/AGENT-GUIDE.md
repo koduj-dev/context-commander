@@ -86,6 +86,10 @@ what you are doing, how far you are, and what not to start themselves.
   keep coming, and a gap over 15 minutes counts as idle. The one-line
   description is what your colleagues see next to your name, so make it
   specific: "rewriting the invoice export query", not "working".
+  Pass `branch` (the git branch you are on) and `ticket_key` (the ticket in
+  the team's tracker, e.g. `PROJ-123`) when you know them. The team's usage
+  figures are grouped by both, and `usage.summary` answers "what did this
+  ticket cost" only for work that named it.
 - **Call `plan.stop` when you finish or stop.** Otherwise you show as present
   until you go idle.
 

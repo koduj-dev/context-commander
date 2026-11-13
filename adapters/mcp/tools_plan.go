@@ -525,11 +525,92 @@ func registerPlanTools(server *sdkmcp.Server, deps Deps, principalID, clientID u
 		return nil, out, nil
 	})
 
+	type usageArgs struct {
+		Project string `json:"project,omitempty" jsonschema:"project path \"namespace/slug\"; omit to sum every project you can read plans in"`
+		From    string `json:"from,omitempty" jsonschema:"first UTC day, YYYY-MM-DD (default: 29 days before to)"`
+		To      string `json:"to,omitempty" jsonschema:"last UTC day, YYYY-MM-DD, inclusive (default: today)"`
+		Group   string `json:"group,omitempty" jsonschema:"comma-separated dimensions to group by: project, day, principal, model, branch, ticket; omit for one total"`
+	}
+	type usageRow struct {
+		Project          string   `json:"project,omitempty"`
+		Day              string   `json:"day,omitempty"`
+		PrincipalID      string   `json:"principal_id,omitempty"`
+		Principal        string   `json:"principal,omitempty"`
+		Model            *string  `json:"model,omitempty"`
+		Branch           *string  `json:"branch,omitempty"`
+		TicketKey        *string  `json:"ticket_key,omitempty"`
+		Seconds          int64    `json:"seconds"`
+		TokensIn         int64    `json:"tokens_in"`
+		TokensOut        int64    `json:"tokens_out"`
+		CacheReadTokens  int64    `json:"cache_read_tokens"`
+		CacheWriteTokens int64    `json:"cache_write_tokens"`
+		Turns            int64    `json:"turns"`
+		Cost             *float64 `json:"cost_estimate,omitempty"`
+	}
+	type usageResult struct {
+		From      string     `json:"from"`
+		To        string     `json:"to"`
+		Rows      []usageRow `json:"rows"`
+		Total     usageRow   `json:"total"`
+		Currency  string     `json:"currency,omitempty"`
+		Unpriced  []string   `json:"unpriced_models,omitempty"`
+		Truncated bool       `json:"truncated"`
+	}
+	toUsageRow := func(r plans.UsageRow) usageRow {
+		out := usageRow{
+			Project: r.ProjectPath, Principal: r.PrincipalName, Model: r.Model, Branch: r.Branch, TicketKey: r.TicketKey,
+			Seconds: r.Seconds, TokensIn: r.Tokens.TokensIn, TokensOut: r.Tokens.TokensOut,
+			CacheReadTokens: r.Tokens.CacheReadTokens, CacheWriteTokens: r.Tokens.CacheWriteTokens,
+			Turns: r.Turns, Cost: r.Cost,
+		}
+		if r.Day != nil {
+			out.Day = r.Day.Format(time.DateOnly)
+		}
+		if r.PrincipalID != nil {
+			out.PrincipalID = r.PrincipalID.String()
+		}
+		return out
+	}
+	sdkmcp.AddTool(server, &sdkmcp.Tool{
+		Name: "usage.summary",
+		Description: "What the work cost: time present and tokens (fresh input, output, cache reads, cache writes) as client hooks " +
+			"reported them, summed per UTC day and grouped by project, day, principal, model, branch or ticket. " +
+			"cost_estimate is at the operator's price table and only an estimate; it is absent without one. " +
+			"Use it to answer questions like \"what did ticket PROJ-12 cost\" or \"who worked on which branch this week\".",
+	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, args usageArgs) (*sdkmcp.CallToolResult, usageResult, error) {
+		q, err := plans.ParseUsageQuery(args.From, args.To, args.Group, time.Now())
+		if err != nil {
+			return nil, usageResult{}, err
+		}
+		if args.Project != "" {
+			projectID, err := resolve(ctx, args.Project)
+			if err != nil {
+				return nil, usageResult{}, err
+			}
+			q.ProjectID = &projectID
+		}
+		s, err := deps.Plans.Usage(ctx, principalID, q)
+		if err != nil {
+			return nil, usageResult{}, err
+		}
+		out := usageResult{
+			From: q.From.Format(time.DateOnly), To: q.To.Format(time.DateOnly),
+			Rows: make([]usageRow, len(s.Rows)), Total: toUsageRow(s.Total),
+			Currency: s.Currency, Unpriced: s.Unpriced, Truncated: s.Truncated,
+		}
+		for i, r := range s.Rows {
+			out.Rows[i] = toUsageRow(r)
+		}
+		return nil, out, nil
+	})
+
 	type reportArgs struct {
 		Project   string `json:"project" jsonschema:"project path \"namespace/slug\""`
 		ItemID    string `json:"item_id,omitempty" jsonschema:"the step you are on now"`
 		PlanID    string `json:"plan_id,omitempty" jsonschema:"the plan you are on, if not on a particular step"`
 		Activity  string `json:"activity,omitempty" jsonschema:"one line: what you are doing right now"`
+		Branch    string `json:"branch,omitempty" jsonschema:"the git branch you are working on, if you know it (git branch --show-current)"`
+		TicketKey string `json:"ticket_key,omitempty" jsonschema:"the ticket this work is for in the team's ticket system, e.g. PROJ-123, if there is one"`
 		TokensIn  int64  `json:"tokens_in,omitempty" jsonschema:"input tokens used since your previous report, if your client can tell you; never estimate"`
 		TokensOut int64  `json:"tokens_out,omitempty" jsonschema:"output tokens used since your previous report, if your client can tell you; never estimate"`
 		Model     string `json:"model,omitempty" jsonschema:"the model id the tokens were for, e.g. claude-opus-5-5, if you report tokens; letters, digits and . _ - : / @ +"`
@@ -560,7 +641,7 @@ func registerPlanTools(server *sdkmcp.Server, deps Deps, principalID, clientID u
 			return nil, reportResult{}, err
 		}
 		p, err := deps.Plans.Report(ctx, principalID, &clientID, projectID, plans.Report{
-			PlanID: planID, ItemID: itemID, Activity: args.Activity,
+			PlanID: planID, ItemID: itemID, Activity: args.Activity, Branch: args.Branch, TicketKey: args.TicketKey,
 			Usage: plans.Tokens{Model: args.Model, TokensIn: args.TokensIn, TokensOut: args.TokensOut},
 		})
 		if err != nil {

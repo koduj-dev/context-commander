@@ -107,6 +107,8 @@ var expectedTools = []string{
 	"skill.search",
 	"skill.unpin",
 	"skill.versions",
+	// The usage ledger, summed (docs/adr/0027).
+	"usage.summary",
 }
 
 func TestToolInventory(t *testing.T) {

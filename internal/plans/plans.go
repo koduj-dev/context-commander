@@ -314,6 +314,11 @@ type Report struct {
 	PlanID   *uuid.UUID
 	ItemID   *uuid.UUID
 	Activity string
+	// Branch and TicketKey say what the work is for, so the usage ledger can
+	// be grouped by them (docs/adr/0027). Empty keeps what the client said
+	// before in the same project.
+	Branch    string
+	TicketKey string
 	// Usage carries token deltas and the model they were for. There is no
 	// time in it: time comes from the heartbeats themselves.
 	Usage Tokens
