@@ -115,6 +115,12 @@ type Pack struct {
 	// present.
 	Work *WorkSection `json:"work,omitempty"`
 
+	// Memories are the project's newest active memories (docs/adr/0025):
+	// titles and metadata only, never bodies, so an arriving agent learns
+	// that the team already wrote things down and searches for the rest
+	// with memory.search. Nil when the project has none.
+	Memories *MemoriesSection `json:"memories,omitempty"`
+
 	Artifacts []ArtifactSection `json:"artifacts"`
 	Skills    []SkillSection    `json:"skills"`
 	Events    EventsSection     `json:"events"`
@@ -215,7 +221,7 @@ type BudgetReport struct {
 // exactly like a complete one to a reader, and a skill package truncated
 // mid-instruction is worse than an absent one.
 type TruncationNote struct {
-	Kind      string `json:"kind"`                 // "artifact" | "skill" | "handoff" | "events"
+	Kind      string `json:"kind"`                 // "artifact" | "skill" | "handoff" | "work" | "memories" | "events"
 	Ref       string `json:"ref"`                  // logical path, skill name, or section name
 	SizeBytes int64  `json:"size_bytes,omitempty"` // what it would have cost, when known
 	Reason    string `json:"reason"`
@@ -258,3 +264,26 @@ type WorkPresence struct {
 
 // MaxWorkEntries caps each list in WorkSection.
 const MaxWorkEntries = 10
+
+// MaxMemoryEntries caps MemoriesSection. Enough to show what kind of
+// things the team records and what is recent; memory.search is the way in
+// to the rest, and a pack is not the place to hand over a project's whole
+// knowledge.
+const MaxMemoryEntries = 10
+
+// MemoriesSection lists recent memories without their bodies.
+type MemoriesSection struct {
+	Recent []MemoryRef `json:"recent"`
+	// More says the project has more active memories than are listed.
+	More bool `json:"more,omitempty"`
+}
+
+type MemoryRef struct {
+	ID        uuid.UUID `json:"id"`
+	Kind      string    `json:"kind"`
+	Title     string    `json:"title"`
+	Branch    string    `json:"branch,omitempty"`
+	TicketKey string    `json:"ticket_key,omitempty"`
+	Tags      []string  `json:"tags,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
+}

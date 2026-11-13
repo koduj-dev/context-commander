@@ -25,6 +25,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/identity"
 	"github.com/koduj-dev/context-commander/internal/installation"
 	"github.com/koduj-dev/context-commander/internal/members"
+	"github.com/koduj-dev/context-commander/internal/memories"
 	"github.com/koduj-dev/context-commander/internal/organizations"
 	"github.com/koduj-dev/context-commander/internal/plans"
 	"github.com/koduj-dev/context-commander/internal/projects"
@@ -87,13 +88,15 @@ func newFixture(t *testing.T) *fixture {
 	contextSvc := contextpack.NewService(appPool, projStore, authz, artifactsSvc, skillsSvc, handoffsSvc, eventsSvc)
 	plansSvc := plans.NewService(appPool, cryptoProvider, authz)
 	contextSvc.WithPlans(plansSvc)
+	memoriesSvc := memories.NewService(appPool, cryptoProvider, authz)
+	contextSvc.WithMemories(memoriesSvc)
 
 	handler := ccmcp.NewHandler(ccmcp.Deps{
 		Pool: appPool, Projects: projStore, Members: members.NewService(appPool, projStore, authz), Authz: authz, Artifacts: artifactsSvc,
 		Events: eventsSvc, Organizations: orgSvc, Audit: auditSvc,
 		Handoffs: handoffsSvc, History: historySvc,
 		Skills: skillsSvc, Gates: gatesAdmin, Secrets: secretsSvc,
-		Installation: installationSvc, ContextPack: contextSvc, Plans: plansSvc,
+		Installation: installationSvc, ContextPack: contextSvc, Plans: plansSvc, Memories: memoriesSvc,
 	})
 	server := httptest.NewServer(handler)
 	t.Cleanup(server.Close)
