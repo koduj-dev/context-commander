@@ -156,6 +156,11 @@ type Effort struct {
 	TokensOut        int64
 	CacheReadTokens  int64
 	CacheWriteTokens int64
+	// CacheWrite1hTokens is the part of CacheWriteTokens written to the
+	// one-hour cache, which is billed higher than the five-minute one. A
+	// subset, not a fifth kind: the four counts above are the whole
+	// (migrations/000042).
+	CacheWrite1hTokens int64
 	// Models splits the four token counts by the model the client named,
 	// ordered by model; Model "" is "not stated". The rows add up to the
 	// totals above (migrations/000035).
@@ -171,6 +176,9 @@ type Tokens struct {
 	TokensOut        int64
 	CacheReadTokens  int64
 	CacheWriteTokens int64
+	// CacheWrite1hTokens is how many of CacheWriteTokens went to the
+	// one-hour cache; never more than CacheWriteTokens.
+	CacheWrite1hTokens int64
 }
 
 func (t Tokens) any() bool {
@@ -182,15 +190,19 @@ func (t *Tokens) add(o Tokens) {
 	t.TokensOut += o.TokensOut
 	t.CacheReadTokens += o.CacheReadTokens
 	t.CacheWriteTokens += o.CacheWriteTokens
+	t.CacheWrite1hTokens += o.CacheWrite1hTokens
 }
 
 // check refuses a count that is not a plausible delta and a model that is
 // not a plausible label.
 func (t Tokens) check() error {
-	for _, v := range []int64{t.TokensIn, t.TokensOut, t.CacheReadTokens, t.CacheWriteTokens} {
+	for _, v := range []int64{t.TokensIn, t.TokensOut, t.CacheReadTokens, t.CacheWriteTokens, t.CacheWrite1hTokens} {
 		if v < 0 || v > MaxTokensPerReport {
 			return invalid("token counts are deltas since the previous report, between 0 and %d", MaxTokensPerReport)
 		}
+	}
+	if t.CacheWrite1hTokens > t.CacheWriteTokens {
+		return invalid("cache_write_1h_tokens is the part of cache_write_tokens written for an hour, so it cannot exceed it")
 	}
 	if !ValidModel(t.Model) {
 		return invalid("model is at most %d characters of letters, digits and . _ - : / @ +", MaxModel)
@@ -223,6 +235,7 @@ func (e *Effort) add(o Effort) {
 	e.TokensOut += o.TokensOut
 	e.CacheReadTokens += o.CacheReadTokens
 	e.CacheWriteTokens += o.CacheWriteTokens
+	e.CacheWrite1hTokens += o.CacheWrite1hTokens
 	for _, m := range o.Models {
 		e.addModel(m)
 	}

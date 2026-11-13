@@ -23,6 +23,7 @@ const row = (over: Partial<UsageSummary["rows"][number]>) => ({
   tokens_out: 0,
   cache_read_tokens: 0,
   cache_write_tokens: 0,
+  cache_write_1h_tokens: 0,
   turns: 0,
   ...over,
 });

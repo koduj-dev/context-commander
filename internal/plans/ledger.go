@@ -3,6 +3,7 @@ package plans
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"sort"
 	"strings"
 	"time"
@@ -68,17 +69,18 @@ func creditLedger(ctx context.Context, tx pgx.Tx, key ledgerKey, principalID uui
 	upsert := func(model string, seconds int64, t Tokens, turns int64) error {
 		_, err := tx.Exec(ctx,
 			`INSERT INTO usage_ledger (project_id, day, principal_id, model, branch, ticket_key,
-			                           seconds, tokens_in, tokens_out, cache_read_tokens, cache_write_tokens, turns)
-			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+			                           seconds, tokens_in, tokens_out, cache_read_tokens, cache_write_tokens, cache_write_1h_tokens, turns)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 			 ON CONFLICT (project_id, day, principal_id, model, branch, ticket_key) DO UPDATE SET
 			   seconds = usage_ledger.seconds + EXCLUDED.seconds,
 			   tokens_in = usage_ledger.tokens_in + EXCLUDED.tokens_in,
 			   tokens_out = usage_ledger.tokens_out + EXCLUDED.tokens_out,
 			   cache_read_tokens = usage_ledger.cache_read_tokens + EXCLUDED.cache_read_tokens,
 			   cache_write_tokens = usage_ledger.cache_write_tokens + EXCLUDED.cache_write_tokens,
+			   cache_write_1h_tokens = usage_ledger.cache_write_1h_tokens + EXCLUDED.cache_write_1h_tokens,
 			   turns = usage_ledger.turns + EXCLUDED.turns`,
 			key.project, day, principalID, model, key.branch, key.ticketKey,
-			seconds, t.TokensIn, t.TokensOut, t.CacheReadTokens, t.CacheWriteTokens, turns)
+			seconds, t.TokensIn, t.TokensOut, t.CacheReadTokens, t.CacheWriteTokens, t.CacheWrite1hTokens, turns)
 		return err
 	}
 	switch {
@@ -273,7 +275,7 @@ func (s *Service) Usage(ctx context.Context, principalID uuid.UUID, q UsageQuery
 		rows, err := tx.Query(ctx,
 			`SELECT `+selectCols+`,
 			        sum(l.seconds), sum(l.tokens_in), sum(l.tokens_out),
-			        sum(l.cache_read_tokens), sum(l.cache_write_tokens), sum(l.turns)
+			        sum(l.cache_read_tokens), sum(l.cache_write_tokens), sum(l.cache_write_1h_tokens), sum(l.turns)
 			 FROM usage_ledger l
 			 WHERE l.project_id = ANY($1) AND l.day BETWEEN $2 AND $3
 			 GROUP BY `+selectCols+`
@@ -285,7 +287,7 @@ func (s *Service) Usage(ctx context.Context, principalID uuid.UUID, q UsageQuery
 		defer rows.Close()
 		for rows.Next() {
 			var r UsageRow
-			dest := make([]any, 0, len(dims)+6)
+			dest := make([]any, 0, len(dims)+7)
 			var day time.Time
 			var project, principal uuid.UUID
 			var model, branch, ticket string
@@ -306,7 +308,7 @@ func (s *Service) Usage(ctx context.Context, principalID uuid.UUID, q UsageQuery
 				}
 			}
 			dest = append(dest, &r.Seconds, &r.Tokens.TokensIn, &r.Tokens.TokensOut,
-				&r.Tokens.CacheReadTokens, &r.Tokens.CacheWriteTokens, &r.Turns)
+				&r.Tokens.CacheReadTokens, &r.Tokens.CacheWriteTokens, &r.Tokens.CacheWrite1hTokens, &r.Turns)
 			if err := rows.Scan(dest...); err != nil {
 				return err
 			}
@@ -485,4 +487,53 @@ func rowKey(r UsageRow) string {
 		b.WriteString(*r.TicketKey)
 	}
 	return b.String()
+}
+
+// UsageLedgerRetentionInterval is how often RunUsageLedgerRetention purges.
+// Rows are per day, so once an hour finds at most one day's worth to delete.
+const UsageLedgerRetentionInterval = time.Hour
+
+// PurgeUsageLedger deletes the ledger rows whose day is more than keepDays
+// days before today (UTC) and returns how many went. keepDays must be at
+// least 1. It runs with no principal, through cc_purge_usage_ledger
+// (migrations/000042): cc_app has no DELETE on the ledger, so no request can
+// remove a counted cost, and retention is the one way rows leave.
+func (s *Service) PurgeUsageLedger(ctx context.Context, keepDays int) (int64, error) {
+	if keepDays < 1 {
+		return 0, invalid("usage ledger retention is at least one day")
+	}
+	var n int64
+	err := db.WithoutPrincipal(ctx, s.pool, func(tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `SELECT cc_purge_usage_ledger($1)`, keepDays).Scan(&n)
+	})
+	if err != nil {
+		return 0, fmt.Errorf("plans: purge usage ledger: %w", err)
+	}
+	return n, nil
+}
+
+// RunUsageLedgerRetention purges the ledger once at start and then every
+// interval until ctx ends. A failed purge is logged and retried at the next
+// tick: a row kept a little longer does no harm.
+func (s *Service) RunUsageLedgerRetention(ctx context.Context, keepDays int, interval time.Duration) {
+	purge := func() {
+		n, err := s.PurgeUsageLedger(ctx, keepDays)
+		switch {
+		case err != nil && ctx.Err() == nil:
+			slog.Warn("usage ledger retention: purge failed", "error", err)
+		case n > 0:
+			slog.Info("usage ledger retention: purged old rows", "rows", n, "keep_days", keepDays)
+		}
+	}
+	purge()
+	t := time.NewTicker(interval)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			purge()
+		}
+	}
 }

@@ -282,17 +282,19 @@ Only on top of a core loop people actually use:
         keeps the four counts per model (migration 000035) and, given a price
         table (`--usage-prices`, example in `deploy/usage-prices.example.json`),
         shows a cost estimate. The goal is deciding whether the API would be
-        cheaper than a subscription. Still open: one-hour cache writes are
-        priced as five-minute ones (Claude Code's transcripts split them,
-        the counts do not), and whether Codex fires `Stop` for its subagents
-        has not been checked against a real session.
+        cheaper than a subscription. One-hour cache writes are counted and
+        priced apart since 2026-11-13
+        ([ADR 0031](docs/adr/0031-one-hour-cache-writes-and-ledger-retention.md)).
+        Still open: whether Codex fires `Stop` for its subagents has not
+        been checked against a real session.
       - [x] ~~**Usage by branch, ticket and day; tokens from unplaced clients
         dropped.**~~ Closed 2026-11-13
         ([ADR 0027](docs/adr/0027-usage-ledger-by-branch-and-ticket.md)): the
         usage ledger, `usage.summary`, and `CC_PROJECT` in the hooks. The
         dashboard and the project Usage tab show it (2026-11-13). Still
-        open: retention for old ledger rows, and a real chart if a table
-        with bars stops being enough.
+        open: a real chart if a table with bars stops being enough.
+        Retention for old ledger rows followed the same day
+        (`--usage-ledger-retention`, ADR 0031).
       - **Board streams are in process.** Fine for the one `ccd` per
         installation that is supported; a second process would need
         `internal/plans/changes.go` on Postgres LISTEN/NOTIFY. Agents still

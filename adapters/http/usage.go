@@ -23,16 +23,19 @@ type usageRowResponse struct {
 	PrincipalName string     `json:"principal_name,omitempty"`
 	// Model, Branch and TicketKey are present when grouped by them; "" means
 	// "not stated", which is a group of its own.
-	Model            *string  `json:"model,omitempty"`
-	Branch           *string  `json:"branch,omitempty"`
-	TicketKey        *string  `json:"ticket_key,omitempty"`
-	Seconds          int64    `json:"seconds"`
-	TokensIn         int64    `json:"tokens_in"`
-	TokensOut        int64    `json:"tokens_out"`
-	CacheReadTokens  int64    `json:"cache_read_tokens"`
-	CacheWriteTokens int64    `json:"cache_write_tokens"`
-	Turns            int64    `json:"turns"`
-	Cost             *float64 `json:"cost,omitempty"`
+	Model            *string `json:"model,omitempty"`
+	Branch           *string `json:"branch,omitempty"`
+	TicketKey        *string `json:"ticket_key,omitempty"`
+	Seconds          int64   `json:"seconds"`
+	TokensIn         int64   `json:"tokens_in"`
+	TokensOut        int64   `json:"tokens_out"`
+	CacheReadTokens  int64   `json:"cache_read_tokens"`
+	CacheWriteTokens int64   `json:"cache_write_tokens"`
+	// CacheWrite1hTokens is the part of cache_write_tokens written to the
+	// one-hour cache, not a fifth kind.
+	CacheWrite1hTokens int64    `json:"cache_write_1h_tokens"`
+	Turns              int64    `json:"turns"`
+	Cost               *float64 `json:"cost,omitempty"`
 }
 
 type usageResponse struct {
@@ -54,7 +57,8 @@ func usageRowFrom(r plans.UsageRow) usageRowResponse {
 		Model: r.Model, Branch: r.Branch, TicketKey: r.TicketKey,
 		Seconds: r.Seconds, TokensIn: r.Tokens.TokensIn, TokensOut: r.Tokens.TokensOut,
 		CacheReadTokens: r.Tokens.CacheReadTokens, CacheWriteTokens: r.Tokens.CacheWriteTokens,
-		Turns: r.Turns, Cost: r.Cost,
+		CacheWrite1hTokens: r.Tokens.CacheWrite1hTokens,
+		Turns:              r.Turns, Cost: r.Cost,
 	}
 	if r.Day != nil {
 		out.Day = r.Day.Format(time.DateOnly)

@@ -36,6 +36,9 @@ CC_TRUSTED_PROXIES=172.16.0.0/12
 
 # Optional: what tokens would cost on the API, as an estimate.
 # CC_USAGE_PRICES=/data/usage-prices.json
+
+# Optional: keep only this many days of the usage ledger (default: forever).
+# CC_USAGE_LEDGER_RETENTION=400
 ```
 
 The remaining flags go in a `compose.override.yml` beside it:
@@ -164,7 +167,8 @@ unless you choose an external provider. See
 - **Dashboard:** who is working where right now, ideas waiting for a
   decision, and usage by day and by person.
 - **A project's Usage tab:** time and tokens by day, person, branch, ticket
-  or model, priced when `CC_USAGE_PRICES` is set.
+  or model, priced when `CC_USAGE_PRICES` is set. Kept forever unless
+  `CC_USAGE_LEDGER_RETENTION` names a number of days.
 - **Administration → Security log:** refused sign-ins and rate limits.
 
 Back up the two Docker volumes and keep `CC_ROOT_KEY`; see "Backup and

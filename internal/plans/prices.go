@@ -26,11 +26,15 @@ type Prices struct {
 }
 
 // Price is what one model charges per million tokens of each kind.
+// CacheWrite is the five-minute cache write and CacheWrite1h the one-hour
+// one; a table that does not give the latter prices one-hour writes at
+// CacheWrite.
 type Price struct {
-	Input      float64 `json:"input"`
-	Output     float64 `json:"output"`
-	CacheRead  float64 `json:"cache_read"`
-	CacheWrite float64 `json:"cache_write"`
+	Input        float64 `json:"input"`
+	Output       float64 `json:"output"`
+	CacheRead    float64 `json:"cache_read"`
+	CacheWrite   float64 `json:"cache_write"`
+	CacheWrite1h float64 `json:"cache_write_1h"`
 }
 
 type prefixPrice struct {
@@ -72,9 +76,13 @@ func LoadPrices(path string) (*Prices, error) {
 // such as "cache-read" fails at startup instead of silently pricing cache
 // reads at zero. For the same reason every model must give all four rates:
 // a missing one is an error, and a kind the vendor does not charge for is an
-// explicit 0. A model key ending in "*" matches every model starting with
-// what precedes it ("claude-opus-5*"); an exact key beats a prefix, and a
-// longer prefix beats a shorter one.
+// explicit 0. The one-hour cache write, cache_write_1h, is the exception:
+// it is optional and defaults to cache_write, so a table written before it
+// existed keeps working and prices one-hour writes as it always did.
+//
+// A model key ending in "*" matches every model starting with what precedes
+// it ("claude-opus-5*"); an exact key beats a prefix, and a longer prefix
+// beats a shorter one.
 func ParsePrices(b []byte) (*Prices, error) {
 	var raw struct {
 		Comment  string `json:"_comment"`
@@ -85,6 +93,8 @@ func ParsePrices(b []byte) (*Prices, error) {
 			Output     *float64 `json:"output"`
 			CacheRead  *float64 `json:"cache_read"`
 			CacheWrite *float64 `json:"cache_write"`
+			// Optional: absent prices one-hour writes at cache_write.
+			CacheWrite1h *float64 `json:"cache_write_1h"`
 		} `json:"models"`
 	}
 	dec := json.NewDecoder(bytes.NewReader(b))
@@ -103,8 +113,11 @@ func ParsePrices(b []byte) (*Prices, error) {
 		if rates.Input == nil || rates.Output == nil || rates.CacheRead == nil || rates.CacheWrite == nil {
 			return nil, fmt.Errorf("model %q: give all four rates (input, output, cache_read, cache_write); use 0 for a kind that is not charged", key)
 		}
-		price := Price{Input: *rates.Input, Output: *rates.Output, CacheRead: *rates.CacheRead, CacheWrite: *rates.CacheWrite}
-		for _, v := range []float64{price.Input, price.Output, price.CacheRead, price.CacheWrite} {
+		price := Price{Input: *rates.Input, Output: *rates.Output, CacheRead: *rates.CacheRead, CacheWrite: *rates.CacheWrite, CacheWrite1h: *rates.CacheWrite}
+		if rates.CacheWrite1h != nil {
+			price.CacheWrite1h = *rates.CacheWrite1h
+		}
+		for _, v := range []float64{price.Input, price.Output, price.CacheRead, price.CacheWrite, price.CacheWrite1h} {
 			if v < 0 {
 				return nil, fmt.Errorf("model %q: a price cannot be negative", key)
 			}
@@ -140,15 +153,19 @@ func (p *Prices) Lookup(model string) (Price, bool) {
 	return Price{}, false
 }
 
-// Cost is what t would have cost, if its model has a price.
+// Cost is what t would have cost, if its model has a price. One-hour cache
+// writes are part of CacheWriteTokens and priced at CacheWrite1h; the rest
+// of the cache writes at CacheWrite.
 func (p *Prices) Cost(t Tokens) (float64, bool) {
 	price, ok := p.Lookup(t.Model)
 	if !ok {
 		return 0, false
 	}
 	const perMillion = 1_000_000
+	hour := min(t.CacheWrite1hTokens, t.CacheWriteTokens)
 	return (float64(t.TokensIn)*price.Input + float64(t.TokensOut)*price.Output +
-		float64(t.CacheReadTokens)*price.CacheRead + float64(t.CacheWriteTokens)*price.CacheWrite) / perMillion, true
+		float64(t.CacheReadTokens)*price.CacheRead +
+		float64(t.CacheWriteTokens-hour)*price.CacheWrite + float64(hour)*price.CacheWrite1h) / perMillion, true
 }
 
 // Estimate prices an Effort's per-model breakdown. Nil when there is no

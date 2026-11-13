@@ -185,28 +185,30 @@ func (s *Service) creditPrevious(ctx context.Context, tx pgx.Tx, principalID, cl
 	}
 	if target != nil && (seconds > 0 || tokens.any()) {
 		if _, err := tx.Exec(ctx,
-			`INSERT INTO plan_item_effort (item_id, principal_id, project_id, seconds, tokens_in, tokens_out, cache_read_tokens, cache_write_tokens)
-			 SELECT id, $2, project_id, $3, $4, $5, $6, $7 FROM plan_items WHERE id = $1
+			`INSERT INTO plan_item_effort (item_id, principal_id, project_id, seconds, tokens_in, tokens_out, cache_read_tokens, cache_write_tokens, cache_write_1h_tokens)
+			 SELECT id, $2, project_id, $3, $4, $5, $6, $7, $8 FROM plan_items WHERE id = $1
 			 ON CONFLICT (item_id, principal_id) DO UPDATE SET
 			   seconds = plan_item_effort.seconds + EXCLUDED.seconds,
 			   tokens_in = plan_item_effort.tokens_in + EXCLUDED.tokens_in,
 			   tokens_out = plan_item_effort.tokens_out + EXCLUDED.tokens_out,
 			   cache_read_tokens = plan_item_effort.cache_read_tokens + EXCLUDED.cache_read_tokens,
-			   cache_write_tokens = plan_item_effort.cache_write_tokens + EXCLUDED.cache_write_tokens`,
-			*target, principalID, seconds, tokens.TokensIn, tokens.TokensOut, tokens.CacheReadTokens, tokens.CacheWriteTokens); err != nil {
+			   cache_write_tokens = plan_item_effort.cache_write_tokens + EXCLUDED.cache_write_tokens,
+			   cache_write_1h_tokens = plan_item_effort.cache_write_1h_tokens + EXCLUDED.cache_write_1h_tokens`,
+			*target, principalID, seconds, tokens.TokensIn, tokens.TokensOut, tokens.CacheReadTokens, tokens.CacheWriteTokens, tokens.CacheWrite1hTokens); err != nil {
 			return time.Time{}, err
 		}
 	}
 	if target != nil && tokens.any() {
 		if _, err := tx.Exec(ctx,
-			`INSERT INTO plan_item_effort_models (item_id, principal_id, model, project_id, tokens_in, tokens_out, cache_read_tokens, cache_write_tokens)
-			 SELECT id, $2, $3, project_id, $4, $5, $6, $7 FROM plan_items WHERE id = $1
+			`INSERT INTO plan_item_effort_models (item_id, principal_id, model, project_id, tokens_in, tokens_out, cache_read_tokens, cache_write_tokens, cache_write_1h_tokens)
+			 SELECT id, $2, $3, project_id, $4, $5, $6, $7, $8 FROM plan_items WHERE id = $1
 			 ON CONFLICT (item_id, principal_id, model) DO UPDATE SET
 			   tokens_in = plan_item_effort_models.tokens_in + EXCLUDED.tokens_in,
 			   tokens_out = plan_item_effort_models.tokens_out + EXCLUDED.tokens_out,
 			   cache_read_tokens = plan_item_effort_models.cache_read_tokens + EXCLUDED.cache_read_tokens,
-			   cache_write_tokens = plan_item_effort_models.cache_write_tokens + EXCLUDED.cache_write_tokens`,
-			*target, principalID, tokens.Model, tokens.TokensIn, tokens.TokensOut, tokens.CacheReadTokens, tokens.CacheWriteTokens); err != nil {
+			   cache_write_tokens = plan_item_effort_models.cache_write_tokens + EXCLUDED.cache_write_tokens,
+			   cache_write_1h_tokens = plan_item_effort_models.cache_write_1h_tokens + EXCLUDED.cache_write_1h_tokens`,
+			*target, principalID, tokens.Model, tokens.TokensIn, tokens.TokensOut, tokens.CacheReadTokens, tokens.CacheWriteTokens, tokens.CacheWrite1hTokens); err != nil {
 			return time.Time{}, err
 		}
 	}

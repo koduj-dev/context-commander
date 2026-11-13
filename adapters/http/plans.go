@@ -25,6 +25,9 @@ type effortResponse struct {
 	TokensOut        int64 `json:"tokens_out"`
 	CacheReadTokens  int64 `json:"cache_read_tokens"`
 	CacheWriteTokens int64 `json:"cache_write_tokens"`
+	// CacheWrite1hTokens is the part of cache_write_tokens written to the
+	// one-hour cache, not a fifth kind.
+	CacheWrite1hTokens int64 `json:"cache_write_1h_tokens"`
 	// Models is the same four counts by model; "" is "not stated".
 	Models []modelTokensResponse `json:"models"`
 	// CostEstimate is absent when the server has no price table
@@ -33,11 +36,12 @@ type effortResponse struct {
 }
 
 type modelTokensResponse struct {
-	Model            string `json:"model"`
-	TokensIn         int64  `json:"tokens_in"`
-	TokensOut        int64  `json:"tokens_out"`
-	CacheReadTokens  int64  `json:"cache_read_tokens"`
-	CacheWriteTokens int64  `json:"cache_write_tokens"`
+	Model              string `json:"model"`
+	TokensIn           int64  `json:"tokens_in"`
+	TokensOut          int64  `json:"tokens_out"`
+	CacheReadTokens    int64  `json:"cache_read_tokens"`
+	CacheWriteTokens   int64  `json:"cache_write_tokens"`
+	CacheWrite1hTokens int64  `json:"cache_write_1h_tokens"`
 	// EstimatedCost is null when the model has no price, or no table is
 	// configured: "no price" is not zero.
 	EstimatedCost *float64 `json:"estimated_cost"`
@@ -56,13 +60,13 @@ type estimateResponse struct {
 func effortFrom(e plans.Effort, prices *plans.Prices) effortResponse {
 	r := effortResponse{
 		Seconds: e.Seconds, TokensIn: e.TokensIn, TokensOut: e.TokensOut,
-		CacheReadTokens: e.CacheReadTokens, CacheWriteTokens: e.CacheWriteTokens,
+		CacheReadTokens: e.CacheReadTokens, CacheWriteTokens: e.CacheWriteTokens, CacheWrite1hTokens: e.CacheWrite1hTokens,
 		Models: []modelTokensResponse{},
 	}
 	for _, m := range e.Models {
 		mr := modelTokensResponse{
 			Model: m.Model, TokensIn: m.TokensIn, TokensOut: m.TokensOut,
-			CacheReadTokens: m.CacheReadTokens, CacheWriteTokens: m.CacheWriteTokens,
+			CacheReadTokens: m.CacheReadTokens, CacheWriteTokens: m.CacheWriteTokens, CacheWrite1hTokens: m.CacheWrite1hTokens,
 		}
 		if cost, ok := prices.Cost(m); ok {
 			mr.EstimatedCost = &cost
@@ -80,17 +84,20 @@ func effortFrom(e plans.Effort, prices *plans.Prices) effortResponse {
 
 // usageRequest is token deltas since the client's previous report, and the
 // model they were for. The model is optional: without it the tokens count
-// in the totals and as "not stated" in the breakdown.
+// in the totals and as "not stated" in the breakdown. cache_write_1h_tokens
+// is the part of cache_write_tokens written to the one-hour cache, and
+// cannot exceed it.
 type usageRequest struct {
-	Model            string `json:"model"`
-	TokensIn         int64  `json:"tokens_in"`
-	TokensOut        int64  `json:"tokens_out"`
-	CacheReadTokens  int64  `json:"cache_read_tokens"`
-	CacheWriteTokens int64  `json:"cache_write_tokens"`
+	Model              string `json:"model"`
+	TokensIn           int64  `json:"tokens_in"`
+	TokensOut          int64  `json:"tokens_out"`
+	CacheReadTokens    int64  `json:"cache_read_tokens"`
+	CacheWriteTokens   int64  `json:"cache_write_tokens"`
+	CacheWrite1hTokens int64  `json:"cache_write_1h_tokens"`
 }
 
 func (u usageRequest) tokens() plans.Tokens {
-	return plans.Tokens{Model: u.Model, TokensIn: u.TokensIn, TokensOut: u.TokensOut, CacheReadTokens: u.CacheReadTokens, CacheWriteTokens: u.CacheWriteTokens}
+	return plans.Tokens{Model: u.Model, TokensIn: u.TokensIn, TokensOut: u.TokensOut, CacheReadTokens: u.CacheReadTokens, CacheWriteTokens: u.CacheWriteTokens, CacheWrite1hTokens: u.CacheWrite1hTokens}
 }
 
 type countsResponse struct {

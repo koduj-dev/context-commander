@@ -74,6 +74,7 @@ supersedes it, so the trail of what was believed when stays readable.
 | [0028](adr/0028-semantic-search.md) | Semantic search of memories: pluggable embeddings, encrypted vectors by default |
 | [0029](adr/0029-trusted-proxies-and-per-ip-limits.md) | Trusted proxies, and per-IP limits on unauthenticated endpoints |
 | [0030](adr/0030-project-invitations.md) | Project invitations, accepted at sign-in |
+| [0031](adr/0031-one-hour-cache-writes-and-ledger-retention.md) | One-hour cache writes counted and priced apart; retention for the usage ledger |
 
 ## Not documentation
 

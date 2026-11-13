@@ -6,6 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+
+	"github.com/koduj-dev/context-commander/internal/db"
 	"github.com/koduj-dev/context-commander/internal/plans"
 	"github.com/koduj-dev/context-commander/internal/projects"
 )
@@ -162,5 +165,130 @@ func TestLedgerIsProjectScopedAndValidated(t *testing.T) {
 	}
 	if _, err := plans.ParseUsageQuery("", "", "day,secret_column", f.clock); !errors.Is(err, plans.ErrInvalid) {
 		t.Errorf("an unknown group: %v, want ErrInvalid", err)
+	}
+}
+
+// One-hour cache writes are a part of the cache writes, counted in the
+// ledger beside them and priced at their own rate; a table without a
+// one-hour rate prices them as five-minute writes, as before.
+func TestLedgerPricesOneHourCacheWritesApart(t *testing.T) {
+	f := newFixture(t)
+	agent := f.join(f.projectID, "Claude", projects.RoleContributor)
+	if _, err := f.svc.Report(f.ctx, agent.principalID, &agent.clientID, f.projectID, plans.Report{Branch: "b"}); err != nil {
+		t.Fatal(err)
+	}
+	tokens := plans.Tokens{Model: "claude-opus-5-5", CacheWriteTokens: 1_000_000, CacheWrite1hTokens: 400_000}
+	if _, ok, err := f.svc.ReportUsage(f.ctx, agent.principalID, &agent.clientID, tokens, plans.UsageContext{}); err != nil || !ok {
+		t.Fatalf("usage: ok=%v err=%v", ok, err)
+	}
+	bad := plans.Tokens{Model: "claude-opus-5-5", CacheWriteTokens: 1, CacheWrite1hTokens: 2}
+	if _, _, err := f.svc.ReportUsage(f.ctx, agent.principalID, &agent.clientID, bad, plans.UsageContext{}); !errors.Is(err, plans.ErrInvalid) {
+		t.Errorf("a one-hour part larger than the whole: %v, want ErrInvalid", err)
+	}
+
+	for _, c := range []struct {
+		table string
+		want  float64
+	}{
+		{`"cache_write":5,"cache_write_1h":8`, 0.6*5 + 0.4*8},
+		{`"cache_write":5`, 5},
+	} {
+		prices, err := plans.ParsePrices([]byte(`{"currency":"USD","models":{"claude-opus-5-5":{"input":4,"output":20,"cache_read":0.2,` + c.table + `}}}`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		f.svc.SetPrices(prices)
+		s := f.usage(agent, "model")
+		if s.Total.Tokens.CacheWriteTokens != 1_000_000 || s.Total.Tokens.CacheWrite1hTokens != 400_000 {
+			t.Fatalf("total %+v", s.Total.Tokens)
+		}
+		if s.Total.Cost == nil || *s.Total.Cost < c.want-1e-9 || *s.Total.Cost > c.want+1e-9 {
+			t.Errorf("prices {%s}: cost %v, want %v", c.table, s.Total.Cost, c.want)
+		}
+	}
+}
+
+// Retention deletes the days older than it and nothing newer, runs as the
+// application role through cc_purge_usage_ledger, and is the only way: the
+// application role still cannot delete a ledger row itself.
+func TestUsageLedgerRetentionDeletesOnlyOldDays(t *testing.T) {
+	f := newFixture(t)
+	agent := f.join(f.projectID, "Claude", projects.RoleContributor)
+	today := time.Now().UTC().Truncate(24 * time.Hour)
+	days := map[string]time.Time{
+		"today":       today,
+		"30 days ago": today.AddDate(0, 0, -30),
+		"31 days ago": today.AddDate(0, 0, -31),
+		"a year ago":  today.AddDate(-1, 0, 0),
+	}
+	err := db.WithoutPrincipal(f.ctx, f.ownerPool, func(tx pgx.Tx) error {
+		for name, day := range days {
+			if _, err := tx.Exec(f.ctx,
+				`INSERT INTO usage_ledger (project_id, day, principal_id, model, branch, tokens_out, turns) VALUES ($1, $2, $3, '', $4, 1, 1)`,
+				f.projectID, day.Format(time.DateOnly), agent.principalID, name); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	left := func() map[string]bool {
+		t.Helper()
+		out := map[string]bool{}
+		err := db.WithoutPrincipal(f.ctx, f.ownerPool, func(tx pgx.Tx) error {
+			rows, err := tx.Query(f.ctx, `SELECT branch FROM usage_ledger WHERE project_id = $1`, f.projectID)
+			if err != nil {
+				return err
+			}
+			defer rows.Close()
+			for rows.Next() {
+				var b string
+				if err := rows.Scan(&b); err != nil {
+					return err
+				}
+				out[b] = true
+			}
+			return rows.Err()
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
+
+	for _, bad := range []int{0, -1} {
+		if _, err := f.svc.PurgeUsageLedger(f.ctx, bad); !errors.Is(err, plans.ErrInvalid) {
+			t.Errorf("PurgeUsageLedger(%d) = %v, want ErrInvalid", bad, err)
+		}
+	}
+	// The database refuses it too, should anything call the function directly.
+	err = db.WithoutPrincipal(f.ctx, f.appPool, func(tx pgx.Tx) error {
+		_, err := tx.Exec(f.ctx, `SELECT cc_purge_usage_ledger(0)`)
+		return err
+	})
+	if err == nil || !strings.Contains(err.Error(), "at least one day") {
+		t.Errorf("cc_purge_usage_ledger(0) = %v, want it refused", err)
+	}
+	if got := left(); len(got) != len(days) {
+		t.Fatalf("a refused purge deleted rows: %v", got)
+	}
+
+	n, err := f.svc.PurgeUsageLedger(f.ctx, 30)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := left(); n != 2 || len(got) != 2 || !got["today"] || !got["30 days ago"] {
+		t.Errorf("purged %d, left %v; want today and 30 days ago kept", n, got)
+	}
+
+	// The application role has no DELETE of its own, even on its own rows.
+	err = db.WithPrincipal(f.ctx, f.appPool, db.Principal{ID: agent.principalID}, func(tx pgx.Tx) error {
+		_, err := tx.Exec(f.ctx, `DELETE FROM usage_ledger WHERE project_id = $1`, f.projectID)
+		return err
+	})
+	if err == nil || !strings.Contains(err.Error(), "permission denied") {
+		t.Errorf("cc_app deleting ledger rows: %v, want permission denied", err)
 	}
 }

@@ -31,6 +31,7 @@ type fixture struct {
 	t         *testing.T
 	ctx       context.Context
 	ownerPool *db.Pool
+	appPool   *db.Pool
 	svc       *plans.Service
 	projectID uuid.UUID
 	nsSlug    string
@@ -59,7 +60,7 @@ func newFixture(t *testing.T) *fixture {
 		t.Fatal(err)
 	}
 	f := &fixture{
-		t: t, ctx: ctx, ownerPool: ownerPool,
+		t: t, ctx: ctx, ownerPool: ownerPool, appPool: appPool,
 		svc: plans.NewService(appPool, crypto.NewProvider(root), auth.NewAuthzService(appPool, projects.NewStore())),
 		// Near the real time, not a fixed date: cc_prune_presence deletes
 		// presence by the database's now(), so a clock more than a week in
