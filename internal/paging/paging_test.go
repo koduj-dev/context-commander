@@ -10,6 +10,27 @@ import (
 	"github.com/koduj-dev/context-commander/internal/paging"
 )
 
+func TestRankRoundTripAndKindCheck(t *testing.T) {
+	when := time.Date(2026, 11, 13, 9, 0, 0, 123456000, time.UTC)
+	id := uuid.New()
+	cursor := paging.EncodeRank(2, 7, when, id)
+
+	prio, pos, gotTime, gotID, ok, err := (paging.Options{Cursor: cursor}).DecodeRank()
+	if err != nil || !ok {
+		t.Fatalf("DecodeRank: ok=%v err=%v", ok, err)
+	}
+	if prio != 2 || pos != 7 || !gotTime.Equal(when) || gotID != id {
+		t.Errorf("DecodeRank = %d %d %v %v", prio, pos, gotTime, gotID)
+	}
+	// A rank cursor is not a time cursor, and the other way round.
+	if _, _, _, err := (paging.Options{Cursor: cursor}).DecodeTimeUUID(); !errors.Is(err, paging.ErrInvalidCursor) {
+		t.Errorf("a rank cursor decoded as a time cursor: %v", err)
+	}
+	if _, _, _, _, _, err := (paging.Options{Cursor: paging.EncodeTimeUUID(when, id)}).DecodeRank(); !errors.Is(err, paging.ErrInvalidCursor) {
+		t.Errorf("a time cursor decoded as a rank cursor: %v", err)
+	}
+}
+
 func TestClampedLimit(t *testing.T) {
 	cases := []struct{ in, want int }{
 		{0, paging.DefaultLimit},

@@ -84,6 +84,15 @@ const (
 	// where a reader is on the project to read.
 	CapPlanRead  Capability = "plan.read"
 	CapPlanWrite Capability = "plan.write"
+
+	// The idea stack (docs/adr/0026). Same tiers as plans: a reader reads,
+	// every role that writes can add, claim and propose. Accepting or
+	// rejecting a proposal needs CapIdeaWrite AND a browser session — a
+	// decision made by a person, not by whatever holds their token. That is
+	// checked in internal/ideas, because a role cannot express it: an agent
+	// on a user's PAT holds exactly the user's role.
+	CapIdeaRead  Capability = "idea.read"
+	CapIdeaWrite Capability = "idea.write"
 )
 
 // roleCapabilities is the single source of truth for what each role can do.
@@ -96,6 +105,7 @@ var roleCapabilities = map[projects.Role]map[Capability]bool{
 		CapEventRead, CapIntegrationRead,
 		CapHandoffRead, CapHistoryRead,
 		CapPlanRead,
+		CapIdeaRead,
 	),
 	projects.RoleContributor: setOf(
 		CapProjectRead, CapMemberRead, CapArtifactRead, CapSkillRead,
@@ -106,6 +116,7 @@ var roleCapabilities = map[projects.Role]map[Capability]bool{
 		CapSkillPublish,
 		CapHandoffRead, CapHandoffWrite, CapHistoryRead, CapHistoryWrite,
 		CapPlanRead, CapPlanWrite,
+		CapIdeaRead, CapIdeaWrite,
 	),
 	projects.RoleAdmin: setOf(
 		CapProjectRead, CapMemberRead, CapArtifactRead, CapSkillRead,
@@ -118,6 +129,7 @@ var roleCapabilities = map[projects.Role]map[Capability]bool{
 		CapSkillPublish, CapSkillOverride, CapGateManage,
 		CapHandoffRead, CapHandoffWrite, CapHistoryRead, CapHistoryWrite,
 		CapPlanRead, CapPlanWrite,
+		CapIdeaRead, CapIdeaWrite,
 		// No CapProjectDelete and no CapMemberGrantOwner — both are
 		// ownership-level actions, OWNER only
 		// (docs/architecture-cookbook.md §7.1: "no ownership transfer
@@ -136,6 +148,7 @@ var roleCapabilities = map[projects.Role]map[Capability]bool{
 		CapSkillPublish, CapSkillOverride, CapGateManage,
 		CapHandoffRead, CapHandoffWrite, CapHistoryRead, CapHistoryWrite,
 		CapPlanRead, CapPlanWrite,
+		CapIdeaRead, CapIdeaWrite,
 		CapProjectDelete, CapMemberGrantOwner,
 	),
 }

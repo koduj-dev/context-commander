@@ -27,6 +27,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/gates"
 	"github.com/koduj-dev/context-commander/internal/handoffs"
 	"github.com/koduj-dev/context-commander/internal/history"
+	"github.com/koduj-dev/context-commander/internal/ideas"
 	"github.com/koduj-dev/context-commander/internal/installation"
 	"github.com/koduj-dev/context-commander/internal/members"
 	"github.com/koduj-dev/context-commander/internal/memories"
@@ -59,6 +60,7 @@ type Deps struct {
 	ContextPack   *contextpack.Service
 	Plans         *plans.Service
 	Memories      *memories.Service
+	Ideas         *ideas.Service
 	// Security records refusals and Limiter bounds them. Both are safe to
 	// leave nil — a nil *security.Recorder records nothing and a nil
 	// *ratelimit.Limiter allows everything, which is what the CLI and the
@@ -284,6 +286,22 @@ func NewHandler(deps Deps) http.Handler {
 					r.Patch("/{memoryID}", deps.updateMemory)
 					r.Post("/{memoryID}/status", deps.setMemoryStatus)
 					r.Delete("/{memoryID}", deps.deleteMemory)
+				})
+				// The idea stack (docs/adr/0026). "claim-next" is static and
+				// registered before "/{ideaID}" for the same reason as above.
+				r.Route("/ideas", func(r chi.Router) {
+					r.Post("/", deps.createIdea)
+					r.Get("/", deps.listIdeas)
+					r.Post("/claim-next", deps.claimNextIdea)
+					r.Get("/{ideaID}", deps.getIdea)
+					r.Patch("/{ideaID}", deps.updateIdea)
+					r.Post("/{ideaID}/claim", deps.ideaAction((*ideas.Service).Claim))
+					r.Post("/{ideaID}/renew", deps.ideaAction((*ideas.Service).Renew))
+					r.Post("/{ideaID}/release", deps.ideaAction((*ideas.Service).Release))
+					r.Post("/{ideaID}/propose", deps.proposeIdea)
+					r.Post("/{ideaID}/accept", deps.ideaAction((*ideas.Service).Accept))
+					r.Post("/{ideaID}/reject", deps.rejectIdea)
+					r.Post("/{ideaID}/withdraw", deps.ideaAction((*ideas.Service).Withdraw))
 				})
 				r.Route("/phases", func(r chi.Router) {
 					r.Post("/", deps.createPhase)

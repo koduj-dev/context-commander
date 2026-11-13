@@ -42,6 +42,14 @@ cat deploy/mcp-clients/codex-config.toml >> ~/.codex/config.toml
 codex                               # the tools appear as context_commander.*
 ```
 
+## Planning agent
+
+[`planning-agent.md`](planning-agent.md) is a ready prompt for an agent that
+works through a project's idea stack (docs/adr/0026): it takes one idea,
+reads the project's context, proposes a solution with a draft plan, and
+stops. Context Commander does not run it; start it by hand, from cron or
+from CI, with a token of its own.
+
 ## Token usage
 
 The plans board (docs/adr/0022) shows the time spent on each step and, if the

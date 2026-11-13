@@ -15,6 +15,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/gates"
 	"github.com/koduj-dev/context-commander/internal/handoffs"
 	"github.com/koduj-dev/context-commander/internal/history"
+	"github.com/koduj-dev/context-commander/internal/ideas"
 	"github.com/koduj-dev/context-commander/internal/identity"
 	"github.com/koduj-dev/context-commander/internal/installation"
 	"github.com/koduj-dev/context-commander/internal/members"
@@ -92,7 +93,7 @@ func writeDomainError(w http.ResponseWriter, r *http.Request, err error) {
 		errors.Is(err, skills.ErrNotFound), errors.Is(err, gates.ErrNotFound), errors.Is(err, secrets.ErrNotFound),
 		errors.Is(err, identity.ErrNotFound), errors.Is(err, installation.ErrNotFound),
 		errors.Is(err, contextpack.ErrNotFound), errors.Is(err, plans.ErrNotFound), errors.Is(err, signin.ErrNotFound),
-		errors.Is(err, memories.ErrNotFound):
+		errors.Is(err, memories.ErrNotFound), errors.Is(err, ideas.ErrNotFound):
 		// A deleted artifact reads as "not found," not a distinct state —
 		// same reasoning as a non-member's Resolve: don't hand out more
 		// information than "you can't have this."
@@ -104,6 +105,20 @@ func writeDomainError(w http.ResponseWriter, r *http.Request, err error) {
 		errors.Is(err, contextpack.ErrForbidden), errors.Is(err, security.ErrForbidden), errors.Is(err, plans.ErrForbidden),
 		errors.Is(err, memories.ErrForbidden):
 		writeError(w, http.StatusForbidden, "forbidden", "forbidden")
+	case errors.Is(err, ideas.ErrNeedsPerson):
+		// Its own code: the interface explains it differently from a role
+		// the caller lacks, and an agent must not read it as one to retry.
+		writeError(w, http.StatusForbidden, "needs_person", ideas.ErrNeedsPerson.Error())
+	case errors.Is(err, ideas.ErrForbidden):
+		writeError(w, http.StatusForbidden, "forbidden", "forbidden")
+	case errors.Is(err, ideas.ErrAlreadyClaimed):
+		writeError(w, http.StatusConflict, "already_claimed", "this idea is claimed by another client")
+	case errors.Is(err, ideas.ErrNotClaimant):
+		writeError(w, http.StatusConflict, "not_claimant", ideas.ErrNotClaimant.Error())
+	case errors.Is(err, ideas.ErrInvalidTransition):
+		writeError(w, http.StatusConflict, "conflict", err.Error())
+	case errors.Is(err, ideas.ErrInvalid), errors.Is(err, ideas.ErrNoClient):
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
 	case errors.Is(err, installation.ErrAlreadyAdmin):
 		writeError(w, http.StatusConflict, "conflict", "user is already an installation admin")
 	case errors.Is(err, identity.ErrAlreadyExists):

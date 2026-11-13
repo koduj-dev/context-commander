@@ -849,6 +849,46 @@ export type ItemChange = {
 };
 
 /**
+ * The idea stack (adapters/http/ideas.go, docs/adr/0026). A list carries
+ * titles only; body, proposal and rejection come with the single idea.
+ */
+export type IdeaStatus = "open" | "claimed" | "proposed" | "accepted" | "rejected" | "withdrawn";
+export type IdeaPriority = "low" | "normal" | "high";
+
+export type Idea = {
+  id: string;
+  status: IdeaStatus;
+  priority: IdeaPriority;
+  position: number;
+  version: number;
+  title: string;
+  body?: string;
+  /** Markdown the planning agent wrote. Rendered as text, never as HTML. */
+  proposal?: string;
+  rejection?: string;
+  branch?: string;
+  ticket_key?: string;
+  /** http(s) only — the server refuses anything else. */
+  ticket_url?: string;
+  created_by: string;
+  claimed_by?: string;
+  claimed_at?: string;
+  claim_expires_at?: string;
+  claimed_by_you: boolean;
+  /** Claimed, but the lease ran out: the next claim takes it. */
+  claim_lapsed: boolean;
+  proposed_at?: string;
+  decided_by?: string;
+  decided_at?: string;
+  resulting_plan_id?: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type IdeaWithPeople = Idea & { people: Record<string, Person> };
+export type IdeaPage = Page<Idea> & { people: Record<string, Person> };
+
+/**
  * One namespace's storage (adapters/http/storage.go). limit_bytes is what is
  * enforced and is absent when nothing limits the namespace. override and
  * created_at come only with the admin listing.
@@ -1129,6 +1169,42 @@ export const api = {
   // board changed"; the reader re-reads it with the calls above.
   planBoardEvents: (ns: string, slug: string) => `${project(ns, slug)}/plans/events`,
   myPresenceEvents: () => "/me/presence/events",
+
+  // The idea stack. Its changes are announced on the plan board's stream
+  // (planBoardEvents), so the Ideas tab holds that one rather than a second.
+  ideas: (ns: string, slug: string, statuses: IdeaStatus[], cursor?: string) => {
+    // Repeated ?status=, which withQuery cannot spell.
+    const q = new URLSearchParams();
+    for (const s of statuses) q.append("status", s);
+    if (cursor) q.set("cursor", cursor);
+    return request<IdeaPage>(`${project(ns, slug)}/ideas/?${q.toString()}`);
+  },
+  idea: (ns: string, slug: string, id: string) =>
+    request<IdeaWithPeople>(`${project(ns, slug)}/ideas/${id}`),
+  createIdea: (
+    ns: string,
+    slug: string,
+    idea: { title: string; body?: string; priority?: IdeaPriority },
+  ) => request<IdeaWithPeople>(`${project(ns, slug)}/ideas/`, { method: "POST", body: idea }),
+  updateIdea: (
+    ns: string,
+    slug: string,
+    id: string,
+    change: { priority?: IdeaPriority; position?: number },
+  ) =>
+    request<IdeaWithPeople>(`${project(ns, slug)}/ideas/${id}`, { method: "PATCH", body: change }),
+  acceptIdea: (ns: string, slug: string, id: string) =>
+    request<IdeaWithPeople>(`${project(ns, slug)}/ideas/${id}/accept`, { method: "POST" }),
+  rejectIdea: (ns: string, slug: string, id: string, reason: string, reopen: boolean) =>
+    request<IdeaWithPeople>(`${project(ns, slug)}/ideas/${id}/reject`, {
+      method: "POST",
+      body: { reason, reopen },
+    }),
+  withdrawIdea: (ns: string, slug: string, id: string) =>
+    request<IdeaWithPeople>(`${project(ns, slug)}/ideas/${id}/withdraw`, { method: "POST" }),
+  /** A person freeing an idea an agent holds, without waiting out the lease. */
+  releaseIdea: (ns: string, slug: string, id: string) =>
+    request<IdeaWithPeople>(`${project(ns, slug)}/ideas/${id}/release`, { method: "POST" }),
 
   memories: (ns: string, slug: string, filter: MemoryFilter, cursor?: string) =>
     request<Page<Memory> & { people: Record<string, Person> }>(

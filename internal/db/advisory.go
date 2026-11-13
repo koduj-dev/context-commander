@@ -31,6 +31,10 @@ const (
 	// internal/plans — creating a phase and moving one — keyed by
 	// project_id. Never nested with another class.
 	LockClassPhaseOrder LockClass = 3
+	// LockClassIdeaOrder serializes assigning idea positions in
+	// internal/ideas — adding an idea, moving one, changing its priority —
+	// keyed by project_id. Never nested with another class.
+	LockClassIdeaOrder LockClass = 4
 )
 
 // AdvisoryXactLock takes a transaction-scoped exclusive advisory lock on
