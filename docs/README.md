@@ -67,6 +67,7 @@ supersedes it, so the trail of what was believed when stays readable.
 | [0022](adr/0022-plans-phases-and-presence.md) | Plans, phases and who is working on what |
 | [0023](adr/0023-oidc-hardening.md) | OIDC hardening: Entra's verified domains, a signed attempt cookie, the issuer beside each link |
 | [0024](adr/0024-sign-in-rules-managed-by-an-administrator.md) | Sign-in rules managed by an administrator: domains and addresses, organizations granted on creation, Google's `hd` checked |
+| [0025](adr/0025-memories.md) | Memories: what agents learned, with the branch and ticket it belongs to |
 
 ## Not documentation
 

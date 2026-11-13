@@ -204,7 +204,7 @@ func TestMetadataIsValidated(t *testing.T) {
 		"unknown kind":           {Title: "x", Kind: "rumour"},
 		"javascript url":         {Title: "x", TicketURL: "javascript:alert(1)"},
 		"relative url":           {Title: "x", TicketURL: "/browse/PROJ-1"},
-		"url with credentials":   {Title: "x", TicketURL: "https://me:secret@tracker.example.test/PROJ-1"},
+		"url with credentials":   {Title: "x", TicketURL: "https://me:secret@tracker.example.test/PROJ-1"}, //nolint:gosec // a fake credential, here to prove it is refused
 		"branch with a newline":  {Title: "x", Branch: "main\nevil"},
 		"ticket with spaces":     {Title: "x", TicketKey: "PROJ 1"},
 		"too many tags":          {Title: "x", Tags: tooMany},

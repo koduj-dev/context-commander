@@ -24,7 +24,11 @@ Keeping shipped work here makes the roadmap grow instead of shrink.
 Context Commander is a **self-hosted, vendor-neutral layer for handing project
 context between different coding agents** — not an agent orchestrator, not a
 general knowledge-management system, not "memory for AI". See cookbook §1 for
-the full definition and §3 for the non-goals.
+the full definition and §3 for the non-goals. *(2026-11-13: one exception, by
+the maintainer's decision. Project-scoped **memories** that agents write on
+purpose, with branch, ticket and assignee metadata, and search by text.
+[ADR 0025](docs/adr/0025-memories.md). There is still no general memory
+store and no vector search.)*
 
 The strongest entry use case is deliberately narrow:
 
@@ -42,7 +46,7 @@ Strategic alternatives considered on 2026-09-01 and their verdicts:
 | Shared context + handoff between agents | **Primary** |
 | Multi-agent orchestrator/scheduler | Not now — conflicts with the declared non-goals |
 | Enterprise governance/control plane | Later monetization layer; nothing to govern without an active workflow |
-| General "AI memory"/vector database | No — dilutes the differentiator, makes relevance/search the product |
+| General "AI memory"/vector database | No — dilutes the differentiator, makes relevance/search the product. *Narrowed 2026-11-13: explicit, project-scoped memories with metadata were built ([ADR 0025](docs/adr/0025-memories.md)); a vector database is still out.* |
 | Skill registry + policy marketplace | Only after the core loop works and there is distribution |
 
 ### Primary user
@@ -285,6 +289,22 @@ Only on top of a core loop people actually use:
         `GET /v1/me/plans/search`, `plan.search` without a project and the
         quick finder search every project the caller can read plans in,
         bounded at 50 projects and 100 hits.
+- [x] ~~**Memories: what agents learned, by branch and ticket**~~ Closed
+      2026-11-13 ([ADR 0025](docs/adr/0025-memories.md)). Requested by a
+      team of three who want their agents to keep writing down decisions,
+      findings and gotchas with the git branch, the ticket and who solved
+      it, and to search them over MCP and in the interface. This replaces
+      the "not memory for AI" stance for this one primitive, by the
+      maintainer's decision. Still open:
+      - **Semantic search.** `memories.Ranker` is the seam, and nothing
+        implements it yet. Where embeddings would live, and whether they
+        count as content that must be encrypted, are that change's
+        questions.
+      - **Search decrypts.** At most 1000 memories per project are decrypted
+        per search, after the metadata filters. Measure real projects
+        before adding an index.
+      - **No push for memories.** The interface re-reads after its own
+        writes. Writes by another agent show up on the next load.
 - [x] ~~**A wrong id in `POST /projects/{ns}/{slug}/members` or
       `POST /installation/principals/{id}/tokens` is a 500.**~~ Closed
       2026-11-03: the services check the id before the insert. An unknown
@@ -677,7 +697,12 @@ feature.
 - **No agent runtime, planner, scheduler or task queue of our own.**
 - **No further domain types** until the current ones form a finished workflow.
 - **No large web UI** before the CLI/MCP core loop is validated.
-- **Not selling this as general "memory for AI".**
+- **Not selling this as general "memory for AI".** Project memories
+  ([ADR 0025](docs/adr/0025-memories.md), 2026-11-13) are the maintainer's
+  deliberate exception. They are written on purpose, belong to one project,
+  carry provenance and metadata, and are searched by text. They are not
+  captured automatically, there is no similarity search, and there is no
+  store outside a project.
 - **No public skill marketplace** before trust, signing and distribution are
   solved.
 - **No multi-region/hosted SaaS optimization** until the self-hosted install

@@ -43,6 +43,21 @@ All notable changes to Context Commander are documented here. The format follows
   `--oidc-allowed-domains`; the first rule closes sign-in to everything not
   listed. Also over HTTP under `/v1/installation/signin-rules`.
 
+- **Memories** ([ADR 0025](docs/adr/0025-memories.md), migration 000037):
+  - A memory records a decision, finding, gotcha or status note on a
+    project. It can carry the git branch, the ticket (key and URL), who
+    solved it, tags, and the plan and step it came from. The title and body
+    are encrypted; the metadata stays plaintext so it can be filtered.
+  - MCP tools: `memory.create`, `memory.get`, `memory.update`,
+    `memory.list`, `memory.search` and `memory.supersede`. Search matches
+    the text together with the metadata filters, title hits first, and says
+    when a limit cut the answer. Without a project it searches every
+    project you can read.
+  - HTTP endpoints under `/v1/projects/{ns}/{slug}/memories`, plus
+    `GET /v1/me/memories/search`.
+  - `context.bootstrap` lists the newest titles.
+  - The interface has a **Memories** tab with filters, search and a detail
+    view.
 - **Install script.** `scripts/install.sh` installs the release binary on
   Linux and macOS. It checks the download against `SHA256SUMS` before writing
   anything, and verifies the cosign signature on `SHA256SUMS` when cosign is
