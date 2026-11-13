@@ -646,6 +646,8 @@ export type Effort = {
   /** Billed apart from fresh input: reading the cache is cheaper, writing dearer. */
   cache_read_tokens: number;
   cache_write_tokens: number;
+  /** The part of cache_write_tokens written to the one-hour cache, billed dearer; not a fifth kind. */
+  cache_write_1h_tokens: number;
   /** The same four counts by model; "" is "not stated". Adds up to the totals. */
   models?: ModelTokens[];
   /** Absent when the server has no price table or nothing to price. */
@@ -657,6 +659,8 @@ export type ModelTokens = {
   tokens_out: number;
   cache_read_tokens: number;
   cache_write_tokens: number;
+  /** The part of cache_write_tokens written to the one-hour cache, billed dearer; not a fifth kind. */
+  cache_write_1h_tokens: number;
   /** null: this model has no price in the operator's table — not zero. */
   estimated_cost: number | null;
 };
@@ -947,6 +951,8 @@ export type UsageRow = {
   tokens_out: number;
   cache_read_tokens: number;
   cache_write_tokens: number;
+  /** The part of cache_write_tokens written to the one-hour cache, billed dearer; not a fifth kind. */
+  cache_write_1h_tokens: number;
   turns: number;
   cost?: number;
 };

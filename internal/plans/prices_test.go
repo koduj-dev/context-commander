@@ -78,6 +78,8 @@ func TestABrokenPriceTableIsRefused(t *testing.T) {
 		"a missing rate":   `{"currency":"USD","models":{"m":{"input":1,"output":1,"cache_read":1}}}`,
 		"a null rate":      `{"currency":"USD","models":{"m":{"input":1,"output":1,"cache_read":1,"cache_write":null}}}`,
 		"an unknown field": `{"currency":"USD","per":1000,"models":{"m":{"input":1,"output":1,"cache_read":1,"cache_write":1}}}`,
+		"a negative 1h":    `{"currency":"USD","models":{"m":{"input":1,"output":1,"cache_read":1,"cache_write":1,"cache_write_1h":-2}}}`,
+		"only the 1h rate": `{"currency":"USD","models":{"m":{"input":1,"output":1,"cache_read":1,"cache_write_1h":2}}}`,
 	} {
 		if _, err := plans.ParsePrices([]byte(body)); err == nil {
 			t.Errorf("%s: accepted", name)
@@ -86,5 +88,35 @@ func TestABrokenPriceTableIsRefused(t *testing.T) {
 	// A kind the vendor does not charge for is an explicit zero, and fine.
 	if _, err := plans.ParsePrices([]byte(`{"currency":"USD","models":{"m":{"input":1,"output":1,"cache_read":0.1,"cache_write":0}}}`)); err != nil {
 		t.Errorf("an explicit zero was refused: %v", err)
+	}
+}
+
+// cache_write_1h is optional and falls back to cache_write, so a table
+// written before it existed prices one-hour writes as it always did; given,
+// it prices the one-hour part of the cache writes and only that part.
+func TestOneHourCacheWritesHaveTheirOwnOptionalRate(t *testing.T) {
+	old, err := plans.ParsePrices([]byte(`{"currency":"USD","models":{"m":{"input":0,"output":0,"cache_read":0,"cache_write":5}}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	withRate, err := plans.ParsePrices([]byte(`{"currency":"USD","models":{"m":{"input":0,"output":0,"cache_read":0,"cache_write":5,"cache_write_1h":8}}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p, _ := old.Lookup("m"); p.CacheWrite1h != 5 {
+		t.Errorf("without cache_write_1h the one-hour rate is %v, want cache_write's 5", p.CacheWrite1h)
+	}
+	tokens := plans.Tokens{Model: "m", CacheWriteTokens: 1_000_000, CacheWrite1hTokens: 250_000}
+	for _, c := range []struct {
+		name   string
+		prices *plans.Prices
+		want   float64
+	}{
+		{"without a one-hour rate", old, 5},
+		{"with one", withRate, 0.75*5 + 0.25*8},
+	} {
+		if got, ok := c.prices.Cost(tokens); !ok || got != c.want {
+			t.Errorf("%s: cost %v, want %v", c.name, got, c.want)
+		}
 	}
 }

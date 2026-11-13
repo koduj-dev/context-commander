@@ -6,6 +6,26 @@ All notable changes to Context Commander are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **One-hour cache writes counted and priced apart**
+  ([ADR 0031](docs/adr/0031-one-hour-cache-writes-and-ledger-retention.md)).
+  Anthropic bills a one-hour cache write at 2x input and a five-minute one
+  at 1.25x; until now both were one count, priced as five-minute writes.
+  The Claude Code usage hook now sends `cache_write_1h_tokens`, the part of
+  `cache_write_tokens` written for an hour, read from the transcript's
+  `usage.cache_creation.ephemeral_1h_input_tokens`. Plan efforts, the usage
+  ledger and the HTTP and MCP usage output carry it beside the four counts,
+  which still add up to every token reported. A price table may give
+  `cache_write_1h`; without it one-hour writes are priced at `cache_write`,
+  so existing tables keep working. Migration 000042.
+- **Retention for the usage ledger.** `ccd serve --usage-ledger-retention
+  DAYS` (`CC_USAGE_LEDGER_RETENTION`) deletes, once an hour, ledger rows
+  whose day is more than that many days before today (UTC). The default, 0,
+  keeps them forever. The application role still cannot delete a ledger
+  row; the purge runs through a `SECURITY DEFINER` function that deletes
+  only rows older than the retention.
+
 ## [0.1.0-beta.2] — 2026-11-13
 
 The team release: Context Commander as an agent dashboard for a small team.

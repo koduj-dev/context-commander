@@ -59,7 +59,9 @@ model to the session transcript, and
 [`claude-code-usage-hook.py`](claude-code-usage-hook.py) is a `Stop` hook
 that sends it after every turn, per model. It counts fresh input, output,
 cache reads and cache writes separately, because they are billed
-differently. For an agent, almost all of the input is cache reads.
+differently. For an agent, almost all of the input is cache reads. Of the
+cache writes, it also sends how many went to the one-hour cache
+(`cache_write_1h_tokens`), which costs more than the five-minute one.
 Subagents count too: the hook reads their transcripts, which Claude Code
 keeps in `<session>/subagents/` beside the session's own.
 
@@ -178,8 +180,19 @@ example only. Codex models are left out of it; add them from OpenAI's price
 list. The Plans tab then shows an estimate next to the tokens of each item,
 plan and phase. Models the table does not price show "no price", and their
 tokens are left out of the estimate rather than counted as free. It is an
-estimate, not what was spent. One-hour cache writes are priced as
-five-minute ones.
+estimate, not what was spent. One-hour cache writes are priced at
+`cache_write_1h` when the table gives it, and at `cache_write` when it does
+not, so a table written before that rate existed keeps working.
+
+### Keeping the ledger bounded
+
+The usage ledger keeps one row per project, day, person, model, branch and
+ticket, forever by default. To keep only recent days, start the server with
+`--usage-ledger-retention DAYS` (or `CC_USAGE_LEDGER_RETENTION`). Once an
+hour it deletes the rows whose day is more than that many days before today
+(UTC). Plan steps keep their own time and tokens; only the ledger behind the
+Usage screens is pruned. See
+[ADR 0031](../../docs/adr/0031-one-hour-cache-writes-and-ledger-retention.md).
 
 ## What to expect once connected
 

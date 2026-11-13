@@ -22,6 +22,9 @@ type effortResult struct {
 	TokensOut        int64 `json:"tokens_out_reported,omitempty"`
 	CacheReadTokens  int64 `json:"cache_read_tokens_reported,omitempty"`
 	CacheWriteTokens int64 `json:"cache_write_tokens_reported,omitempty"`
+	// CacheWrite1hTokens is the part of the cache writes made to the
+	// one-hour cache, not a fifth kind.
+	CacheWrite1hTokens int64 `json:"cache_write_1h_tokens_reported,omitempty"`
 	// ByModel splits the tokens by the model the client named; "" is
 	// "not stated".
 	ByModel []modelTokensResult `json:"by_model,omitempty"`
@@ -31,11 +34,12 @@ type effortResult struct {
 }
 
 type modelTokensResult struct {
-	Model            string `json:"model"`
-	TokensIn         int64  `json:"tokens_in,omitempty"`
-	TokensOut        int64  `json:"tokens_out,omitempty"`
-	CacheReadTokens  int64  `json:"cache_read_tokens,omitempty"`
-	CacheWriteTokens int64  `json:"cache_write_tokens,omitempty"`
+	Model              string `json:"model"`
+	TokensIn           int64  `json:"tokens_in,omitempty"`
+	TokensOut          int64  `json:"tokens_out,omitempty"`
+	CacheReadTokens    int64  `json:"cache_read_tokens,omitempty"`
+	CacheWriteTokens   int64  `json:"cache_write_tokens,omitempty"`
+	CacheWrite1hTokens int64  `json:"cache_write_1h_tokens,omitempty"`
 	// EstimatedCost is absent when the model has no price.
 	EstimatedCost *float64 `json:"estimated_cost,omitempty"`
 }
@@ -51,12 +55,12 @@ type estimateResult struct {
 func toEffort(e plans.Effort, prices *plans.Prices) effortResult {
 	r := effortResult{
 		Seconds: e.Seconds, TokensIn: e.TokensIn, TokensOut: e.TokensOut,
-		CacheReadTokens: e.CacheReadTokens, CacheWriteTokens: e.CacheWriteTokens,
+		CacheReadTokens: e.CacheReadTokens, CacheWriteTokens: e.CacheWriteTokens, CacheWrite1hTokens: e.CacheWrite1hTokens,
 	}
 	for _, m := range e.Models {
 		mr := modelTokensResult{
 			Model: m.Model, TokensIn: m.TokensIn, TokensOut: m.TokensOut,
-			CacheReadTokens: m.CacheReadTokens, CacheWriteTokens: m.CacheWriteTokens,
+			CacheReadTokens: m.CacheReadTokens, CacheWriteTokens: m.CacheWriteTokens, CacheWrite1hTokens: m.CacheWrite1hTokens,
 		}
 		if cost, ok := prices.Cost(m); ok {
 			mr.EstimatedCost = &cost
@@ -532,20 +536,22 @@ func registerPlanTools(server *sdkmcp.Server, deps Deps, principalID, clientID u
 		Group   string `json:"group,omitempty" jsonschema:"comma-separated dimensions to group by: project, day, principal, model, branch, ticket; omit for one total"`
 	}
 	type usageRow struct {
-		Project          string   `json:"project,omitempty"`
-		Day              string   `json:"day,omitempty"`
-		PrincipalID      string   `json:"principal_id,omitempty"`
-		Principal        string   `json:"principal,omitempty"`
-		Model            *string  `json:"model,omitempty"`
-		Branch           *string  `json:"branch,omitempty"`
-		TicketKey        *string  `json:"ticket_key,omitempty"`
-		Seconds          int64    `json:"seconds"`
-		TokensIn         int64    `json:"tokens_in"`
-		TokensOut        int64    `json:"tokens_out"`
-		CacheReadTokens  int64    `json:"cache_read_tokens"`
-		CacheWriteTokens int64    `json:"cache_write_tokens"`
-		Turns            int64    `json:"turns"`
-		Cost             *float64 `json:"cost_estimate,omitempty"`
+		Project          string  `json:"project,omitempty"`
+		Day              string  `json:"day,omitempty"`
+		PrincipalID      string  `json:"principal_id,omitempty"`
+		Principal        string  `json:"principal,omitempty"`
+		Model            *string `json:"model,omitempty"`
+		Branch           *string `json:"branch,omitempty"`
+		TicketKey        *string `json:"ticket_key,omitempty"`
+		Seconds          int64   `json:"seconds"`
+		TokensIn         int64   `json:"tokens_in"`
+		TokensOut        int64   `json:"tokens_out"`
+		CacheReadTokens  int64   `json:"cache_read_tokens"`
+		CacheWriteTokens int64   `json:"cache_write_tokens"`
+		// The part of cache_write_tokens written to the one-hour cache.
+		CacheWrite1hTokens int64    `json:"cache_write_1h_tokens"`
+		Turns              int64    `json:"turns"`
+		Cost               *float64 `json:"cost_estimate,omitempty"`
 	}
 	type usageResult struct {
 		From      string     `json:"from"`
@@ -561,7 +567,8 @@ func registerPlanTools(server *sdkmcp.Server, deps Deps, principalID, clientID u
 			Project: r.ProjectPath, Principal: r.PrincipalName, Model: r.Model, Branch: r.Branch, TicketKey: r.TicketKey,
 			Seconds: r.Seconds, TokensIn: r.Tokens.TokensIn, TokensOut: r.Tokens.TokensOut,
 			CacheReadTokens: r.Tokens.CacheReadTokens, CacheWriteTokens: r.Tokens.CacheWriteTokens,
-			Turns: r.Turns, Cost: r.Cost,
+			CacheWrite1hTokens: r.Tokens.CacheWrite1hTokens,
+			Turns:              r.Turns, Cost: r.Cost,
 		}
 		if r.Day != nil {
 			out.Day = r.Day.Format(time.DateOnly)
@@ -573,7 +580,8 @@ func registerPlanTools(server *sdkmcp.Server, deps Deps, principalID, clientID u
 	}
 	sdkmcp.AddTool(server, &sdkmcp.Tool{
 		Name: "usage.summary",
-		Description: "What the work cost: time present and tokens (fresh input, output, cache reads, cache writes) as client hooks " +
+		Description: "What the work cost: time present and tokens (fresh input, output, cache reads, cache writes, and how many of " +
+			"the cache writes were one-hour writes) as client hooks " +
 			"reported them, summed per UTC day and grouped by project, day, principal, model, branch or ticket. " +
 			"cost_estimate is at the operator's price table and only an estimate; it is absent without one. " +
 			"Use it to answer questions like \"what did ticket PROJ-12 cost\" or \"who worked on which branch this week\".",

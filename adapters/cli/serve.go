@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -61,6 +62,7 @@ const (
 	oidcClientSecretEnv = "CC_OIDC_CLIENT_SECRET" //nolint:gosec // G101: an env var name
 	storageQuotaEnv     = "CC_STORAGE_QUOTA"
 	usagePricesEnv      = "CC_USAGE_PRICES"
+	usageRetentionEnv   = "CC_USAGE_LEDGER_RETENTION"
 	trustedProxiesEnv   = "CC_TRUSTED_PROXIES"
 )
 
@@ -83,6 +85,27 @@ func isLoopbackAddr(addr string) bool {
 	}
 	ip := net.ParseIP(host)
 	return ip != nil && ip.IsLoopback()
+}
+
+// usageRetentionDays reads --usage-ledger-retention, falling back to
+// CC_USAGE_LEDGER_RETENTION when the flag was not given. A number of days,
+// optionally written with a "d" suffix in the environment ("90d"); 0 keeps
+// the ledger forever.
+func usageRetentionDays(cmd *cobra.Command) (int, error) {
+	days, _ := cmd.Flags().GetInt("usage-ledger-retention")
+	if !cmd.Flags().Changed("usage-ledger-retention") {
+		if env := strings.TrimSpace(os.Getenv(usageRetentionEnv)); env != "" {
+			n, err := strconv.Atoi(strings.TrimSuffix(env, "d"))
+			if err != nil {
+				return 0, fmt.Errorf("$%s is a number of days, not %q", usageRetentionEnv, env)
+			}
+			days = n
+		}
+	}
+	if days < 0 {
+		return 0, fmt.Errorf("a number of days, 0 or more, not %d", days)
+	}
+	return days, nil
 }
 
 // newServeCmd runs the REST API (at "/") and the MCP server (at "/mcp") on
@@ -237,6 +260,20 @@ func newServeCmd() *cobra.Command {
 				}
 				plansSvc.SetPrices(prices)
 				slog.Info("token cost estimates enabled", "prices", pricesPath, "currency", prices.Currency, "as_of", prices.AsOf)
+			}
+
+			// Usage ledger retention (docs/adr/0031). Off by default: the
+			// ledger is bounded by distinct days and dimensions, and how long
+			// to keep who-spent-what is the operator's call, not ours.
+			keepDays, err := usageRetentionDays(cmd)
+			if err != nil {
+				return fmt.Errorf("serve: --usage-ledger-retention: %w", err)
+			}
+			retentionCtx, stopRetention := context.WithCancel(context.Background())
+			defer stopRetention()
+			if keepDays > 0 {
+				slog.Info("usage ledger retention enabled", "keep_days", keepDays)
+				go plansSvc.RunUsageLedgerRetention(retentionCtx, keepDays, plans.UsageLedgerRetentionInterval)
 			}
 
 			// Semantic search (docs/adr/0028). Off unless a provider is
@@ -468,6 +505,8 @@ func newServeCmd() *cobra.Command {
 		fmt.Sprintf("default storage limit per user or organization, e.g. 10GB or 2GiB (defaults to $%s; empty means no limit — an administrator can still set one per namespace)", storageQuotaEnv))
 	cmd.Flags().String("usage-prices", "",
 		fmt.Sprintf("JSON price table per model, to show what reported tokens would cost on the API as an estimate (defaults to $%s; empty shows tokens without a cost; example: deploy/usage-prices.example.json)", usagePricesEnv))
+	cmd.Flags().Int("usage-ledger-retention", 0,
+		fmt.Sprintf("days of usage ledger rows to keep; older days are deleted hourly (defaults to $%s; 0 keeps them forever)", usageRetentionEnv))
 	cmd.Flags().Bool("security-log", true,
 		"record failed authentications, denied capabilities and rate-limit refusals to the security_events table "+
 			"(--security-log=false opts out; nothing is recorded and attacks become invisible)")

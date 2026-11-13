@@ -21,21 +21,23 @@ import (
 // counted once, per model, subagents included, and nothing sent twice.
 
 type modelTokens struct {
-	Model            string   `json:"model"`
-	TokensIn         int64    `json:"tokens_in"`
-	TokensOut        int64    `json:"tokens_out"`
-	CacheReadTokens  int64    `json:"cache_read_tokens"`
-	CacheWriteTokens int64    `json:"cache_write_tokens"`
-	EstimatedCost    *float64 `json:"estimated_cost"`
+	Model              string   `json:"model"`
+	TokensIn           int64    `json:"tokens_in"`
+	TokensOut          int64    `json:"tokens_out"`
+	CacheReadTokens    int64    `json:"cache_read_tokens"`
+	CacheWriteTokens   int64    `json:"cache_write_tokens"`
+	CacheWrite1hTokens int64    `json:"cache_write_1h_tokens"`
+	EstimatedCost      *float64 `json:"estimated_cost"`
 }
 
 type effortJSON struct {
-	TokensIn         int64         `json:"tokens_in"`
-	TokensOut        int64         `json:"tokens_out"`
-	CacheReadTokens  int64         `json:"cache_read_tokens"`
-	CacheWriteTokens int64         `json:"cache_write_tokens"`
-	Models           []modelTokens `json:"models"`
-	CostEstimate     *struct {
+	TokensIn           int64         `json:"tokens_in"`
+	TokensOut          int64         `json:"tokens_out"`
+	CacheReadTokens    int64         `json:"cache_read_tokens"`
+	CacheWriteTokens   int64         `json:"cache_write_tokens"`
+	CacheWrite1hTokens int64         `json:"cache_write_1h_tokens"`
+	Models             []modelTokens `json:"models"`
+	CostEstimate       *struct {
 		Currency string   `json:"currency"`
 		Amount   float64  `json:"amount"`
 		Unpriced []string `json:"unpriced_models"`
@@ -201,6 +203,55 @@ func TestTheClaudeCodeUsageHookSendsEachResponseOncePerModel(t *testing.T) {
 	if got := b.effort().byModel(); fmt.Sprint(got) != fmt.Sprint(want) {
 		t.Errorf("after the second turn: %v, want %v", got, want)
 	}
+}
+
+// One-hour cache writes travel as a part of the cache writes and are priced
+// at their own rate. A session already running when the hook learned about
+// them has a state file without them: the next turn must not send the whole
+// session's one-hour writes beside one turn's cache writes, which the server
+// would refuse as a part larger than the whole.
+func TestTheClaudeCodeUsageHookSendsOneHourCacheWritesApart(t *testing.T) {
+	prices, err := plans.ParsePrices([]byte(`{"currency":"USD","models":{"claude-opus-5-5":{"input":4,"output":20,"cache_read":0.2,"cache_write":5,"cache_write_1h":8}}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	f := newFixtureWithDeps(t, nil, ratelimit.Limits{}, func(d *cchttp.Deps) { d.Plans.SetPrices(prices) })
+	b := newHookBench(t, f, "hour")
+	transcript := filepath.Join(b.dir, "hour.jsonl")
+	if err := os.WriteFile(transcript, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	stdin := fmt.Sprintf(`{"session_id":"s-hour","transcript_path":%q}`, transcript)
+	appendLines(t, transcript, assistantLine1h("msg_1", 1000, 600))
+	b.run("claude-code-usage-hook.py", stdin)
+	e := b.effort()
+	if e.CacheWriteTokens != 1000 || e.CacheWrite1hTokens != 600 || len(e.Models) != 1 || e.Models[0].CacheWrite1hTokens != 600 {
+		t.Fatalf("effort after the first turn: %+v", e)
+	}
+	if want := (400*5.0 + 600*8.0) / 1e6; e.Models[0].EstimatedCost == nil || *e.Models[0].EstimatedCost != want {
+		t.Errorf("estimated cost %v, want %v (five-minute writes at 5, one-hour at 8)", e.Models[0].EstimatedCost, want)
+	}
+
+	// The state an older hook would have left: everything sent, no one-hour field.
+	state := filepath.Join(b.dir, "context-commander", "usage", "s-hour.json")
+	if err := os.WriteFile(state, []byte(`{"models":{"claude-opus-5-5":{"tokens_in":0,"tokens_out":0,"cache_read_tokens":0,"cache_write_tokens":1000}}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	appendLines(t, transcript, assistantLine1h("msg_2", 100, 100))
+	b.run("claude-code-usage-hook.py", stdin)
+	if e := b.effort(); e.CacheWriteTokens != 1100 || e.CacheWrite1hTokens != 700 {
+		t.Errorf("after an upgrade mid-session: %d cache writes, %d of them one-hour; want 1100 and 700", e.CacheWriteTokens, e.CacheWrite1hTokens)
+	}
+
+	f.wantStatus(http.MethodPost, "/v1/me/usage", b.token, []byte(`{"model":"claude-opus-5-5","cache_write_tokens":1,"cache_write_1h_tokens":2}`), http.StatusBadRequest, "a one-hour part larger than the whole")
+}
+
+func assistantLine1h(id string, cacheWrite, oneHour int) string {
+	b, _ := json.Marshal(map[string]any{"type": "assistant", "message": map[string]any{"id": id, "model": "claude-opus-5-5", "usage": map[string]any{
+		"input_tokens": 0, "output_tokens": 0, "cache_read_input_tokens": 0, "cache_creation_input_tokens": cacheWrite,
+		"cache_creation": map[string]any{"ephemeral_5m_input_tokens": cacheWrite - oneHour, "ephemeral_1h_input_tokens": oneHour},
+	}}})
+	return string(b)
 }
 
 // A state file written before the hook sent models holds one flat total of

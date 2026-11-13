@@ -48,6 +48,11 @@ FIELDS = {
     "tokens_out": "output_tokens",
     "cache_read_tokens": "cache_read_input_tokens",
     "cache_write_tokens": "cache_creation_input_tokens",
+    # Nested: usage.cache_creation.ephemeral_1h_input_tokens. The part of
+    # the cache writes made to the one-hour cache, which costs more than the
+    # five-minute one; the server keeps it as a subset of cache_write_tokens
+    # (docs/adr/0031).
+    "cache_write_1h_tokens": ("cache_creation", "ephemeral_1h_input_tokens"),
 }
 
 # What the server accepts as a model label (internal/plans.ValidModel).
@@ -97,8 +102,14 @@ def responses(files: list) -> dict:
                 usage = message["usage"]
                 counts = {}
                 for field, source in FIELDS.items():
-                    value = usage.get(source)
+                    if isinstance(source, tuple):
+                        parent = usage.get(source[0])
+                        value = parent.get(source[1]) if isinstance(parent, dict) else None
+                    else:
+                        value = usage.get(source)
                     counts[field] = value if isinstance(value, int) and value > 0 else 0
+                # A subset of the cache writes, whatever the transcript says.
+                counts["cache_write_1h_tokens"] = min(counts["cache_write_1h_tokens"], counts["cache_write_tokens"])
                 by_id[key] = (model if isinstance(model, str) and MODEL.fullmatch(model) else "", counts)
     return by_id
 
@@ -213,6 +224,12 @@ def main() -> None:
     for model in sorted(now):
         before = sent.get(model, {f: 0 for f in FIELDS})
         delta = {f: max(0, now[model][f] - before.get(f, 0)) for f in FIELDS}
+        # A state file written before one-hour writes were sent has none of
+        # them as sent, so the whole session's one-hour writes would come
+        # due at once beside only this turn's cache writes. The server
+        # refuses a one-hour part larger than the whole; send at most the
+        # whole, and the rest is never sent rather than sent wrong.
+        delta["cache_write_1h_tokens"] = min(delta["cache_write_1h_tokens"], delta["cache_write_tokens"])
         if not any(delta.values()):
             continue
         answer = post(url, token, {"model": model, **delta, **context})
