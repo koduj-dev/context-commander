@@ -9,13 +9,13 @@ import {
   Badge,
   Btn,
   Cell,
-  Code,
   DataTable,
   Def,
   Defs,
   EmptyState,
   ErrorState,
   Loading,
+  Markdown,
   Mono,
   Note,
   PageHead,
@@ -448,9 +448,9 @@ function IdeaRows({
 // ---------------------------------------------------------------- detail
 
 /**
- * One idea in full. The proposal is the agent's Markdown shown as text: the
- * app has no Markdown renderer, and turning model output into HTML on a
- * colleague's screen is not a thing to add for a heading or two.
+ * One idea in full. Body and proposal are Markdown, rendered as elements by
+ * <Markdown> and never as an HTML string: a proposal is model output, and
+ * whatever reached the model's context can write it.
  */
 function IdeaDetail({ id, onChanged }: { id: string; onChanged: () => void }) {
   const t = useT();
@@ -529,7 +529,7 @@ function IdeaDetail({ id, onChanged }: { id: string; onChanged: () => void }) {
       <div>
         <b>{t("ideas.details")}</b>
         <div className="mt-sm">
-          {i.body ? <Code>{i.body}</Code> : <span className="dim">{t("ideas.noBody")}</span>}
+          {i.body ? <Markdown source={i.body} /> : <span className="dim">{t("ideas.noBody")}</span>}
         </div>
       </div>
 
@@ -544,7 +544,7 @@ function IdeaDetail({ id, onChanged }: { id: string; onChanged: () => void }) {
         <div>
           <b>{t("ideas.proposal")}</b>
           <div className="mt-sm">
-            <Code>{i.proposal}</Code>
+            <Markdown source={i.proposal} />
           </div>
           {planLink && (
             <div className="mt-sm">

@@ -212,6 +212,46 @@ describe("the memories tab", () => {
     });
   });
 
+  it("edits a memory, sending only what changed and the version it was opened at", async () => {
+    const calls: Call[] = [];
+    stub(calls, { ...MEMORY, version: 4 });
+    render(wrap());
+    fireEvent.click(await screen.findByRole("button", { name: "Open" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
+
+    fireEvent.change(screen.getByLabelText("Title"), {
+      target: { value: "Retries are unordered" },
+    });
+    fireEvent.change(screen.getByRole("textbox", { name: "Branch" }), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() => expect(calls.some((c) => c.method === "PATCH")).toBe(true));
+    const patch = calls.find((c) => c.method === "PATCH")!;
+    expect(patch.url).toContain("/memories/m-1");
+    expect(JSON.parse(patch.body!)).toEqual({
+      expected_version: 4,
+      title: "Retries are unordered",
+      branch: "",
+    });
+  });
+
+  it("renders the body as Markdown and never as markup", async () => {
+    const calls: Call[] = [];
+    stub(calls, {
+      ...MEMORY,
+      body: "## Why\n\n- **sorted** by `event_seq`\n- <img src=x onerror=alert(1)>\n\n[x](javascript:alert(1))",
+    });
+    const { container } = render(wrap());
+    fireEvent.click(await screen.findByRole("button", { name: "Open" }));
+
+    expect(await screen.findByRole("heading", { name: "Why" })).toBeTruthy();
+    expect(container.querySelector(".prose strong")?.textContent).toBe("sorted");
+    expect(container.querySelector(".prose code")?.textContent).toBe("event_seq");
+    expect(container.querySelector(".prose img")).toBeNull();
+    expect(screen.getByText("<img src=x onerror=alert(1)>")).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "x" })).toBeNull();
+  });
+
   it("offers no search mode and no related memories when the server has no semantic search", async () => {
     const calls: Call[] = [];
     stub(calls);
