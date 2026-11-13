@@ -13,6 +13,7 @@ package memories
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -27,6 +28,10 @@ var (
 	// ErrInvalid is a request with a kind, status, size or metadata value
 	// this package does not accept. The wrapped message says which.
 	ErrInvalid = errors.New("memories: invalid request")
+	// ErrSemanticOff is a semantic search or a related read on a server
+	// with no embedding provider configured. It wraps ErrInvalid, so every
+	// adapter already answers it as a bad request.
+	ErrSemanticOff = fmt.Errorf("%w: semantic search is not configured on this server (an operator sets --embeddings-provider); use mode text", ErrInvalid)
 )
 
 // Kinds. Strings rather than an enum type so adapters pass them through
@@ -167,6 +172,19 @@ type Person struct {
 const (
 	MatchTitle = "title"
 	MatchBody  = "body"
+	// MatchSemantic is a hit found by meaning, not by the words of the
+	// query (docs/adr/0028).
+	MatchSemantic = "semantic"
+)
+
+// Search modes (docs/adr/0028). Text is the substring match; semantic ranks
+// by embedding similarity; hybrid fuses both rankings. The empty mode is
+// the service's default: hybrid when semantic search is configured, text
+// otherwise.
+const (
+	ModeText     = "text"
+	ModeSemantic = "semantic"
+	ModeHybrid   = "hybrid"
 )
 
 // Hit is one memory a search found. Body is left out of a hit — a hundred
@@ -176,6 +194,9 @@ type Hit struct {
 	Memory  Memory
 	Match   string
 	Snippet string
+	// Score is the cosine similarity for a semantic hit and the fused rank
+	// score for a hybrid one; zero for a text hit, whose order is its rank.
+	Score float64
 }
 
 // SearchResult is a search's answer. Projects names the projects the hits
@@ -186,6 +207,12 @@ type SearchResult struct {
 	Projects  []ProjectRef
 	People    map[uuid.UUID]Person
 	Truncated bool
+	// Mode is the mode that answered, after the default was applied.
+	Mode string
+	// Degraded says a hybrid search answered by text alone because the
+	// embedding provider failed: the hits are right, but nothing was found
+	// by meaning.
+	Degraded bool
 }
 
 // ProjectRef names a project a hit came from.

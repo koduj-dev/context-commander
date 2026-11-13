@@ -84,6 +84,7 @@ an older summary. Names and semantics come from the code, not from memory.
 | Conversation enumeration | `history.Service.ListConversations` |
 | Project memories with branch/ticket/assignee metadata | `internal/memories`, migration 000037, [ADR 0025](adr/0025-memories.md) |
 | Idea stack: claim leases, proposals, human-only decisions | `internal/ideas`, migration 000038, [ADR 0026](adr/0026-idea-stack.md) |
+| Semantic search of memories (off unless configured), optional pgvector migration set | `internal/embeddings`, migration 000040, `migrations/pgvector/`, [ADR 0028](adr/0028-semantic-search.md) |
 
 ---
 

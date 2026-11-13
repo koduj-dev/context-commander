@@ -67,6 +67,7 @@ var expectedTools = []string{
 	"memory.create",
 	"memory.get",
 	"memory.list",
+	"memory.related",
 	"memory.search",
 	"memory.supersede",
 	"memory.update",

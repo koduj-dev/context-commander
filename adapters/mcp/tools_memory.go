@@ -311,28 +311,49 @@ func registerMemoryTools(server *sdkmcp.Server, deps Deps, principalID, clientID
 
 	type searchArgs struct {
 		Project string `json:"project,omitempty" jsonschema:"project path \"namespace/slug\"; leave it out to search every project you can read"`
-		Query   string `json:"query" jsonschema:"words to find in memory titles and bodies"`
+		Query   string `json:"query" jsonschema:"words to find in memory titles and bodies, or a question or description to match by meaning"`
+		Mode    string `json:"mode,omitempty" jsonschema:"text (the words), semantic (similar meaning, any language), or hybrid (both); default hybrid when the server has semantic search, text otherwise"`
 		filterArgs
 	}
 	type searchHit struct {
 		memoryResult
-		Match   string `json:"match"`
-		Snippet string `json:"snippet,omitempty"`
+		Match   string  `json:"match"`
+		Snippet string  `json:"snippet,omitempty"`
+		Score   float64 `json:"score,omitempty"`
 	}
 	// An object, not a bare array, so a bounded answer can say it was
-	// bounded (see plan.search).
+	// bounded (see plan.search), which mode answered, and whether a hybrid
+	// search had to fall back to text.
 	type searchResult struct {
 		Items     []searchHit `json:"items"`
 		Truncated bool        `json:"truncated"`
+		Mode      string      `json:"mode"`
+		Degraded  bool        `json:"degraded,omitempty"`
+	}
+	toSearchResult := func(res memories.SearchResult) searchResult {
+		paths := map[uuid.UUID]string{}
+		for _, p := range res.Projects {
+			paths[p.ID] = p.Path
+		}
+		out := searchResult{Items: []searchHit{}, Truncated: res.Truncated, Mode: res.Mode, Degraded: res.Degraded}
+		for _, h := range res.Hits {
+			r := toMemory(h.Memory, principalID, res.People)
+			r.Body, r.Project = "", paths[h.Memory.ProjectID]
+			out.Items = append(out.Items, searchHit{memoryResult: r, Match: h.Match, Snippet: h.Snippet, Score: h.Score})
+		}
+		return out
 	}
 	sdkmcp.AddTool(server, &sdkmcp.Tool{
 		Name: "memory.search",
 		Description: "Find what the team already knows before you start: search memories by words, optionally narrowed " +
 			"by branch, ticket, kind, tag or author. Run it when you pick up a task — with the ticket key or the branch " +
-			"if you have one — so you do not rediscover a known gotcha or reopen a settled decision. Title matches come " +
-			"first, then body matches, newest first within each; at most 100 hits, each with a snippet (memory.get has the " +
-			"whole body). Only active memories unless status says otherwise. Without a project it searches every project " +
-			"you can read (at most 50). `truncated` true means a bound cut the answer: add a filter or narrow the query.",
+			"if you have one — so you do not rediscover a known gotcha or reopen a settled decision. mode text matches " +
+			"words (title matches first, then body, newest first within each); semantic finds memories similar in meaning, " +
+			"in any language, even with none of your words; hybrid (the default when the server has semantic search) " +
+			"fuses both. At most 100 hits, each with a snippet (memory.get has the whole body). Only active memories unless " +
+			"status says otherwise. Without a project it searches every project you can read (at most 50). `truncated` " +
+			"true means a bound cut the answer: add a filter or narrow the query. `degraded` true means semantic ranking " +
+			"was unavailable and the answer is by words only.",
 	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, args searchArgs) (*sdkmcp.CallToolResult, searchResult, error) {
 		f, err := toFilter(args.filterArgs)
 		if err != nil {
@@ -340,27 +361,44 @@ func registerMemoryTools(server *sdkmcp.Server, deps Deps, principalID, clientID
 		}
 		var res memories.SearchResult
 		if args.Project == "" {
-			res, err = deps.Memories.SearchAll(ctx, principalID, args.Query, f)
+			res, err = deps.Memories.SearchAll(ctx, principalID, args.Query, args.Mode, f)
 		} else {
 			projectID, rerr := resolve(ctx, args.Project)
 			if rerr != nil {
 				return nil, searchResult{}, rerr
 			}
-			res, err = deps.Memories.Search(ctx, principalID, projectID, args.Query, f)
+			res, err = deps.Memories.Search(ctx, principalID, projectID, args.Query, args.Mode, f)
 		}
 		if err != nil {
 			return nil, searchResult{}, err
 		}
-		paths := map[uuid.UUID]string{}
-		for _, p := range res.Projects {
-			paths[p.ID] = p.Path
+		return nil, toSearchResult(res), nil
+	})
+
+	type relatedArgs struct {
+		Project  string `json:"project" jsonschema:"project path \"namespace/slug\""`
+		MemoryID string `json:"memory_id" jsonschema:"the memory to find neighbours of"`
+		Limit    int    `json:"limit,omitempty" jsonschema:"how many (default 5, max 20)"`
+	}
+	sdkmcp.AddTool(server, &sdkmcp.Tool{
+		Name: "memory.related",
+		Description: "The project's active memories most similar in meaning to one memory, most similar first — what else " +
+			"the team recorded about the same thing, in any wording or language. Use it after memory.get when a memory " +
+			"is relevant, to find the decisions and gotchas around it. Needs semantic search on the server; without it " +
+			"this is an error and memory.search with mode text is what remains.",
+	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, args relatedArgs) (*sdkmcp.CallToolResult, searchResult, error) {
+		projectID, err := resolve(ctx, args.Project)
+		if err != nil {
+			return nil, searchResult{}, err
 		}
-		out := searchResult{Items: []searchHit{}, Truncated: res.Truncated}
-		for _, h := range res.Hits {
-			r := toMemory(h.Memory, principalID, res.People)
-			r.Body, r.Project = "", paths[h.Memory.ProjectID]
-			out.Items = append(out.Items, searchHit{memoryResult: r, Match: h.Match, Snippet: h.Snippet})
+		id, err := uuid.Parse(args.MemoryID)
+		if err != nil {
+			return nil, searchResult{}, err
 		}
-		return nil, out, nil
+		res, err := deps.Memories.Related(ctx, principalID, projectID, id, args.Limit)
+		if err != nil {
+			return nil, searchResult{}, err
+		}
+		return nil, toSearchResult(res), nil
 	})
 }

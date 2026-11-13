@@ -1007,6 +1007,18 @@ export const en = {
   "memories.delete": "Delete",
   "memories.deleteConfirm": "Delete for good",
   "memories.save": "Save memory",
+  "memories.mode": "Search by",
+  "memories.mode.text": "Words",
+  "memories.mode.semantic": "Similar meaning",
+  "memories.mode.hybrid": "Both",
+  "memories.searchPlaceholderMeaning": "Words, or describe what you are looking for",
+  "memories.degraded":
+    "Search by meaning is unavailable right now, so these results match your words only.",
+  "memories.match.semantic": "Similar meaning",
+  "memories.related": "Related memories",
+  "memories.relatedLead":
+    "Active memories closest in meaning to this one, compared by their embedding.",
+  "memories.relatedEmpty": "No other memory is close in meaning to this one.",
   "project.tab.ideas": "Ideas",
   "ideas.title": "Ideas",
   "ideas.lead":

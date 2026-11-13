@@ -60,7 +60,12 @@ type Deps struct {
 	ContextPack   *contextpack.Service
 	Plans         *plans.Service
 	Memories      *memories.Service
-	Ideas         *ideas.Service
+	// Embeddings reports semantic search's health to administrators
+	// (docs/adr/0028). Nil when no embedding provider is configured; an
+	// interface, and set only when there is one, for the reason Directory
+	// is (adapters/cli/serve.go ldapFromFlags).
+	Embeddings EmbeddingsStatus
+	Ideas      *ideas.Service
 	// Security records refusals and Limiter bounds them. Both are safe to
 	// leave nil — a nil *security.Recorder records nothing and a nil
 	// *ratelimit.Limiter allows everything, which is what the CLI and the
@@ -207,6 +212,7 @@ func NewHandler(deps Deps) http.Handler {
 			r.Route("/installation", func(r chi.Router) {
 				r.Get("/admins", deps.listInstallationAdmins)
 				r.Get("/stats", deps.getInstallationStats)
+				r.Get("/embeddings", deps.getEmbeddingsStatus)
 				r.Get("/trends", deps.getInstallationTrends)
 				r.Get("/storage", deps.listInstallationStorage)
 				r.Put("/storage/{id}", deps.setNamespaceStorageLimit)
@@ -288,6 +294,7 @@ func NewHandler(deps Deps) http.Handler {
 					r.Get("/search", deps.searchMemories)
 					r.Get("/facets", deps.getMemoryFacets)
 					r.Get("/{memoryID}", deps.getMemory)
+					r.Get("/{memoryID}/related", deps.relatedMemories)
 					r.Patch("/{memoryID}", deps.updateMemory)
 					r.Post("/{memoryID}/status", deps.setMemoryStatus)
 					r.Delete("/{memoryID}", deps.deleteMemory)

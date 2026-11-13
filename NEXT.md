@@ -28,7 +28,8 @@ the full definition and §3 for the non-goals. *(2026-11-13: one exception, by
 the maintainer's decision. Project-scoped **memories** that agents write on
 purpose, with branch, ticket and assignee metadata, and search by text.
 [ADR 0025](docs/adr/0025-memories.md). There is still no general memory
-store and no vector search.)*
+store. Semantic search of those memories was added later the same day, also
+by the maintainer's decision: [ADR 0028](docs/adr/0028-semantic-search.md).)*
 
 The strongest entry use case is deliberately narrow:
 
@@ -127,8 +128,13 @@ Only after the core loop is proven:
       `context.bootstrap`; this is the surface that makes it readable.
 - [ ] Project export/import for backup and migration.
 
-Add vector search only if measurement shows metadata and text search are
-insufficient. It is not a precondition for first value.
+~~Add vector search only if measurement shows metadata and text search are
+insufficient.~~ Decided otherwise by the maintainer on 2026-11-13: memories
+get semantic search now, without waiting for that measurement, because the
+team writing them works in Czech and English and a word match misses half of
+what it looks for. It is off unless an operator configures an embedding
+provider, local by default, and vectors are encrypted by default
+([ADR 0028](docs/adr/0028-semantic-search.md)). It covers memories only.
 
 ### Phase 3 — team and enterprise layer
 
@@ -303,10 +309,13 @@ Only on top of a core loop people actually use:
       it, and to search them over MCP and in the interface. This replaces
       the "not memory for AI" stance for this one primitive, by the
       maintainer's decision. Still open:
-      - **Semantic search.** `memories.Ranker` is the seam, and nothing
-        implements it yet. Where embeddings would live, and whether they
-        count as content that must be encrypted, are that change's
-        questions.
+      - ~~**Semantic search.**~~ Closed 2026-11-13
+        ([ADR 0028](docs/adr/0028-semantic-search.md)): pluggable
+        embeddings (Ollama by default), vectors encrypted as content by
+        default or plaintext pgvector by opt-in, text/semantic/hybrid
+        modes and related memories. Still open: an approximate index for
+        pgvector, which needs a fixed dimension per model, and lifting the
+        1000-candidate bound that semantic search shares with text search.
       - **Search decrypts.** At most 1000 memories per project are decrypted
         per search, after the metadata filters. Measure real projects
         before adding an index.

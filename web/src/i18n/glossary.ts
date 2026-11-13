@@ -58,7 +58,7 @@ export const GLOSSARY: GlossaryEntry[] = [
   },
   {
     en: "embedding",
-    note: "No established native form in any of these languages. Kept even though this product does not compute them yet, so the first screen that does cannot invent one.",
+    note: "No established native form in any of these languages. Semantic search of memories (docs/adr/0028) computes them, and the related-memories panel names them.",
     forms: { "zh-CN": "embedding" },
   },
   {

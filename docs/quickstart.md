@@ -209,6 +209,7 @@ Store `CC_ROOT_KEY` somewhere other than alongside the backup.
 - [`deploy/mcp-clients/README.md`](../deploy/mcp-clients/README.md) — the two supported clients in detail
 - [`docs/architecture-cookbook.md`](architecture-cookbook.md) — why the system is shaped this way
 - [`docs/dev-environment.md`](dev-environment.md) — running from source instead
+- [`docs/semantic-search.md`](semantic-search.md) — optional: find memories by meaning with a local model (an `ollama` block is ready, commented out, in the compose file)
 
 ## Security event recording
 

@@ -43,6 +43,14 @@ type fixture struct {
 
 func newFixture(t *testing.T) *fixture {
 	t.Helper()
+	return newFixtureWith(t, nil)
+}
+
+// newFixtureWith is newFixture with a last chance to change the Deps, for a
+// test that turns on something the default fixture leaves off (semantic
+// search, adapters/mcp/semantic_test.go).
+func newFixtureWith(t *testing.T, adjust func(*ccmcp.Deps)) *fixture {
+	t.Helper()
 	dsns := dbtest.New(t)
 	ctx := context.Background()
 
@@ -94,13 +102,17 @@ func newFixture(t *testing.T) *fixture {
 	ideasSvc := ideas.NewService(appPool, cryptoProvider, authz, plansSvc)
 	contextSvc.WithIdeas(ideasSvc)
 
-	handler := ccmcp.NewHandler(ccmcp.Deps{
+	deps := ccmcp.Deps{
 		Pool: appPool, Projects: projStore, Members: members.NewService(appPool, projStore, authz), Authz: authz, Artifacts: artifactsSvc,
 		Events: eventsSvc, Organizations: orgSvc, Audit: auditSvc,
 		Handoffs: handoffsSvc, History: historySvc,
 		Skills: skillsSvc, Gates: gatesAdmin, Secrets: secretsSvc,
 		Installation: installationSvc, ContextPack: contextSvc, Plans: plansSvc, Memories: memoriesSvc, Ideas: ideasSvc,
-	})
+	}
+	if adjust != nil {
+		adjust(&deps)
+	}
+	handler := ccmcp.NewHandler(deps)
 	server := httptest.NewServer(handler)
 	t.Cleanup(server.Close)
 

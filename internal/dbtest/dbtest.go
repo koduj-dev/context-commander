@@ -70,6 +70,12 @@ var (
 	startErr   error
 	createMu   sync.Mutex
 	dbSequence atomic.Uint64
+
+	// The pgvector cluster (NewPgvector) is a second, separate container,
+	// started only by the tests that ask for it.
+	pgvectorOnce sync.Once
+	pgvector     cluster
+	pgvectorErr  error
 )
 
 func adminDSN(c cluster) string {
@@ -83,14 +89,20 @@ func adminDSN(c cluster) string {
 // every later caller, so a failure to start is never mistaken for a test
 // failure in whichever test happened to be first.
 func start(ctx context.Context) (cluster, error) {
-	container, err := tcpostgres.Run(ctx, "postgres:16-alpine",
+	return startCluster(ctx, "postgres:16-alpine", nil, db.Migrate)
+}
+
+// startCluster is start for any image: the init scripts after the roles,
+// and the migrations to apply to the template as cc_owner.
+func startCluster(ctx context.Context, image string, initScripts []string, migrate func(ownerDSN string) error) (cluster, error) {
+	container, err := tcpostgres.Run(ctx, image,
 		tcpostgres.WithDatabase(templateDB),
 		tcpostgres.WithUsername(superuser),
 		tcpostgres.WithPassword(superPassword),
 		// Creates cc_owner/cc_app with the exact non-superuser attributes
 		// production uses. Roles are cluster-wide, so this runs once and
 		// serves every per-test database cloned below.
-		tcpostgres.WithInitScripts("../../deploy/postgres/init/01-roles.sql"),
+		tcpostgres.WithInitScripts(append([]string{"../../deploy/postgres/init/01-roles.sql"}, initScripts...)...),
 		tcpostgres.BasicWaitStrategies(),
 	)
 	if err != nil {
@@ -112,7 +124,7 @@ func start(ctx context.Context) (cluster, error) {
 	// to cc_app land with the same ownership they would in production and
 	// are copied into every clone.
 	ownerDSN := fmt.Sprintf("postgres://cc_owner:cc_owner_dev_password@%s:%s/%s?sslmode=disable", c.host, c.port, templateDB)
-	if err := db.Migrate(ownerDSN); err != nil {
+	if err := migrate(ownerDSN); err != nil {
 		return cluster{}, fmt.Errorf("migrate template: %w", err)
 	}
 
@@ -156,13 +168,46 @@ func New(t *testing.T) DSNs {
 	if startErr != nil {
 		t.Fatalf("dbtest: %v", startErr)
 	}
+	return newDatabase(t, shared)
+}
 
+// NewPgvector is New on a Postgres that has the pgvector extension
+// (pgvector/pgvector:pg16), with the core migrations and the optional
+// pgvector set applied (docs/adr/0028). The extension is created by the
+// superuser through deploy/postgres/init/02-pgvector.sql, as in the compose
+// deployment.
+//
+// It skips the test when that image cannot be started — pulled, say, on a
+// machine without network — because pgvector storage is an opt-in backend
+// and its absence on a developer machine says nothing about the code.
+func NewPgvector(t *testing.T) DSNs {
+	t.Helper()
+	ctx := context.Background()
+	pgvectorOnce.Do(func() {
+		pgvector, pgvectorErr = startCluster(ctx, "pgvector/pgvector:pg16",
+			[]string{"../../deploy/postgres/init/02-pgvector.sql"},
+			func(ownerDSN string) error {
+				if err := db.Migrate(ownerDSN); err != nil {
+					return err
+				}
+				return db.MigratePgvector(ctx, ownerDSN)
+			})
+	})
+	if pgvectorErr != nil {
+		t.Skipf("dbtest: pgvector/pgvector:pg16 unavailable, skipping: %v", pgvectorErr)
+	}
+	return newDatabase(t, pgvector)
+}
+
+func newDatabase(t *testing.T, c cluster) DSNs {
+	t.Helper()
+	ctx := context.Background()
 	name := fmt.Sprintf("cc_test_%d", dbSequence.Add(1))
-	if err := cloneTemplate(ctx, shared, name); err != nil {
+	if err := cloneTemplate(ctx, c, name); err != nil {
 		t.Fatalf("dbtest: %v", err)
 	}
 	t.Cleanup(func() {
-		if err := dropDatabase(context.Background(), shared, name); err != nil {
+		if err := dropDatabase(context.Background(), c, name); err != nil {
 			// Logged, not fatal: the database dies with the container a
 			// few seconds later either way, and failing a test that
 			// otherwise passed because of test-harness cleanup would be
@@ -172,8 +217,8 @@ func New(t *testing.T) DSNs {
 	})
 
 	return DSNs{
-		Owner: fmt.Sprintf("postgres://cc_owner:cc_owner_dev_password@%s:%s/%s?sslmode=disable", shared.host, shared.port, name),
-		App:   fmt.Sprintf("postgres://cc_app:cc_app_dev_password@%s:%s/%s?sslmode=disable", shared.host, shared.port, name),
+		Owner: fmt.Sprintf("postgres://cc_owner:cc_owner_dev_password@%s:%s/%s?sslmode=disable", c.host, c.port, name),
+		App:   fmt.Sprintf("postgres://cc_app:cc_app_dev_password@%s:%s/%s?sslmode=disable", c.host, c.port, name),
 	}
 }
 

@@ -32,7 +32,7 @@ const PEOPLE = { "pr-a": { kind: "user", name: "Alice" } };
 
 type Call = { url: string; method: string; body?: string };
 
-function stub(calls: Call[], memory: Record<string, unknown> = MEMORY) {
+function stub(calls: Call[], memory: Record<string, unknown> = MEMORY, semantic = false) {
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string, init?: RequestInit) => {
@@ -65,12 +65,43 @@ function stub(calls: Call[], memory: Record<string, unknown> = MEMORY) {
           tags: ["webhooks"],
           assignees: ["pr-a"],
           people: PEOPLE,
+          // What the server answers without an embedding provider.
+          search_modes: semantic ? ["text", "semantic", "hybrid"] : ["text"],
+          default_search_mode: semantic ? "hybrid" : "text",
         });
       }
       if (url.includes("/memories/search")) {
+        const byMeaning = url.includes("mode=semantic");
         return json({
-          items: [{ ...memory, body: "", match: "body", snippet: "Sort by event_seq." }],
-          truncated: true,
+          items: [
+            {
+              ...memory,
+              body: "",
+              match: byMeaning ? "semantic" : "body",
+              snippet: "Sort by event_seq.",
+            },
+          ],
+          truncated: !byMeaning,
+          mode: byMeaning ? "semantic" : "text",
+          degraded: false,
+          people: PEOPLE,
+        });
+      }
+      if (url.includes("/memories/m-1/related")) {
+        return json({
+          items: [
+            {
+              ...MEMORY,
+              id: "m-2",
+              title: "Callbacks need idempotent handlers",
+              body: "",
+              match: "semantic",
+              snippet: "Retries deliver twice.",
+              score: 0.8,
+            },
+          ],
+          truncated: false,
+          mode: "semantic",
           people: PEOPLE,
         });
       }
@@ -179,5 +210,40 @@ describe("the memories tab", () => {
       tags: ["Webhooks", "queue"],
       kind: "note",
     });
+  });
+
+  it("offers no search mode and no related memories when the server has no semantic search", async () => {
+    const calls: Call[] = [];
+    stub(calls);
+    render(wrap());
+    fireEvent.click(await screen.findByRole("button", { name: "Open" }));
+    await screen.findByText("Sort by event_seq.");
+    expect(screen.queryByRole("group", { name: "Search by" })).toBeNull();
+    expect(screen.queryByText("Related memories")).toBeNull();
+    expect(calls.some((c) => c.url.includes("/related"))).toBe(false);
+  });
+
+  it("searches by meaning and shows related memories when the server has semantic search", async () => {
+    const calls: Call[] = [];
+    stub(calls, MEMORY, true);
+    render(wrap());
+    await screen.findByText("Webhook retries arrive out of order");
+
+    const modes = await screen.findByRole("group", { name: "Search by" });
+    expect(modes.querySelectorAll("button").length).toBe(3);
+    fireEvent.click(screen.getByRole("button", { name: "Similar meaning" }));
+    fireEvent.change(screen.getByLabelText("Search memories"), {
+      target: { value: "zpětné volání" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    expect(
+      await screen.findByText("Similar meaning", { selector: ".badge, .badge *" }),
+    ).toBeTruthy();
+    const search = calls.find((c) => c.url.includes("/memories/search"));
+    expect(search?.url).toContain("mode=semantic");
+
+    fireEvent.click(screen.getByRole("button", { name: "Open" }));
+    expect(await screen.findByText("Related memories")).toBeTruthy();
+    expect(await screen.findByText("Callbacks need idempotent handlers")).toBeTruthy();
   });
 });

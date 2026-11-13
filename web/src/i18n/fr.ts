@@ -1012,6 +1012,18 @@ export const fr: Partial<Record<MessageKey, string>> = {
   "memories.delete": "Supprimer",
   "memories.deleteConfirm": "Supprimer définitivement",
   "memories.save": "Enregistrer la mémoire",
+  "memories.mode": "Rechercher par",
+  "memories.mode.text": "Mots",
+  "memories.mode.semantic": "Sens proche",
+  "memories.mode.hybrid": "Les deux",
+  "memories.searchPlaceholderMeaning": "Des mots, ou décrivez ce que vous cherchez",
+  "memories.degraded":
+    "La recherche par le sens est indisponible pour le moment : ces résultats ne correspondent qu’à vos mots.",
+  "memories.match.semantic": "Sens proche",
+  "memories.related": "Mémoires liées",
+  "memories.relatedLead":
+    "Les mémoires actives les plus proches de celle-ci par le sens, comparées par leur embedding.",
+  "memories.relatedEmpty": "Aucune autre mémoire n’est proche de celle-ci par le sens.",
   "project.tab.ideas": "Idées",
   "ideas.title": "Idées",
   "ideas.lead":
