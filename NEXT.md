@@ -188,13 +188,15 @@ Only on top of a core loop people actually use:
         ([ADR 0020](docs/adr/0020-oidc-sign-up-is-off-by-default.md)): nobody,
         unless `--oidc-allow-signup`; `--oidc-allowed-domains` limits sign-in
         to verified addresses in the listed domains.
-      - [ ] **Google Workspace: `--oidc-allowed-domains` checks the address,
-        not the Workspace.** A personal Google account registered under a
-        work address stays verified after its owner leaves the Workspace, and
-        its first sign-in links to the local account by address. Requiring
-        Google's `hd` claim would close it, behind a switch named for Google,
-        as the Entra one is. Until then, [docs/oidc.md](docs/oidc.md) says to
-        disable the local account as well.
+      - [x] ~~**Google Workspace: `--oidc-allowed-domains` checks the address,
+        not the Workspace.**~~ Closed 2026-11-13
+        ([ADR 0024](docs/adr/0024-sign-in-rules-managed-by-an-administrator.md)):
+        for Google, a listed domain requires a listed `hd` too, on by default.
+      - [x] ~~**Sign-in allowlist in the administration.**~~ Added 2026-11-13
+        (ADR 0024): domains and addresses managed in the interface, each naming
+        the organizations a new account joins. Still open: a rule cannot name
+        its provider, which matters only once more than one OIDC provider is
+        configured.
       - Review findings (2026-10-27). All were low, and none was exploitable
         as configured:
         - [x] ~~The `cc_oidc` cookie is unsigned~~ Closed 2026-11-03: the

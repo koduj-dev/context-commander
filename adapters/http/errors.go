@@ -25,6 +25,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/quota"
 	"github.com/koduj-dev/context-commander/internal/secrets"
 	"github.com/koduj-dev/context-commander/internal/security"
+	"github.com/koduj-dev/context-commander/internal/signin"
 	"github.com/koduj-dev/context-commander/internal/skills"
 )
 
@@ -89,7 +90,7 @@ func writeDomainError(w http.ResponseWriter, r *http.Request, err error) {
 		errors.Is(err, organizations.ErrNotFound), errors.Is(err, handoffs.ErrNotFound), errors.Is(err, history.ErrNotFound),
 		errors.Is(err, skills.ErrNotFound), errors.Is(err, gates.ErrNotFound), errors.Is(err, secrets.ErrNotFound),
 		errors.Is(err, identity.ErrNotFound), errors.Is(err, installation.ErrNotFound),
-		errors.Is(err, contextpack.ErrNotFound), errors.Is(err, plans.ErrNotFound):
+		errors.Is(err, contextpack.ErrNotFound), errors.Is(err, plans.ErrNotFound), errors.Is(err, signin.ErrNotFound):
 		// A deleted artifact reads as "not found," not a distinct state —
 		// same reasoning as a non-member's Resolve: don't hand out more
 		// information than "you can't have this."
@@ -110,6 +111,14 @@ func writeDomainError(w http.ResponseWriter, r *http.Request, err error) {
 		writeError(w, http.StatusConflict, "conflict", "that already exists")
 	case errors.Is(err, members.ErrAlreadyMember), errors.Is(err, organizations.ErrAlreadyMember):
 		writeError(w, http.StatusConflict, "conflict", err.Error())
+	case errors.Is(err, signin.ErrDuplicate):
+		writeError(w, http.StatusConflict, "conflict", "a rule for this domain or address already exists")
+	case errors.Is(err, signin.ErrInvalidValue):
+		writeError(w, http.StatusBadRequest, "invalid_request", signin.ErrInvalidValue.Error())
+	case errors.Is(err, signin.ErrTooManyOrganizations):
+		writeError(w, http.StatusBadRequest, "invalid_request", signin.ErrTooManyOrganizations.Error())
+	case errors.Is(err, signin.ErrUnknownOrganization):
+		writeError(w, http.StatusBadRequest, "invalid_request", signin.ErrUnknownOrganization.Error())
 	case errors.Is(err, plans.ErrConflict):
 		writeError(w, http.StatusConflict, "conflict", "version conflict: the plan was changed since your expected_version")
 	case errors.Is(err, plans.ErrInvalid), errors.Is(err, plans.ErrNoClient):

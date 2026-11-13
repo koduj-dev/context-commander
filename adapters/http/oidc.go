@@ -1,12 +1,14 @@
 package http
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -16,10 +18,14 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 
+	"github.com/koduj-dev/context-commander/internal/db"
 	"github.com/koduj-dev/context-commander/internal/directory"
 	"github.com/koduj-dev/context-commander/internal/identity"
 	"github.com/koduj-dev/context-commander/internal/security"
+	"github.com/koduj-dev/context-commander/internal/signin"
 )
 
 // An OIDC sign-in attempt travels from the redirect out to the callback in a
@@ -388,15 +394,40 @@ func (d Deps) finishOIDCSignIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// The allowlist: the operator's domains and the administrator's rules
+	// are one list, applied here because neither half may refuse what the
+	// other admits (docs/adr/0024). After Exchange, so only a verified
+	// address is ever compared.
+	decision, err := d.admit(r, p.Admission(), id)
+	if err != nil {
+		slog.ErrorContext(r.Context(), "could not read the sign-in rules",
+			"err", err, "request_id", middleware.GetReqID(r.Context()))
+		signInFailed(w, r, "oidc_failed")
+		return
+	}
+	if !decision.Admitted {
+		d.oidcExchangeFailed(w, r, attempt.Provider, fmt.Errorf("%w: subject %s at provider %s",
+			directory.ErrDomainNotAllowed, id.Subject, attempt.Provider))
+		return
+	}
+
 	// Nothing about authorization happens here: a directory proves who
-	// someone is, not what they may do (docs/adr/0019).
+	// someone is, not what they may do (docs/adr/0019). The only grant is
+	// the one an administrator's rule names for an account it creates.
+	email := id.Email
 	principal, err := identity.ProvisionDirectoryUserWith(r.Context(), d.Pool, identity.DirectoryIdentity{
 		Provider:    id.Provider,
 		Subject:     id.Subject,
 		Email:       id.Email,
 		DisplayName: id.DisplayName,
 		Issuer:      id.Issuer,
-	}, identity.ProvisionPolicy{CreateMissing: p.AllowsSignup()})
+	}, identity.ProvisionPolicy{
+		CreateMissing: p.AllowsSignup() || decision.ByRule,
+		AfterCreate: func(ctx context.Context, tx pgx.Tx, userID uuid.UUID) error {
+			_, err := signin.NewStore().GrantMemberships(ctx, tx, userID, email, decision.DomainTrusted)
+			return err
+		},
+	})
 	if errors.Is(err, identity.ErrNoAccount) {
 		// Authenticated, and simply not a user here. Safe to say: only
 		// reachable after the provider proved who this is, and what they
@@ -469,4 +500,24 @@ func (d Deps) oidcExchangeFailed(w http.ResponseWriter, r *http.Request, provide
 		d.recordSignInFailure(r, "oidc sign-in was rejected by verification", security.KindAuthenticationFailed)
 		signInFailed(w, r, "oidc_failed")
 	}
+}
+
+// admit applies the sign-in allowlist to a verified identity.
+func (d Deps) admit(r *http.Request, adm directory.Admission, id directory.Identity) (signin.Decision, error) {
+	var rules []signin.Rule
+	err := db.WithoutPrincipal(r.Context(), d.Pool, func(tx pgx.Tx) error {
+		var err error
+		rules, err = signin.NewStore().List(r.Context(), tx)
+		return err
+	})
+	if err != nil {
+		return signin.Decision{}, err
+	}
+	return signin.Decide(signin.Input{
+		Email:               id.Email,
+		HostedDomain:        id.HostedDomain,
+		RequireHostedDomain: adm.RequireHostedDomain,
+		FlagDomains:         adm.Domains,
+		Rules:               rules,
+	}), nil
 }

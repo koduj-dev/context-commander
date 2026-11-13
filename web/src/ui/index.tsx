@@ -245,6 +245,37 @@ export function Seg<T extends string>({
   );
 }
 
+/** Any number of independent choices out of many, wrapping (`.picks`). */
+export function Picks<T extends string>({
+  options,
+  value,
+  onChange,
+  label,
+}: {
+  options: { value: T; label: string }[];
+  value: T[];
+  onChange: (v: T[]) => void;
+  label: string;
+}) {
+  return (
+    <span className="picks" role="group" aria-label={label}>
+      {options.map((o) => {
+        const on = value.includes(o.value);
+        return (
+          <button
+            key={o.value}
+            type="button"
+            aria-pressed={on}
+            onClick={() => onChange(on ? value.filter((v) => v !== o.value) : [...value, o.value])}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </span>
+  );
+}
+
 // ---------------------------------------------------------------- structures
 
 export function PageHead({

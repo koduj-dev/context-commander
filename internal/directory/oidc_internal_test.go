@@ -50,7 +50,7 @@ func TestDiscoveryFailureIsRememberedBriefly(t *testing.T) {
 	}
 }
 
-func TestAllowedDomainsMatchExactlyAndIgnoreCase(t *testing.T) {
+func TestAdmissionNormalizesDomainsAndAppliesHostedDomainToGoogleOnly(t *testing.T) {
 	o, err := NewOIDC(OIDCConfig{
 		IssuerURL: "https://id.example.test/realms/x", ClientID: "cc", ClientSecret: "s",
 		RedirectURL:    "https://cc.example.test/v1/auth/oidc/callback",
@@ -59,27 +59,30 @@ func TestAllowedDomainsMatchExactlyAndIgnoreCase(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cases := map[string]bool{
-		"ana@example.com":      true,
-		"ANA@EXAMPLE.COM":      true,
-		"ana@mail.example.com": false, // no subdomains
-		"ana@example.com.evil": false, // not a suffix match either
-		"ana@evilexample.com":  false,
-		"example.com":          false, // no @ at all
-		"a@b@example.com":      true,  // the domain is what follows the last @
+	adm := o.Admission()
+	if len(adm.Domains) != 1 || adm.Domains[0] != "example.com" {
+		t.Fatalf("Admission().Domains = %v, want [example.com]", adm.Domains)
 	}
-	for email, want := range cases {
-		if got := o.domainAllowed(email); got != want {
-			t.Errorf("domainAllowed(%q) = %v, want %v", email, got, want)
-		}
+	if adm.RequireHostedDomain {
+		t.Fatal("the Workspace check applies to Google only, not to every issuer")
 	}
 
-	open, _ := NewOIDC(OIDCConfig{
-		IssuerURL: "https://id.example.test/realms/x", ClientID: "cc", ClientSecret: "s",
-		RedirectURL: "https://cc.example.test/v1/auth/oidc/callback",
-	})
-	if !open.domainAllowed("anyone@anywhere.test") {
-		t.Error("with no list configured, every domain must be admitted")
+	google := func(ignore bool) Admission {
+		g, err := NewOIDC(OIDCConfig{
+			IssuerURL: googleIssuer, ClientID: "cc", ClientSecret: "s",
+			RedirectURL:              "https://cc.example.test/v1/auth/oidc/callback",
+			IgnoreGoogleHostedDomain: ignore,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return g.Admission()
+	}
+	if !google(false).RequireHostedDomain {
+		t.Fatal("Google: the Workspace check must be on by default")
+	}
+	if google(true).RequireHostedDomain {
+		t.Fatal("Google with the check turned off still requires hd")
 	}
 
 	for _, bad := range []string{"@example.com", "ana@example.com", ".example.com"} {

@@ -790,6 +790,21 @@ export type NamespaceStorage = {
   override?: "default" | "custom" | "unlimited";
 };
 
+/** An organization a sign-in rule can grant (adapters/http/signin.go). */
+export type SignInOrganization = { id: string; name: string };
+
+/**
+ * One entry of the sign-in allowlist (docs/adr/0024): a domain or an address,
+ * and the organizations a new account matching it joins.
+ */
+export type SignInRule = {
+  id: string;
+  kind: "domain" | "address";
+  value: string;
+  organizations: SignInOrganization[];
+  created_at: string;
+};
+
 export type StorageLimit =
   { kind: "default" } | { kind: "unlimited" } | { kind: "custom"; bytes: number };
 
@@ -1156,6 +1171,21 @@ export const api = {
   // Every namespace's storage, oldest first. Installation-admin only.
   installationStorage: (cursor?: string, limit?: number) =>
     request<Page<NamespaceStorage>>(withQuery("/installation/storage", { cursor, limit })),
+  // The sign-in allowlist. Installation-admin only.
+  signInRules: () => request<Page<SignInRule>>("/installation/signin-rules"),
+  signInOrganizations: () => request<Page<SignInOrganization>>("/installation/organizations"),
+  createSignInRule: (value: string, organizationIDs: string[]) =>
+    request<SignInRule>("/installation/signin-rules", {
+      method: "POST",
+      body: { value, organization_ids: organizationIDs },
+    }),
+  setSignInRuleOrganizations: (id: string, organizationIDs: string[]) =>
+    request<SignInRule>(`/installation/signin-rules/${id}/organizations`, {
+      method: "PUT",
+      body: { organization_ids: organizationIDs },
+    }),
+  deleteSignInRule: (id: string) =>
+    request<void>(`/installation/signin-rules/${id}`, { method: "DELETE" }),
   // {} puts the namespace back on the server default.
   setStorageLimit: (namespaceID: string, limit: StorageLimit) =>
     request<void>(`/installation/storage/${namespaceID}`, {

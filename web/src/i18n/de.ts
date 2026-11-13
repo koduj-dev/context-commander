@@ -768,6 +768,36 @@ export const de: Partial<Record<MessageKey, string>> = {
   "admin.storage.amount": "Menge",
   "admin.storage.unit": "Einheit",
   "admin.storage.save": "Limit speichern",
+  "admin.tab.signin": "Anmeldung",
+  "admin.signin.title": "Anmeldung",
+  "admin.signin.lead":
+    "Wer sich über Single Sign-on anmelden darf und welchen Organisationen ein neues Konto beitritt. Solange es keine Regel gibt, darf sich jeder anmelden, den der Anbieter bestätigt. Die erste Regel ändert das: Ab dann werden nur die hier aufgeführten Domains und Adressen sowie die in der Serverkonfiguration eingelassen.",
+  "admin.signin.add": "Regel hinzufügen",
+  "admin.signin.value": "Domain oder Adresse",
+  "admin.signin.valuePlaceholder": "example.com oder jemand@example.com",
+  "admin.signin.grant": "Ein neues Konto tritt diesen Organisationen bei",
+  "admin.signin.noOrganizations":
+    "Es gibt noch keine Organisationen. Legen Sie zuerst eine an, damit neue Konten ihr beitreten.",
+  "admin.signin.addButton": "Regel hinzufügen",
+  "admin.signin.rules": "Regeln",
+  "admin.signin.help":
+    "Eine Domain lässt jede bestätigte Adresse darin zu, aber nicht ihre Subdomains. Regeln werden bei jeder Anmeldung geprüft, das Entfernen einer Regel sperrt also die Personen aus, die sie zugelassen hat. Bei Google lässt eine Domain nur Konten in einem Google Workspace zu, dessen Domain ebenfalls aufgeführt ist.",
+  "admin.signin.none": "Keine Regeln",
+  "admin.signin.noneBody":
+    "Jeder, den der Single-Sign-on-Anbieter bestätigt, darf sich anmelden. Konten werden nur angelegt, wenn der Server die Registrierung erlaubt.",
+  "admin.signin.who": "Domain oder Adresse",
+  "admin.signin.organizations": "Organisationen",
+  "admin.signin.actions": "Aktionen",
+  "admin.signin.kindDomain": "Domain",
+  "admin.signin.kindAddress": "Adresse",
+  "admin.signin.grantsNothing": "Keine",
+  "admin.signin.change": "Organisationen ändern",
+  "admin.signin.changeNote":
+    "Das gilt für Konten, die ab jetzt angelegt werden. Wer bereits beigetreten ist, bleibt Mitglied.",
+  "admin.signin.save": "Speichern",
+  "admin.signin.delete": "Entfernen",
+  "admin.signin.confirmDelete":
+    "Die Regel für {value} entfernen? Personen, die sie zugelassen hat, können sich dann nicht mehr über Single Sign-on anmelden, sofern keine andere Regel sie zulässt.",
   "prefs.storage.title": "Speicher",
   "prefs.storage.help":
     "Artefaktversionen, Gesprächsverlauf und Skill-Pakete. Das Löschen eines Artefakts gibt seinen Platz frei.",

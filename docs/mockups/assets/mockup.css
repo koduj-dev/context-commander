@@ -883,6 +883,34 @@ tr:hover .copy > button,
   .solo > .page { justify-content: flex-start; padding-top: 24px; }
 }
 
+/* Picks: several independent toggles that wrap, for choosing a set (the
+   organizations a sign-in rule grants). Seg is one choice of a few and does
+   not wrap; this is any number of choices of many. Pressed state carries a
+   check mark as well as a fill, so it survives greyscale. */
+.picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.picks button {
+  border: 1px solid var(--cc-border);
+  border-radius: 5px;
+  background: var(--cc-surface-1);
+  color: var(--cc-text-secondary);
+  font: inherit;
+  font-size: 12.5px;
+  padding: 4px 11px;
+  cursor: pointer;
+}
+.picks button[aria-pressed="true"] {
+  background: var(--cc-surface-3);
+  color: var(--cc-text);
+  border-color: var(--cc-border-strong);
+}
+.picks button[aria-pressed="true"]::before {
+  content: "✓ ";
+}
+
 /* ---------- foundations page only ----------
  *
  * Everything BELOW this line documents the kit rather than being part of it,

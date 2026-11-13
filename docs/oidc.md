@@ -118,23 +118,48 @@ under **Authorized redirect URIs**. Google allows `http` only for `localhost`.
 The default scopes (`openid profile email`) are what Google needs. It sends
 `email_verified` as a boolean.
 
-- **Leave `--oidc-allow-signup` off** unless `--oidc-allowed-domains` is set.
-  With sign-up on and no domain list, anyone with a Google account can create
-  an account here.
-- **`--oidc-allowed-domains` checks the address, not the Workspace.** Google's
-  `hd` claim, which names the Workspace an account belongs to, is not read
-  ([ADR 0020](adr/0020-oidc-sign-up-is-off-by-default.md)). In most cases the
-  address's domain is equivalent, with one known exception. Someone who once
-  had a mailbox at `example.com` can keep a *personal* Google account
-  registered under that address, and Google still reports it as verified after
-  the Workspace account is gone. That person's first sign-in through the
-  personal account links by address to the local account. Removing someone
-  from Workspace is therefore not enough. Also remove or disable their account
-  here. Checking `hd` would close this, and it is listed in `NEXT.md`.
+- **Leave `--oidc-allow-signup` off.** With sign-up on and no domain list,
+  anyone with a Google account can create an account here. Use sign-in rules
+  instead (below): a rule creates accounts only for what it names.
+- **The Workspace is checked.** For Google, a listed domain admits an account
+  only when the ID token's `hd` claim, which names the account's Workspace, is
+  listed too ([ADR 0024](adr/0024-sign-in-rules-managed-by-an-administrator.md)).
+  This keeps out a *personal* Google account registered under a work address,
+  which Google keeps reporting as verified after its owner leaves the
+  Workspace. A Workspace with several domains must list each of them.
+  `--oidc-google-ignore-hosted-domain` turns the check off, and readmits those
+  accounts.
 
 This configuration has not been tested against Google itself. The flow, the
 checks and the flags are the ones tested against Keycloak. The Google-specific
 lines above come from Google's documentation, not from a test.
+
+## Sign-in rules
+
+An installation administrator can manage who may sign in under
+**Administration → Sign-in**, without touching the server's flags
+([ADR 0024](adr/0024-sign-in-rules-managed-by-an-administrator.md)):
+
+- A rule is a **domain** (`example.com`, which admits every verified address
+  in it but not its subdomains) or one **address** (`someone@example.com`).
+- Each rule names the **organizations a new account joins**. Someone whose
+  first sign-in a rule allows gets an account and becomes a member of those
+  organizations, so they see the organizations' projects straight away. A
+  rule creates accounts even with `--oidc-allow-signup` off.
+- Rules and `--oidc-allowed-domains` form one list. While neither lists
+  anything, everyone the provider verifies may sign in. **The first rule
+  changes that:** from then on only what is listed gets in, checked at every
+  sign-in.
+- A rule grants organizations only to accounts it creates. Changing or
+  removing it does not change the memberships of people who already joined.
+  Removing a rule stops the people it admitted from signing in through OIDC,
+  unless something else on the list still admits them.
+
+The same operations are available over HTTP for automation:
+`GET/POST /v1/installation/signin-rules`,
+`PUT /v1/installation/signin-rules/{id}/organizations`,
+`DELETE /v1/installation/signin-rules/{id}`, and
+`GET /v1/installation/organizations` for the organizations to choose from.
 
 ## Keycloak, for development
 

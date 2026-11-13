@@ -764,6 +764,36 @@ export const pl: Partial<Record<MessageKey, string>> = {
   "admin.storage.amount": "Ilość",
   "admin.storage.unit": "Jednostka",
   "admin.storage.save": "Zapisz limit",
+  "admin.tab.signin": "Logowanie",
+  "admin.signin.title": "Logowanie",
+  "admin.signin.lead":
+    "Kto może logować się przez logowanie jednokrotne i do których organizacji dołącza nowe konto. Dopóki nie ma żadnej reguły, zalogować się może każdy, kogo dostawca zweryfikuje. Pierwsza reguła to zmienia: od tej chwili wpuszczane są tylko domeny i adresy wymienione tutaj oraz te z konfiguracji serwera.",
+  "admin.signin.add": "Dodaj regułę",
+  "admin.signin.value": "Domena lub adres",
+  "admin.signin.valuePlaceholder": "example.com lub ktos@example.com",
+  "admin.signin.grant": "Nowe konto dołącza do tych organizacji",
+  "admin.signin.noOrganizations":
+    "Nie ma jeszcze żadnych organizacji. Najpierw utwórz jedną, aby nowe konta do niej dołączały.",
+  "admin.signin.addButton": "Dodaj regułę",
+  "admin.signin.rules": "Reguły",
+  "admin.signin.help":
+    "Domena dopuszcza każdy zweryfikowany adres w niej, ale nie jej subdomeny. Reguły są sprawdzane przy każdym logowaniu, więc usunięcie reguły odcina osoby, które dopuszczała. W przypadku Google domena dopuszcza tylko konta w Google Workspace, którego domena również jest na liście.",
+  "admin.signin.none": "Brak reguł",
+  "admin.signin.noneBody":
+    "Zalogować się może każdy, kogo zweryfikuje dostawca logowania jednokrotnego, a konta są tworzone tylko wtedy, gdy serwer zezwala na rejestrację.",
+  "admin.signin.who": "Domena lub adres",
+  "admin.signin.organizations": "Organizacje",
+  "admin.signin.actions": "Działania",
+  "admin.signin.kindDomain": "Domena",
+  "admin.signin.kindAddress": "Adres",
+  "admin.signin.grantsNothing": "Brak",
+  "admin.signin.change": "Zmień organizacje",
+  "admin.signin.changeNote":
+    "Dotyczy kont tworzonych od teraz. Osoby, które już dołączyły, pozostają członkami.",
+  "admin.signin.save": "Zapisz",
+  "admin.signin.delete": "Usuń",
+  "admin.signin.confirmDelete":
+    "Usunąć regułę dla {value}? Osoby, które dopuszczała, nie będą mogły logować się przez logowanie jednokrotne, chyba że dopuści je inna reguła.",
   "prefs.storage.title": "Przestrzeń",
   "prefs.storage.help":
     "Wersje artefaktów, historia rozmów i pakiety skilli. Usunięcie artefaktu zwalnia jego miejsce.",

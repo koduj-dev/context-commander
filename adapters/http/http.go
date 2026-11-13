@@ -211,6 +211,11 @@ func NewHandler(deps Deps) http.Handler {
 				r.Get("/principals/{id}/tokens", deps.listCredentialsFor)
 				r.Delete("/tokens/{id}", deps.revokeCredentialFor)
 				r.Get("/security-events", deps.listSecurityEvents)
+				r.Get("/signin-rules", deps.listSignInRules)
+				r.Post("/signin-rules", deps.createSignInRule)
+				r.Put("/signin-rules/{id}/organizations", deps.setSignInRuleOrganizations)
+				r.Delete("/signin-rules/{id}", deps.deleteSignInRule)
+				r.Get("/organizations", deps.listSignInOrganizations)
 			})
 
 			r.Route("/projects/{namespace}/{slug}", func(r chi.Router) {

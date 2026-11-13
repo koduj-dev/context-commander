@@ -67,6 +67,11 @@ type Identity struct {
 	// another issuer does not hand the new issuer's subjects the old one's
 	// accounts (migrations/000034).
 	Issuer string
+
+	// HostedDomain is Google's `hd` claim — the primary domain of the
+	// Workspace the account belongs to — read only from a Google issuer and
+	// empty for a personal account (docs/adr/0024).
+	HostedDomain string
 }
 
 // Authenticator is what a password-checking directory backend implements.
@@ -98,12 +103,28 @@ type RedirectAuthenticator interface {
 	// account, rather than only reach one that exists (docs/adr/0020).
 	AllowsSignup() bool
 
+	// Admission is what the operator configured about who may sign in
+	// through this provider. The caller applies it together with the
+	// administrator's rules (internal/signin), because the two lists are one
+	// allowlist and neither half may refuse what the other admits.
+	Admission() Admission
+
 	// AuthCodeURL is where to send the browser for this attempt.
 	AuthCodeURL(req AuthRequest) (string, error)
 
 	// Exchange redeems the code the provider returned and reports who
 	// signed in.
 	Exchange(ctx context.Context, cb Callback, req AuthRequest) (Identity, error)
+}
+
+// Admission is a provider's share of the sign-in allowlist.
+type Admission struct {
+	// Domains is --oidc-allowed-domains, lowercased.
+	Domains []string
+	// RequireHostedDomain is set for a Google issuer unless the operator
+	// turned it off: a domain then admits only accounts in a Workspace
+	// whose domain is listed (docs/adr/0024).
+	RequireHostedDomain bool
 }
 
 var _ RedirectAuthenticator = (*OIDC)(nil)

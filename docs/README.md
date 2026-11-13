@@ -66,6 +66,7 @@ supersedes it, so the trail of what was believed when stays readable.
 | [0021](adr/0021-storage-quotas-per-namespace.md) | Storage quotas per namespace, counted by the database |
 | [0022](adr/0022-plans-phases-and-presence.md) | Plans, phases and who is working on what |
 | [0023](adr/0023-oidc-hardening.md) | OIDC hardening: Entra's verified domains, a signed attempt cookie, the issuer beside each link |
+| [0024](adr/0024-sign-in-rules-managed-by-an-administrator.md) | Sign-in rules managed by an administrator: domains and addresses, organizations granted on creation, Google's `hd` checked |
 
 ## Not documentation
 
