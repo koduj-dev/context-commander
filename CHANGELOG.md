@@ -33,6 +33,31 @@ All notable changes to Context Commander are documented here. The format follows
 
 ### Added
 
+- **The idea stack** (docs/adr/0026). People and agents drop ideas into a
+  project; a planning agent takes them one at a time, proposes a solution
+  with a draft plan, and a person accepts or rejects it. Context Commander
+  still runs no agent: the stack is durable state an agent pulls from.
+  - **Migration 000038** adds `ideas`. Title, body, proposal and rejection
+    reason are encrypted; status, priority, order and claim metadata are
+    not. RLS as every project table, no `DELETE` for `cc_app`.
+  - **Claims are two-hour leases.** `claim_next` takes the highest-priority
+    open idea or a lapsed claim with `FOR UPDATE SKIP LOCKED`, so two agents
+    never take the same idea and a crashed agent does not hold one forever.
+  - **Accepting a proposal activates its draft plan; rejecting abandons it**
+    and may send the idea back to the queue with the reason. Both need a
+    person signed in to the interface: an agent's token is refused
+    (`needs_person`), whatever its role.
+  - New capabilities `idea.read` (every role) and `idea.write` (every role
+    that writes).
+  - MCP: `idea.add`, `idea.list`, `idea.get`, `idea.claim_next`,
+    `idea.claim`, `idea.release`, `idea.propose`. HTTP under
+    `/v1/projects/{namespace}/{slug}/ideas`. `context.bootstrap` counts what
+    waits on the stack.
+  - An **Ideas** tab per project: quick add, proposals waiting for a
+    decision, the queue with move and priority controls, what is being
+    analysed, and what was decided.
+  - `deploy/mcp-clients/planning-agent.md`, a ready prompt for the planning
+    agent, and a section for it in `docs/AGENT-GUIDE.md`.
 - **Sign-in rules, managed in the interface**
   ([ADR 0024](docs/adr/0024-sign-in-rules-managed-by-an-administrator.md)).
   Under Administration → Sign-in, an installation administrator lists the

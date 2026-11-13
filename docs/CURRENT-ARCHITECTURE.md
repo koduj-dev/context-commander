@@ -83,6 +83,7 @@ an older summary. Names and semantics come from the code, not from memory.
 | Organization audit trail (write and read) | migration 000023, `organizations.Service.QueryAudit` |
 | Conversation enumeration | `history.Service.ListConversations` |
 | Project memories with branch/ticket/assignee metadata | `internal/memories`, migration 000037, [ADR 0025](adr/0025-memories.md) |
+| Idea stack: claim leases, proposals, human-only decisions | `internal/ideas`, migration 000038, [ADR 0026](adr/0026-idea-stack.md) |
 
 ---
 
@@ -197,6 +198,8 @@ Projects
 └── <namespace>/<project>
     ├── Overview       current handoff and what came before
     ├── Context        the assembled pack an agent receives, with its budget
+    ├── Plans          phases, plans, who is on which step
+    ├── Ideas          the idea stack: proposals to decide, the queue
     ├── Artifacts      versions, content, a versioned editor
     ├── Skills         the effective set: install, override, pin
     ├── Policies       gate bindings: bind, unbind

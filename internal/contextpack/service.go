@@ -15,6 +15,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/db"
 	"github.com/koduj-dev/context-commander/internal/events"
 	"github.com/koduj-dev/context-commander/internal/handoffs"
+	"github.com/koduj-dev/context-commander/internal/ideas"
 	"github.com/koduj-dev/context-commander/internal/memories"
 	"github.com/koduj-dev/context-commander/internal/paging"
 	"github.com/koduj-dev/context-commander/internal/plans"
@@ -49,7 +50,9 @@ type Service struct {
 	// memories is optional in the same way: without it, no Memories
 	// section (docs/adr/0025).
 	memories *memories.Service
-	events   *events.Service
+	// ideas is optional the same way: without it a pack has no Ideas count.
+	ideas  *ideas.Service
+	events *events.Service
 }
 
 func NewService(
@@ -73,6 +76,12 @@ func (s *Service) WithPlans(p *plans.Service) *Service {
 // assembles.
 func (s *Service) WithMemories(m *memories.Service) *Service {
 	s.memories = m
+	return s
+}
+
+// WithIdeas adds the idea stack's counts to every pack (docs/adr/0026).
+func (s *Service) WithIdeas(i *ideas.Service) *Service {
+	s.ideas = i
 	return s
 }
 
@@ -154,6 +163,7 @@ func (s *Service) Bootstrap(ctx context.Context, principalID, projectID uuid.UUI
 	referenced := s.fillHandoff(ctx, principalID, projectID, &pack, b)
 	s.fillWork(ctx, principalID, projectID, &pack, b)
 	s.fillMemories(ctx, principalID, projectID, &pack, b)
+	s.fillIdeas(ctx, principalID, projectID, &pack, b)
 	if !opts.SkipSkills {
 		s.fillSkills(ctx, principalID, projectID, &pack, b)
 	}
@@ -345,6 +355,26 @@ func (s *Service) fillWork(ctx context.Context, principalID, projectID uuid.UUID
 		b.note("work", "board", int64(size), "included despite exceeding the budget: who is on what is needed to avoid duplicate work")
 	}
 	pack.Work = w
+}
+
+// fillIdeas counts the idea stack. Four integers, never decrypted and never
+// worth omitting, so it is charged nothing: it is smaller than the note
+// that would say it was left out.
+func (s *Service) fillIdeas(ctx context.Context, principalID, projectID uuid.UUID, pack *Pack, b *budget) {
+	if s.ideas == nil {
+		return
+	}
+	c, err := s.ideas.Counts(ctx, principalID, projectID)
+	if err != nil {
+		if !errors.Is(err, ideas.ErrForbidden) {
+			b.note("ideas", "counts", 0, reasonFor(err, "could not count the project's ideas"))
+		}
+		return
+	}
+	if c.Open == 0 && c.Claimed == 0 && c.Proposed == 0 {
+		return
+	}
+	pack.Ideas = &IdeasSection{Open: c.Open, Claimed: c.Claimed, Proposed: c.Proposed, Claimable: c.Open + c.Lapsed}
 }
 
 // fillMemories lists the newest active memories, titles and metadata only.

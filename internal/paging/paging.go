@@ -85,6 +85,7 @@ const (
 	kindTimeUUID = "tu" // (timestamp, uuid) — rows keyed by a UUID, ordered by time
 	kindSeq      = "n"  // a monotonic integer — bigserial seq/id columns
 	kindString   = "s"  // a unique text key — e.g. a secret name
+	kindRank     = "r"  // (priority, position, timestamp, uuid) — the idea queue
 )
 
 func encode(kind string, parts ...string) string {
@@ -176,4 +177,40 @@ func (o Options) DecodeString() (key string, ok bool, err error) {
 		return "", false, fmt.Errorf("%w: belongs to a different list", ErrInvalidCursor)
 	}
 	return payload, true, nil
+}
+
+// EncodeRank builds a cursor for a list ordered by a rank: a priority
+// (descending), a manual position, then (timestamp, id) to break ties. The
+// idea queue is ordered this way (internal/ideas); a timestamp-only cursor
+// would re-show or skip every idea that someone moved meanwhile.
+func EncodeRank(priority, position int, t time.Time, id uuid.UUID) string {
+	return encode(kindRank, strconv.Itoa(priority), strconv.Itoa(position), strconv.FormatInt(t.UTC().UnixNano(), 10), id.String())
+}
+
+// DecodeRank reads a cursor built by EncodeRank.
+func (o Options) DecodeRank() (priority, position int, t time.Time, id uuid.UUID, ok bool, err error) {
+	if o.Cursor == "" {
+		return 0, 0, time.Time{}, uuid.Nil, false, nil
+	}
+	parts, err := decode(o.Cursor, kindRank, 4)
+	if err != nil {
+		return 0, 0, time.Time{}, uuid.Nil, false, err
+	}
+	bad := func(what string) (int, int, time.Time, uuid.UUID, bool, error) {
+		return 0, 0, time.Time{}, uuid.Nil, false, fmt.Errorf("%w: bad %s", ErrInvalidCursor, what)
+	}
+	if priority, err = strconv.Atoi(parts[0]); err != nil {
+		return bad("priority")
+	}
+	if position, err = strconv.Atoi(parts[1]); err != nil {
+		return bad("position")
+	}
+	nanos, err := strconv.ParseInt(parts[2], 10, 64)
+	if err != nil {
+		return bad("timestamp")
+	}
+	if id, err = uuid.Parse(parts[3]); err != nil {
+		return bad("id")
+	}
+	return priority, position, time.Unix(0, nanos).UTC(), id, true, nil
 }

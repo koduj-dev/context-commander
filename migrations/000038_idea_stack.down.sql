@@ -1,0 +1,2 @@
+DROP TRIGGER IF EXISTS ideas_storage ON ideas;
+DROP TABLE IF EXISTS ideas;

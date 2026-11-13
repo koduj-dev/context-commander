@@ -694,7 +694,12 @@ feature.
 
 ## 🧭 Deliberately not doing
 
-- **No agent runtime, planner, scheduler or task queue of our own.**
+- **No agent runtime, planner or scheduler of our own.** Refined
+  2026-11-13 by the maintainer: Context Commander now *holds* a stack of
+  ideas a planning agent pulls from (docs/adr/0026), with claims so two
+  agents never take the same one. It still runs nothing — no scheduler, no
+  agent runtime, no push to agents. What starts the planning agent is the
+  operator's business, outside this server.
 - **No further domain types** until the current ones form a finished workflow.
 - **No large web UI** before the CLI/MCP core loop is validated.
 - **Not selling this as general "memory for AI".** Project memories

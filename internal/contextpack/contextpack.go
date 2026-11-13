@@ -121,6 +121,12 @@ type Pack struct {
 	// with memory.search. Nil when the project has none.
 	Memories *MemoriesSection `json:"memories,omitempty"`
 
+	// Ideas counts what waits on the project's idea stack (docs/adr/0026):
+	// counts only, nothing decrypted, so it costs a few bytes. A planning
+	// agent reads it to know whether idea.claim_next has anything for it.
+	// Nil when nothing waits.
+	Ideas *IdeasSection `json:"ideas,omitempty"`
+
 	Artifacts []ArtifactSection `json:"artifacts"`
 	Skills    []SkillSection    `json:"skills"`
 	Events    EventsSection     `json:"events"`
@@ -264,6 +270,16 @@ type WorkPresence struct {
 
 // MaxWorkEntries caps each list in WorkSection.
 const MaxWorkEntries = 10
+
+// IdeasSection is how many ideas wait at each live stage. Claimable is
+// what idea.claim_next would hand out now: open ideas plus claims whose
+// lease lapsed.
+type IdeasSection struct {
+	Open      int `json:"open"`
+	Claimed   int `json:"claimed"`
+	Proposed  int `json:"proposed"`
+	Claimable int `json:"claimable"`
+}
 
 // MaxMemoryEntries caps MemoriesSection. Enough to show what kind of
 // things the team records and what is recent; memory.search is the way in

@@ -153,6 +153,34 @@ the artifacts you touched.
 
 ---
 
+## If you are the planning agent
+
+Some projects keep an **idea stack**: tasks and thoughts people and agents
+dropped in for later (docs/adr/0026). If you were started to work through
+it, your job is to propose, not to build. One idea per run:
+
+1. `idea.claim_next`. `claimed: false` means nothing is waiting — stop, do
+   not poll. `resumed: true` means you already held this idea; carry on.
+2. `idea.get` for the whole idea. A `rejection` means a person sent an
+   earlier proposal back; your proposal must answer that reason.
+3. Read the context: `context.bootstrap`, then `plan.board`, then whatever
+   artifacts or files the idea points to.
+4. Analyse, then `idea.propose` with your proposal in Markdown and a draft
+   plan of the steps.
+5. **Stop.** A person accepts or rejects the proposal; the draft plan becomes
+   the work only when they accept. Never start implementing it yourself.
+
+Your claim is a two-hour lease: call `idea.claim` again to renew it if you
+run long, and `idea.release` if you cannot finish. `not_claimant` means your
+lease lapsed and another agent took the idea — stand down. You cannot accept
+or reject proposals; the server refuses that from any agent.
+
+Any agent may drop an idea with `idea.add` — something worth doing that is
+not yours to do now. A ready prompt for a planning agent is in
+`deploy/mcp-clients/planning-agent.md`.
+
+---
+
 ## Skills: instructions the project expects you to follow
 
 `context.bootstrap` returns the content of the project's effective skills.
@@ -202,7 +230,9 @@ them according to that person's preferences. Pass them along as they are.
 | What you see | What it means | What to do |
 |---|---|---|
 | conflict on write | the artifact moved since you read it | re-read, merge, retry |
-| already claimed | another client took the handoff | check `claimed_by_you`; if false, stand down |
+| already claimed | another client took the handoff or idea | check `claimed_by_you`; if false, stand down |
+| not claimant | your idea claim lapsed and another agent took it | stop; do not propose |
+| needs person | accepting or rejecting a proposal | a person decides in the interface; not yours to do |
 | forbidden | your role lacks the capability | report it; do not route around it |
 | not found on a skill version | it exists but is not visible at your scope | ask whoever owns it to promote it |
 | checksum mismatch | stored content no longer matches what was published | stop; this is a supply-chain event, not a transient error |

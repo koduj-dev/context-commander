@@ -365,6 +365,12 @@ func (s *Service) MyPresence(ctx context.Context, principalID uuid.UUID) ([]Pres
 	return out, people, nil
 }
 
+// ResolvePeople is resolvePeople for internal/ideas, whose screen names the
+// same principals the board does and should name them the same way.
+func ResolvePeople(ctx context.Context, tx pgx.Tx, ids map[uuid.UUID]bool) (map[uuid.UUID]Person, error) {
+	return resolvePeople(ctx, tx, ids)
+}
+
 // resolvePeople names principals: a user's display name or email, an agent's
 // name.
 func resolvePeople(ctx context.Context, tx pgx.Tx, ids map[uuid.UUID]bool) (map[uuid.UUID]Person, error) {

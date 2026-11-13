@@ -45,6 +45,16 @@ var expectedTools = []string{
 	"history.get_lineage",
 	"history.list_conversations",
 	"history.list_objects",
+	"idea.add",
+	"idea.claim",
+	"idea.claim_next",
+	"idea.get",
+	"idea.list",
+	"idea.propose",
+	"idea.release",
+	// No idea.accept or idea.reject, deliberately: deciding on a proposal
+	// is a person's call, made in the interface with a browser session
+	// (docs/adr/0026). An agent holding its user's token is not that person.
 	"installation.create_service_principal",
 	"installation.create_user",
 	"installation.issue_token",

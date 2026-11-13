@@ -317,8 +317,35 @@ func (s *Service) CreatePlan(
 	ctx context.Context, principalID uuid.UUID, clientID *uuid.UUID, projectID uuid.UUID,
 	phaseID *uuid.UUID, title, body string, items []NewItem,
 ) (Plan, error) {
+	var p Plan
+	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+		var err error
+		p, err = s.CreatePlanInTx(ctx, tx, principalID, clientID, projectID, phaseID, PlanActive, title, body, items)
+		return err
+	})
+	if err != nil {
+		return Plan{}, fmt.Errorf("plans: create plan: %w", quota.Translate(err))
+	}
+	s.changes.publish(projectID, false)
+	return p, nil
+}
+
+// CreatePlanInTx is CreatePlan inside a transaction the caller owns, with
+// the status chosen by the caller. It exists for internal/ideas, whose
+// proposal and its draft plan must be one commit: a proposal pointing at a
+// plan that was never written, or a draft plan no idea knows about, are both
+// states nobody could clean up by looking. It still checks CapPlanWrite
+// itself, before its first query (docs/adr/0014). The caller calls
+// NotifyChanged after its commit.
+func (s *Service) CreatePlanInTx(
+	ctx context.Context, tx pgx.Tx, principalID uuid.UUID, clientID *uuid.UUID, projectID uuid.UUID,
+	phaseID *uuid.UUID, status, title, body string, items []NewItem,
+) (Plan, error) {
 	if err := s.checkCapability(ctx, principalID, projectID, auth.CapPlanWrite); err != nil {
 		return Plan{}, err
+	}
+	if !validPlanStatus(status) {
+		return Plan{}, invalid("plan status %q is not one of draft, active, done, abandoned", status)
 	}
 	title = strings.TrimSpace(title)
 	if title == "" {
@@ -329,7 +356,7 @@ func (s *Service) CreatePlan(
 	}
 
 	p := Plan{
-		ID: uuid.New(), ProjectID: projectID, PhaseID: phaseID, Status: PlanActive, Version: 1,
+		ID: uuid.New(), ProjectID: projectID, PhaseID: phaseID, Status: status, Version: 1,
 		Title: title, Body: body, CreatedBy: principalID, CreatedByClient: clientID,
 	}
 	blob := planBlob{Title: title, Body: body, Items: map[uuid.UUID]itemBlob{}}
@@ -343,37 +370,61 @@ func (s *Service) CreatePlan(
 		p.Items = append(p.Items, item)
 	}
 
-	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
-		if err := s.checkPhase(ctx, tx, projectID, phaseID); err != nil {
-			return err
-		}
-		e, err := s.seal(ctx, tx, projectID, "plan", p.ID, p.Version, blob)
-		if err != nil {
-			return err
-		}
-		if err := tx.QueryRow(ctx,
-			`INSERT INTO plans (id, project_id, phase_id, status, version, ciphertext, nonce, wrapped_dek, project_key_version, created_by_principal, created_by_client)
-			 VALUES ($1, $2, $3, $4, 1, $5, $6, $7, $8, $9, $10) RETURNING created_at, updated_at`,
-			p.ID, projectID, phaseID, p.Status, e.ciphertext, e.nonce, e.wrappedDEK, e.keyVersion, principalID, clientID,
-		).Scan(&p.CreatedAt, &p.UpdatedAt); err != nil {
-			return err
-		}
-		for i := range p.Items {
-			if err := insertItem(ctx, tx, projectID, &p.Items[i]); err != nil {
-				return err
-			}
-		}
-		return audit.Write(ctx, tx, audit.Entry{
-			ProjectID: &projectID, PrincipalID: &principalID, ClientID: clientID,
-			Action: "plan.create", ResourceType: "plan", ResourceID: &p.ID, Result: audit.ResultAllow,
-		})
-	})
-	if err != nil {
-		return Plan{}, fmt.Errorf("plans: create plan: %w", quota.Translate(err))
+	if err := s.checkPhase(ctx, tx, projectID, phaseID); err != nil {
+		return Plan{}, err
 	}
-	s.changes.publish(projectID, false)
+	e, err := s.seal(ctx, tx, projectID, "plan", p.ID, p.Version, blob)
+	if err != nil {
+		return Plan{}, err
+	}
+	if err := tx.QueryRow(ctx,
+		`INSERT INTO plans (id, project_id, phase_id, status, version, ciphertext, nonce, wrapped_dek, project_key_version, created_by_principal, created_by_client)
+		 VALUES ($1, $2, $3, $4, 1, $5, $6, $7, $8, $9, $10) RETURNING created_at, updated_at`,
+		p.ID, projectID, phaseID, p.Status, e.ciphertext, e.nonce, e.wrappedDEK, e.keyVersion, principalID, clientID,
+	).Scan(&p.CreatedAt, &p.UpdatedAt); err != nil {
+		return Plan{}, err
+	}
+	for i := range p.Items {
+		if err := insertItem(ctx, tx, projectID, &p.Items[i]); err != nil {
+			return Plan{}, err
+		}
+	}
+	if err := audit.Write(ctx, tx, audit.Entry{
+		ProjectID: &projectID, PrincipalID: &principalID, ClientID: clientID,
+		Action: "plan.create", ResourceType: "plan", ResourceID: &p.ID, Result: audit.ResultAllow,
+	}); err != nil {
+		return Plan{}, err
+	}
 	return p, nil
 }
+
+// SetStatusInTx moves a plan to status, but only from one of from; a plan in
+// any other status, or gone, is left alone and reported as moved=false. For
+// internal/ideas: accepting a proposal activates its draft plan and
+// rejecting one abandons it, in the decision's own transaction, and a
+// person who already started or finished that plan by hand is not
+// overruled. Checks CapPlanWrite itself; the caller calls NotifyChanged.
+func (s *Service) SetStatusInTx(ctx context.Context, tx pgx.Tx, principalID, projectID, planID uuid.UUID, from []string, status string) (moved bool, err error) {
+	if err := s.checkCapability(ctx, principalID, projectID, auth.CapPlanWrite); err != nil {
+		return false, err
+	}
+	if !validPlanStatus(status) {
+		return false, invalid("plan status %q is not one of draft, active, done, abandoned", status)
+	}
+	tag, err := tx.Exec(ctx,
+		`UPDATE plans SET status = $3, updated_at = now() WHERE id = $1 AND project_id = $2 AND status = ANY($4)`,
+		planID, projectID, status, from)
+	if err != nil {
+		return false, fmt.Errorf("plans: set status: %w", err)
+	}
+	return tag.RowsAffected() == 1, nil
+}
+
+// NotifyChanged tells the project's open board streams that something they
+// show changed. For callers that wrote through an *InTx method, after their
+// commit. internal/ideas also calls it for idea changes, so the Ideas screen
+// holds the board's stream instead of opening a second one per project.
+func (s *Service) NotifyChanged(projectID uuid.UUID) { s.changes.publish(projectID, false) }
 
 func insertItem(ctx context.Context, tx pgx.Tx, projectID uuid.UUID, it *Item) error {
 	return tx.QueryRow(ctx,

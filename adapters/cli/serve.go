@@ -31,6 +31,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/gates"
 	"github.com/koduj-dev/context-commander/internal/handoffs"
 	"github.com/koduj-dev/context-commander/internal/history"
+	"github.com/koduj-dev/context-commander/internal/ideas"
 	"github.com/koduj-dev/context-commander/internal/identity"
 	"github.com/koduj-dev/context-commander/internal/installation"
 	"github.com/koduj-dev/context-commander/internal/members"
@@ -179,6 +180,8 @@ func newServeCmd() *cobra.Command {
 			contextSvc.WithPlans(plansSvc)
 			memoriesSvc := memories.NewService(pool, cryptoProvider, authz)
 			contextSvc.WithMemories(memoriesSvc)
+			ideasSvc := ideas.NewService(pool, cryptoProvider, authz, plansSvc)
+			contextSvc.WithIdeas(ideasSvc)
 
 			// Structured logs to stderr. JSON by default: these lines are
 			// meant to be shipped and queried (CRA Annex I expects security
@@ -334,7 +337,7 @@ func newServeCmd() *cobra.Command {
 				Events: eventsSvc, Organizations: orgSvc, Audit: auditSvc,
 				Handoffs: handoffsSvc, History: historySvc,
 				Skills: skillsSvc, Gates: gatesAdmin, Secrets: secretsSvc,
-				Installation: installationSvc, ContextPack: contextSvc, Plans: plansSvc, Memories: memoriesSvc,
+				Installation: installationSvc, ContextPack: contextSvc, Plans: plansSvc, Memories: memoriesSvc, Ideas: ideasSvc,
 				Security: securityRec, Limiter: limiter,
 			}))
 			mux.Handle("/", cchttp.NewHandler(cchttp.Deps{
@@ -342,7 +345,7 @@ func newServeCmd() *cobra.Command {
 				Events: eventsSvc, Organizations: orgSvc, Audit: auditSvc,
 				Handoffs: handoffsSvc, History: historySvc,
 				Skills: skillsSvc, Gates: gatesAdmin, Secrets: secretsSvc,
-				Installation: installationSvc, ContextPack: contextSvc, Plans: plansSvc, Memories: memoriesSvc,
+				Installation: installationSvc, ContextPack: contextSvc, Plans: plansSvc, Memories: memoriesSvc, Ideas: ideasSvc,
 				Security: securityRec, Limiter: limiter, SecurityEvents: securitySvc,
 				FirstRun: firstRunCode,
 				// Nil unless --ldap-url was given, and a nil Directory is what

@@ -18,17 +18,19 @@ import (
 // uuid.UUID reflects as a [16]byte array despite marshaling as a string —
 // the mismatch fails the SDK's own output validation (adapters/mcp/mcp_test.go).
 type contextPackResult struct {
-	Project      contextProjectResult    `json:"project"`
-	Role         string                  `json:"role"`
-	Capabilities []string                `json:"capabilities"`
-	Handoff      *contextHandoffResult   `json:"handoff,omitempty"`
-	Work         *contextWorkResult      `json:"work,omitempty"`
-	Memories     *contextMemoriesResult  `json:"memories,omitempty"`
-	Artifacts    []contextArtifactResult `json:"artifacts"`
-	Skills       []contextSkillResult    `json:"skills"`
-	Events       contextEventsResult     `json:"events"`
-	Budget       contextBudgetResult     `json:"budget"`
-	AssembledAt  string                  `json:"assembled_at"`
+	Project      contextProjectResult   `json:"project"`
+	Role         string                 `json:"role"`
+	Capabilities []string               `json:"capabilities"`
+	Handoff      *contextHandoffResult  `json:"handoff,omitempty"`
+	Work         *contextWorkResult     `json:"work,omitempty"`
+	Memories     *contextMemoriesResult `json:"memories,omitempty"`
+	// Ideas has no IDs to restate, so the domain type travels as it is.
+	Ideas       *contextpack.IdeasSection `json:"ideas,omitempty"`
+	Artifacts   []contextArtifactResult   `json:"artifacts"`
+	Skills      []contextSkillResult      `json:"skills"`
+	Events      contextEventsResult       `json:"events"`
+	Budget      contextBudgetResult       `json:"budget"`
+	AssembledAt string                    `json:"assembled_at"`
 }
 
 // contextWorkResult is contextpack.WorkSection with string IDs.
@@ -180,6 +182,7 @@ func toContextPackResult(p contextpack.Pack, thisClientID uuid.UUID) contextPack
 		AssembledAt: p.AssembledAt.Format(rfc3339),
 		Work:        toContextWork(p.Work),
 		Memories:    toContextMemories(p.Memories),
+		Ideas:       p.Ideas,
 	}
 	if p.Handoff != nil {
 		h := contextHandoffResult{
