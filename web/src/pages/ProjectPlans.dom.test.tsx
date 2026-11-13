@@ -134,10 +134,45 @@ const PLAN = {
 
 type Call = { url: string; method: string; body?: string };
 
+const SENT = [
+  {
+    id: "m-1",
+    from: "pr-me",
+    audience: "session",
+    to_principal: "pr-agent",
+    to_client: "c-1",
+    body: "Use staging, not production.",
+    created_at: now,
+    expires_at: now,
+    expired: false,
+    deliveries: [
+      {
+        client_id: "c-1",
+        client_type: "codex",
+        principal_id: "pr-agent",
+        delivered_at: now,
+        acked_at: now,
+      },
+    ],
+  },
+  {
+    id: "m-2",
+    from: "pr-me",
+    audience: "project",
+    body: "Freeze the schema.",
+    created_at: now,
+    expires_at: now,
+    expired: false,
+    deliveries: [],
+  },
+];
+
 type StubOptions = {
   /** The board's event stream; absent, it is refused as a server without one would. */
   events?: () => ReadableStream<Uint8Array>;
   plan?: typeof PLAN;
+  /** What GET …/messages returns: the messages the reader sent. */
+  sent?: unknown[];
 };
 
 function stub(calls: Call[], opts: StubOptions = {}) {
@@ -186,6 +221,10 @@ function stub(calls: Call[], opts: StubOptions = {}) {
       if (url.includes("/plans/items/") && method === "PATCH")
         return json({ ...PLAN.items[0], status: "in_progress" });
       if (url.endsWith("/plans/presence") && method === "POST") return json(BOARD.presence[0]);
+      if (url.endsWith("/acme/work/messages") && method === "POST")
+        return new Response(JSON.stringify(SENT[0]), { status: 201 });
+      if (url.includes("/acme/work/messages"))
+        return json({ items: opts.sent ?? [], people: BOARD.people });
       return new Response("{}", { status: 404 });
     }),
   );
@@ -382,5 +421,69 @@ describe("progress", () => {
       percent: 50,
     });
     expect(progress({ open: 0, in_progress: 0, done: 0, blocked: 0, skipped: 2 }).percent).toBe(0);
+  });
+
+  it("sends a message to an agent working on the project, and to everyone", async () => {
+    const calls: Call[] = [];
+    stub(calls);
+    render(wrap());
+
+    const row = (await waitFor(() => screen.getByText("Codex at home"))).closest("tr")!;
+    fireEvent.click(within(row).getByLabelText("Send a message to this agent"));
+    expect(screen.getByText("To Codex at home (codex)")).toBeTruthy();
+    const send = screen.getByText("Send") as HTMLButtonElement;
+    expect(send.disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText("Message"), {
+      target: { value: "Use staging, not production." },
+    });
+    fireEvent.click(send);
+    await waitFor(() =>
+      expect(calls.some((c) => c.method === "POST" && c.url.endsWith("/messages"))).toBe(true),
+    );
+    const post = calls.find((c) => c.method === "POST" && c.url.endsWith("/messages"))!;
+    expect(JSON.parse(post.body!)).toEqual({
+      body: "Use staging, not production.",
+      to_client: "c-1",
+    });
+    await waitFor(() => expect(screen.queryByText("To Codex at home (codex)")).toBeNull());
+
+    fireEvent.click(screen.getByText("Message everyone"));
+    expect(screen.getByText("To everyone working on this project")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Message"), { target: { value: "Freeze the schema." } });
+    fireEvent.click(screen.getByText("Send"));
+    await waitFor(() =>
+      expect(calls.filter((c) => c.method === "POST" && c.url.endsWith("/messages")).length).toBe(
+        2,
+      ),
+    );
+    const broadcast = calls.filter((c) => c.method === "POST" && c.url.endsWith("/messages"))[1];
+    expect(JSON.parse(broadcast!.body!)).toEqual({ body: "Freeze the schema." });
+  });
+
+  it("lists sent messages with whether they were delivered and acknowledged", async () => {
+    stub([], { sent: SENT });
+    render(wrap());
+
+    const acked = (await waitFor(() => screen.getByText("Use staging, not production."))).closest(
+      "tr",
+    )!;
+    expect(within(acked).getByText("Codex at home · one session")).toBeTruthy();
+    expect(within(acked).getByText("Acknowledged: 1 session")).toBeTruthy();
+    const waiting = screen.getByText("Freeze the schema.").closest("tr")!;
+    expect(within(waiting).getByText("Everyone on the project")).toBeTruthy();
+    expect(within(waiting).getByText("Waiting")).toBeTruthy();
+  });
+
+  it("offers no message to a browser session", async () => {
+    stub([]);
+    const browser = { ...BOARD.presence[0]!, client_id: "c-2", client_type: "session" };
+    BOARD.presence.push(browser);
+    try {
+      render(wrap());
+      await waitFor(() => screen.getAllByText("Codex at home"));
+      expect(screen.getAllByLabelText("Send a message to this agent").length).toBe(1);
+    } finally {
+      BOARD.presence.pop();
+    }
   });
 });

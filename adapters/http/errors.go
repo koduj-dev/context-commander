@@ -20,6 +20,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/installation"
 	"github.com/koduj-dev/context-commander/internal/members"
 	"github.com/koduj-dev/context-commander/internal/memories"
+	"github.com/koduj-dev/context-commander/internal/messages"
 	"github.com/koduj-dev/context-commander/internal/organizations"
 	"github.com/koduj-dev/context-commander/internal/paging"
 	"github.com/koduj-dev/context-commander/internal/plans"
@@ -93,7 +94,7 @@ func writeDomainError(w http.ResponseWriter, r *http.Request, err error) {
 		errors.Is(err, skills.ErrNotFound), errors.Is(err, gates.ErrNotFound), errors.Is(err, secrets.ErrNotFound),
 		errors.Is(err, identity.ErrNotFound), errors.Is(err, installation.ErrNotFound),
 		errors.Is(err, contextpack.ErrNotFound), errors.Is(err, plans.ErrNotFound), errors.Is(err, signin.ErrNotFound),
-		errors.Is(err, memories.ErrNotFound), errors.Is(err, ideas.ErrNotFound):
+		errors.Is(err, memories.ErrNotFound), errors.Is(err, ideas.ErrNotFound), errors.Is(err, messages.ErrNotFound):
 		// A deleted artifact reads as "not found," not a distinct state —
 		// same reasoning as a non-member's Resolve: don't hand out more
 		// information than "you can't have this."
@@ -103,8 +104,12 @@ func writeDomainError(w http.ResponseWriter, r *http.Request, err error) {
 		errors.Is(err, skills.ErrForbidden), errors.Is(err, gates.ErrForbidden), errors.Is(err, secrets.ErrForbidden),
 		errors.Is(err, installation.ErrForbidden), errors.Is(err, members.ErrForbidden),
 		errors.Is(err, contextpack.ErrForbidden), errors.Is(err, security.ErrForbidden), errors.Is(err, plans.ErrForbidden),
-		errors.Is(err, memories.ErrForbidden):
+		errors.Is(err, memories.ErrForbidden), errors.Is(err, messages.ErrForbidden):
 		writeError(w, http.StatusForbidden, "forbidden", "forbidden")
+	case errors.Is(err, messages.ErrNeedsPerson):
+		writeError(w, http.StatusForbidden, "needs_person", messages.ErrNeedsPerson.Error())
+	case errors.Is(err, messages.ErrInvalid), errors.Is(err, messages.ErrNoClient):
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
 	case errors.Is(err, ideas.ErrNeedsPerson):
 		// Its own code: the interface explains it differently from a role
 		// the caller lacks, and an agent must not read it as one to retry.

@@ -55,6 +55,12 @@ var expectedTools = []string{
 	// No idea.accept or idea.reject, deliberately: deciding on a proposal
 	// is a person's call, made in the interface with a browser session
 	// (docs/adr/0026). An agent holding its user's token is not that person.
+	"inbox.ack",
+	"inbox.next",
+	// No inbox.send, deliberately: a message is read by an agent as its
+	// user speaking, so only a person in the interface sends one
+	// (docs/adr/0032). An agent that could send could instruct another
+	// agent in a person's name.
 	"installation.create_service_principal",
 	"installation.create_user",
 	"installation.issue_token",

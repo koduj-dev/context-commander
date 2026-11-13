@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useT } from "../i18n";
 import { useCrumbs } from "../app/crumbs";
@@ -15,6 +16,7 @@ import { roleLabel } from "../lib/labels";
 import { useLive } from "../lib/live";
 import { usePolled, useResource } from "../lib/resource";
 import { BOARD_REFRESH_MS, LIVE_REFRESH_MS, PresenceTable } from "./ProjectPlans";
+import { MessageComposer, type MessageTarget } from "./AgentMessages";
 import { lastDays, UsageFooter, UsageTable } from "./Usage";
 import {
   Badge,
@@ -26,6 +28,7 @@ import {
   Kpi,
   Loading,
   Mono,
+  Note,
   PageHead,
   Panel,
   Stack,
@@ -238,10 +241,26 @@ function WorkingNow() {
     live.live ? LIVE_REFRESH_MS : BOARD_REFRESH_MS,
     live.pulse,
   );
+  const [messageTo, setMessageTo] = useState<MessageTarget>();
+  const [sent, setSent] = useState(false);
   return (
     <Panel
       title={t("dashboard.workingNow")}
       sub={live.live ? t("plans.live") : t("plans.refreshes")}
+      footer={
+        messageTo ? (
+          <MessageComposer
+            target={messageTo}
+            onSent={() => {
+              setMessageTo(undefined);
+              setSent(true);
+            }}
+            onCancel={() => setMessageTo(undefined)}
+          />
+        ) : sent ? (
+          <Note tone="info">{t("messages.sentNote")}</Note>
+        ) : undefined
+      }
       tight
     >
       {presence.loading ? (
@@ -249,7 +268,20 @@ function WorkingNow() {
       ) : presence.error || !presence.data ? (
         <ErrorState error={presence.error} onRetry={presence.reload} />
       ) : (
-        <PresenceTable items={presence.data.items} people={presence.data.people} showProject />
+        <PresenceTable
+          items={presence.data.items}
+          people={presence.data.people}
+          showProject
+          onMessage={(p) => {
+            setSent(false);
+            setMessageTo({
+              kind: "session",
+              project: p.project,
+              presence: p,
+              person: presence.data?.people[p.principal_id],
+            });
+          }}
+        />
       )}
     </Panel>
   );

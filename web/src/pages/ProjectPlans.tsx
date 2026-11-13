@@ -40,6 +40,7 @@ import {
   TextField,
 } from "../ui";
 import { useProject } from "./ProjectLayout";
+import { canMessage, MessageComposer, SentMessages, type MessageTarget } from "./AgentMessages";
 
 /** How often the board refreshes while it is on screen and no stream is open. */
 export const BOARD_REFRESH_MS = 10_000;
@@ -80,6 +81,9 @@ export function ProjectPlans() {
   const [params] = useSearchParams();
   const linkedPlan = params.get("plan") ?? undefined;
   const linkedItem = params.get("item") ?? undefined;
+  const [messageTo, setMessageTo] = useState<MessageTarget>();
+  const [sentNonce, setSentNonce] = useState(0);
+  const projectPath = `${namespace}/${slug}`;
 
   if (board.loading) return <Loading />;
   if (board.error || !board.data) return <ErrorState error={board.error} onRetry={board.reload} />;
@@ -96,10 +100,41 @@ export function ProjectPlans() {
         <Panel
           title={t("plans.workingNow")}
           sub={live.live ? t("plans.live") : t("plans.refreshes")}
+          right={
+            b.presence.some(canMessage) ? (
+              <Btn small onClick={() => setMessageTo({ kind: "project", project: projectPath })}>
+                {t("messages.everyone")}
+              </Btn>
+            ) : undefined
+          }
           tight
         >
-          <PresenceTable items={b.presence} people={b.people} />
+          <PresenceTable
+            items={b.presence}
+            people={b.people}
+            onMessage={(p) =>
+              setMessageTo({
+                kind: "session",
+                project: projectPath,
+                presence: p,
+                person: b.people[p.principal_id],
+              })
+            }
+          />
         </Panel>
+        {messageTo && (
+          <Panel>
+            <MessageComposer
+              target={messageTo}
+              onSent={() => {
+                setMessageTo(undefined);
+                setSentNonce((n) => n + 1);
+              }}
+              onCancel={() => setMessageTo(undefined)}
+            />
+          </Panel>
+        )}
+        <SentMessages namespace={namespace} slug={slug} pulse={live.pulse + sentNonce} />
 
         {b.blocked.length > 0 && (
           <Panel title={t("plans.blockedTitle", { count: b.blocked.length })} tight>
@@ -160,10 +195,13 @@ export function PresenceTable({
   items,
   people,
   showProject,
+  onMessage,
 }: {
   items: Presence[];
   people: Record<string, Person>;
   showProject?: boolean;
+  /** Offers "Message" on every agent session's row (docs/adr/0032). */
+  onMessage?: (p: Presence) => void;
 }) {
   const t = useT();
   const f = useFormat();
@@ -176,6 +214,7 @@ export function PresenceTable({
         { key: "who", label: t("plans.column.who") },
         { key: "where", label: t("plans.column.where") },
         { key: "seen", label: t("plans.column.seen"), align: "r" },
+        ...(onMessage ? [{ key: "message", align: "r" as const }] : []),
       ]}
     >
       {items.map((p) => {
@@ -229,6 +268,15 @@ export function PresenceTable({
                 </Badge>
               )}
             </td>
+            {onMessage && (
+              <td className="r">
+                {canMessage(p) && (
+                  <Btn small label={t("messages.messageLabel")} onClick={() => onMessage(p)}>
+                    {t("messages.message")}
+                  </Btn>
+                )}
+              </td>
+            )}
           </tr>
         );
       })}

@@ -38,6 +38,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/installation"
 	"github.com/koduj-dev/context-commander/internal/members"
 	"github.com/koduj-dev/context-commander/internal/memories"
+	"github.com/koduj-dev/context-commander/internal/messages"
 	"github.com/koduj-dev/context-commander/internal/organizations"
 	"github.com/koduj-dev/context-commander/internal/plans"
 	"github.com/koduj-dev/context-commander/internal/projects"
@@ -206,6 +207,7 @@ func newServeCmd() *cobra.Command {
 			memoriesSvc := memories.NewService(pool, cryptoProvider, authz)
 			contextSvc.WithMemories(memoriesSvc)
 			ideasSvc := ideas.NewService(pool, cryptoProvider, authz, plansSvc)
+			messagesSvc := messages.NewService(pool, cryptoProvider, authz, plansSvc)
 			contextSvc.WithIdeas(ideasSvc)
 
 			// Read before the logger is set up and before anything listens,
@@ -428,7 +430,7 @@ func newServeCmd() *cobra.Command {
 				Events: eventsSvc, Organizations: orgSvc, Audit: auditSvc,
 				Handoffs: handoffsSvc, History: historySvc,
 				Skills: skillsSvc, Gates: gatesAdmin, Secrets: secretsSvc,
-				Installation: installationSvc, ContextPack: contextSvc, Plans: plansSvc, Memories: memoriesSvc, Ideas: ideasSvc,
+				Installation: installationSvc, ContextPack: contextSvc, Plans: plansSvc, Memories: memoriesSvc, Ideas: ideasSvc, Messages: messagesSvc,
 				Security: securityRec, Limiter: limiter,
 			}))
 			mux.Handle("/", cchttp.NewHandler(cchttp.Deps{
@@ -436,7 +438,7 @@ func newServeCmd() *cobra.Command {
 				Events: eventsSvc, Organizations: orgSvc, Audit: auditSvc,
 				Handoffs: handoffsSvc, History: historySvc,
 				Skills: skillsSvc, Gates: gatesAdmin, Secrets: secretsSvc,
-				Installation: installationSvc, ContextPack: contextSvc, Plans: plansSvc, Memories: memoriesSvc, Ideas: ideasSvc,
+				Installation: installationSvc, ContextPack: contextSvc, Plans: plansSvc, Memories: memoriesSvc, Ideas: ideasSvc, Messages: messagesSvc,
 				Security: securityRec, Limiter: limiter, SecurityEvents: securitySvc, ClientIP: clientIPs,
 				FirstRun: firstRunCode, Embeddings: embeddingsStatus,
 				// Nil unless --ldap-url was given, and a nil Directory is what

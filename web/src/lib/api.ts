@@ -747,6 +747,32 @@ export type Presence = {
 
 export type Person = { kind: "user" | "service"; name: string };
 
+/**
+ * A message from a person to an agent (adapters/http/messages.go,
+ * docs/adr/0032). `audience` says how it was addressed: one session, every
+ * session of a principal, or everyone working on the project.
+ */
+export type AgentMessage = {
+  id: string;
+  from: string;
+  audience: "session" | "principal" | "project";
+  to_principal?: string;
+  to_client?: string;
+  body: string;
+  created_at: string;
+  expires_at: string;
+  expired: boolean;
+  deliveries: {
+    client_id: string;
+    client_type: string;
+    principal_id: string;
+    delivered_at: string;
+    acked_at?: string;
+  }[];
+};
+
+export type AgentMessagePage = Page<AgentMessage> & { people: Record<string, Person> };
+
 export type Board = {
   phases: Phase[];
   plans: PlanSummary[];
@@ -1283,6 +1309,16 @@ export const api = {
   // board changed"; the reader re-reads it with the calls above.
   planBoardEvents: (ns: string, slug: string) => `${project(ns, slug)}/plans/events`,
   myPresenceEvents: () => "/me/presence/events",
+
+  // Messages to agents mid-work (docs/adr/0032). Only a browser session may
+  // send; the board stream announces deliveries and acknowledgements.
+  sendAgentMessage: (
+    ns: string,
+    slug: string,
+    msg: { body: string; to_client?: string; to_principal?: string },
+  ) => request<AgentMessage>(`${project(ns, slug)}/messages`, { method: "POST", body: msg }),
+  sentAgentMessages: (ns: string, slug: string, cursor?: string) =>
+    request<AgentMessagePage>(withQuery(`${project(ns, slug)}/messages`, { cursor })),
 
   // The idea stack. Its changes are announced on the plan board's stream
   // (planBoardEvents), so the Ideas tab holds that one rather than a second.

@@ -194,6 +194,78 @@ hour it deletes the rows whose day is more than that many days before today
 Usage screens is pruned. See
 [ADR 0031](../../docs/adr/0031-one-hour-cache-writes-and-ledger-retention.md).
 
+## Messages to the agent
+
+A person on the project can send a running agent a message from the
+interface: "Message" on its row under **Working now**, or **Message
+everyone** on the board (docs/adr/0032). MCP gives the server no way to
+speak first, so the message waits in the session's inbox, and reaches the
+agent in one of two ways:
+
+- **Any MCP client** gets a one-line notice at the end of its next
+  Context Commander tool result ("You have 1 unread message from Filip —
+  call inbox.next"), and the agent reads it with `inbox.next`. Nothing to
+  install.
+- **Claude Code with the inbox hook** gets the message itself, in the
+  model's context, right after its next tool call of any kind, or when the
+  next prompt is submitted.
+  [`claude-code-inbox-hook.py`](claude-code-inbox-hook.py) polls
+  `GET /v1/me/inbox`, prints what is waiting as
+  `hookSpecificOutput.additionalContext`, and acknowledges it.
+
+Install it once per machine, next to the usage hook:
+
+```bash
+mkdir -p ~/.claude/hooks
+cp deploy/mcp-clients/claude-code-inbox-hook.py ~/.claude/hooks/
+# CC_URL and CC_TOKEN are already set for the usage hook and MCP
+export CC_INBOX_INTERVAL=15   # optional: seconds between polls after tool calls
+```
+
+Then add both events to `~/.claude/settings.json`. Merge them into existing
+`hooks.PostToolUse` and `hooks.UserPromptSubmit` lists if there are any; do
+not replace them:
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      { "hooks": [ { "type": "command", "command": "python3 ~/.claude/hooks/claude-code-inbox-hook.py", "timeout": 5 } ] }
+    ],
+    "UserPromptSubmit": [
+      { "hooks": [ { "type": "command", "command": "python3 ~/.claude/hooks/claude-code-inbox-hook.py", "timeout": 5 } ] }
+    ]
+  }
+}
+```
+
+Or ask Claude Code: *"Install the Context Commander inbox hook from
+deploy/mcp-clients/README.md (Messages to the agent) into my user
+settings."*
+
+What to know:
+
+- **Use the same `CC_TOKEN` as the MCP connection.** The inbox is per
+  credential. "Message" on a row of the board is sent to that row's token.
+  Two Claude Code processes on one token share one inbox, and the first to
+  poll takes the message. Create one token per client and machine.
+- **It never slows the agent down.** After a tool call it polls at most once
+  every `CC_INBOX_INTERVAL` seconds (default 15), tracked in
+  `~/.local/state/context-commander/inbox/` (or `$XDG_STATE_HOME`). A prompt
+  always polls. The server gets `CC_INBOX_TIMEOUT` seconds (default 2), and
+  any failure prints nothing and exits 0.
+- **What the agent sees** is each message with who sent it, how it was
+  addressed, the project and the time, after a line telling it to treat
+  them as input from its user. The hook acknowledges them after printing,
+  so the sender sees "acknowledged". If the ack fails, the next poll shows
+  them again.
+- **Only people send.** A message can be sent only from a browser session.
+  A token, an agent's included, gets `403 needs_person`. Agents cannot
+  message each other through this.
+
+Codex CLI has no hook that can add context in the middle of a turn. It gets
+the notice on tool results, and its agent calls `inbox.next`.
+
 ## What to expect once connected
 
 The server advertises `context.bootstrap` as the first call to make. On a

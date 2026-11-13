@@ -32,6 +32,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/installation"
 	"github.com/koduj-dev/context-commander/internal/members"
 	"github.com/koduj-dev/context-commander/internal/memories"
+	"github.com/koduj-dev/context-commander/internal/messages"
 	"github.com/koduj-dev/context-commander/internal/organizations"
 	"github.com/koduj-dev/context-commander/internal/plans"
 	"github.com/koduj-dev/context-commander/internal/projects"
@@ -67,6 +68,7 @@ type Deps struct {
 	// is (adapters/cli/serve.go ldapFromFlags).
 	Embeddings EmbeddingsStatus
 	Ideas      *ideas.Service
+	Messages   *messages.Service
 	// Security records refusals and Limiter bounds them. Both are safe to
 	// leave nil — a nil *security.Recorder records nothing and a nil
 	// *ratelimit.Limiter allows everything, which is what the CLI and the
@@ -182,6 +184,9 @@ func NewHandler(deps Deps) http.Handler {
 			// Plan search across every project the caller can read plans in.
 			r.Get("/me/plans/search", deps.searchMyPlans)
 			r.Get("/me/ideas/counts", deps.myIdeaCounts)
+			// The calling session's inbox of messages from people (docs/adr/0032).
+			r.Get("/me/inbox", deps.getMyInbox)
+			r.Post("/me/inbox/ack", deps.ackMyInbox)
 			// Memory search across every project the caller can read (docs/adr/0025).
 			r.Get("/me/memories/search", deps.searchMyMemories)
 			// The same, pushed: "something changed", never what (docs/adr/0022).
@@ -323,6 +328,10 @@ func NewHandler(deps Deps) http.Handler {
 					r.Post("/{ideaID}/reject", deps.rejectIdea)
 					r.Post("/{ideaID}/withdraw", deps.ideaAction((*ideas.Service).Withdraw))
 				})
+				// Messages to agents mid-work (docs/adr/0032): send, and what
+				// the caller sent with who received it.
+				r.Post("/messages", deps.sendMessage)
+				r.Get("/messages", deps.listSentMessages)
 				r.Route("/phases", func(r chi.Router) {
 					r.Post("/", deps.createPhase)
 					r.Patch("/{phaseID}", deps.updatePhase)

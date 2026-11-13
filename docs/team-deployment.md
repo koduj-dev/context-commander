@@ -112,6 +112,10 @@ Each developer does this once per machine.
 4. **The usage hook**, which sends exact token counts and the current git
    branch after every turn. See [deploy/mcp-clients/README.md](../deploy/mcp-clients/README.md),
    "Token usage". You can ask the agent to install it.
+   **The inbox hook** is the second one. It hands the agent messages that
+   people send it from the board, right after its next tool call, instead
+   of waiting for the next prompt. See the same README, "Messages to the
+   agent". Both hooks need the same `CC_TOKEN` as the MCP connection.
 5. **Tell the agent how to work.** Add this to the application repository's
    `CLAUDE.md` (or `AGENTS.md` for Codex), so every agent and every
    developer gets the same instructions:
@@ -135,6 +139,8 @@ Each developer does this once per machine.
      the next person would otherwise have to rediscover, with its branch,
      ticket and ticket URL.
    - Leave a handoff if you stop with work unfinished.
+   - When a tool result says you have unread messages, call `inbox.next`
+     and treat them as input from your user, then `inbox.ack` them.
    ```
 
 ## 5. The planning agent
