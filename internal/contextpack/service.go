@@ -15,6 +15,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/db"
 	"github.com/koduj-dev/context-commander/internal/events"
 	"github.com/koduj-dev/context-commander/internal/handoffs"
+	"github.com/koduj-dev/context-commander/internal/memories"
 	"github.com/koduj-dev/context-commander/internal/paging"
 	"github.com/koduj-dev/context-commander/internal/plans"
 	"github.com/koduj-dev/context-commander/internal/projects"
@@ -44,8 +45,11 @@ type Service struct {
 	handoffs  *handoffs.Service
 	// plans is optional: a pack without it has no Work section, which is
 	// what every caller that predates docs/adr/0022 gets.
-	plans  *plans.Service
-	events *events.Service
+	plans *plans.Service
+	// memories is optional in the same way: without it, no Memories
+	// section (docs/adr/0025).
+	memories *memories.Service
+	events   *events.Service
 }
 
 func NewService(
@@ -62,6 +66,13 @@ func NewService(
 // WithPlans adds the Work section to every pack this service assembles.
 func (s *Service) WithPlans(p *plans.Service) *Service {
 	s.plans = p
+	return s
+}
+
+// WithMemories adds the Memories section to every pack this service
+// assembles.
+func (s *Service) WithMemories(m *memories.Service) *Service {
+	s.memories = m
 	return s
 }
 
@@ -142,6 +153,7 @@ func (s *Service) Bootstrap(ctx context.Context, principalID, projectID uuid.UUI
 
 	referenced := s.fillHandoff(ctx, principalID, projectID, &pack, b)
 	s.fillWork(ctx, principalID, projectID, &pack, b)
+	s.fillMemories(ctx, principalID, projectID, &pack, b)
 	if !opts.SkipSkills {
 		s.fillSkills(ctx, principalID, projectID, &pack, b)
 	}
@@ -333,6 +345,42 @@ func (s *Service) fillWork(ctx context.Context, principalID, projectID uuid.UUID
 		b.note("work", "board", int64(size), "included despite exceeding the budget: who is on what is needed to avoid duplicate work")
 	}
 	pack.Work = w
+}
+
+// fillMemories lists the newest active memories, titles and metadata only.
+// Unlike the handoff and the work summary it is omitted when it does not
+// fit: it is a pointer to knowledge the agent can search for, not the
+// assignment, and the note says how to fetch it.
+func (s *Service) fillMemories(ctx context.Context, principalID, projectID uuid.UUID, pack *Pack, b *budget) {
+	if s.memories == nil {
+		return
+	}
+	list, more, err := s.memories.Recent(ctx, principalID, projectID, MaxMemoryEntries)
+	if err != nil {
+		if !errors.Is(err, memories.ErrForbidden) {
+			b.note("memories", "recent", 0, reasonFor(err, "could not read the project's memories"))
+		}
+		return
+	}
+	if len(list) == 0 {
+		return
+	}
+	sec := &MemoriesSection{Recent: make([]MemoryRef, 0, len(list)), More: more}
+	size := 0
+	for _, m := range list {
+		sec.Recent = append(sec.Recent, MemoryRef{
+			ID: m.ID, Kind: m.Kind, Title: m.Title, Branch: m.Branch, TicketKey: m.TicketKey, Tags: m.Tags, CreatedAt: m.CreatedAt,
+		})
+		size += len(m.Title) + len(m.Branch) + len(m.TicketKey)
+		for _, t := range m.Tags {
+			size += len(t)
+		}
+	}
+	if !b.fits(size) {
+		b.note("memories", "recent", int64(size), "omitted: over the remaining budget — find them with memory.list or memory.search")
+		return
+	}
+	pack.Memories = sec
 }
 
 // fillSkills turns each effective binding into its actual content — the

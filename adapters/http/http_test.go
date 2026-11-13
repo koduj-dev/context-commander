@@ -27,6 +27,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/identity"
 	"github.com/koduj-dev/context-commander/internal/installation"
 	"github.com/koduj-dev/context-commander/internal/members"
+	"github.com/koduj-dev/context-commander/internal/memories"
 	"github.com/koduj-dev/context-commander/internal/organizations"
 	"github.com/koduj-dev/context-commander/internal/plans"
 	"github.com/koduj-dev/context-commander/internal/projects"
@@ -125,6 +126,8 @@ func newFixtureWithDeps(t *testing.T, recordSecurity *bool, limits ratelimit.Lim
 	contextSvc := contextpack.NewService(appPool, projStore, authz, artifactsSvc, skillsSvc, handoffsSvc, eventsSvc)
 	plansSvc := plans.NewService(appPool, cryptoProvider, authz)
 	contextSvc.WithPlans(plansSvc)
+	memoriesSvc := memories.NewService(appPool, cryptoProvider, authz)
+	contextSvc.WithMemories(memoriesSvc)
 
 	var securityRec *security.Recorder
 	if recordSecurity != nil {
@@ -138,7 +141,7 @@ func newFixtureWithDeps(t *testing.T, recordSecurity *bool, limits ratelimit.Lim
 		Events: eventsSvc, Organizations: orgSvc, Audit: auditSvc,
 		Handoffs: handoffsSvc, History: historySvc,
 		Skills: skillsSvc, Gates: gatesAdmin, Secrets: secretsSvc,
-		Installation: installationSvc, ContextPack: contextSvc, Plans: plansSvc,
+		Installation: installationSvc, ContextPack: contextSvc, Plans: plansSvc, Memories: memoriesSvc,
 		Security: securityRec, Limiter: ratelimit.New(limits), SecurityEvents: securitySvc,
 	}
 	if adjust != nil {

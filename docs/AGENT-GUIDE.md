@@ -16,7 +16,7 @@
 ## What this system is, from where you sit
 
 Context Commander is shared, durable state for a project that several agents
-and people work on. It is **not** your memory and not a filesystem. The
+and people work on. It is **not** your private memory and not a filesystem. The
 distinction that matters:
 
 - **You** do the reasoning, the planning and the work.
@@ -111,6 +111,31 @@ Write with `expected_version`. If you get a conflict, someone changed the
 artifact since you read it: re-read, merge, retry. Never retry with a bumped
 number to make the error go away — that is how you silently delete their work.
 
+#### Memories: search before you start, write when you learn
+
+A **memory** is one thing the next agent on this project should know: a
+decision and why, the cause you found, a trap that looks right and is not,
+or where a piece of work stands. Memories are separate from artifacts. They
+are short, one per thing learned, and carry the git branch, the ticket and
+who solved it. That metadata is how your colleagues find them.
+`context.bootstrap` lists the newest titles under `memories`.
+
+- **Before you start a task**, run `memory.search` with the ticket key or
+  the branch if you have one, and a few words about the problem. A known
+  gotcha costs one call to read and an afternoon to rediscover.
+- **When you decide, find a cause or hit a gotcha**, call `memory.create`.
+  Put the finding in the title, so it reads well in a list, and the
+  evidence in the body. Fill in `branch` (`git branch --show-current`) and
+  `ticket_key`/`ticket_url` whenever you know them. Do not write a memory
+  for routine progress. That belongs on the plan step.
+- **When a memory stops being true**, write the new one and call
+  `memory.supersede` on the old one. Do not leave two memories that
+  contradict each other. A superseded memory stays readable, but it drops
+  out of the default list and search.
+- **Branch, ticket and tags are stored as plaintext**, so they can be
+  filtered. Keep anything sensitive in the title and body, which are
+  encrypted, and never put credentials in a ticket URL.
+
 ### 5. Leave before you leave
 
 When you stop, one of two things must be true, or the next agent starts blind:
@@ -187,7 +212,7 @@ them according to that person's preferences. Pass them along as they are.
 
 ## A short version
 
-Bootstrap. Read the board. Claim. Record your plan and report as you go.
+Bootstrap. Read the board. Search memories. Claim. Record your plan and report as you go.
 Work. Write down what outlives you. Close or hand over, then stop.
 Read the skills. Check `budget.truncated`. Never guess at structure, never
 carry a secret, never route around a refusal.

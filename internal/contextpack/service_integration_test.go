@@ -2,6 +2,7 @@ package contextpack_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -20,6 +21,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/gates"
 	"github.com/koduj-dev/context-commander/internal/handoffs"
 	"github.com/koduj-dev/context-commander/internal/installation"
+	"github.com/koduj-dev/context-commander/internal/memories"
 	"github.com/koduj-dev/context-commander/internal/organizations"
 	"github.com/koduj-dev/context-commander/internal/paging"
 	"github.com/koduj-dev/context-commander/internal/projects"
@@ -533,5 +535,64 @@ func TestPackCarriesClaimAttribution(t *testing.T) {
 	}
 	if *pack.Handoff.ClaimedByPrincipal != second {
 		t.Fatalf("claimed_by_principal = %s, want %s", pack.Handoff.ClaimedByPrincipal, second)
+	}
+}
+
+// TestBootstrapListsRecentMemoriesWithoutBodies: an arriving agent learns
+// that memories exist — titles and metadata, newest first, capped — and
+// never receives a body; and a budget that cannot hold the list leaves it
+// out with a note naming the tool that fetches it.
+func TestBootstrapListsRecentMemoriesWithoutBodies(t *testing.T) {
+	f := newFixture(t)
+	root, err := crypto.NewEnvRootKeyProvider("CC_ROOT_KEY")
+	if err != nil {
+		t.Fatal(err)
+	}
+	mem := memories.NewService(f.appPool, crypto.NewProvider(root), auth.NewAuthzService(f.appPool, projects.NewStore()))
+	f.pack.WithMemories(mem)
+
+	pack, err := f.pack.Bootstrap(f.ctx, f.principalID, f.projectID, contextpack.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pack.Memories != nil {
+		t.Fatalf("a project without memories got a section: %+v", pack.Memories)
+	}
+
+	for i := range contextpack.MaxMemoryEntries + 1 {
+		if _, err := mem.Create(f.ctx, f.principalID, nil, f.projectID, memories.NewMemory{
+			Title: fmt.Sprintf("memory %d", i), Body: "SECRET-BODY", Branch: "main", TicketKey: "PROJ-9",
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	pack, err = f.pack.Bootstrap(f.ctx, f.principalID, f.projectID, contextpack.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pack.Memories == nil || len(pack.Memories.Recent) != contextpack.MaxMemoryEntries || !pack.Memories.More {
+		t.Fatalf("memories section = %+v", pack.Memories)
+	}
+	if first := pack.Memories.Recent[0]; first.Title != fmt.Sprintf("memory %d", contextpack.MaxMemoryEntries) || first.Branch != "main" || first.TicketKey != "PROJ-9" {
+		t.Errorf("newest first, with metadata: %+v", first)
+	}
+	raw, _ := json.Marshal(pack)
+	if strings.Contains(string(raw), "SECRET-BODY") {
+		t.Error("a memory body reached the pack")
+	}
+
+	pack, err = f.pack.Bootstrap(f.ctx, f.principalID, f.projectID, contextpack.Options{Budget: 10, SkipSkills: true, SkipArtifacts: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pack.Memories != nil {
+		t.Errorf("memories included over budget: %+v", pack.Memories)
+	}
+	noted := false
+	for _, n := range pack.Budget.Truncated {
+		noted = noted || (n.Kind == "memories" && strings.Contains(n.Reason, "memory.search"))
+	}
+	if !noted {
+		t.Errorf("no truncation note for memories: %+v", pack.Budget.Truncated)
 	}
 }

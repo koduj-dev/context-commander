@@ -764,6 +764,80 @@ export type PlanHit = {
 /** A hit from `GET /me/plans/search`: a PlanHit that names its project. */
 export type MyPlanHit = PlanHit & { project: string; project_name: string };
 
+/**
+ * Memories (adapters/http/memories.go, docs/adr/0025). Title and body are
+ * encrypted on the server; the rest is plaintext metadata a screen filters
+ * by. Optional strings are absent, not empty, when unset.
+ */
+export type MemoryKind = "decision" | "finding" | "gotcha" | "note" | "status" | "other";
+export type MemoryStatus = "active" | "superseded" | "archived";
+
+export type Memory = {
+  id: string;
+  kind: MemoryKind;
+  status: MemoryStatus;
+  version: number;
+  title: string;
+  /** Markdown source. Empty on a search hit, where `snippet` stands in. */
+  body: string;
+  branch?: string;
+  ticket_key?: string;
+  /** Validated http(s) on the server; checked again before it becomes a link. */
+  ticket_url?: string;
+  tags: string[];
+  assignee?: string;
+  plan_id?: string;
+  plan_item_id?: string;
+  superseded_by?: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type MemoryHit = Memory & {
+  /** Set only on `GET /me/memories/search`. */
+  project?: string;
+  project_name?: string;
+  match: "title" | "body";
+  snippet: string;
+};
+
+/** Metadata filters, as the list and search endpoints read them. */
+export type MemoryFilter = {
+  kind?: MemoryKind;
+  branch?: string;
+  ticket?: string;
+  tag?: string;
+  assignee?: string;
+  /** Absent means active only; "any" means every status. */
+  status?: MemoryStatus | "any";
+};
+
+/** The values the project's active memories use: what the filters offer. */
+export type MemoryFacets = {
+  kinds: MemoryKind[];
+  branches: string[];
+  tickets: string[];
+  tags: string[];
+  assignees: string[];
+  people: Record<string, Person>;
+};
+
+export type NewMemory = {
+  kind: MemoryKind;
+  title: string;
+  body: string;
+  branch?: string;
+  ticket_key?: string;
+  ticket_url?: string;
+  tags?: string[];
+};
+
+export type MemoryChange = Partial<Omit<NewMemory, "tags">> & {
+  expected_version: number;
+  tags?: string[];
+};
+
 export type ItemChange = {
   status?: ItemStatus;
   text?: string;
@@ -1055,6 +1129,30 @@ export const api = {
   // board changed"; the reader re-reads it with the calls above.
   planBoardEvents: (ns: string, slug: string) => `${project(ns, slug)}/plans/events`,
   myPresenceEvents: () => "/me/presence/events",
+
+  memories: (ns: string, slug: string, filter: MemoryFilter, cursor?: string) =>
+    request<Page<Memory> & { people: Record<string, Person> }>(
+      withQuery(`${project(ns, slug)}/memories/`, { ...filter, cursor }),
+    ),
+  memory: (ns: string, slug: string, id: string) =>
+    request<Memory>(`${project(ns, slug)}/memories/${id}`),
+  memoryFacets: (ns: string, slug: string) =>
+    request<MemoryFacets>(`${project(ns, slug)}/memories/facets`),
+  searchMemories: (ns: string, slug: string, q: string, filter: MemoryFilter) =>
+    request<{ items: MemoryHit[]; truncated: boolean; people: Record<string, Person> }>(
+      withQuery(`${project(ns, slug)}/memories/search`, { q, ...filter }),
+    ),
+  createMemory: (ns: string, slug: string, memory: NewMemory) =>
+    request<Memory>(`${project(ns, slug)}/memories/`, { method: "POST", body: memory }),
+  updateMemory: (ns: string, slug: string, id: string, change: MemoryChange) =>
+    request<Memory>(`${project(ns, slug)}/memories/${id}`, { method: "PATCH", body: change }),
+  setMemoryStatus: (ns: string, slug: string, id: string, status: "active" | "archived") =>
+    request<Memory>(`${project(ns, slug)}/memories/${id}/status`, {
+      method: "POST",
+      body: { status },
+    }),
+  deleteMemory: (ns: string, slug: string, id: string) =>
+    request<void>(`${project(ns, slug)}/memories/${id}`, { method: "DELETE" }),
 
   gateBindings: (ns: string, slug: string) =>
     request<GateBinding[]>(`${project(ns, slug)}/gates/bindings`),

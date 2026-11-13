@@ -23,6 +23,7 @@ type contextPackResult struct {
 	Capabilities []string                `json:"capabilities"`
 	Handoff      *contextHandoffResult   `json:"handoff,omitempty"`
 	Work         *contextWorkResult      `json:"work,omitempty"`
+	Memories     *contextMemoriesResult  `json:"memories,omitempty"`
 	Artifacts    []contextArtifactResult `json:"artifacts"`
 	Skills       []contextSkillResult    `json:"skills"`
 	Events       contextEventsResult     `json:"events"`
@@ -66,6 +67,36 @@ func toContextWork(w *contextpack.WorkSection) *contextWorkResult {
 		Phases: w.Phases, OpenPlans: w.OpenPlans, InProgress: items(w.InProgress), Blocked: items(w.Blocked),
 		Present: w.Present, Truncated: w.Truncated,
 	}
+}
+
+// contextMemoriesResult is contextpack.MemoriesSection with string IDs.
+type contextMemoriesResult struct {
+	Recent []contextMemoryResult `json:"recent"`
+	More   bool                  `json:"more,omitempty"`
+}
+
+type contextMemoryResult struct {
+	ID        string   `json:"id"`
+	Kind      string   `json:"kind"`
+	Title     string   `json:"title"`
+	Branch    string   `json:"branch,omitempty"`
+	TicketKey string   `json:"ticket_key,omitempty"`
+	Tags      []string `json:"tags,omitempty"`
+	CreatedAt string   `json:"created_at"`
+}
+
+func toContextMemories(m *contextpack.MemoriesSection) *contextMemoriesResult {
+	if m == nil {
+		return nil
+	}
+	out := &contextMemoriesResult{Recent: []contextMemoryResult{}, More: m.More}
+	for _, r := range m.Recent {
+		out.Recent = append(out.Recent, contextMemoryResult{
+			ID: r.ID.String(), Kind: r.Kind, Title: r.Title, Branch: r.Branch, TicketKey: r.TicketKey, Tags: r.Tags,
+			CreatedAt: r.CreatedAt.Format(time.RFC3339),
+		})
+	}
+	return out
 }
 
 type contextProjectResult struct {
@@ -148,6 +179,7 @@ func toContextPackResult(p contextpack.Pack, thisClientID uuid.UUID) contextPack
 		Skills:      make([]contextSkillResult, 0, len(p.Skills)),
 		AssembledAt: p.AssembledAt.Format(rfc3339),
 		Work:        toContextWork(p.Work),
+		Memories:    toContextMemories(p.Memories),
 	}
 	if p.Handoff != nil {
 		h := contextHandoffResult{

@@ -29,6 +29,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/history"
 	"github.com/koduj-dev/context-commander/internal/installation"
 	"github.com/koduj-dev/context-commander/internal/members"
+	"github.com/koduj-dev/context-commander/internal/memories"
 	"github.com/koduj-dev/context-commander/internal/organizations"
 	"github.com/koduj-dev/context-commander/internal/plans"
 	"github.com/koduj-dev/context-commander/internal/projects"
@@ -57,6 +58,7 @@ type Deps struct {
 	Installation  *installation.Service
 	ContextPack   *contextpack.Service
 	Plans         *plans.Service
+	Memories      *memories.Service
 	// Security records refusals and Limiter bounds them. Both are safe to
 	// leave nil — a nil *security.Recorder records nothing and a nil
 	// *ratelimit.Limiter allows everything, which is what the CLI and the
@@ -167,6 +169,8 @@ func NewHandler(deps Deps) http.Handler {
 			r.Get("/me/presence", deps.getMyPresence)
 			// Plan search across every project the caller can read plans in.
 			r.Get("/me/plans/search", deps.searchMyPlans)
+			// Memory search across every project the caller can read (docs/adr/0025).
+			r.Get("/me/memories/search", deps.searchMyMemories)
 			// The same, pushed: "something changed", never what (docs/adr/0022).
 			r.Get("/me/presence/events", deps.streamMyPresence)
 			// What a turn cost, from a client hook (deploy/mcp-clients).
@@ -268,6 +272,18 @@ func NewHandler(deps Deps) http.Handler {
 					r.Patch("/{planID}", deps.updatePlan)
 					r.Delete("/{planID}", deps.deletePlan)
 					r.Post("/{planID}/items", deps.addPlanItems)
+				})
+				// Memories (docs/adr/0025). "search" and "facets" are
+				// registered before "/{memoryID}", as plans' static segments are.
+				r.Route("/memories", func(r chi.Router) {
+					r.Get("/", deps.listMemories)
+					r.Post("/", deps.createMemory)
+					r.Get("/search", deps.searchMemories)
+					r.Get("/facets", deps.getMemoryFacets)
+					r.Get("/{memoryID}", deps.getMemory)
+					r.Patch("/{memoryID}", deps.updateMemory)
+					r.Post("/{memoryID}/status", deps.setMemoryStatus)
+					r.Delete("/{memoryID}", deps.deleteMemory)
 				})
 				r.Route("/phases", func(r chi.Router) {
 					r.Post("/", deps.createPhase)
