@@ -264,6 +264,23 @@ function merge(nodes: Inline[]): Inline[] {
   return out;
 }
 
+/**
+ * How far ahead an opening marker looks for its closing one. Without a bound
+ * every unclosed `*`, `[` or backtick scans to the end of the paragraph, and
+ * a memory of a few tens of kilobytes of them would freeze the browser of
+ * whoever opened it: quadratic in text someone else wrote.
+ */
+const REACH = 500;
+
+/** indexOf that gives up REACH characters past `from` (or at `stop`). */
+function indexWithin(src: string, needle: string, from: number, stop = from + REACH): number {
+  const end = Math.min(src.length, stop) - needle.length;
+  for (let k = from; k <= end; k++) {
+    if (src.startsWith(needle, k)) return k;
+  }
+  return -1;
+}
+
 const ESCAPABLE = "\\`*_{}[]()#+-.!|~>";
 
 /** Parses one line of inline Markdown. */
@@ -288,7 +305,7 @@ export function parseInline(src: string, depth = 0): Inline[] {
       let ticks = 1;
       while (src[i + ticks] === "`") ticks++;
       const marker = "`".repeat(ticks);
-      const end = src.indexOf(marker, i + ticks);
+      const end = indexWithin(src, marker, i + ticks);
       if (end > 0) {
         flush();
         let v = src.slice(i + ticks, end);
@@ -324,7 +341,7 @@ export function parseInline(src: string, depth = 0): Inline[] {
     }
 
     if (ch === "<") {
-      const end = src.indexOf(">", i);
+      const end = indexWithin(src, ">", i);
       if (end > 0) {
         const href = safeHref(src.slice(i + 1, end));
         if (href && /^(https?:|mailto:)/i.test(src.slice(i + 1, end))) {
@@ -398,7 +415,7 @@ export function parseInline(src: string, depth = 0): Inline[] {
 
 function matchBracket(src: string, open: number): number {
   let level = 0;
-  for (let k = open; k < src.length; k++) {
+  for (let k = open; k < Math.min(src.length, open + REACH); k++) {
     if (src[k] === "\\") {
       k++;
       continue;
@@ -414,7 +431,7 @@ function matchBracket(src: string, open: number): number {
 
 function matchParen(src: string, open: number): number {
   let level = 0;
-  for (let k = open; k < src.length; k++) {
+  for (let k = open; k < Math.min(src.length, open + REACH); k++) {
     if (src[k] === "(") level++;
     else if (src[k] === ")") {
       level--;
@@ -426,13 +443,14 @@ function matchParen(src: string, open: number): number {
 
 function findClose(src: string, from: number, marker: string, ch: string): number {
   let k = from;
-  while (k < src.length) {
+  const stop = Math.min(src.length, from + REACH);
+  while (k < stop) {
     if (src[k] === "\\") {
       k += 2;
       continue;
     }
     if (src[k] === "`") {
-      const end = src.indexOf("`", k + 1);
+      const end = indexWithin(src, "`", k + 1, stop);
       if (end < 0) return -1;
       k = end + 1;
       continue;

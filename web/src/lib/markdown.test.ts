@@ -58,6 +58,15 @@ describe("parseMarkdown", () => {
     ]);
   });
 
+  it("stays fast on long runs of unclosed markers", () => {
+    const hostile = ["*a", "[a", "`a", "_a ", "~~a", "<a"]
+      .map((m) => m.repeat(20_000))
+      .join("\n\n");
+    const started = performance.now();
+    parseMarkdown(hostile);
+    expect(performance.now() - started).toBeLessThan(1_000);
+  });
+
   it("never throws on hostile input", () => {
     for (const s of [
       "[",
