@@ -16,7 +16,7 @@ Three things. A backup missing any one of them is not a backup.
 
 **Keep the root key apart from the data backups.** Someone holding both can
 read everything; someone holding only the dump and the storage archive reads
-ciphertext. Put it in a password manager or a vault, where at least two
+ciphertext, apart from skill packages and plaintext metadata. Put it in a password manager or a vault, where at least two
 people can reach it.
 
 **If the root key is lost, all encrypted content is gone.** Artifacts,
