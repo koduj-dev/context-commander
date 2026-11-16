@@ -84,8 +84,8 @@ claim is a lease held by a client of the old installation), and every write
 is in the audit trail as the owner's, at the time of the import.
 
 If an import stops part way, the project exists with what was written
-before the error. There is no project deletion yet; that is the purge
-workflow of Phase 3.
+before the error; `ccd project purge --project ns/slug --yes` removes it
+(ADR 0036).
 
 Restoring authorship is why import is an operator action and not an
 endpoint: a member able to import could attribute content to anyone whose

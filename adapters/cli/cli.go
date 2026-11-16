@@ -49,6 +49,7 @@ func NewCommand() []*cobra.Command {
 		newInstallationCmd(),
 		newEmbeddingsCmd(),
 		newRootKeyCmd(),
+		newPurgeCmd(),
 		newServeCmd(),
 	}
 }

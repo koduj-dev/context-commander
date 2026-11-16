@@ -133,6 +133,12 @@ export const de: Partial<Record<MessageKey, string>> = {
   "dashboard.title": "Übersicht",
   "dashboard.lead":
     "Was sich geändert hat, woran Sie gearbeitet haben und ob etwas auf Sie wartet.",
+  "dashboard.pendingDeletion": "Zum Löschen vorgemerkt",
+  "dashboard.pendingDeletionLead":
+    "Vor allen verborgen. Vor dem Datum zurücknehmen, um ein Projekt zurückzuholen; danach entfernt es der Purge eines Operators.",
+  "dashboard.purgeColumn": "Endgültig gelöscht nach",
+  "dashboard.purgeAfter": "Endgültig gelöscht nach {date}",
+  "dashboard.cancelDeletion": "Löschen zurücknehmen",
   "dashboard.waiting": "Wartet auf Sie",
   "dashboard.noneWaiting": "Nichts wartet auf Sie",
   "dashboard.noneWaitingBody":
@@ -621,7 +627,12 @@ export const de: Partial<Record<MessageKey, string>> = {
     "Inhalte sind im Ruhezustand unter einem Schlüssel dieses Projekts verschlüsselt, der selbst vom Wurzelschlüssel der Installation umschlossen wird. Übergabetexte und Geheimnisse gehen durch diesen Umschlag; die Bytes von Artefakten gehen in den Objektspeicher.",
   "settings.danger": "Nicht umkehrbar",
   "settings.noWrites":
-    "Auf diesem Bildschirm lässt sich nichts ändern: die API hat weder ein Update noch ein Löschen für ein Projekt. Umbenennen, Sichtbarkeit ändern und Löschen sind Operationen der Kommandozeile, und ein Bedienelement, das einen Dialog öffnet und dann scheitert, wäre schlechter als sein Fehlen.",
+    "Ein Projekt umzubenennen oder seine Sichtbarkeit zu ändern ist noch nicht gebaut, daher bietet dieser Bildschirm beides nicht an.",
+  "settings.delete": "Projekt löschen",
+  "settings.deleteLead":
+    "Das Löschen verbirgt das Projekt sofort vor allen. Seine OWNER können es {days, plural, one {# Tag} other {# Tage}} lang zurücknehmen; danach entfernt der Purge eines Operators alles endgültig. Nur ein OWNER kann löschen, und nur hier, nicht mit dem Token eines Agenten.",
+  "settings.deleteConfirm": "Zur Bestätigung {path} eingeben",
+  "settings.deleteButton": "Projekt löschen",
   "settings.connect": "Einen Agenten verbinden",
   "settings.connectLead":
     "Richten Sie einen MCP-Client auf diesen Server, mit einem persönlichen Zugriffstoken. Das Projekt wird pro Aufruf benannt, ein Token erreicht also jedes Projekt, in dem Sie Mitglied sind.",

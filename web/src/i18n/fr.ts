@@ -163,6 +163,12 @@ export const fr: Partial<Record<MessageKey, string>> = {
 
   "dashboard.title": "Tableau de bord",
   "dashboard.lead": "Ce qui a changé, où vous travailliez, et si quelque chose vous attend.",
+  "dashboard.pendingDeletion": "Suppression programmée",
+  "dashboard.pendingDeletionLead":
+    "Masqués pour tous. Annulez avant la date pour récupérer un projet ; après, la purge d’un opérateur le supprime.",
+  "dashboard.purgeColumn": "Purgé après le",
+  "dashboard.purgeAfter": "Purgé après le {date}",
+  "dashboard.cancelDeletion": "Annuler la suppression",
   "dashboard.waiting": "En attente de vous",
   "dashboard.noneWaiting": "Rien ne vous attend",
   "dashboard.noneWaitingBody": "Aucun transfert ouvert, aucun refus qui mérite un coup d’œil.",
@@ -638,7 +644,12 @@ export const fr: Partial<Record<MessageKey, string>> = {
     "Le contenu est chiffré au repos sous une clé propre à ce projet, elle-même enveloppée par la clé racine de l’installation. Les corps de transfert et les secrets passent par cette enveloppe ; les octets des artefacts vont dans le magasin d’objets.",
   "settings.danger": "Irréversible",
   "settings.noWrites":
-    "Rien sur cet écran ne peut être changé ici : l’API n’a ni mise à jour ni suppression pour un projet. Renommer, changer la visibilité et supprimer sont des opérations de la ligne de commande, et un bouton qui ouvrirait une boîte de dialogue pour échouer ensuite serait pire que son absence.",
+    "Renommer un projet et changer sa visibilité ne sont pas encore construits, cet écran ne propose donc ni l’un ni l’autre.",
+  "settings.delete": "Supprimer le projet",
+  "settings.deleteLead":
+    "La suppression masque le projet à tous immédiatement. Ses OWNER peuvent l’annuler pendant {days, plural, one {# jour} other {# jours}} ; ensuite, la purge d’un opérateur efface tout définitivement. Seul un OWNER peut supprimer, et seulement ici, pas avec le token d’un agent.",
+  "settings.deleteConfirm": "Saisissez {path} pour confirmer",
+  "settings.deleteButton": "Supprimer le projet",
   "settings.connect": "Connecter un agent",
   "settings.connectLead":
     "Pointez un client MCP vers ce serveur avec un token d’accès personnel. Le projet est nommé à chaque appel, un seul token atteint donc tous les projets dont vous êtes membre.",

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5/middleware"
 
@@ -27,6 +28,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/portability"
 	"github.com/koduj-dev/context-commander/internal/projects"
 	"github.com/koduj-dev/context-commander/internal/quota"
+	"github.com/koduj-dev/context-commander/internal/retention"
 	"github.com/koduj-dev/context-commander/internal/secrets"
 	"github.com/koduj-dev/context-commander/internal/security"
 	"github.com/koduj-dev/context-commander/internal/signin"
@@ -135,6 +137,16 @@ func writeDomainError(w http.ResponseWriter, r *http.Request, err error) {
 		writeError(w, http.StatusConflict, "conflict", "that already exists")
 	case errors.Is(err, members.ErrAlreadyMember), errors.Is(err, organizations.ErrAlreadyMember):
 		writeError(w, http.StatusConflict, "conflict", err.Error())
+	case errors.Is(err, retention.ErrForbidden):
+		writeError(w, http.StatusForbidden, "forbidden", "only an OWNER can delete a project, or cancel its deletion")
+	case errors.Is(err, retention.ErrNeedsPerson):
+		writeError(w, http.StatusForbidden, "needs_person", "only a person signed in to the interface can delete a project")
+	case errors.Is(err, retention.ErrConfirmation):
+		writeError(w, http.StatusBadRequest, "confirmation_required", "confirm by sending the project's path as \"confirm\"")
+	case errors.Is(err, retention.ErrLegalHold):
+		writeError(w, http.StatusConflict, "legal_hold", "the project is under legal hold and cannot be deleted")
+	case errors.Is(err, retention.ErrState):
+		writeError(w, http.StatusConflict, "conflict", strings.TrimPrefix(err.Error(), retention.ErrState.Error()+": "))
 	case errors.Is(err, members.ErrLastOwner):
 		writeError(w, http.StatusConflict, "last_owner", "the project needs at least one OWNER; make someone else OWNER first")
 	case errors.Is(err, members.ErrNotMember):

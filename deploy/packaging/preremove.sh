@@ -7,8 +7,8 @@ set -e
 
 if [ "$1" = "remove" ] || [ "$1" = "0" ]; then
 	if [ -d /run/systemd/system ]; then
-		systemctl stop ccd.service || true
-		systemctl disable ccd.service || true
+		systemctl stop ccd.service ccd-purge.timer || true
+		systemctl disable ccd.service ccd-purge.timer || true
 	fi
 fi
 

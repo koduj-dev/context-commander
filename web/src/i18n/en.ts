@@ -160,6 +160,12 @@ export const en = {
 
   "dashboard.title": "Dashboard",
   "dashboard.lead": "What changed, where you were working, and whether anything is waiting on you.",
+  "dashboard.pendingDeletion": "Scheduled for deletion",
+  "dashboard.pendingDeletionLead":
+    "Hidden from everyone. Cancel before the date to bring a project back; after it, an operator's purge removes it.",
+  "dashboard.purgeColumn": "Purged after",
+  "dashboard.purgeAfter": "Purged after {date}",
+  "dashboard.cancelDeletion": "Cancel deletion",
   "dashboard.waiting": "Waiting on you",
   "dashboard.noneWaiting": "Nothing is waiting on you",
   "dashboard.noneWaitingBody": "No open handoffs, no refusals worth a look.",
@@ -635,7 +641,12 @@ export const en = {
     "Content is encrypted at rest under a key belonging to this project, itself wrapped by the installation root key. Handoff bodies and secrets travel through that envelope; artifact bytes go to the object store.",
   "settings.danger": "Irreversible",
   "settings.noWrites":
-    "Nothing on this screen can be changed here: the API has no update or delete for a project. Renaming, changing visibility and deleting are CLI operations, and a control that opened a dialog and then failed would be worse than its absence.",
+    "Renaming a project and changing its visibility are not built yet, so this screen offers neither.",
+  "settings.delete": "Delete project",
+  "settings.deleteLead":
+    "Deleting hides the project from everyone at once. Its OWNERs can cancel for {days, plural, one {# day} other {# days}}; after that an operator's purge removes everything for good. Only an OWNER can delete, and only here, not with an agent's token.",
+  "settings.deleteConfirm": "Type {path} to confirm",
+  "settings.deleteButton": "Delete project",
   "settings.connect": "Connecting an agent",
   "settings.connectLead":
     "Point an MCP client at this server with a personal access token. The project is named per call, so one token reaches every project you are a member of.",

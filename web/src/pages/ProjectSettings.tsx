@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useT } from "../i18n";
 import { api } from "../lib/api";
 import {
@@ -14,6 +15,7 @@ import {
   PageHead,
   Panel,
   Stack,
+  TextField,
 } from "../ui";
 import { useProject } from "./ProjectLayout";
 
@@ -84,8 +86,10 @@ export function ProjectSettings() {
             </Defs>
           </Panel>
 
+          <DeletePanel />
+
           <Panel title={t("settings.danger")}>
-            <Note tone="warn">{t("settings.noWrites")}</Note>
+            <Note tone="info">{t("settings.noWrites")}</Note>
           </Panel>
         </Stack>
       </Grid>
@@ -129,6 +133,61 @@ function ExportPanel() {
       <Btn onClick={() => void download()} disabled={busy}>
         {busy ? t("settings.exporting") : t("settings.exportButton")}
       </Btn>
+      {failure !== undefined && (
+        <div className="mt">
+          <ErrorState error={failure} />
+        </div>
+      )}
+    </Panel>
+  );
+}
+
+/** Days a scheduled deletion can be cancelled (retention.DefaultGrace). */
+const GRACE_DAYS = 7;
+
+/**
+ * Scheduling the project for deletion (docs/adr/0036). The path is typed
+ * back as the confirmation, and the server checks it again: a button alone
+ * is one stray click from hiding a team's project.
+ */
+function DeletePanel() {
+  const t = useT();
+  const navigate = useNavigate();
+  const { namespace, slug } = useProject();
+  const path = `${namespace}/${slug}`;
+  const [typed, setTyped] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState<unknown>();
+
+  async function remove() {
+    setBusy(true);
+    setFailure(undefined);
+    try {
+      await api.deleteProject(namespace, slug, typed.trim());
+      navigate("/");
+    } catch (err) {
+      setFailure(err);
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Panel title={t("settings.delete")}>
+      <p className="sec lead-out">{t("settings.deleteLead", { days: GRACE_DAYS })}</p>
+      <div className="stack-sm">
+        <TextField
+          label={t("settings.deleteConfirm", { path })}
+          placeholder={path}
+          value={typed}
+          onChange={setTyped}
+          labelled
+        />
+        <div>
+          <Btn kind="danger" onClick={() => void remove()} disabled={busy || typed.trim() !== path}>
+            {t("settings.deleteButton")}
+          </Btn>
+        </div>
+      </div>
       {failure !== undefined && (
         <div className="mt">
           <ErrorState error={failure} />

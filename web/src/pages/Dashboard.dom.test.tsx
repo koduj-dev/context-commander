@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../i18n";
@@ -91,13 +91,19 @@ const IDEAS = {
   items: [{ project: "acme/beta", name: "Beta", open: 0, claimed: 0, lapsed: 0, proposed: 1 }],
 };
 
-/** A URL ending in one of `failing` answers 500. */
-function stubServer(waiting: unknown = WAITING, failing: string[] = []) {
+/** A URL ending in one of `failing` answers 500; `pending` are projects scheduled for deletion. */
+function stubServer(waiting: unknown = WAITING, failing: string[] = [], pending: unknown[] = []) {
   const calls: string[] = [];
   vi.stubGlobal(
     "fetch",
-    vi.fn(async (url: string) => {
-      calls.push(url);
+    vi.fn(async (url: string, init?: RequestInit) => {
+      calls.push(init?.method && init.method !== "GET" ? `${init.method} ${url}` : url);
+      if (url.endsWith("/v1/me/projects/pending-deletion")) {
+        return new Response(JSON.stringify({ items: pending }), { status: 200 });
+      }
+      if (url.includes("/pending-deletion/") && url.endsWith("/cancel")) {
+        return new Response(null, { status: 204 });
+      }
       if (failing.some((f) => url.endsWith(f))) {
         return new Response(JSON.stringify({ error: { code: "internal", message: "boom" } }), {
           status: 500,
@@ -255,5 +261,37 @@ describe("the dashboard", () => {
     expect((await within(table).findAllByText("Something went wrong")).length).toBe(2);
     expect(within(table).queryByText("You are not in any project yet")).toBeNull();
     expect(within(table).getAllByRole("button", { name: "Try again" })).toHaveLength(2);
+  });
+
+  it("offers the way back for a project scheduled for deletion", async () => {
+    const calls = stubServer(
+      WAITING,
+      [],
+      [
+        {
+          id: "p9",
+          project: "acme/old",
+          name: "Old",
+          requested_at: "2026-11-16T10:00:00Z",
+          requested_by: "pr-1",
+          purge_after: "2026-11-23T10:00:00Z",
+        },
+      ],
+    );
+    render(wrap());
+
+    const panel = (await screen.findByRole("heading", { name: "Scheduled for deletion" })).closest(
+      "section",
+    ) as HTMLElement;
+    expect(within(panel).getByText("acme/old")).toBeTruthy();
+    fireEvent.click(within(panel).getByRole("button", { name: "Cancel deletion" }));
+    await waitFor(() => expect(calls).toContain("POST /v1/me/projects/pending-deletion/p9/cancel"));
+  });
+
+  it("draws nothing when no project is scheduled for deletion", async () => {
+    stubServer();
+    render(wrap());
+    await screen.findByRole("heading", { name: "Projects at a glance" });
+    expect(screen.queryByRole("heading", { name: "Scheduled for deletion" })).toBeNull();
   });
 });
