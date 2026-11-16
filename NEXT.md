@@ -120,9 +120,20 @@ Only after the core loop is proven:
       `context/manifest.json` with paths, prefixes, `max_bytes`, `why` and a
       default budget. Still open: nothing checks a manifest when it is
       written; the next pack reports what is wrong.
-- [ ] Metadata/full-text retrieval filtered by type, author, time, provenance.
-- [ ] Compaction/summarization as a derived history object, never overwriting
-      the source (cookbook §10.3 already decided this shape).
+- [x] ~~Metadata/full-text retrieval filtered by type, author, time,
+      provenance.~~ Narrowed 2026-11-16: memories filter by kind, author,
+      assignee, branch, ticket, tag and creation time, and search by words or
+      meaning (ADR 0025, 0028); plans search across projects (ADR 0022).
+      Still open: artifacts are found by path only. Searching their content
+      means decrypting every version on every query; build it when someone
+      asks for it.
+- [x] ~~Compaction/summarization as a derived history object, never
+      overwriting the source.~~ Already in place: `history.append_object`
+      stores `compacted` and `summary` objects with `derived_from`, and
+      `cc_app` may only insert into `history_objects` (migration 000011), so
+      nothing derived can overwrite its source. Producing the summary is the
+      client's job, as the positioning above says; exports carry the lineage
+      (ADR 0035).
 - [x] ~~Subscriptions, or reliable cursor polling, for changes during a
       session.~~ Closed 2026-11-16 ([ADR 0033](docs/adr/0033-what-changed-while-you-worked.md)):
       `project.changes` and `GET …/changes?since=` list memories, step moves
