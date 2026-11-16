@@ -24,6 +24,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/organizations"
 	"github.com/koduj-dev/context-commander/internal/paging"
 	"github.com/koduj-dev/context-commander/internal/plans"
+	"github.com/koduj-dev/context-commander/internal/portability"
 	"github.com/koduj-dev/context-commander/internal/projects"
 	"github.com/koduj-dev/context-commander/internal/quota"
 	"github.com/koduj-dev/context-commander/internal/secrets"
@@ -102,7 +103,7 @@ func writeDomainError(w http.ResponseWriter, r *http.Request, err error) {
 	case errors.Is(err, artifacts.ErrForbidden), errors.Is(err, events.ErrForbidden), errors.Is(err, organizations.ErrForbidden),
 		errors.Is(err, audit.ErrForbidden), errors.Is(err, handoffs.ErrForbidden), errors.Is(err, history.ErrForbidden),
 		errors.Is(err, skills.ErrForbidden), errors.Is(err, gates.ErrForbidden), errors.Is(err, secrets.ErrForbidden),
-		errors.Is(err, installation.ErrForbidden), errors.Is(err, members.ErrForbidden),
+		errors.Is(err, installation.ErrForbidden), errors.Is(err, members.ErrForbidden), errors.Is(err, portability.ErrForbidden),
 		errors.Is(err, contextpack.ErrForbidden), errors.Is(err, security.ErrForbidden), errors.Is(err, plans.ErrForbidden),
 		errors.Is(err, memories.ErrForbidden), errors.Is(err, messages.ErrForbidden):
 		writeError(w, http.StatusForbidden, "forbidden", "forbidden")

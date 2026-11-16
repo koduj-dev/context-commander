@@ -364,3 +364,34 @@ func (s *Service) GetLineage(ctx context.Context, principalID, projectID, conver
 	}
 	return edges, nil
 }
+
+// ListExternalSessions returns every provider-side session of a
+// conversation, oldest first: what a project export carries so an import
+// can rebuild the conversation's edges.
+func (s *Service) ListExternalSessions(ctx context.Context, principalID, projectID, conversationID uuid.UUID) ([]ExternalSession, error) {
+	if err := s.checkCapability(ctx, principalID, projectID, auth.CapHistoryRead); err != nil {
+		return nil, err
+	}
+	var out []ExternalSession
+	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+		rows, err := tx.Query(ctx,
+			`SELECT id, project_id, conversation_id, provider, client, provider_session_id,
+			        parent_external_session_id, relation, started_at, ended_at
+			 FROM external_sessions WHERE project_id = $1 AND conversation_id = $2
+			 ORDER BY started_at, id`, projectID, conversationID)
+		if err != nil {
+			return err
+		}
+		out, err = pgx.CollectRows(rows, func(r pgx.CollectableRow) (ExternalSession, error) {
+			var e ExternalSession
+			err := r.Scan(&e.ID, &e.ProjectID, &e.ConversationID, &e.Provider, &e.Client, &e.ProviderSessionID,
+				&e.ParentExternalSessionID, &e.Relation, &e.StartedAt, &e.EndedAt)
+			return e, err
+		})
+		return err
+	})
+	if err != nil {
+		return nil, fmt.Errorf("history: list external sessions: %w", err)
+	}
+	return out, nil
+}

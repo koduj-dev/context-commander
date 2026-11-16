@@ -598,6 +598,11 @@ export const es: Partial<Record<MessageKey, string>> = {
   "settings.lead": "Qué es este proyecto y qué puede cambiarse de él desde aquí.",
   "settings.identity": "Identidad",
   "settings.visibility": "Visibilidad",
+  "settings.export": "Exportar",
+  "settings.exportLead":
+    "Descarga todo el proyecto en un archivo: artefactos con todas sus versiones, memorias, planes, ideas, traspasos e historial de conversaciones, en texto plano. No incluye secretos, miembros ni el registro de auditoría. Solo OWNER y ADMIN; guarda el archivo con el mismo cuidado que el proyecto.",
+  "settings.exportButton": "Descargar archivo",
+  "settings.exporting": "Preparando el archivo…",
   "settings.encryption": "Cifrado",
   "settings.encryptionBody":
     "El contenido está cifrado en reposo bajo una clave propia de este proyecto, envuelta a su vez por la clave raíz de la instalación. Los cuerpos de los traspasos y los secretos pasan por ese sobre; los bytes de los artefactos van al almacén de objetos.",

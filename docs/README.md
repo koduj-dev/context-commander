@@ -79,6 +79,7 @@ supersedes it, so the trail of what was believed when stays readable.
 | [0032](adr/0032-agent-inbox.md) | Messages to agents mid-work: an inbox per session |
 | [0033](adr/0033-what-changed-while-you-worked.md) | What changed while you worked: a change feed an agent reads |
 | [0034](adr/0034-project-manifest.md) | A project manifest: what an arriving agent must read |
+| [0035](adr/0035-project-export-and-import.md) | Project export and import |
 
 ## Not documentation
 

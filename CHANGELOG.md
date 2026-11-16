@@ -86,6 +86,14 @@ All notable changes to Context Commander are documented here. The format follows
   whether the provider answers, the last error, the queue and the memories
   still waiting.
 
+- **Project export.** `GET /v1/projects/{ns}/{slug}/export` and a button on
+  the project's Settings tab download the whole project as a `.tar.gz`:
+  artifacts with every version, memories, phases and plans, ideas, handoffs
+  and conversation history, in plaintext, plus the people they name. No
+  secrets, members, audit trail, events, usage or messages. OWNER and ADMIN
+  only (new capability `project.export`).
+  [ADR 0035](docs/adr/0035-project-export-and-import.md).
+
 - **Project manifest.** `context/manifest.json` tells `context.bootstrap`
   what an arriving agent must read: paths and prefixes in priority order,
   `max_bytes` to carry a long file cut rather than drop it, a `why` that

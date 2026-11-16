@@ -38,6 +38,21 @@ Also keep, with your configuration rather than your data:
   volume, as [team-deployment.md](team-deployment.md) suggests with
   `/data/usage-prices.json`, is already in the storage backup.
 
+## One project on its own
+
+A backup is the whole installation. To keep, move or hand over a single
+project, export it: **Settings → Export** in the project, or
+
+```bash
+curl -fH "Authorization: Bearer $CC_TOKEN" -o work.ccproject.tar.gz \
+  https://cc.example.com/v1/projects/team/work/export
+```
+
+The archive is the project's content in plaintext, without secrets,
+members or the audit trail
+([ADR 0035](adr/0035-project-export-and-import.md)). Store it as carefully
+as the project itself.
+
 ## What does not need a backup
 
 - **Sign-in signing keys.** The key that signs the OIDC sign-in attempt
