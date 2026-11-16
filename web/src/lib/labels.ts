@@ -26,3 +26,13 @@ export function trustLabel(t: T, trust: string): string {
   if (trust === "unverified") return t("trust.unverified");
   return trust;
 }
+
+/** Up to two initials of a name, for an avatar. */
+export function initials(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() ?? "")
+    .join("");
+}

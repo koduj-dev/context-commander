@@ -107,6 +107,7 @@ export function useFormat() {
       utc: (iso: string) => fmt.utcStamp(iso),
       number: (n: number) => fmt.number(n, locale),
       money: (n: number, currency: string) => fmt.money(n, currency, locale),
+      percent: (fraction: number) => fmt.percent(fraction, locale),
       bytes: (n: number) => fmt.bytes(n, locale, prefs.units),
       duration: (seconds: number) => fmt.duration(seconds, locale),
       calendarDate: (day: string) => fmt.calendarDate(day, locale, prefs.dateOrder),

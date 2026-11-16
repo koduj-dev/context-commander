@@ -7,6 +7,7 @@ import { useCrumbsValue, useDocumentTitle } from "./crumbs";
 import { QuickFind } from "./QuickFind";
 import { modifierLabel } from "../lib/platform";
 import { SelectField } from "../ui";
+import { initials } from "../lib/labels";
 import { useTheme } from "./theme";
 
 /**
@@ -46,15 +47,6 @@ const ICONS = {
   tokens:
     "M11.5 3.5a3.5 3.5 0 1 0-3.3 4.6L4 12.3V15h2.7l.7-.7v-1.4h1.4l.9-.9v-1.4h1.4l.7-.7a3.5 3.5 0 0 0-.3-6.4M12 6h.01",
 };
-
-function initials(name: string) {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p[0]?.toUpperCase() ?? "")
-    .join("");
-}
 
 export function Shell() {
   const t = useT();

@@ -791,6 +791,21 @@ export type PlanHit = {
   status: string;
 };
 
+/**
+ * One project's work in numbers (`GET /me/projects/overview`, or
+ * `…/plans/overview` for one project). `done_per_day` holds one count per UTC
+ * day starting at the answer's `from`, the last being today.
+ */
+export type ProjectOverview = {
+  project: string;
+  name: string;
+  role: string;
+  counts: Counts;
+  done_per_day: number[];
+  last_activity?: string;
+};
+export type Overview = { from: string; days: number; items: ProjectOverview[] };
+
 /** A hit from `GET /me/plans/search`: a PlanHit that names its project. */
 export type MyPlanHit = PlanHit & { project: string; project_name: string };
 
@@ -1136,6 +1151,10 @@ export const api = {
 
   me: () => request<Me>("/me"),
   myProjects: () => request<MyProject[]>("/me/projects"),
+  myProjectsOverview: (days?: number) =>
+    request<Overview>(withQuery("/me/projects/overview", { days })),
+  projectOverview: (ns: string, slug: string, days?: number) =>
+    request<Overview>(withQuery(`${project(ns, slug)}/plans/overview`, { days })),
   myOrganizations: () => request<MyOrganization[]>("/me/organizations"),
   // One request for every project, instead of one request per project.
   myHandoffs: () => request<WaitingHandoff[]>("/me/handoffs"),

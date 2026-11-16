@@ -8,6 +8,25 @@ All notable changes to Context Commander are documented here. The format follows
 
 ### Added
 
+- **Project dashboards.** The home screen opens with **Projects at a
+  glance**: one row per project with a progress bar (done, in progress,
+  blocked, open), counts of in-progress and blocked items, who is working on
+  it now, items finished per day over 14 days, what waits on you (open
+  handoffs and proposals to decide), and when it last changed. A project's
+  **Overview** tab is now its dashboard: four numbers (share done, in
+  progress, blocked, working now), **Working now** with "Message" and
+  "Message everyone", phases as progress bars with time tracked, items
+  finished and time reported per day, branches and tickets in flight over
+  the last week, what waits on a person (proposals, blocked steps, the
+  current handoff), and recent decisions, gotchas and findings. Time and
+  branches come from the usage ledger, which stays optional: without
+  reported usage those panels say so, or are left out, rather than showing
+  zeros. New endpoints `GET /v1/me/projects/overview` and
+  `GET /v1/projects/{ns}/{slug}/plans/overview` (`?days=`, 1 to 90, default
+  14) return item counts, items finished per UTC day, and the last
+  activity, from plaintext statuses in one query per kind of number, without
+  decrypting anything. The design kit gains `.progress`, `.bars` and
+  `.legend`.
 - **Backup and restore** ([docs/backup-restore.md](docs/backup-restore.md)).
   What a full restore needs (`CC_ROOT_KEY`, the database and the object
   store), why the database is dumped before storage is copied, why

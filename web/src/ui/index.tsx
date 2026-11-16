@@ -4,6 +4,7 @@ import { copyToClipboard } from "../lib/clipboard";
 import { useT } from "../i18n";
 import { ApiError } from "../lib/api";
 import { parseMarkdown, type Block, type Inline } from "../lib/markdown";
+import { initials } from "../lib/labels";
 
 /**
  * The component kit.
@@ -152,6 +153,97 @@ export function Meter({ percent, tone }: { percent: number; tone?: "warn" | "dan
     <div className={`meter${tone ? " " + tone : ""}`}>
       <i style={{ width: `${clamped}%` }} />
     </div>
+  );
+}
+
+/**
+ * Items by status as one bar. `label` is the whole reading for a screen
+ * reader; sighted readers get the counts beside it from the caller.
+ */
+export function Progress({
+  done,
+  doing,
+  blocked,
+  open,
+  label,
+}: {
+  done: number;
+  doing: number;
+  blocked: number;
+  open: number;
+  label: string;
+}) {
+  const total = done + doing + blocked + open;
+  if (total === 0) return <div className="progress empty" role="img" aria-label={label} />;
+  const parts = [
+    ["done", done],
+    ["doing", doing],
+    ["blocked", blocked],
+    ["open", open],
+  ] as const;
+  return (
+    <div className="progress" role="img" aria-label={label}>
+      {parts.map(([cls, n]) =>
+        n > 0 ? <i key={cls} className={cls} style={{ width: `${(n / total) * 100}%` }} /> : null,
+      )}
+    </div>
+  );
+}
+
+/**
+ * One column per value, oldest first; the last is marked as now. `titles`
+ * give each column its reading on hover, `label` the whole chart's.
+ */
+export function Bars({
+  values,
+  titles,
+  label,
+  spark,
+}: {
+  values: number[];
+  titles: string[];
+  label: string;
+  spark?: boolean;
+}) {
+  const max = Math.max(...values, 0);
+  return (
+    <div className={spark ? "bars spark" : "bars"} role="img" aria-label={label}>
+      {values.map((v, k) => (
+        <i
+          key={k}
+          className={k === values.length - 1 ? "now" : undefined}
+          title={titles[k]}
+          style={{ height: max > 0 && v > 0 ? `${Math.max(6, (v / max) * 100)}%` : "0" }}
+        />
+      ))}
+    </div>
+  );
+}
+
+/** The key to Progress's colours. */
+export function ProgressLegend({
+  labels,
+}: {
+  labels: { done: string; doing: string; blocked: string; open: string };
+}) {
+  return (
+    <div className="legend">
+      {(["done", "doing", "blocked", "open"] as const).map((k) => (
+        <span key={k}>
+          <span className={`swatch ${k}`} aria-hidden="true" />
+          {labels[k]}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/** A person or agent as initials; the full name is the tooltip and the label. */
+export function Avatar({ name }: { name: string }) {
+  return (
+    <span className="avatar" title={name} role="img" aria-label={name}>
+      {initials(name || "?")}
+    </span>
   );
 }
 

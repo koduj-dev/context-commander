@@ -1292,6 +1292,99 @@ table.dt th.r {
   background: var(--cc-danger);
 }
 
+/* Work progress as one bar: done, in progress, blocked, open, in that
+ * order. The status colours are the badges'; the counts always sit beside
+ * it as text, so the bar never carries the meaning alone. */
+.progress {
+  display: flex;
+  gap: 2px;
+  height: 8px;
+}
+.progress > i {
+  display: block;
+  min-width: 2px;
+  border-radius: 2px;
+}
+.progress > i.done {
+  background: var(--cc-success);
+}
+.progress > i.doing {
+  background: var(--cc-info);
+}
+.progress > i.blocked {
+  background: var(--cc-danger);
+}
+.progress > i.open {
+  background: var(--cc-surface-3);
+  box-shadow: inset 0 0 0 1px var(--cc-border-strong);
+}
+.progress.empty {
+  border-radius: 2px;
+  background: var(--cc-surface-2);
+}
+
+/* One column per day; the height is the value. Violet like the meter, and
+ * today in pink: the day you are in. */
+.bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 72px;
+  border-bottom: 1px solid var(--cc-border-strong);
+}
+.bars > i {
+  display: block;
+  flex: 1;
+  border-radius: 2px 2px 0 0;
+  background: var(--cc-accent-secondary-visual);
+}
+.bars > i.now {
+  background: var(--cc-accent-primary-visual);
+}
+.bars.spark {
+  width: 140px;
+  height: 24px;
+}
+.bars-axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--cc-text-muted);
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  font-size: 11.5px;
+  color: var(--cc-text-muted);
+}
+.legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+.swatch.done {
+  background: var(--cc-success);
+}
+.swatch.doing {
+  background: var(--cc-info);
+}
+.swatch.blocked {
+  background: var(--cc-danger);
+}
+.swatch.open {
+  background: var(--cc-surface-3);
+  box-shadow: inset 0 0 0 1px var(--cc-border-strong);
+}
+
 /* A document preview: rendered markdown, a skill body, a handoff note. */
 .doc {
   border: 1px solid var(--cc-border);

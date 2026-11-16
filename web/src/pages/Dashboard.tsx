@@ -8,17 +8,21 @@ import {
   api,
   principalName,
   type MyProject,
+  type Person,
+  type Presence,
   type ProjectIdeaCounts,
+  type ProjectOverview,
   type UsageSummary,
   type WaitingHandoff,
 } from "../lib/api";
-import { roleLabel } from "../lib/labels";
 import { useLive } from "../lib/live";
 import { usePolled, useResource } from "../lib/resource";
 import { BOARD_REFRESH_MS, LIVE_REFRESH_MS, PresenceTable } from "./ProjectPlans";
 import { MessageComposer, type MessageTarget } from "./AgentMessages";
 import { lastDays, UsageFooter, UsageTable } from "./Usage";
+import { DoneBars, ProgressCell } from "./WorkOverview";
 import {
+  Avatar,
   Badge,
   Cell,
   DataTable,
@@ -31,6 +35,7 @@ import {
   Note,
   PageHead,
   Panel,
+  ProgressLegend,
   Stack,
 } from "../ui";
 
@@ -78,6 +83,15 @@ export function Dashboard() {
   const handoffs = useResource(() => api.myHandoffs(), []);
   const waiting = withProjects(handoffs.data ?? [], mine);
   const ideas = useResource(() => api.myIdeaCounts(), []);
+  // One live presence read for the table of projects and the panel of who is
+  // where, rather than two connections asking the same question.
+  const live = useLive(api.myPresenceEvents());
+  const presence = usePolled(
+    () => api.myPresence(),
+    [],
+    live.live ? LIVE_REFRESH_MS : BOARD_REFRESH_MS,
+    live.pulse,
+  );
   const week = lastDays(7);
   const fortnight = lastDays(14);
   const weekUsage = useResource(() => api.myUsage({ ...week, group: ["principal"] }), [week.from]);
@@ -97,8 +111,16 @@ export function Dashboard() {
         queued={(ideas.data?.items ?? []).reduce((n, c) => n + c.open, 0)}
       />
 
-      <Grid cols="2-1">
-        <Stack>
+      <Stack>
+        <Portfolio
+          projects={mine}
+          projectsLoading={projects.loading}
+          presence={presence.data}
+          waiting={handoffs.data ?? []}
+          ideas={ideas.data?.items ?? []}
+        />
+
+        <Grid cols={2}>
           <Panel
             title={t("dashboard.waiting")}
             tight
@@ -152,7 +174,11 @@ export function Dashboard() {
             reload={ideas.reload}
             items={ideas.data?.items ?? []}
           />
-          <WorkingNow />
+        </Grid>
+
+        <WorkingNow live={live.live} presence={presence} />
+
+        <Grid cols={2}>
           <Panel
             title={t("dashboard.usageDaily", { count: 14 })}
             tight
@@ -182,47 +208,8 @@ export function Dashboard() {
               <UsageTable summary={weekUsage.data} group="principal" />
             )}
           </Panel>
-        </Stack>
-
-        <Stack top>
-          <Panel
-            title={t("dashboard.yourProjects")}
-            sub={t("projects.count", { count: mine.length })}
-            tight
-          >
-            {projects.loading ? (
-              <Loading />
-            ) : projects.error ? (
-              <ErrorState error={projects.error} onRetry={projects.reload} />
-            ) : mine.length === 0 ? (
-              <EmptyState title={t("dashboard.noProjects")} body={t("projects.emptyBody")} />
-            ) : (
-              <DataTable
-                columns={[
-                  { key: "p", label: t("projects.column.project") },
-                  { key: "r", label: t("projects.column.role"), align: "r" },
-                ]}
-              >
-                {mine.map((p) => (
-                  <tr key={`${p.namespace}/${p.slug}`}>
-                    <td>
-                      <Cell
-                        primary={<Link to={`/p/${p.namespace}/${p.slug}`}>{p.name}</Link>}
-                        secondary={<Mono dim>{`${p.namespace}/${p.slug}`}</Mono>}
-                      />
-                    </td>
-                    <td className="r">
-                      <Badge tone={p.role === "OWNER" ? "active" : "neutral"}>
-                        {roleLabel(t, p.role)}
-                      </Badge>
-                    </td>
-                  </tr>
-                ))}
-              </DataTable>
-            )}
-          </Panel>
-        </Stack>
-      </Grid>
+        </Grid>
+      </Stack>
     </>
   );
 }
@@ -232,21 +219,14 @@ export function Dashboard() {
  * for checking on an agent left running at home. Re-reads when the server
  * says someone moved, and polls while visible when it cannot (docs/adr/0022).
  */
-function WorkingNow() {
+function WorkingNow({ live, presence }: { live: boolean; presence: PresenceRead }) {
   const t = useT();
-  const live = useLive(api.myPresenceEvents());
-  const presence = usePolled(
-    () => api.myPresence(),
-    [],
-    live.live ? LIVE_REFRESH_MS : BOARD_REFRESH_MS,
-    live.pulse,
-  );
   const [messageTo, setMessageTo] = useState<MessageTarget>();
   const [sent, setSent] = useState(false);
   return (
     <Panel
       title={t("dashboard.workingNow")}
-      sub={live.live ? t("plans.live") : t("plans.refreshes")}
+      sub={live ? t("plans.live") : t("plans.refreshes")}
       footer={
         messageTo ? (
           <MessageComposer
@@ -385,6 +365,173 @@ function IdeasWaiting({
               </td>
             </tr>
           ))}
+        </DataTable>
+      )}
+    </Panel>
+  );
+}
+
+type PresenceData = { items: Presence[]; people: Record<string, Person> };
+type PresenceRead = {
+  data?: PresenceData;
+  loading: boolean;
+  error?: unknown;
+  reload: () => void;
+};
+
+/** How many of a project's people to draw before "+n". */
+const AVATARS_SHOWN = 4;
+
+/**
+ * Every project in one row each: how far its plans are, what is in progress
+ * and blocked, who is on it now, what it finished each day, what waits on the
+ * reader, and when it last moved. Most recently active first.
+ *
+ * The numbers come from one read (`GET /me/projects/overview`); who is on it
+ * and what waits are the reads this screen makes anyway, joined by path. A
+ * project whose role cannot read plans still gets its row, with the reason.
+ */
+function Portfolio({
+  projects,
+  projectsLoading,
+  presence,
+  waiting,
+  ideas,
+}: {
+  projects: MyProject[];
+  projectsLoading: boolean;
+  presence?: PresenceData;
+  waiting: WaitingHandoff[];
+  ideas: ProjectIdeaCounts[];
+}) {
+  const t = useT();
+  const f = useFormat();
+  const overview = useResource(() => api.myProjectsOverview(), []);
+
+  const rows: { path: string; name: string; o?: ProjectOverview }[] = (
+    overview.data?.items ?? []
+  ).map((o) => ({ path: o.project, name: o.name, o }));
+  const listed = new Set(rows.map((r) => r.path));
+  for (const p of projects) {
+    const path = `${p.namespace}/${p.slug}`;
+    if (!listed.has(path)) rows.push({ path, name: p.name });
+  }
+
+  const people = new Map<string, string[]>();
+  for (const p of presence?.items ?? []) {
+    if (p.idle) continue;
+    const names = people.get(p.project) ?? [];
+    const name = presence?.people[p.principal_id]?.name ?? p.client_type;
+    if (!names.includes(name)) names.push(name);
+    people.set(p.project, names);
+  }
+  const waitingOn = new Map<string, number>();
+  for (const h of waiting) waitingOn.set(h.project, (waitingOn.get(h.project) ?? 0) + 1);
+  for (const c of ideas) waitingOn.set(c.project, (waitingOn.get(c.project) ?? 0) + c.proposed);
+
+  const days = overview.data?.days ?? 14;
+  return (
+    <Panel
+      title={t("overview.portfolio")}
+      sub={t("projects.count", { count: rows.length })}
+      tight
+      footer={
+        <Stack gap="sm">
+          <ProgressLegend
+            labels={{
+              done: t("overview.legend.done"),
+              doing: t("overview.legend.doing"),
+              blocked: t("overview.legend.blocked"),
+              open: t("overview.legend.open"),
+            }}
+          />
+          <span className="dim">{t("overview.portfolioLead")}</span>
+        </Stack>
+      }
+    >
+      {overview.loading || projectsLoading ? (
+        <Loading />
+      ) : overview.error ? (
+        <ErrorState error={overview.error} onRetry={overview.reload} />
+      ) : rows.length === 0 ? (
+        <EmptyState title={t("dashboard.noProjects")} body={t("projects.emptyBody")} />
+      ) : (
+        <DataTable
+          columns={[
+            { key: "project", label: t("projects.column.project") },
+            { key: "progress", label: t("overview.col.progress") },
+            { key: "doing", label: t("overview.col.doing"), align: "r" },
+            { key: "blocked", label: t("overview.col.blocked"), align: "r" },
+            { key: "people", label: t("overview.col.people") },
+            { key: "activity", label: t("overview.col.activity", { count: days }) },
+            { key: "waiting", label: t("overview.col.waiting"), align: "r" },
+            { key: "last", label: t("overview.col.last"), align: "r" },
+          ]}
+        >
+          {rows.map(({ path, name, o }) => {
+            const here = people.get(path) ?? [];
+            const wait = waitingOn.get(path) ?? 0;
+            return (
+              <tr key={path}>
+                <td>
+                  <Cell
+                    primary={<Link to={`/p/${path}`}>{name}</Link>}
+                    secondary={<Mono dim>{path}</Mono>}
+                  />
+                </td>
+                <td>
+                  {o ? (
+                    <ProgressCell counts={o.counts} />
+                  ) : (
+                    <span className="dim">{t("overview.noPlanAccess")}</span>
+                  )}
+                </td>
+                <td className="r">
+                  <span className="num">{o ? f.number(o.counts.in_progress) : "—"}</span>
+                </td>
+                <td className="r">
+                  {o && o.counts.blocked > 0 ? (
+                    <Badge tone="danger">{f.number(o.counts.blocked)}</Badge>
+                  ) : (
+                    <span className="dim">{o ? "0" : "—"}</span>
+                  )}
+                </td>
+                <td>
+                  {here.length === 0 ? (
+                    <span className="dim">{t("overview.nobody")}</span>
+                  ) : (
+                    <div className="row row-sm">
+                      {here.slice(0, AVATARS_SHOWN).map((n) => (
+                        <Avatar key={n} name={n} />
+                      ))}
+                      {here.length > AVATARS_SHOWN && (
+                        <span className="dim">+{f.number(here.length - AVATARS_SHOWN)}</span>
+                      )}
+                    </div>
+                  )}
+                </td>
+                <td>
+                  {o && overview.data ? (
+                    <DoneBars from={overview.data.from} values={o.done_per_day} spark />
+                  ) : (
+                    <span className="dim">—</span>
+                  )}
+                </td>
+                <td className="r">
+                  {wait > 0 ? (
+                    <Badge tone="warn">{t("overview.waitingCount", { count: wait })}</Badge>
+                  ) : (
+                    <span className="dim">—</span>
+                  )}
+                </td>
+                <td className="r">
+                  <span className="dim">
+                    {o?.last_activity ? f.relative(o.last_activity) : t("overview.never")}
+                  </span>
+                </td>
+              </tr>
+            );
+          })}
         </DataTable>
       )}
     </Panel>

@@ -2,7 +2,9 @@ package http
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -667,4 +669,71 @@ func (d Deps) deletePhase(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+type projectOverviewResponse struct {
+	Project      string         `json:"project"`
+	Name         string         `json:"name"`
+	Role         string         `json:"role"`
+	Counts       countsResponse `json:"counts"`
+	DonePerDay   []int          `json:"done_per_day"`
+	LastActivity *time.Time     `json:"last_activity,omitempty"`
+}
+
+// overviewDays reads ?days=, 14 when absent.
+func overviewDays(w http.ResponseWriter, r *http.Request) (int, bool) {
+	raw := r.URL.Query().Get("days")
+	if raw == "" {
+		return plans.DefaultOverviewDays, true
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil || n < 1 || n > plans.MaxOverviewDays {
+		writeError(w, http.StatusBadRequest, "invalid_request", fmt.Sprintf("days must be a whole number between 1 and %d", plans.MaxOverviewDays))
+		return 0, false
+	}
+	return n, true
+}
+
+func writeOverview(w http.ResponseWriter, first time.Time, list []plans.ProjectOverview, days int) {
+	out := struct {
+		From  string                    `json:"from"`
+		Days  int                       `json:"days"`
+		Items []projectOverviewResponse `json:"items"`
+	}{From: first.Format(time.DateOnly), Days: days, Items: make([]projectOverviewResponse, len(list))}
+	for i, p := range list {
+		out.Items[i] = projectOverviewResponse{
+			Project: p.Path, Name: p.Name, Role: p.Role, Counts: countsFrom(p.Counts), DonePerDay: p.DonePerDay, LastActivity: p.LastActivity,
+		}
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// myProjectsOverview is every project the caller can read plans in, in
+// numbers: item counts, items finished per day, the last change. Most
+// recently active first.
+func (d Deps) myProjectsOverview(w http.ResponseWriter, r *http.Request) {
+	days, ok := overviewDays(w, r)
+	if !ok {
+		return
+	}
+	first, list, err := d.Plans.Overview(r.Context(), principalIDFrom(r.Context()), uuid.Nil, days)
+	if err != nil {
+		writeDomainError(w, r, err)
+		return
+	}
+	writeOverview(w, first, list, days)
+}
+
+// getPlanOverview is the same numbers for one project.
+func (d Deps) getPlanOverview(w http.ResponseWriter, r *http.Request) {
+	days, ok := overviewDays(w, r)
+	if !ok {
+		return
+	}
+	first, list, err := d.Plans.Overview(r.Context(), principalIDFrom(r.Context()), projectFrom(r.Context()).ID, days)
+	if err != nil {
+		writeDomainError(w, r, err)
+		return
+	}
+	writeOverview(w, first, list, days)
 }

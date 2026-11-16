@@ -91,6 +91,8 @@ const AA_NORMAL = 4.5;
 /** Inline styles that are data rather than styling, and why. */
 const INLINE_STYLE_ALLOWED = new Map([
   ["Meter", "the fill width IS the value being displayed"],
+  ["Progress", "each segment's width IS its share of the items"],
+  ["Bars", "each column's height IS that day's value"],
   ["SelectField", "a popup's position IS the trigger's position, and no class can know it"],
 ]);
 
