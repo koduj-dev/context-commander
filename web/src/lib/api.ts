@@ -363,6 +363,10 @@ export type ContextPack = {
     size_bytes: number;
     updated_at: string;
     content: string;
+    /** The manifest's reason for this file (docs/adr/0034). */
+    why?: string;
+    /** Content stops at the manifest's max_bytes; size_bytes is the whole file. */
+    truncated?: boolean;
   }[];
   skills: {
     binding_id: string;

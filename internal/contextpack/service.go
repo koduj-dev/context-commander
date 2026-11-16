@@ -135,7 +135,26 @@ func (s *Service) Bootstrap(ctx context.Context, principalID, projectID uuid.UUI
 	}
 
 	pack := Pack{AssembledAt: time.Now().UTC()}
-	b := &budget{limit: clampBudget(opts.Budget)}
+
+	// The manifest is read before the budget exists because it may set the
+	// budget (docs/adr/0034). A caller naming its own paths, or skipping
+	// artifacts, has no use for it.
+	var manifest *Manifest
+	var manifestErr error
+	if !opts.SkipArtifacts && len(opts.ArtifactPaths) == 0 {
+		manifest, manifestErr = s.readManifest(ctx, principalID, projectID)
+		if errors.Is(manifestErr, artifacts.ErrForbidden) {
+			manifestErr = nil // the artifact section says so itself
+		}
+	}
+	limit := opts.Budget
+	if limit <= 0 && manifest != nil && manifest.Budget > 0 {
+		limit = manifest.Budget
+	}
+	b := &budget{limit: clampBudget(limit)}
+	if manifestErr != nil {
+		b.note("artifact", ManifestPath, 0, manifestNote(manifestErr))
+	}
 
 	if err := s.fillProjectAndRole(ctx, principalID, projectID, &pack); err != nil {
 		return Pack{}, err
@@ -168,7 +187,7 @@ func (s *Service) Bootstrap(ctx context.Context, principalID, projectID uuid.UUI
 		s.fillSkills(ctx, principalID, projectID, &pack, b)
 	}
 	if !opts.SkipArtifacts {
-		s.fillArtifacts(ctx, principalID, projectID, opts, referenced, &pack, b)
+		s.fillArtifacts(ctx, principalID, projectID, opts, manifest, referenced, &pack, b)
 	}
 
 	// A seam for the interleaving test in boundary_internal_test.go: nil in
@@ -445,13 +464,14 @@ func (s *Service) fillSkills(ctx context.Context, principalID, projectID uuid.UU
 
 // fillArtifacts selects what to read, then reads it. Selection is, in
 // order: the caller's explicit ArtifactPaths if given; otherwise the
-// artifacts the current handoff referenced, followed by whatever lives
-// under ConventionalArtifactPrefix.
+// artifacts the current handoff referenced, followed by the project's
+// manifest if it has a usable one, or else whatever lives under
+// ConventionalArtifactPrefix.
 func (s *Service) fillArtifacts(
 	ctx context.Context, principalID, projectID uuid.UUID,
-	opts Options, referenced []uuid.UUID, pack *Pack, b *budget,
+	opts Options, manifest *Manifest, referenced []uuid.UUID, pack *Pack, b *budget,
 ) {
-	paths, overflow, err := s.selectArtifactPaths(ctx, principalID, projectID, opts, referenced)
+	selected, overflow, err := s.selectArtifactPaths(ctx, principalID, projectID, opts, manifest, referenced, b)
 	if err != nil {
 		b.note("artifact", "selection", 0, reasonFor(err, "could not list artifacts"))
 		return
@@ -461,7 +481,8 @@ func (s *Service) fillArtifacts(
 			"omitted: more than "+strconv.Itoa(MaxConventionalArtifacts)+" artifacts under this prefix — list them with artifact.list and pass artifact_paths explicitly")
 	}
 
-	for _, path := range paths {
+	for _, sel := range selected {
+		path := sel.path
 		version, content, err := s.artifacts.Read(ctx, principalID, projectID, path, nil)
 		if err != nil {
 			b.note("artifact", path, 0, reasonFor(err, "could not read the artifact"))
@@ -471,6 +492,10 @@ func (s *Service) fillArtifacts(
 		// its current version is resolved, and the current version is what
 		// the read returns. A manifest with declared budgets (NEXT.md
 		// Phase 2) is what will let this decide before spending the read.
+		truncated := false
+		if sel.maxBytes > 0 && len(content) > sel.maxBytes {
+			content, truncated = cut(content, sel.maxBytes), true
+		}
 		if !b.fits(len(content)) {
 			b.note("artifact", path, version.SizeBytes,
 				"omitted: over the remaining budget — fetch it with artifact.read")
@@ -479,6 +504,7 @@ func (s *Service) fillArtifacts(
 		pack.Artifacts = append(pack.Artifacts, ArtifactSection{
 			LogicalPath: path, Version: version.Version, ContentHash: version.ContentHash,
 			SizeBytes: version.SizeBytes, UpdatedAt: version.CreatedAt, Content: string(content),
+			Why: sel.why, Truncated: truncated,
 		})
 	}
 }
@@ -488,10 +514,10 @@ func (s *Service) fillArtifacts(
 // they were named by the agent that did the work, which is a stronger
 // signal than a naming convention.
 func (s *Service) selectArtifactPaths(
-	ctx context.Context, principalID, projectID uuid.UUID, opts Options, referenced []uuid.UUID,
-) (selected []string, overflow bool, err error) {
+	ctx context.Context, principalID, projectID uuid.UUID, opts Options, manifest *Manifest, referenced []uuid.UUID, b *budget,
+) (selected []selection, overflow bool, err error) {
 	if len(opts.ArtifactPaths) > 0 {
-		return dedupe(opts.ArtifactPaths), false, nil
+		return plain(dedupe(opts.ArtifactPaths)), false, nil
 	}
 
 	var paths []string
@@ -501,6 +527,9 @@ func (s *Service) selectArtifactPaths(
 			return nil, false, err
 		}
 		paths = append(paths, resolved...)
+	}
+	if manifest != nil {
+		return dedupeSelections(append(plain(paths), s.expandManifest(ctx, principalID, projectID, manifest, b)...)), false, nil
 	}
 
 	// The convention half. The prefix is filtered in the query
@@ -524,7 +553,9 @@ func (s *Service) selectArtifactPaths(
 		return nil, false, err
 	}
 	for _, a := range page.Items {
-		paths = append(paths, a.LogicalPath)
+		if a.LogicalPath != ManifestPath {
+			paths = append(paths, a.LogicalPath)
+		}
 	}
 	if page.NextCursor != "" {
 		// Reported rather than dropped: "there are more must-read files
@@ -532,7 +563,29 @@ func (s *Service) selectArtifactPaths(
 		// not have to infer from a suspiciously round number of artifacts.
 		overflow = true
 	}
-	return dedupe(paths), overflow, nil
+	return plain(dedupe(paths)), overflow, nil
+}
+
+func plain(paths []string) []selection {
+	out := make([]selection, len(paths))
+	for i, p := range paths {
+		out[i] = selection{path: p}
+	}
+	return out
+}
+
+// dedupeSelections keeps the first selection of each path: a handoff's
+// reference outranks the manifest's entry for the same file.
+func dedupeSelections(in []selection) []selection {
+	seen := map[string]bool{}
+	out := in[:0]
+	for _, s := range in {
+		if !seen[s.path] {
+			seen[s.path] = true
+			out = append(out, s)
+		}
+	}
+	return out
 }
 
 // resolveArtifactPaths maps artifact IDs to logical paths. The handoff

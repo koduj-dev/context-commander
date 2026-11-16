@@ -532,6 +532,7 @@ export const pl: Partial<Record<MessageKey, string>> = {
   "context.column.what": "Co",
   "context.column.ref": "Które",
   "context.column.why": "Dlaczego",
+  "context.cut": "dołączono pierwsze {size}",
   "context.included": "Zawarte",
   "context.artifacts":
     "{count, plural, one {# artefakt} few {# artefakty} many {# artefaktów} other {# artefaktu}}",

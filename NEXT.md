@@ -115,7 +115,11 @@ re-derive them:
 
 Only after the core loop is proven:
 
-- [ ] Declarative project manifest naming "must-read" artifacts and their budgets.
+- [x] ~~Declarative project manifest naming "must-read" artifacts and their
+      budgets.~~ Closed 2026-11-16 ([ADR 0034](docs/adr/0034-project-manifest.md)):
+      `context/manifest.json` with paths, prefixes, `max_bytes`, `why` and a
+      default budget. Still open: nothing checks a manifest when it is
+      written; the next pack reports what is wrong.
 - [ ] Metadata/full-text retrieval filtered by type, author, time, provenance.
 - [ ] Compaction/summarization as a derived history object, never overwriting
       the source (cookbook §10.3 already decided this shape).

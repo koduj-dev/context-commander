@@ -86,6 +86,15 @@ All notable changes to Context Commander are documented here. The format follows
   whether the provider answers, the last error, the queue and the memories
   still waiting.
 
+- **Project manifest.** `context/manifest.json` tells `context.bootstrap`
+  what an arriving agent must read: paths and prefixes in priority order,
+  `max_bytes` to carry a long file cut rather than drop it, a `why` that
+  travels with each artifact, and the pack's default budget. A manifest that
+  cannot be used is reported in `budget.truncated` and the `context/`
+  convention takes over. The Context tab shows each artifact's reason and
+  how much of a cut one was included.
+  [ADR 0034](docs/adr/0034-project-manifest.md).
+
 - **What changed while you worked.** `project.changes` (MCP) and
   `GET /v1/projects/{ns}/{slug}/changes?since=` list what everyone else did
   on the project since a moment: memories recorded, plan steps blocked,

@@ -525,6 +525,7 @@ export const en = {
   "context.column.what": "What",
   "context.column.ref": "Which one",
   "context.column.why": "Why",
+  "context.cut": "first {size} included",
   "context.included": "Included",
   "context.artifacts": "{count, plural, one {# artifact} other {# artifacts}}",
   "context.skills": "{count, plural, one {# skill} other {# skills}}",

@@ -132,6 +132,8 @@ type contextArtifactResult struct {
 	SizeBytes   int64  `json:"size_bytes"`
 	UpdatedAt   string `json:"updated_at"`
 	Content     string `json:"content"`
+	Why         string `json:"why,omitempty"`
+	Truncated   bool   `json:"truncated,omitempty"`
 }
 
 type contextSkillResult struct {
@@ -207,6 +209,7 @@ func toContextPackResult(p contextpack.Pack, thisClientID uuid.UUID) contextPack
 		out.Artifacts = append(out.Artifacts, contextArtifactResult{
 			LogicalPath: a.LogicalPath, Version: a.Version, ContentHash: a.ContentHash,
 			SizeBytes: a.SizeBytes, UpdatedAt: a.UpdatedAt.Format(rfc3339), Content: a.Content,
+			Why: a.Why, Truncated: a.Truncated,
 		})
 	}
 	for _, sk := range p.Skills {
@@ -272,7 +275,7 @@ func registerContextTools(server *sdkmcp.Server, deps Deps, principalID, clientI
 		Name: "context.bootstrap",
 		Description: "Assemble everything needed to start working on a project, in one call: the project and " +
 			"your role in it, the handoff to continue from, the content of the project's effective skills, the " +
-			"artifacts it says to read, and the tail of its event stream with a cursor to follow along from. " +
+			"artifacts it says to read (context/manifest.json if the project has one, else everything under context/), and the tail of its event stream with a cursor to follow along from. " +
 			"Call this FIRST when joining a project — the per-domain tools (handoff.*, artifact.*, skill.*, " +
 			"event.list) are for everything after that first step. Content is capped by an explicit byte " +
 			"budget; whatever did not fit is listed in budget.truncated with the tool that fetches it, so an " +
