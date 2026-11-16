@@ -92,6 +92,12 @@ All notable changes to Context Commander are documented here. The format follows
   most likely the wrong `CC_ROOT_KEY`, as after a restore with a different
   key, instead of only blaming an unfinished rotation.
 
+### Security
+
+- OpenTelemetry Go 1.44.0 → 1.47.0 for GHSA-q7gw-24fr-5p69: attribute values
+  made of U+FFFD runes bypassed `AttributeValueLengthLimit`. The modules are
+  indirect dependencies and Context Commander sets no such limit.
+
 ## [0.1.0-beta.2] — 2026-11-13
 
 The team release: Context Commander as an agent dashboard for a small team.
