@@ -175,6 +175,11 @@ type ArtifactSection struct {
 	SizeBytes   int64     `json:"size_bytes"`
 	UpdatedAt   time.Time `json:"updated_at"`
 	Content     string    `json:"content"`
+	// Why is the manifest's reason for this file, when it gave one.
+	Why string `json:"why,omitempty"`
+	// Truncated means Content stops at the manifest's max_bytes for this
+	// entry; SizeBytes is the whole file, and artifact.read returns it.
+	Truncated bool `json:"truncated,omitempty"`
 }
 
 // SkillSection carries a skill's actual instructions, not just the binding

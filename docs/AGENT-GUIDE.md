@@ -111,6 +111,23 @@ Artifacts under `context/` are the project's must-read set, and
 newcomer needs, and nothing else — a `context/` full of scratch notes is a
 context budget spent on nothing.
 
+A project can instead say exactly what to read, in which order and how much
+of each, in `context/manifest.json` (docs/adr/0034):
+
+```json
+{"version": 1, "read": [
+  {"path": "context/overview.md", "why": "what the project is"},
+  {"path": "docs/architecture.md", "max_bytes": 20000},
+  {"prefix": "docs/adr/", "max_bytes": 4000}
+]}
+```
+
+An artifact the pack carries cut at `max_bytes` comes back with
+`truncated: true`; read the rest with `artifact.read` when your task needs
+it. After changing the manifest, run `context.bootstrap` once: if the
+manifest is wrong, `budget.truncated` says why, and the pack falls back to
+`context/`.
+
 Write with `expected_version`. If you get a conflict, someone changed the
 artifact since you read it: re-read, merge, retry. Never retry with a bumped
 number to make the error go away — that is how you silently delete their work.

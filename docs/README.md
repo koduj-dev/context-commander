@@ -78,6 +78,7 @@ supersedes it, so the trail of what was believed when stays readable.
 | [0031](adr/0031-one-hour-cache-writes-and-ledger-retention.md) | One-hour cache writes counted and priced apart; retention for the usage ledger |
 | [0032](adr/0032-agent-inbox.md) | Messages to agents mid-work: an inbox per session |
 | [0033](adr/0033-what-changed-while-you-worked.md) | What changed while you worked: a change feed an agent reads |
+| [0034](adr/0034-project-manifest.md) | A project manifest: what an arriving agent must read |
 
 ## Not documentation
 

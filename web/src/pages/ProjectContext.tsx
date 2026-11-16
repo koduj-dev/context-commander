@@ -8,6 +8,7 @@ import {
   Badge,
   Btn,
   Code,
+  Cell,
   DataTable,
   Def,
   Defs,
@@ -161,13 +162,23 @@ export function ProjectContext() {
               {p.artifacts.map((a) => (
                 <tr key={a.logical_path}>
                   <td>
-                    <Mono>{a.logical_path}</Mono>
+                    <Cell
+                      primary={<Mono>{a.logical_path}</Mono>}
+                      secondary={a.why ? <span className="dim">{a.why}</span> : undefined}
+                    />
                   </td>
                   <td className="r">
                     <span className="num">v{a.version}</span>
                   </td>
                   <td className="r">
                     <span className="num">{f.bytes(a.size_bytes)}</span>
+                    {a.truncated && (
+                      <div className="sub-line">
+                        {t("context.cut", {
+                          size: f.bytes(new TextEncoder().encode(a.content).length),
+                        })}
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}

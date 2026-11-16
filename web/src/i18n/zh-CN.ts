@@ -512,6 +512,7 @@ export const zhCN: Partial<Record<MessageKey, string>> = {
   "context.column.what": "什么",
   "context.column.ref": "哪一个",
   "context.column.why": "为什么",
+  "context.cut": "已包含前 {size}",
   "context.included": "已包含",
   "context.artifacts": "{count, plural, other {# 个工件}}",
   "context.skills": "{count, plural, other {# 个 skill}}",
