@@ -152,17 +152,25 @@ All notable changes to Context Commander are documented here. The format follows
   the fingerprints and how many project keys use each. See
   [docs/backup-restore.md](docs/backup-restore.md#rotate-the-root-key).
 
+### Security
+
+- **Browser hardening headers on every response.** A Content-Security-Policy
+  that allows the interface only its own scripts (no inline script, no
+  eval), its own styles plus the Inter webfont, and requests to its own
+  origin, and forbids framing and plugins; `X-Content-Type-Options:
+  nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`,
+  `Cross-Origin-Opener-Policy`, a restrictive `Permissions-Policy`, and
+  `Strict-Transport-Security` when `ccd serve` terminates TLS itself.
+
+- OpenTelemetry Go 1.44.0 → 1.47.0 for GHSA-q7gw-24fr-5p69: attribute values
+  made of U+FFFD runes bypassed `AttributeValueLengthLimit`. The modules are
+  indirect dependencies and Context Commander sets no such limit.
+
 ### Changed
 
 - The error for a project key wrapped under another root key now says it is
   most likely the wrong `CC_ROOT_KEY`, as after a restore with a different
   key, instead of only blaming an unfinished rotation.
-
-### Security
-
-- OpenTelemetry Go 1.44.0 → 1.47.0 for GHSA-q7gw-24fr-5p69: attribute values
-  made of U+FFFD runes bypassed `AttributeValueLengthLimit`. The modules are
-  indirect dependencies and Context Commander sets no such limit.
 
 ## [0.1.0-beta.2] — 2026-11-13
 

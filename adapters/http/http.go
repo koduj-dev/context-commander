@@ -130,6 +130,7 @@ func NewHandler(deps Deps) http.Handler {
 	// client-supplied copies first (GHSA-3fxj-6jh8-hvhx). internal/clientip
 	// reads the header only from a proxy named in --trusted-proxies.
 	r.Use(middleware.Recoverer)
+	r.Use(securityHeaders)
 
 	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
