@@ -115,6 +115,8 @@ export function Dashboard() {
         <Portfolio
           projects={mine}
           projectsLoading={projects.loading}
+          projectsError={projects.error}
+          onRetryProjects={projects.reload}
           presence={presence.data}
           waiting={handoffs.data ?? []}
           ideas={ideas.data?.items ?? []}
@@ -390,16 +392,25 @@ const AVATARS_SHOWN = 4;
  * The numbers come from one read (`GET /me/projects/overview`); who is on it
  * and what waits are the reads this screen makes anyway, joined by path. A
  * project whose role cannot read plans still gets its row, with the reason.
+ *
+ * Either read failing shows its error above whatever the other one returned:
+ * the list of projects is the way into every project, so a failed aggregate
+ * must not take the links with it, and a failed list must not read as "no
+ * projects".
  */
 function Portfolio({
   projects,
   projectsLoading,
+  projectsError,
+  onRetryProjects,
   presence,
   waiting,
   ideas,
 }: {
   projects: MyProject[];
   projectsLoading: boolean;
+  projectsError?: unknown;
+  onRetryProjects: () => void;
   presence?: PresenceData;
   waiting: WaitingHandoff[];
   ideas: ProjectIdeaCounts[];
@@ -451,88 +462,96 @@ function Portfolio({
     >
       {overview.loading || projectsLoading ? (
         <Loading />
-      ) : overview.error ? (
-        <ErrorState error={overview.error} onRetry={overview.reload} />
-      ) : rows.length === 0 ? (
-        <EmptyState title={t("dashboard.noProjects")} body={t("projects.emptyBody")} />
       ) : (
-        <DataTable
-          columns={[
-            { key: "project", label: t("projects.column.project") },
-            { key: "progress", label: t("overview.col.progress") },
-            { key: "doing", label: t("overview.col.doing"), align: "r" },
-            { key: "blocked", label: t("overview.col.blocked"), align: "r" },
-            { key: "people", label: t("overview.col.people") },
-            { key: "activity", label: t("overview.col.activity", { count: days }) },
-            { key: "waiting", label: t("overview.col.waiting"), align: "r" },
-            { key: "last", label: t("overview.col.last"), align: "r" },
-          ]}
-        >
-          {rows.map(({ path, name, o }) => {
-            const here = people.get(path) ?? [];
-            const wait = waitingOn.get(path) ?? 0;
-            return (
-              <tr key={path}>
-                <td>
-                  <Cell
-                    primary={<Link to={`/p/${path}`}>{name}</Link>}
-                    secondary={<Mono dim>{path}</Mono>}
-                  />
-                </td>
-                <td>
-                  {o ? (
-                    <ProgressCell counts={o.counts} />
-                  ) : (
-                    <span className="dim">{t("overview.noPlanAccess")}</span>
-                  )}
-                </td>
-                <td className="r">
-                  <span className="num">{o ? f.number(o.counts.in_progress) : "—"}</span>
-                </td>
-                <td className="r">
-                  {o && o.counts.blocked > 0 ? (
-                    <Badge tone="danger">{f.number(o.counts.blocked)}</Badge>
-                  ) : (
-                    <span className="dim">{o ? "0" : "—"}</span>
-                  )}
-                </td>
-                <td>
-                  {here.length === 0 ? (
-                    <span className="dim">{t("overview.nobody")}</span>
-                  ) : (
-                    <div className="row row-sm">
-                      {here.slice(0, AVATARS_SHOWN).map((n) => (
-                        <Avatar key={n} name={n} />
-                      ))}
-                      {here.length > AVATARS_SHOWN && (
-                        <span className="dim">+{f.number(here.length - AVATARS_SHOWN)}</span>
+        <>
+          {projectsError ? <ErrorState error={projectsError} onRetry={onRetryProjects} /> : null}
+          {overview.error ? <ErrorState error={overview.error} onRetry={overview.reload} /> : null}
+          {rows.length === 0 ? (
+            projectsError || overview.error ? null : (
+              <EmptyState title={t("dashboard.noProjects")} body={t("projects.emptyBody")} />
+            )
+          ) : (
+            <DataTable
+              columns={[
+                { key: "project", label: t("projects.column.project") },
+                { key: "progress", label: t("overview.col.progress") },
+                { key: "doing", label: t("overview.col.doing"), align: "r" },
+                { key: "blocked", label: t("overview.col.blocked"), align: "r" },
+                { key: "people", label: t("overview.col.people") },
+                { key: "activity", label: t("overview.col.activity", { count: days }) },
+                { key: "waiting", label: t("overview.col.waiting"), align: "r" },
+                { key: "last", label: t("overview.col.last"), align: "r" },
+              ]}
+            >
+              {rows.map(({ path, name, o }) => {
+                const here = people.get(path) ?? [];
+                const wait = waitingOn.get(path) ?? 0;
+                return (
+                  <tr key={path}>
+                    <td>
+                      <Cell
+                        primary={<Link to={`/p/${path}`}>{name}</Link>}
+                        secondary={<Mono dim>{path}</Mono>}
+                      />
+                    </td>
+                    <td>
+                      {o ? (
+                        <ProgressCell counts={o.counts} />
+                      ) : overview.error ? (
+                        <span className="dim">—</span>
+                      ) : (
+                        <span className="dim">{t("overview.noPlanAccess")}</span>
                       )}
-                    </div>
-                  )}
-                </td>
-                <td>
-                  {o && overview.data ? (
-                    <DoneBars from={overview.data.from} values={o.done_per_day} spark />
-                  ) : (
-                    <span className="dim">—</span>
-                  )}
-                </td>
-                <td className="r">
-                  {wait > 0 ? (
-                    <Badge tone="warn">{t("overview.waitingCount", { count: wait })}</Badge>
-                  ) : (
-                    <span className="dim">—</span>
-                  )}
-                </td>
-                <td className="r">
-                  <span className="dim">
-                    {o?.last_activity ? f.relative(o.last_activity) : t("overview.never")}
-                  </span>
-                </td>
-              </tr>
-            );
-          })}
-        </DataTable>
+                    </td>
+                    <td className="r">
+                      <span className="num">{o ? f.number(o.counts.in_progress) : "—"}</span>
+                    </td>
+                    <td className="r">
+                      {o && o.counts.blocked > 0 ? (
+                        <Badge tone="danger">{f.number(o.counts.blocked)}</Badge>
+                      ) : (
+                        <span className="dim">{o ? "0" : "—"}</span>
+                      )}
+                    </td>
+                    <td>
+                      {here.length === 0 ? (
+                        <span className="dim">{t("overview.nobody")}</span>
+                      ) : (
+                        <div className="row row-sm">
+                          {here.slice(0, AVATARS_SHOWN).map((n) => (
+                            <Avatar key={n} name={n} />
+                          ))}
+                          {here.length > AVATARS_SHOWN && (
+                            <span className="dim">+{f.number(here.length - AVATARS_SHOWN)}</span>
+                          )}
+                        </div>
+                      )}
+                    </td>
+                    <td>
+                      {o && overview.data ? (
+                        <DoneBars from={overview.data.from} values={o.done_per_day} spark />
+                      ) : (
+                        <span className="dim">—</span>
+                      )}
+                    </td>
+                    <td className="r">
+                      {wait > 0 ? (
+                        <Badge tone="warn">{t("overview.waitingCount", { count: wait })}</Badge>
+                      ) : (
+                        <span className="dim">—</span>
+                      )}
+                    </td>
+                    <td className="r">
+                      <span className="dim">
+                        {o?.last_activity ? f.relative(o.last_activity) : t("overview.never")}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </DataTable>
+          )}
+        </>
       )}
     </Panel>
   );

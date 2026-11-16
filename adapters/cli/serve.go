@@ -240,7 +240,7 @@ func newServeCmd() *cobra.Command {
 			if len(keyCheck.Others) > 0 {
 				slog.Warn("some project keys are wrapped under another root key, so those projects cannot be read: "+
 					"an unfinished rotation; run `ccd root-key rotate` again with the previous key in $"+rootKeyPreviousEnv,
-					"root_key", keyCheck.Current, "matching", keyCheck.Matching, "other", fmt.Sprint(keyCheck.Others))
+					"root_key", keyCheck.Current, "matching", keyCheck.Matching, "other", crypto.FormatRootKeyUses(keyCheck.Others))
 			}
 
 			// Parsed before anything writes, and stated at startup either way:

@@ -77,12 +77,14 @@ func CheckRootKey(ctx context.Context, pool *db.Pool, root RootKeyProvider) (Roo
 			"%w: CC_ROOT_KEY has fingerprint %q, but the project keys are wrapped under %s. "+
 				"Start with the key the data was written under (after a restore, the key the backup was taken with; "+
 				"docs/backup-restore.md shows how to compare fingerprints)",
-			ErrWrongRootKey, current, describeUses(check.Others))
+			ErrWrongRootKey, current, FormatRootKeyUses(check.Others))
 	}
 	return check, nil
 }
 
-func describeUses(uses []RootKeyUse) string {
+// FormatRootKeyUses lists fingerprints with their project key counts:
+// `"env:…" (3), "env:…" (1)`.
+func FormatRootKeyUses(uses []RootKeyUse) string {
 	parts := make([]string, len(uses))
 	for i, u := range uses {
 		parts[i] = fmt.Sprintf("%q (%d)", u.Ref, u.ProjectKeys)

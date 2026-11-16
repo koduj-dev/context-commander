@@ -1174,7 +1174,8 @@ export const en = {
   "overview.waitingLead":
     "Proposals to accept or reject, blocked steps, and the handoff left for whoever comes next.",
   "overview.waitingNone": "Nothing waits on a person",
-  "overview.waitingNoneBody": "No proposal to decide, nothing blocked, no open handoff.",
+  "overview.noProposals": "No proposal to decide",
+  "overview.waitingNoneBody": "No proposal to decide and nothing blocked.",
   "overview.kind.proposal": "Proposal",
   "overview.kind.blocked": "Blocked",
   "overview.phaseTime": "{time} tracked",

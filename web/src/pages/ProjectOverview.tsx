@@ -107,7 +107,11 @@ export function ProjectOverview() {
             ) : null}
           </Panel>
 
-          <WaitingOnPerson blocked={board.data?.blocked ?? []} people={board.data?.people ?? {}} />
+          <WaitingOnPerson
+            blocked={board.data?.blocked}
+            boardLoading={board.loading}
+            people={board.data?.people ?? {}}
+          />
           <RecentMemories />
           <HandoffHistory />
 
@@ -332,6 +336,8 @@ function LastDays() {
           <div className="label-caps">{t("overview.timePerDay")}</div>
           {usage.loading ? (
             <Loading />
+          ) : usage.error ? (
+            <ErrorState error={usage.error} onRetry={usage.reload} />
           ) : !anyTime ? (
             <p className="dim">{t("overview.noTime")}</p>
           ) : (
@@ -411,12 +417,17 @@ function Branches() {
 /**
  * What a person has to act on: proposals to accept or reject, and blocked
  * steps. The current handoff has its own panel above this one.
+ *
+ * `blocked` is undefined while the board loads or when it failed (the board's
+ * own panel shows that error): then nothing is claimed about blocked steps.
  */
 function WaitingOnPerson({
   blocked,
+  boardLoading,
   people,
 }: {
-  blocked: Board["blocked"];
+  blocked?: Board["blocked"];
+  boardLoading: boolean;
   people: Record<string, Person>;
 }) {
   const t = useT();
@@ -424,17 +435,23 @@ function WaitingOnPerson({
   const { namespace, slug } = useProject();
   const proposals = useResource(() => api.ideas(namespace, slug, ["proposed"]), [namespace, slug]);
   const ideas = proposals.data?.items ?? [];
-  const empty = ideas.length === 0 && blocked.length === 0;
+  const stuck = blocked ?? [];
   return (
     <Panel
       title={t("overview.waiting")}
       tight
       footer={<span className="dim">{t("overview.waitingLead")}</span>}
     >
-      {proposals.loading ? (
+      {proposals.loading || boardLoading ? (
         <Loading />
-      ) : empty ? (
-        <EmptyState title={t("overview.waitingNone")} body={t("overview.waitingNoneBody")} />
+      ) : proposals.error ? (
+        <ErrorState error={proposals.error} onRetry={proposals.reload} />
+      ) : ideas.length === 0 && stuck.length === 0 ? (
+        blocked ? (
+          <EmptyState title={t("overview.waitingNone")} body={t("overview.waitingNoneBody")} />
+        ) : (
+          <EmptyState title={t("overview.noProposals")} />
+        )
       ) : (
         <ul className="feed">
           {ideas.map((i) => (
@@ -453,7 +470,7 @@ function WaitingOnPerson({
               </div>
             </li>
           ))}
-          {blocked.map((b) => (
+          {stuck.map((b) => (
             <li key={b.item.id}>
               <Badge tone="danger">{t("overview.kind.blocked")}</Badge>
               <div className="what">
@@ -487,10 +504,25 @@ function RecentMemories() {
   const t = useT();
   const f = useFormat();
   const { namespace, slug } = useProject();
-  const list = useResource(() => api.memories(namespace, slug, {}), [namespace, slug]);
-  const items = (list.data?.items ?? [])
-    .filter((m) => RECENT_KINDS.includes(m.kind))
-    .slice(0, RECENT_SHOWN);
+  // One read per kind, filtered by the server: filtering the first page of
+  // every kind here would lose a decision behind a page of notes. Each list
+  // is newest first, so the newest few of the union are among their heads.
+  const list = useResource(async () => {
+    const pages = await Promise.all(
+      RECENT_KINDS.map((kind) => api.memories(namespace, slug, { kind })),
+    );
+    const items = pages
+      .flatMap((p) => p.items)
+      .sort(
+        (a, b) => Date.parse(b.created_at) - Date.parse(a.created_at) || b.id.localeCompare(a.id),
+      )
+      .slice(0, RECENT_SHOWN);
+    return {
+      items,
+      people: Object.assign({}, ...pages.map((p) => p.people)) as Record<string, Person>,
+    };
+  }, [namespace, slug]);
+  const items = list.data?.items ?? [];
   return (
     <Panel
       title={t("overview.memories")}

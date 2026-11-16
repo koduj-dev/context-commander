@@ -80,6 +80,7 @@ func TestProjectsOverviewOverHTTP(t *testing.T) {
 	f.mustDo(http.MethodGet, base+"/plans/overview", bob, nil, http.StatusNotFound, "an outsider's project overview")
 	f.mustDo(http.MethodGet, "/v1/me/projects/overview?days=0", alice, nil, http.StatusBadRequest, "zero days")
 	f.mustDo(http.MethodGet, "/v1/me/projects/overview?days=91", alice, nil, http.StatusBadRequest, "too many days")
+	f.mustDo(http.MethodGet, "/v1/me/projects/overview?days=many", alice, nil, http.StatusBadRequest, "days not a number")
 	mustJSON(t, f.mustDo(http.MethodGet, "/v1/me/projects/overview", bob, nil, http.StatusOK, "bob's overview"), &ov)
 	if len(ov.Items) != 1 || ov.Items[0].Project != "ov-bob/own" {
 		t.Errorf("bob sees %+v", ov.Items)

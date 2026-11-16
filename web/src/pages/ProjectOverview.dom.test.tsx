@@ -59,12 +59,35 @@ const BOARD = {
   people: { "pr-bob": { kind: "user", name: "Bob" } },
 };
 
-function stub(usageRows: unknown[] = []) {
+const MEMORIES = [
+  // Newer than the decision: a first page of every kind would be all notes.
+  ...Array.from({ length: 50 }, (_, k) => ({
+    id: `n-${k}`,
+    kind: "note",
+    title: `A passing note ${k}`,
+    created_by: "pr-bob",
+    created_at: "2026-11-15T09:00:00Z",
+    tags: [],
+  })),
+  {
+    id: "m-1",
+    kind: "decision",
+    title: "Vectors stay encrypted",
+    created_by: "pr-bob",
+    created_at: "2026-11-14T08:00:00Z",
+    tags: [],
+  },
+];
+
+/** Answers like the server; a path ending in one of `failing` answers 500. */
+function stub(usageRows: unknown[] = [], failing: string[] = []) {
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string) => {
       const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
       const path = url.split("?")[0] ?? url;
+      if (failing.some((f) => path.endsWith(f)))
+        return json({ error: { code: "internal", message: "boom" } }, 500);
       if (path.endsWith("/v1/me"))
         return json({
           principal_id: "pr-me",
@@ -113,28 +136,13 @@ function stub(usageRows: unknown[] = []) {
           ],
           people: { "pr-bob": { kind: "user", name: "Bob" } },
         });
-      if (path.endsWith("/memories/"))
+      if (path.endsWith("/memories/")) {
+        const kind = new URL(url, "http://x").searchParams.get("kind");
         return json({
-          items: [
-            {
-              id: "m-1",
-              kind: "decision",
-              title: "Vectors stay encrypted",
-              created_by: "pr-bob",
-              created_at: "2026-11-14T08:00:00Z",
-              tags: [],
-            },
-            {
-              id: "m-2",
-              kind: "note",
-              title: "A passing note",
-              created_by: "pr-bob",
-              created_at: "2026-11-14T09:00:00Z",
-              tags: [],
-            },
-          ],
+          items: MEMORIES.filter((m) => !kind || m.kind === kind).slice(0, 50),
           people: { "pr-bob": { kind: "user", name: "Bob" } },
         });
+      }
       return json({}, 404);
     }),
   );
@@ -160,6 +168,10 @@ function wrap() {
       </PrefsProvider>
     </I18nProvider>
   );
+}
+
+async function findPanel(title: string) {
+  return (await screen.findByRole("heading", { name: title })).closest("section") as HTMLElement;
 }
 
 function panel(title: string) {
@@ -189,7 +201,7 @@ describe("a project's overview", () => {
 
     const memories = panel("Recent decisions and gotchas");
     expect(await within(memories).findByText("Vectors stay encrypted")).toBeTruthy();
-    expect(within(memories).queryByText("A passing note")).toBeNull();
+    expect(within(memories).queryByText(/A passing note/)).toBeNull();
 
     expect(
       await screen.findByRole("img", { name: /^Items finished per day: 0, 0, .*1, 1$/ }),
@@ -211,5 +223,35 @@ describe("a project's overview", () => {
     ) as HTMLElement;
     expect(within(branches).getByText("feature/inbox")).toBeTruthy();
     expect(within(branches).getByText("CC-142")).toBeTruthy();
+  });
+
+  it("shows a failed read as an error, not as nothing to show", async () => {
+    stub([], ["/ideas/", "/usage"]);
+    render(wrap());
+    const waiting = await findPanel("Waiting on a person");
+    expect(await within(waiting).findByText("Something went wrong")).toBeTruthy();
+    expect(within(waiting).queryByText("Nothing waits on a person")).toBeNull();
+    expect(within(waiting).getByRole("button", { name: "Try again" })).toBeTruthy();
+
+    expect((await screen.findAllByText("Something went wrong")).length).toBeGreaterThan(1);
+    expect(screen.queryByText(/No time reported\./)).toBeNull();
+  });
+
+  it("claims nothing about blocked steps when the board did not load", async () => {
+    stub([], ["/plans/board"]);
+    const fetchBefore = globalThis.fetch;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        const path = url.split("?")[0] ?? url;
+        if (path.endsWith("/ideas/"))
+          return new Response(JSON.stringify({ items: [], people: {} }), { status: 200 });
+        return fetchBefore(url, init);
+      }),
+    );
+    render(wrap());
+    const waiting = await findPanel("Waiting on a person");
+    expect(await within(waiting).findByText("No proposal to decide")).toBeTruthy();
+    expect(within(waiting).queryByText("Nothing waits on a person")).toBeNull();
   });
 });

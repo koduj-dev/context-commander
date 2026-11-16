@@ -342,18 +342,21 @@ type Counts struct {
 	Open, InProgress, Done, Blocked, Skipped int
 }
 
-func (c *Counts) add(status string) {
+func (c *Counts) add(status string) { c.addN(status, 1) }
+
+// addN counts n items of one status, as a GROUP BY row reports them.
+func (c *Counts) addN(status string, n int) {
 	switch status {
 	case ItemOpen:
-		c.Open++
+		c.Open += n
 	case ItemInProgress:
-		c.InProgress++
+		c.InProgress += n
 	case ItemDone:
-		c.Done++
+		c.Done += n
 	case ItemBlocked:
-		c.Blocked++
+		c.Blocked += n
 	case ItemSkipped:
-		c.Skipped++
+		c.Skipped += n
 	}
 }
 
