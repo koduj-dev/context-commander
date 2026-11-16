@@ -118,15 +118,18 @@ Create, Resolve, List and Delete — **no rotate**.
 history or a rotate action in UI or API. A migration happens when it is
 scheduled, not because a target-state section names richer entities.
 
-### 4.3 Members API — INCOMPLETE
+### 4.3 Members API — projects complete, organizations INCOMPLETE
 
 *Architecture:* names `project.remove_member`.
 
-*Repository:* `members.Service` has `Add` and `List` only. Organizations
-likewise have add and list, no removal.
+*Repository:* `members.Service` has `Add`, `List`, `SetRole` and `Remove`
+(`PATCH`/`DELETE /projects/{ns}/{slug}/members/{principalID}`, MCP
+`project.set_member_role` and `project.remove_member`). Anything touching an
+OWNER needs OWNER, every member may leave, and the last OWNER can neither
+step down nor leave. Organizations still have add and list only, no removal.
 
-*Action:* treat the API list as desired surface. The frontend must not offer
-removal until the backend has it.
+*Action:* the frontend must not offer organization member removal until the
+backend has it.
 
 ### 4.4 Integrations — NOT BUILT
 

@@ -380,7 +380,7 @@ organizations with creation and membership, administration (admins, identity
 creation, credential lookup, security log) and personal access tokens.
 
 What it deliberately does not offer, because the API has no write for it:
-removing a project member or changing a role, renaming or deleting a project,
+removing an organization member, renaming or deleting a project,
 changing visibility, revoking installation admin. Each of those says so on
 the screen rather than showing a control that would fail.
 

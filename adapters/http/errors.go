@@ -134,6 +134,10 @@ func writeDomainError(w http.ResponseWriter, r *http.Request, err error) {
 		writeError(w, http.StatusConflict, "conflict", "that already exists")
 	case errors.Is(err, members.ErrAlreadyMember), errors.Is(err, organizations.ErrAlreadyMember):
 		writeError(w, http.StatusConflict, "conflict", err.Error())
+	case errors.Is(err, members.ErrLastOwner):
+		writeError(w, http.StatusConflict, "last_owner", "the project needs at least one OWNER; make someone else OWNER first")
+	case errors.Is(err, members.ErrNotMember):
+		writeError(w, http.StatusNotFound, "not_found", "not a member of this project")
 	case errors.Is(err, members.ErrInvitationNotFound):
 		writeError(w, http.StatusNotFound, "not_found", "not found")
 	case errors.Is(err, members.ErrInvalidEmail):

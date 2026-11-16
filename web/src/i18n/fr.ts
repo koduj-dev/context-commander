@@ -217,6 +217,16 @@ export const fr: Partial<Record<MessageKey, string>> = {
   "members.inviteActions": "Actions",
   "members.inviteRevoke": "Révoquer",
   "members.count": "{count, plural, one {# membre} other {# membres}}",
+  "members.actions": "Actions",
+  "members.remove": "Retirer",
+  "members.leave": "Quitter le projet",
+  "members.roleOf": "Rôle de {name}",
+  "members.confirmRemove": "Retirer {name} de ce projet ? Ce qui a été écrit reste dans le projet.",
+  "members.confirmLeave":
+    "Quitter ce projet ? Vous perdrez l’accès jusqu’à ce que quelqu’un vous ajoute à nouveau.",
+  "members.ownerOnly": "Seul un OWNER peut changer le rôle d’un OWNER ou le retirer.",
+  "members.noRemoval":
+    "Retirer un membre et changer un rôle ne sont pas implémentés : l’API n’a d’écriture pour ni l’un ni l’autre, cet écran n’en propose donc pas.",
   "members.addHelp":
     "Un rôle de projet appartient à un principal — une personne ou un agent. Les deux sont proposés ici si vous administrez cette installation ; sinon le champ prend l’identifiant du principal, qui n’est pas celui du compte.",
   "members.principalPlaceholder": "UUID du principal",
@@ -226,8 +236,6 @@ export const fr: Partial<Record<MessageKey, string>> = {
   "picker.agent": "agent",
   "picker.noDirectory":
     "Seule la personne qui administre l’installation peut en lister les utilisateurs ; ce champ demande donc un identifiant au lieu de proposer un choix. Demandez-le à un administrateur, ou copiez-le depuis l’écran de compte de la personne concernée.",
-  "members.noRemoval":
-    "Retirer un membre et changer un rôle ne sont pas implémentés : l’API n’a d’écriture pour ni l’un ni l’autre, cet écran n’en propose donc pas.",
 
   "skills.title": "Skills",
   "skills.lead":

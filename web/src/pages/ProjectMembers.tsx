@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useT } from "../i18n";
 import { useAuth } from "../app/auth";
 import { useFormat } from "../app/prefs";
@@ -15,7 +16,6 @@ import {
   ErrorState,
   Loading,
   Mono,
-  Note,
   PageHead,
   Panel,
   Row,
@@ -38,6 +38,11 @@ const ROLES = ["OWNER", "ADMIN", "CONTRIBUTOR", "READER"] as const;
  * The caller's own role is read off this list rather than fetched: it is
  * already here, and asking a second endpoint for something on screen is a
  * request that can fail for no benefit.
+ *
+ * ADMIN and OWNER change roles and remove members; anything touching an
+ * OWNER is the OWNER's alone, and every member may leave. The server says no
+ * to the last OWNER stepping down or leaving, and that refusal is shown as
+ * it comes back rather than guessed here.
  */
 export function ProjectMembers() {
   const t = useT();
@@ -50,9 +55,29 @@ export function ProjectMembers() {
     [namespace, slug],
   );
 
+  const navigate = useNavigate();
   const members = useMemo(() => data ?? [], [data]);
   const myRole = members.find((m) => m.principal_id === me?.principal_id)?.role;
   const canAdd = myRole === "OWNER" || myRole === "ADMIN";
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState<unknown>();
+
+  /** Whether the reader may change this member's role or remove them. */
+  const canManage = (role: string) => canAdd && (role !== "OWNER" || myRole === "OWNER");
+  const roles = myRole === "OWNER" ? ROLES : ROLES.filter((r) => r !== "OWNER");
+
+  async function act(action: () => Promise<unknown>, after: () => void = reload) {
+    setBusy(true);
+    setFailure(undefined);
+    try {
+      await action();
+      after();
+    } catch (err) {
+      setFailure(err);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <>
@@ -66,39 +91,95 @@ export function ProjectMembers() {
         ) : members.length === 0 ? (
           <EmptyState title={t("members.title")} body={t("members.lead")} />
         ) : (
-          <DataTable
-            columns={[
-              { key: "principal", label: t("members.column.principal") },
-              { key: "role", label: t("members.column.role") },
-              { key: "added", label: t("members.column.added"), align: "r" },
-            ]}
-          >
-            {members.map((m) => (
-              <tr key={m.principal_id}>
-                <td>
-                  <Cell
-                    primary={
-                      <>
-                        {m.display_name ?? m.email ?? <Mono>{m.principal_id}</Mono>}
-                        {m.principal_id === me?.principal_id && (
-                          <span className="inline-badge">{t("common.you")}</span>
-                        )}
-                      </>
-                    }
-                    secondary={<Copyable value={m.principal_id} />}
-                  />
-                </td>
-                <td>
-                  <Badge tone={m.role === "OWNER" ? "active" : "neutral"}>
-                    {roleLabel(t, m.role)}
-                  </Badge>
-                </td>
-                <td className="r">
-                  <span className="dim">{f.date(m.created_at)}</span>
-                </td>
-              </tr>
-            ))}
-          </DataTable>
+          <>
+            {failure !== undefined && <ErrorState error={failure} />}
+            <DataTable
+              columns={[
+                { key: "principal", label: t("members.column.principal") },
+                { key: "role", label: t("members.column.role") },
+                { key: "added", label: t("members.column.added"), align: "r" },
+                { key: "actions", label: t("members.actions"), align: "r" },
+              ]}
+            >
+              {members.map((m) => {
+                const name = m.display_name ?? m.email ?? m.principal_id;
+                const mine = m.principal_id === me?.principal_id;
+                return (
+                  <tr key={m.principal_id}>
+                    <td>
+                      <Cell
+                        primary={
+                          <>
+                            {m.display_name ?? m.email ?? <Mono>{m.principal_id}</Mono>}
+                            {m.principal_id === me?.principal_id && (
+                              <span className="inline-badge">{t("common.you")}</span>
+                            )}
+                          </>
+                        }
+                        secondary={<Copyable value={m.principal_id} />}
+                      />
+                    </td>
+                    <td>
+                      {canManage(m.role) ? (
+                        <SelectField
+                          label={t("members.roleOf", { name })}
+                          value={m.role as (typeof ROLES)[number]}
+                          onChange={(role) =>
+                            void act(() => api.setMemberRole(namespace, slug, m.principal_id, role))
+                          }
+                          options={(m.role === "OWNER" ? ROLES : roles).map((r) => ({
+                            value: r,
+                            label: roleLabel(t, r),
+                          }))}
+                        />
+                      ) : (
+                        <span
+                          title={canAdd && m.role === "OWNER" ? t("members.ownerOnly") : undefined}
+                        >
+                          <Badge tone={m.role === "OWNER" ? "active" : "neutral"}>
+                            {roleLabel(t, m.role)}
+                          </Badge>
+                        </span>
+                      )}
+                    </td>
+                    <td className="r">
+                      <span className="dim">{f.date(m.created_at)}</span>
+                    </td>
+                    <td className="r">
+                      {mine ? (
+                        <Btn
+                          small
+                          kind="danger"
+                          disabled={busy}
+                          onClick={() => {
+                            if (!window.confirm(t("members.confirmLeave"))) return;
+                            void act(
+                              () => api.removeMember(namespace, slug, m.principal_id),
+                              () => navigate("/"),
+                            );
+                          }}
+                        >
+                          {t("members.leave")}
+                        </Btn>
+                      ) : canManage(m.role) ? (
+                        <Btn
+                          small
+                          kind="danger"
+                          disabled={busy}
+                          onClick={() => {
+                            if (!window.confirm(t("members.confirmRemove", { name }))) return;
+                            void act(() => api.removeMember(namespace, slug, m.principal_id));
+                          }}
+                        >
+                          {t("members.remove")}
+                        </Btn>
+                      ) : null}
+                    </td>
+                  </tr>
+                );
+              })}
+            </DataTable>
+          </>
         )}
       </Panel>
 
@@ -174,9 +255,6 @@ function AddMember({ onAdded }: { onAdded: () => void }) {
           <ErrorState error={failure} />
         </div>
       )}
-      <div className="mt">
-        <Note tone="info">{t("members.noRemoval")}</Note>
-      </div>
     </Panel>
   );
 }

@@ -43,6 +43,12 @@ var (
 	// ErrAlreadyMember is returned when the principal is already on the
 	// project. Changing an existing member's role is not what Add does.
 	ErrAlreadyMember = errors.New("members: principal is already a member of this project")
+	// ErrNotMember is returned when the principal to change or remove is
+	// not on the project.
+	ErrNotMember = errors.New("members: principal is not a member of this project")
+	// ErrLastOwner is returned when a change would leave the project with no
+	// OWNER: nobody could then grant ownership or delete the project.
+	ErrLastOwner = errors.New("members: the project needs at least one OWNER; make someone else OWNER first")
 )
 
 type Service struct {
@@ -150,4 +156,125 @@ func (s *Service) List(ctx context.Context, principalID, projectID uuid.UUID) ([
 		return nil, fmt.Errorf("members: list: %w", err)
 	}
 	return list, nil
+}
+
+// SetRole changes targetPrincipalID's role on projectID.
+//
+// Like Add, it needs CapMemberManage, and anything touching ownership needs
+// CapMemberGrantOwner too: granting OWNER, and taking it away. Without the
+// second half an ADMIN could demote every OWNER and then hold the highest
+// role left. The last OWNER cannot be demoted (ErrLastOwner); the owners are
+// locked for the check, so two owners demoting each other at once cannot
+// both succeed. Setting the role a member already has changes nothing.
+func (s *Service) SetRole(ctx context.Context, principalID, projectID, targetPrincipalID uuid.UUID, role projects.Role) error {
+	switch role {
+	case projects.RoleOwner, projects.RoleAdmin, projects.RoleContributor, projects.RoleReader:
+	default:
+		return ErrInvalidRole
+	}
+	if err := s.checkCapability(ctx, principalID, projectID, auth.CapMemberManage); err != nil {
+		return err
+	}
+	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+		current, err := s.projects.GetMembership(ctx, tx, projectID, targetPrincipalID)
+		if errors.Is(err, projects.ErrNotFound) {
+			return ErrNotMember
+		}
+		if err != nil {
+			return err
+		}
+		if current.Role == role {
+			return nil
+		}
+		if role == projects.RoleOwner || current.Role == projects.RoleOwner {
+			if err := s.checkCapability(ctx, principalID, projectID, auth.CapMemberGrantOwner); err != nil {
+				return err
+			}
+		}
+		if current.Role == projects.RoleOwner {
+			owners, err := s.projects.LockOwners(ctx, tx, projectID)
+			if err != nil {
+				return err
+			}
+			if owners <= 1 {
+				return ErrLastOwner
+			}
+		}
+		if err := s.projects.SetMemberRole(ctx, tx, projectID, targetPrincipalID, role); err != nil {
+			return err
+		}
+		return audit.Write(ctx, tx, audit.Entry{
+			ProjectID: &projectID, PrincipalID: &principalID,
+			Action: "member.role_change", ResourceType: "project_member", ResourceID: &targetPrincipalID,
+			Result: audit.ResultAllow,
+		})
+	})
+	if err != nil {
+		return fmt.Errorf("members: set role: %w", err)
+	}
+	return nil
+}
+
+// Remove takes targetPrincipalID off projectID. Removing someone else needs
+// CapMemberManage, and removing an OWNER needs CapMemberGrantOwner as well;
+// leaving (removing yourself) needs only membership. The last OWNER can do
+// neither (ErrLastOwner).
+//
+// Their presence on the project goes with them, so the board stops showing
+// them at work there. What they wrote stays: artifacts, memories, handoffs
+// and history are the project's, not the member's. Their credentials stay
+// valid, and row-level security now hides the project from every one of
+// them.
+func (s *Service) Remove(ctx context.Context, principalID, projectID, targetPrincipalID uuid.UUID) error {
+	leaving := principalID == targetPrincipalID
+	if !leaving {
+		if err := s.checkCapability(ctx, principalID, projectID, auth.CapMemberManage); err != nil {
+			return err
+		}
+	}
+	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+		current, err := s.projects.GetMembership(ctx, tx, projectID, targetPrincipalID)
+		if errors.Is(err, projects.ErrNotFound) {
+			return ErrNotMember
+		}
+		if err != nil {
+			return err
+		}
+		if current.Role == projects.RoleOwner {
+			if !leaving {
+				if err := s.checkCapability(ctx, principalID, projectID, auth.CapMemberGrantOwner); err != nil {
+					return err
+				}
+			}
+			owners, err := s.projects.LockOwners(ctx, tx, projectID)
+			if err != nil {
+				return err
+			}
+			if owners <= 1 {
+				return ErrLastOwner
+			}
+		}
+		action := "member.remove"
+		if leaving {
+			action = "member.leave"
+		}
+		// Before the delete: once a member has left, row-level security no
+		// longer lets them write the project's audit trail or presence.
+		if err := audit.Write(ctx, tx, audit.Entry{
+			ProjectID: &projectID, PrincipalID: &principalID,
+			Action: action, ResourceType: "project_member", ResourceID: &targetPrincipalID,
+			Result: audit.ResultAllow,
+		}); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx,
+			`DELETE FROM work_presence WHERE project_id = $1 AND principal_id = $2`, projectID, targetPrincipalID); err != nil {
+			return fmt.Errorf("clear presence: %w", err)
+		}
+		return s.projects.RemoveMember(ctx, tx, projectID, targetPrincipalID)
+	})
+	if err != nil {
+		return fmt.Errorf("members: remove: %w", err)
+	}
+	return nil
 }

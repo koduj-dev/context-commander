@@ -155,6 +155,69 @@ func registerProjectTools(server *sdkmcp.Server, deps Deps, principalID, clientI
 		return nil, addMemberResult{Added: true}, nil
 	})
 
+	resolveProject := func(ctx context.Context, path string) (projects.Project, error) {
+		var project projects.Project
+		err := db.WithPrincipal(ctx, deps.Pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+			var err error
+			project, err = deps.Projects.Resolve(ctx, tx, path)
+			return err
+		})
+		return project, err
+	}
+
+	type setMemberRoleArgs struct {
+		Project     string `json:"project" jsonschema:"project path \"namespace/slug\""`
+		PrincipalID string `json:"principal_id" jsonschema:"UUID of the member's principal"`
+		Role        string `json:"role" jsonschema:"OWNER, ADMIN, CONTRIBUTOR, or READER"`
+	}
+	type setMemberRoleResult struct {
+		Changed bool `json:"changed"`
+	}
+	sdkmcp.AddTool(server, &sdkmcp.Tool{
+		Name: "project.set_member_role",
+		Description: "Change a project member's role. Requires ADMIN or OWNER; granting or taking away OWNER requires OWNER, " +
+			"and the last OWNER cannot be demoted.",
+	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, args setMemberRoleArgs) (*sdkmcp.CallToolResult, setMemberRoleResult, error) {
+		target, err := uuid.Parse(args.PrincipalID)
+		if err != nil {
+			return nil, setMemberRoleResult{}, errors.New("principal_id must be a UUID")
+		}
+		project, err := resolveProject(ctx, args.Project)
+		if err != nil {
+			return nil, setMemberRoleResult{}, err
+		}
+		if err := deps.Members.SetRole(ctx, principalID, project.ID, target, projects.Role(args.Role)); err != nil {
+			return nil, setMemberRoleResult{}, err
+		}
+		return nil, setMemberRoleResult{Changed: true}, nil
+	})
+
+	type removeMemberArgs struct {
+		Project     string `json:"project" jsonschema:"project path \"namespace/slug\""`
+		PrincipalID string `json:"principal_id" jsonschema:"UUID of the member's principal; your own to leave the project"`
+	}
+	type removeMemberResult struct {
+		Removed bool `json:"removed"`
+	}
+	sdkmcp.AddTool(server, &sdkmcp.Tool{
+		Name: "project.remove_member",
+		Description: "Remove a member from a project, or leave it by naming your own principal_id. Removing someone else " +
+			"requires ADMIN or OWNER, removing an OWNER requires OWNER, and the last OWNER cannot leave. What they wrote stays.",
+	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, args removeMemberArgs) (*sdkmcp.CallToolResult, removeMemberResult, error) {
+		target, err := uuid.Parse(args.PrincipalID)
+		if err != nil {
+			return nil, removeMemberResult{}, errors.New("principal_id must be a UUID")
+		}
+		project, err := resolveProject(ctx, args.Project)
+		if err != nil {
+			return nil, removeMemberResult{}, err
+		}
+		if err := deps.Members.Remove(ctx, principalID, project.ID, target); err != nil {
+			return nil, removeMemberResult{}, err
+		}
+		return nil, removeMemberResult{Removed: true}, nil
+	})
+
 	type listMembersArgs struct {
 		Project string `json:"project" jsonschema:"project path \"namespace/slug\""`
 	}

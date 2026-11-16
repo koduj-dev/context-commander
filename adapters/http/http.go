@@ -250,6 +250,8 @@ func NewHandler(deps Deps) http.Handler {
 				r.Get("/", deps.getProject)
 				r.Post("/members", deps.addMember)
 				r.Get("/members", deps.listMembers)
+				r.Patch("/members/{principalID}", deps.setMemberRole)
+				r.Delete("/members/{principalID}", deps.removeMember)
 				r.Get("/invitations", deps.listInvitations)
 				r.Post("/invitations", deps.createInvitation)
 				r.Delete("/invitations/{invitationID}", deps.revokeInvitation)

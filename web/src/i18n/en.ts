@@ -214,6 +214,16 @@ export const en = {
   "members.inviteActions": "Actions",
   "members.inviteRevoke": "Revoke",
   "members.count": "{count, plural, one {# member} other {# members}}",
+  "members.actions": "Actions",
+  "members.remove": "Remove",
+  "members.leave": "Leave project",
+  "members.roleOf": "Role of {name}",
+  "members.confirmRemove": "Remove {name} from this project? What they wrote stays in the project.",
+  "members.confirmLeave":
+    "Leave this project? You will lose access to it until someone adds you again.",
+  "members.ownerOnly": "Only an OWNER can change an OWNER’s role or remove them.",
+  "members.noRemoval":
+    "Removing a member and changing a role are not built: the API has no write for either, so this screen does not offer one.",
   "members.addHelp":
     "A project role belongs to a principal — a person or an agent. Both are offered here if you administer this installation; otherwise it takes the principal id, which is not the same as a user id.",
   "members.principalPlaceholder": "Principal UUID",
@@ -222,8 +232,6 @@ export const en = {
   "picker.agent": "agent",
   "picker.noDirectory":
     "Only an installation admin can list the people on this installation, so this asks for an id rather than offering a choice. Ask an admin for it, or paste it from the person's own account screen.",
-  "members.noRemoval":
-    "Removing a member and changing a role are not built: the API has no write for either, so this screen does not offer one.",
 
   "skills.title": "Skills",
   "skills.lead":
