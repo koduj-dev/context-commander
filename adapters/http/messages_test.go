@@ -194,6 +194,35 @@ func TestTheClaudeCodeInboxHook(t *testing.T) {
 		t.Errorf("a prompt did not poll: %q", out)
 	}
 
+	// Claude Code caps additionalContext at 10,000 characters and shows only a
+	// preview past it. Three messages near the 8 KiB limit do not fit in one
+	// poll: the hook prints one whole, acknowledges only that one, and the
+	// next poll delivers the next.
+	long := strings.Repeat("a", 7000)
+	for range 3 {
+		if r := b.sendAsPerson(fmt.Sprintf(`{"body":%q}`, long)); r.status != http.StatusCreated {
+			t.Fatalf("send long: %d %s", r.status, r.body)
+		}
+	}
+	for poll := 1; poll <= 3; poll++ {
+		out := run("PostToolUse", f.server.URL, "0")
+		var got struct {
+			HookSpecificOutput struct {
+				AdditionalContext string `json:"additionalContext"`
+			} `json:"hookSpecificOutput"`
+		}
+		if err := json.Unmarshal([]byte(out), &got); err != nil {
+			t.Fatalf("poll %d output %q: %v", poll, out, err)
+		}
+		text := got.HookSpecificOutput.AdditionalContext
+		if len(text) > 10000 || strings.Count(text, long) != 1 {
+			t.Fatalf("poll %d printed %d characters holding %d long messages", poll, len(text), strings.Count(text, long))
+		}
+	}
+	if out := run("PostToolUse", f.server.URL, "0"); out != "" {
+		t.Errorf("a fourth poll printed %q", out)
+	}
+
 	// A server that is not there: silence, exit 0.
 	if out := run("UserPromptSubmit", "http://127.0.0.1:1", "0"); out != "" {
 		t.Errorf("a down server printed %q", out)
