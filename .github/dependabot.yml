@@ -40,3 +40,13 @@ updates:
     groups:
       npm-minor-patch:
         update-types: ["minor", "patch"]
+
+  # The container's base images (golang:*-alpine to build, distroless to
+  # run). A patched base image is a security update like any other
+  # dependency's (docs/cra/vulnerability-handling.md), and nothing else
+  # would notice one.
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    labels: ["dependencies"]

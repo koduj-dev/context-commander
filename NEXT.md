@@ -164,7 +164,15 @@ provider, local by default, and vectors are encrypted by default
 Only on top of a core loop people actually use:
 
 - [ ] **CRA (Regulation (EU) 2024/2847) applicability and the rest of Annex
-      I.** Annex I (2)(l) — recording security-relevant internal activity
+      I.** *2026-11-16: the maintainer decided to treat the product as in
+      scope. The working file is [docs/cra/](docs/cra/README.md): technical
+      documentation (Annex VII), essential requirements mapped (Annex I
+      Part I), vulnerability handling and Art. 14 reporting, risk
+      assessment, a declaration-of-conformity template, and a coordinated
+      disclosure policy in SECURITY.md. The SBOM was already in every
+      release. Still open: the TODO(manufacturer) items (legal name and
+      address, support period, CSIRT), serving the web font locally,
+      deleting a user account, and an in-product update notice.* Annex I (2)(l) — recording security-relevant internal activity
       with a user opt-out — is now implemented (`internal/security`,
       migration 000019, `--security-log`). Not yet looked at: whether the
       CRA applies to this project at all (the free-and-open-source exemption

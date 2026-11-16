@@ -86,6 +86,14 @@ All notable changes to Context Commander are documented here. The format follows
   whether the provider answers, the last error, the queue and the memories
   still waiting.
 
+- **Cyber Resilience Act working file.** [docs/cra/](docs/cra/README.md):
+  technical documentation in the order of Annex VII, each essential
+  requirement of Annex I with where it is met, vulnerability handling and
+  Art. 14 reporting, a risk assessment, and a declaration-of-conformity
+  template. SECURITY.md gains a coordinated disclosure policy with
+  acknowledgement, fix and disclosure targets, and Dependabot now watches
+  the container's base images.
+
 - **Project deletion, legal hold and purge.** An OWNER deletes a project
   from its Settings tab, typing its path; it disappears for everyone at once
   (row-level security), and its OWNERs can restore it from the home screen
