@@ -14,6 +14,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/artifacts"
 	"github.com/koduj-dev/context-commander/internal/audit"
 	"github.com/koduj-dev/context-commander/internal/auth"
+	"github.com/koduj-dev/context-commander/internal/changes"
 	"github.com/koduj-dev/context-commander/internal/contextpack"
 	"github.com/koduj-dev/context-commander/internal/crypto"
 	"github.com/koduj-dev/context-commander/internal/db"
@@ -109,7 +110,7 @@ func newFixtureWith(t *testing.T, adjust func(*ccmcp.Deps)) *fixture {
 		Events: eventsSvc, Organizations: orgSvc, Audit: auditSvc,
 		Handoffs: handoffsSvc, History: historySvc,
 		Skills: skillsSvc, Gates: gatesAdmin, Secrets: secretsSvc,
-		Installation: installationSvc, ContextPack: contextSvc, Plans: plansSvc, Memories: memoriesSvc, Ideas: ideasSvc, Messages: messagesSvc,
+		Installation: installationSvc, ContextPack: contextSvc, Plans: plansSvc, Memories: memoriesSvc, Ideas: ideasSvc, Messages: messagesSvc, Changes: changes.NewService(appPool, authz, memoriesSvc, plansSvc),
 	}
 	if adjust != nil {
 		adjust(&deps)

@@ -119,7 +119,12 @@ Only after the core loop is proven:
 - [ ] Metadata/full-text retrieval filtered by type, author, time, provenance.
 - [ ] Compaction/summarization as a derived history object, never overwriting
       the source (cookbook §10.3 already decided this shape).
-- [ ] Subscriptions, or reliable cursor polling, for changes during a session.
+- [x] ~~Subscriptions, or reliable cursor polling, for changes during a
+      session.~~ Closed 2026-11-16 ([ADR 0033](docs/adr/0033-what-changed-while-you-worked.md)):
+      `project.changes` and `GET …/changes?since=` list memories, step moves
+      and handoffs by others, and the Claude Code inbox hook prints them.
+      Still open: artifacts and ideas are not in the feed, and Codex has no
+      mid-turn hook.
 - [x] ~~Diagnostics: "why does this context pack contain exactly these
       items?"~~ Closed 2026-09-14: the interface's Context tab renders the
       assembled pack with its budget report — what was left out, how big it
@@ -321,8 +326,9 @@ Only on top of a core loop people actually use:
       - **Search decrypts.** At most 1000 memories per project are decrypted
         per search, after the metadata filters. Measure real projects
         before adding an index.
-      - **No push for memories.** The interface re-reads after its own
-        writes. Writes by another agent show up on the next load.
+      - **No push for memories in the interface.** It re-reads after its
+        own writes. Writes by another agent show up on the next load.
+        Agents hear about them through `project.changes` (ADR 0033).
 - [x] ~~**A wrong id in `POST /projects/{ns}/{slug}/members` or
       `POST /installation/principals/{id}/tokens` is a 500.**~~ Closed
       2026-11-03: the services check the id before the insert. An unknown

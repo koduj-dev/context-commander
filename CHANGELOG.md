@@ -86,6 +86,15 @@ All notable changes to Context Commander are documented here. The format follows
   whether the provider answers, the last error, the queue and the memories
   still waiting.
 
+- **What changed while you worked.** `project.changes` (MCP) and
+  `GET /v1/projects/{ns}/{slug}/changes?since=` list what everyone else did
+  on the project since a moment: memories recorded, plan steps blocked,
+  finished or unblocked, and handoffs opened, newest first, at most 20,
+  back at most a day. With `CC_PROJECT` set, the Claude Code inbox hook
+  prints them into the agent's context between tool calls. Migration
+  000046 adds the indexes the polls use.
+  [ADR 0033](docs/adr/0033-what-changed-while-you-worked.md).
+
 - **Change a member's role, remove a member, leave a project.**
   `PATCH` and `DELETE /v1/projects/{ns}/{slug}/members/{principal_id}`, MCP
   `project.set_member_role` and `project.remove_member`, and controls on the

@@ -20,6 +20,12 @@ Configuration, from the environment Claude Code runs in:
   CC_INBOX_INTERVAL  seconds between polls after tool calls (default 15). A
                      prompt always polls.
   CC_INBOX_TIMEOUT   seconds to wait for the server (default 2).
+  CC_PROJECT         optional, the project path ("namespace/slug"). With it,
+                     each poll also reports what everyone else did on that
+                     project since the previous poll: memories recorded,
+                     steps blocked, finished or unblocked, handoffs opened
+                     (GET /v1/projects/{ns}/{slug}/changes, docs/adr/0033).
+  CC_CHANGES         set to 0 to turn that report off.
 
 Standard library only. It never slows the agent down or fails the tool call:
 it polls at most once per interval, gives the server a short timeout, and on
@@ -30,6 +36,7 @@ See deploy/mcp-clients/README.md, "Messages to the agent".
 """
 
 import json
+from datetime import datetime, timedelta
 import os
 import sys
 import time
@@ -66,6 +73,95 @@ def due(state: Path, interval: float) -> bool:
     return True
 
 
+def changes_file(session_id: str) -> Path:
+    return state_file(session_id).with_suffix(".changes.json")
+
+
+# How far before the previous poll's `now` the next one asks from. A change
+# is stamped when its transaction starts and visible when it commits, so one
+# committed just after a poll can carry a time just before it. The overlap
+# catches it; the ids already printed keep it from showing twice.
+OVERLAP_SECONDS = 30
+# The report is a pointer to what moved, not a log: it gets a small share of
+# the context budget, after messages.
+CHANGES_BUDGET = 2500
+
+
+def change_key(c: dict) -> str:
+    return f"{c.get('kind')}:{c.get('id')}:{c.get('detail')}:{c.get('at')}"
+
+
+def describe(c: dict) -> str:
+    who = c.get("by_name") or "someone"
+    kind, detail, title = c.get("kind"), c.get("detail", ""), c.get("title", "")
+    if kind == "memory":
+        return f"- {who} recorded a {detail}: \"{title}\" (memory.get {c.get('id')})"
+    if kind == "item":
+        where = f" in plan \"{c['where']}\"" if c.get("where") else ""
+        verb = {"blocked": "marked a step blocked", "done": "finished a step", "unblocked": "unblocked a step"}.get(detail, f"moved a step to {detail}")
+        return f"- {who} {verb}{where}: \"{title}\" (plan.get {c.get('plan_id', '')})"
+    if kind == "handoff":
+        return f"- {who} opened a handoff (handoff.get {c.get('id')})"
+    return f"- {who}: {kind} {detail} {title}".rstrip()
+
+
+def render_changes(project: str, items: list) -> str:
+    lines = [
+        f"Context Commander: since this session last checked, other people and agents changed "
+        f"{project}. Read what touches your task with the tool named on each line."
+    ]
+    used = len(lines[0])
+    for k, c in enumerate(items):
+        line = describe(c)
+        if used + len(line) + 1 > CHANGES_BUDGET:
+            lines.append(f"- … and {len(items) - k} more (project.changes)")
+            break
+        lines.append(line)
+        used += len(line) + 1
+    return "\n".join(lines)
+
+
+def poll_changes(base: str, token: str, timeout: float, session_id: str) -> str:
+    """The report of what others changed since the previous poll, or "".
+
+    The first poll of a session only records where to start from: what
+    happened before the session is context.bootstrap's to tell."""
+    project = os.environ.get("CC_PROJECT", "").strip().strip("/")
+    if not project or os.environ.get("CC_CHANGES", "1") == "0" or project.count("/") != 1:
+        return ""
+    ns, slug = (urllib.parse.quote(p, safe="") for p in project.split("/"))
+    path = changes_file(session_id)
+    try:
+        state = json.loads(path.read_text())
+    except (OSError, ValueError):
+        state = {}
+    url = f"{base}/v1/projects/{ns}/{slug}/changes?"
+    since = state.get("since")
+    if not since:
+        # The session's starting point. What falls in the overlap before it
+        # happened before the session too: mark it seen, print nothing.
+        since = request("GET", url, token, timeout).get("now")
+        if not since:
+            return ""
+        state = {"since": since, "seen": []}
+        first = True
+    else:
+        first = False
+    moment = datetime.fromisoformat(since.replace("Z", "+00:00")) - timedelta(seconds=OVERLAP_SECONDS)
+    answer = request("GET", url + urllib.parse.urlencode({"since": moment.isoformat().replace("+00:00", "Z")}), token, timeout)
+    items = [c for c in answer.get("items", []) if isinstance(c, dict)]
+    seen = set(state.get("seen", []))
+    fresh = [c for c in items if change_key(c) not in seen]
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"since": answer.get("now"), "seen": [change_key(c) for c in items][:200]}))
+    except OSError:
+        pass
+    if first or not fresh:
+        return ""
+    return render_changes(project, fresh)
+
+
 def request(method: str, url: str, token: str, timeout: float, body=None) -> dict:
     data = json.dumps(body).encode() if body is not None else None
     headers = {"Authorization": f"Bearer {token}"}
@@ -96,7 +192,7 @@ def header(m: dict) -> str:
     return f"--- Message {m.get('id', '')} from {sender} ({audience}) in {m.get('project', '?')}, sent {m.get('created_at', '')} ---\n"
 
 
-def render(items: list) -> tuple[str, list]:
+def render(items: list, budget: int = BUDGET) -> tuple[str, list]:
     """The context to print and the ids printed in full (to acknowledge).
 
     Written as a statement of what arrived, not as an instruction: the
@@ -112,14 +208,14 @@ def render(items: list) -> tuple[str, list]:
     for m in items:
         body = str(m.get("body", ""))
         whole = header(m) + body
-        if used + len(whole) + 2 <= BUDGET:
+        if used + len(whole) + 2 <= budget:
             parts.append(whole)
             done.append(m["id"])
             used += len(whole) + 2
             continue
         if not done:
             # Nothing fits whole yet: show this one cut, and leave it unacknowledged.
-            room = max(0, min(EXCERPT, BUDGET - used - 400))
+            room = max(0, min(EXCERPT, budget - used - 400))
             parts.append(
                 header(m)
                 + body[:room]
@@ -150,9 +246,15 @@ def main() -> None:
 
     inbox = request("GET", base + "/v1/me/inbox?" + urllib.parse.urlencode({"limit": 20}), token, timeout)
     items = [m for m in inbox.get("items", []) if isinstance(m, dict) and m.get("id")]
-    if not items:
+    try:
+        report = poll_changes(base, token, timeout, hook.get("session_id") or "")
+    except (OSError, ValueError):
+        report = ""  # the inbox still gets through when the changes cannot be read
+    # Messages and the report share one budget under Claude Code's cap.
+    text, printed = render(items, BUDGET - len(report) - 2) if items else ("", [])
+    text = "\n\n".join(t for t in (text, report) if t)
+    if not text:
         return
-    text, printed = render(items)
     print(json.dumps({"hookSpecificOutput": {"hookEventName": event, "additionalContext": text}}))
     sys.stdout.flush()
     if not printed:

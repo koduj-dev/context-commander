@@ -171,6 +171,18 @@ you, so the message waits in your inbox (docs/adr/0032).
 - `to` says how it was addressed: `you` (this session), `your sessions`, or
   `everyone` working on the project.
 
+#### What others changed while you worked
+
+Other people and agents keep working on the project while you do. Call
+`project.changes` when you resume work, after finishing a step, and before a
+large change: it lists the memories recorded, plan steps blocked, finished
+or unblocked, and handoffs opened since the `now` of your previous call
+(docs/adr/0033). Your first call, without `since`, only gives you that
+starting point. Read whatever touches your task (`memory.get`, `plan.get`,
+`handoff.get`): a gotcha a colleague just recorded is cheaper to read than
+to rediscover. If the Claude Code inbox hook is installed with
+`CC_PROJECT`, these lines appear in your context on their own.
+
 ### 5. Leave before you leave
 
 When you stop, one of two things must be true, or the next agent starts blind:
