@@ -279,7 +279,13 @@ func (s *Service) exportIdeas(ctx context.Context, principalID, projectID uuid.U
 	var out []Idea
 	err := pages(func(c string) (paging.Page[ideas.Idea], error) {
 		return s.ideas.List(ctx, principalID, projectID, nil, paging.Options{Limit: paging.MaxLimit, Cursor: c})
-	}, func(i ideas.Idea) error {
+	}, func(listed ideas.Idea) error {
+		// The list carries titles only; the body, proposal and rejection
+		// come with the idea itself.
+		i, err := s.ideas.Get(ctx, principalID, projectID, listed.ID)
+		if err != nil {
+			return err
+		}
 		out = append(out, Idea{ID: i.ID.String(), Status: i.Status, Priority: i.Priority, Position: i.Position,
 			Title: i.Title, Body: i.Body, Proposal: i.Proposal, Rejection: i.Rejection, Branch: i.Branch,
 			TicketKey: i.TicketKey, TicketURL: i.TicketURL, CreatedBy: who.id(i.CreatedBy), ClaimedBy: who.ptr(i.ClaimedBy),

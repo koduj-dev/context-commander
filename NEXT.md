@@ -135,10 +135,11 @@ Only after the core loop is proven:
       was and why — and can reassemble it under a different limit. The
       server half (`BudgetReport`/`TruncationNote`) shipped with
       `context.bootstrap`; this is the surface that makes it readable.
-- [ ] Project export/import for backup and migration. Export is built
-      ([ADR 0035](docs/adr/0035-project-export-and-import.md)):
-      `GET …/export` and the Settings tab. Import (`ccd project import`, as
-      `cc_owner`) is next.
+- [x] ~~Project export/import for backup and migration.~~ Closed 2026-11-16
+      ([ADR 0035](docs/adr/0035-project-export-and-import.md)): `GET …/export`
+      and the Settings tab; `ccd project import` as `cc_owner`. Still open:
+      an import that stops part way leaves a partial project, and there is
+      no project deletion to clean it up (Phase 3 purge).
 
 ~~Add vector search only if measurement shows metadata and text search are
 insufficient.~~ Decided otherwise by the maintainer on 2026-11-13: memories

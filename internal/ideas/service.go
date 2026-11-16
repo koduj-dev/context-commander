@@ -377,6 +377,11 @@ func (s *Service) List(ctx context.Context, principalID, projectID uuid.UUID, st
 			return paging.Page[Idea]{}, invalid("status %q is not one of %s", st, strings.Join(Statuses, ", "))
 		}
 	}
+	if statuses == nil {
+		// cardinality(NULL) is NULL, not 0: a nil slice would match nothing
+		// where an empty one means every status.
+		statuses = []string{}
+	}
 	limit := opts.ClampedLimit()
 	queue := queueOrder(statuses)
 	var (
@@ -1038,4 +1043,35 @@ func (s *Service) CountsAll(ctx context.Context, principalID uuid.UUID) ([]Proje
 		return out[i].Path < out[j].Path
 	})
 	return out, nil
+}
+
+// RestoreText sets an idea's proposal and rejection text, keeping its title,
+// body and version: what a project import needs to bring back a decided idea
+// without replaying claim, proposal and decision (internal/portability). It
+// needs CapIdeaWrite and changes no status; the importer sets those.
+func (s *Service) RestoreText(ctx context.Context, principalID, projectID, ideaID uuid.UUID, proposal, rejection string) error {
+	if err := s.checkCapability(ctx, principalID, projectID, auth.CapIdeaWrite); err != nil {
+		return err
+	}
+	if err := errors.Join(checkLen("proposal", proposal, MaxBody), checkLen("rejection", rejection, MaxBody)); err != nil {
+		return err
+	}
+	i, err := s.Get(ctx, principalID, projectID, ideaID)
+	if err != nil {
+		return err
+	}
+	err = db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+		e, err := s.seal(ctx, tx, projectID, i.ID, i.Version, ideaBlob{Title: i.Title, Body: i.Body, Proposal: proposal, Rejection: rejection})
+		if err != nil {
+			return err
+		}
+		_, err = tx.Exec(ctx,
+			`UPDATE ideas SET ciphertext = $1, nonce = $2, wrapped_dek = $3, project_key_version = $4 WHERE id = $5 AND project_id = $6`,
+			e.ciphertext, e.nonce, e.wrappedDEK, e.keyVersion, i.ID, projectID)
+		return err
+	})
+	if err != nil {
+		return fmt.Errorf("ideas: restore text: %w", err)
+	}
+	return nil
 }
