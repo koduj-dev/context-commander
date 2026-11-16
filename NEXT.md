@@ -148,9 +148,8 @@ Only after the core loop is proven:
       `context.bootstrap`; this is the surface that makes it readable.
 - [x] ~~Project export/import for backup and migration.~~ Closed 2026-11-16
       ([ADR 0035](docs/adr/0035-project-export-and-import.md)): `GET …/export`
-      and the Settings tab; `ccd project import` as `cc_owner`. Still open:
-      an import that stops part way leaves a partial project, and there is
-      no project deletion to clean it up (Phase 3 purge).
+      and the Settings tab; `ccd project import` as `cc_owner`. An import
+      that stops part way is removed with `ccd project purge` (ADR 0036).
 
 ~~Add vector search only if measurement shows metadata and text search are
 insufficient.~~ Decided otherwise by the maintainer on 2026-11-13: memories
@@ -288,7 +287,12 @@ Only on top of a core loop people actually use:
         namespace, which is created with its first project.
       - CLI writes (`--database-url`) carry no default limit, only the exceptions an
         admin sets. That is the operator tier, which also runs migrations.
-- [ ] Retention rules, legal hold, controlled purge workflow.
+- [ ] Retention rules, legal hold, controlled purge workflow. Project
+      deletion with a grace period, legal hold, and `ccd purge` for deleted
+      projects and long-deleted artifacts are built
+      ([ADR 0036](docs/adr/0036-project-deletion-legal-hold-and-purge.md)).
+      Still open: retention by age for memories, history and the audit
+      trail, which wants a decision on what a team must keep.
 - [ ] Signed/trusted skill packages and an approval workflow.
 - [ ] Operational telemetry that doesn't leak content.
 

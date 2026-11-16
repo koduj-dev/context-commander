@@ -162,6 +162,12 @@ export const zhCN: Partial<Record<MessageKey, string>> = {
 
   "dashboard.title": "概览",
   "dashboard.lead": "有什么变化、你之前在哪里工作，以及是否有事情在等你。",
+  "dashboard.pendingDeletion": "已计划删除",
+  "dashboard.pendingDeletionLead":
+    "已对所有人隐藏。在日期之前撤销即可恢复项目；之后由运维人员的清除将其删除。",
+  "dashboard.purgeColumn": "清除时间",
+  "dashboard.purgeAfter": "{date} 之后清除",
+  "dashboard.cancelDeletion": "撤销删除",
   "dashboard.waiting": "等待你处理",
   "dashboard.noneWaiting": "没有事情在等你",
   "dashboard.noneWaitingBody": "没有未完成的交接，也没有值得一看的拒绝记录。",
@@ -618,8 +624,12 @@ export const zhCN: Partial<Record<MessageKey, string>> = {
   "settings.encryptionBody":
     "内容在静态存储时用属于这个项目的密钥加密，而该密钥本身又被安装实例的根密钥包裹。交接正文和密钥走这层信封；工件的字节进入对象存储。",
   "settings.danger": "不可撤销",
-  "settings.noWrites":
-    "这个页面上的内容在这里都改不了：API 对项目既没有更新也没有删除。改名、改可见性和删除都是命令行的操作，而一个打开对话框然后失败的按钮，比没有这个按钮更糟。",
+  "settings.noWrites": "重命名项目和修改可见性尚未实现，因此此页面两者都不提供。",
+  "settings.delete": "删除项目",
+  "settings.deleteLead":
+    "删除会立即对所有人隐藏该项目。其 OWNER 可在 {days, plural, other {# 天}}内撤销；之后由运维人员执行的清除会永久删除全部内容。只有 OWNER 可以删除，且只能在这里操作，不能用 agent 的 token。",
+  "settings.deleteConfirm": "输入 {path} 以确认",
+  "settings.deleteButton": "删除项目",
   "settings.connect": "接入 agent",
   "settings.connectLead":
     "用个人访问 token 把 MCP 客户端指向这个服务器。项目在每次调用时指定，所以一个 token 就能到达你所属的所有项目。",

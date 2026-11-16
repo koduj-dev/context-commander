@@ -343,6 +343,16 @@ export type HandoffDetail = Handoff & {
  * the JSON tags and the adapter writes it straight out, so a second shape
  * mirroring it field for field would only be a place for the two to drift.
  */
+/** A project scheduled for deletion, as its OWNERs see it (docs/adr/0036). */
+export type PendingDeletion = {
+  id: string;
+  project: string;
+  name: string;
+  requested_at: string;
+  requested_by: string;
+  purge_after: string;
+};
+
 export type ContextPack = {
   project: { id: string; path: string; name: string };
   role: string;
@@ -1181,6 +1191,16 @@ export const api = {
       method: "POST",
       body: { principal_id: principalID, role },
     }),
+  /** Schedules the project for deletion (docs/adr/0036); `confirm` is its path. */
+  deleteProject: (ns: string, slug: string, confirm: string) =>
+    request<{ project: string; purge_after: string }>(`${project(ns, slug)}/`, {
+      method: "DELETE",
+      body: { confirm },
+    }),
+  /** The caller's own projects that wait for purge; nothing else lists them. */
+  pendingDeletions: () => request<{ items: PendingDeletion[] }>("/me/projects/pending-deletion"),
+  cancelDeletion: (projectID: string) =>
+    request<void>(`/me/projects/pending-deletion/${projectID}/cancel`, { method: "POST" }),
   /** The whole project as a .tar.gz archive (docs/adr/0035). OWNER and ADMIN. */
   exportProject: async (ns: string, slug: string): Promise<{ blob: Blob; filename: string }> => {
     const res = await raw(`${project(ns, slug)}/export`);

@@ -1,0 +1,25 @@
+[Unit]
+Description=Context Commander — purge deleted projects and long-deleted artifacts
+Documentation=https://github.com/koduj-dev/context-commander/blob/main/docs/adr/0036-project-deletion-legal-hold-and-purge.md
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Purging deletes rows the server may not touch, so it connects as cc_owner
+# with migrate.env's credentials (read last, so its CC_DATABASE_URL wins over
+# ccd.env's). It runs as root rather than as `ccd`: a process running as the
+# server's user would expose the owner password to the server through
+# /proc, which is the one thing the split between the two roles prevents.
+Environment=CC_STORAGE_DIR=/var/lib/ccd/objects
+EnvironmentFile=/etc/context-commander/ccd.env
+EnvironmentFile=/etc/context-commander/migrate.env
+ExecCondition=/bin/grep -qs ^CC_DATABASE_URL=. /etc/context-commander/migrate.env
+ExecStart=/usr/bin/ccd purge
+SyslogIdentifier=ccd-purge
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/ccd

@@ -363,13 +363,51 @@ keys, so it takes seconds however much is stored.
 For the packages, run the same with `sudo systemctl stop ccd` and
 `ccd root-key rotate` with the variables set in the shell.
 
+## Deleting for good: purge and legal hold
+
+An OWNER deletes a project from its Settings tab. It disappears for
+everyone at once, and its OWNERs can restore it from the home screen for
+seven days. After that, and for artifacts deleted more than 30 days ago,
+an operator's purge removes the rows and the stored objects
+([ADR 0036](adr/0036-project-deletion-legal-hold-and-purge.md)).
+
+Purging connects as `cc_owner`. With Docker Compose, give the `app` service
+(it has the storage) the owner connection:
+
+```bash
+OWNER="postgres://cc_owner:…@postgres:5432/context_commander?sslmode=disable"
+docker compose run --rm --no-deps -e CC_DATABASE_URL="$OWNER" app purge --dry-run
+docker compose run --rm --no-deps -e CC_DATABASE_URL="$OWNER" app purge
+```
+
+Schedule the second line daily. The packages ship a timer that is off until
+you turn it on:
+
+```bash
+sudo systemctl enable --now ccd-purge.timer
+```
+
+A legal hold stops all of it for one project: it cannot be scheduled for
+deletion, a scheduled deletion is cancelled, and every purge skips it.
+
+```bash
+ccd project hold --project team/work --reason "litigation, ticket LEGAL-12"
+ccd project hold --project team/work --release
+```
+
+`ccd project purge --project team/work --yes` removes one project at once,
+whatever its state, except under a hold. Use it for an import that stopped
+part way.
+
 ## Known gaps
 
 - **The root key comes only from an environment variable.** There is no
   file, KMS or Vault provider yet, so the key sits in `.env` or `ccd.env` on
   the server, and backing up those files backs up the key.
-- **Deleted artifacts are never cleaned up from storage** (see "Order"
-  above). Good for backups, but storage only grows.
+- **A purge does not reach backups.** `ccd purge` removes deleted
+  projects and long-deleted artifacts from the database and storage
+  ([ADR 0036](adr/0036-project-deletion-legal-hold-and-purge.md)); backups
+  taken before it still hold them until you rotate them.
 - **S3 is not covered.** `internal/storage/s3` exists, but `ccd serve` only
   builds the filesystem store, so S3 is not a deployment option yet.
 

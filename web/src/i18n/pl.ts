@@ -159,6 +159,12 @@ export const pl: Partial<Record<MessageKey, string>> = {
 
   "dashboard.title": "Pulpit",
   "dashboard.lead": "Co się zmieniło, gdzie pracowałaś lub pracowałeś i czy coś na Ciebie czeka.",
+  "dashboard.pendingDeletion": "Zaplanowane do usunięcia",
+  "dashboard.pendingDeletionLead":
+    "Ukryte przed wszystkimi. Anuluj przed datą, aby przywrócić projekt; potem purge operatora go usuwa.",
+  "dashboard.purgeColumn": "Purge po",
+  "dashboard.purgeAfter": "Purge po {date}",
+  "dashboard.cancelDeletion": "Anuluj usunięcie",
   "dashboard.waiting": "Czeka na Ciebie",
   "dashboard.noneWaiting": "Nic na Ciebie nie czeka",
   "dashboard.noneWaitingBody": "Żadnych otwartych przekazań, żadnych odmów wartych spojrzenia.",
@@ -645,7 +651,12 @@ export const pl: Partial<Record<MessageKey, string>> = {
     "Treść jest szyfrowana w spoczynku kluczem należącym do tego projektu, który sam jest owinięty kluczem głównym instalacji. Treści przekazań i sekrety przechodzą przez tę kopertę; bajty artefaktów idą do magazynu obiektów.",
   "settings.danger": "Nieodwracalne",
   "settings.noWrites":
-    "Nic na tym ekranie nie da się tu zmienić: API nie ma dla projektu ani aktualizacji, ani usunięcia. Zmiana nazwy, zmiana widoczności i usunięcie to operacje wiersza poleceń, a przycisk, który otwiera okno i potem pada, byłby gorszy niż jego brak.",
+    "Zmiana nazwy projektu i jego widoczności nie są jeszcze zrobione, więc ten ekran nie oferuje żadnej z nich.",
+  "settings.delete": "Usuń projekt",
+  "settings.deleteLead":
+    "Usunięcie od razu ukrywa projekt przed wszystkimi. Jego OWNER-zy mogą je cofnąć przez {days, plural, one {# dzień} few {# dni} many {# dni} other {# dnia}}; potem purge operatora usuwa wszystko na stałe. Usunąć może tylko OWNER i tylko tutaj, nie tokenem agenta.",
+  "settings.deleteConfirm": "Wpisz {path}, aby potwierdzić",
+  "settings.deleteButton": "Usuń projekt",
   "settings.connect": "Podłączanie agenta",
   "settings.connectLead":
     "Skieruj klienta MCP na ten serwer z osobistym tokenem dostępu. Projekt nazywa się przy każdym wywołaniu, więc jeden token dosięga wszystkich projektów, do których należysz.",

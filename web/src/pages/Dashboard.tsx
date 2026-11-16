@@ -24,6 +24,7 @@ import { DoneBars, ProgressCell } from "./WorkOverview";
 import {
   Avatar,
   Badge,
+  Btn,
   Cell,
   DataTable,
   EmptyState,
@@ -112,6 +113,8 @@ export function Dashboard() {
       />
 
       <Stack>
+        <PendingDeletions onRestored={projects.reload} />
+
         <Portfolio
           projects={mine}
           projectsLoading={projects.loading}
@@ -553,6 +556,74 @@ function Portfolio({
           )}
         </>
       )}
+    </Panel>
+  );
+}
+
+/**
+ * The reader's projects scheduled for deletion (docs/adr/0036). Nothing
+ * else lists them any more, so this is the only way back before the purge.
+ * Not drawn when there are none, or when the list cannot be read: an empty
+ * panel here would only be noise on every visit.
+ */
+function PendingDeletions({ onRestored }: { onRestored: () => void }) {
+  const t = useT();
+  const f = useFormat();
+  const list = useResource(() => api.pendingDeletions(), []);
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState<unknown>();
+  const items = list.data?.items ?? [];
+  if (items.length === 0) return null;
+
+  async function restore(id: string) {
+    setBusy(true);
+    setFailure(undefined);
+    try {
+      await api.cancelDeletion(id);
+      list.reload();
+      onRestored();
+    } catch (err) {
+      setFailure(err);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Panel
+      title={t("dashboard.pendingDeletion")}
+      tight
+      footer={<span className="dim">{t("dashboard.pendingDeletionLead")}</span>}
+    >
+      {failure !== undefined && <ErrorState error={failure} />}
+      <DataTable
+        columns={[
+          { key: "project", label: t("projects.column.project") },
+          { key: "purge", label: t("dashboard.purgeColumn"), align: "r" },
+          { key: "actions", label: "", align: "r" },
+        ]}
+      >
+        {items.map((p) => (
+          <tr key={p.id}>
+            <td>
+              <Cell primary={p.name} secondary={<Mono dim>{p.project}</Mono>} />
+            </td>
+            <td className="r">
+              <span
+                className="dim"
+                title={t("dashboard.purgeAfter", { date: f.date(p.purge_after) })}
+              >
+                {f.date(p.purge_after)}
+              </span>
+            </td>
+            <td className="r">
+              <Btn small onClick={() => void restore(p.id)} disabled={busy}>
+                {t("dashboard.cancelDeletion")}
+              </Btn>
+            </td>
+          </tr>
+        ))}
+      </DataTable>
     </Panel>
   );
 }

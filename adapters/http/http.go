@@ -39,6 +39,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/portability"
 	"github.com/koduj-dev/context-commander/internal/projects"
 	"github.com/koduj-dev/context-commander/internal/ratelimit"
+	"github.com/koduj-dev/context-commander/internal/retention"
 	"github.com/koduj-dev/context-commander/internal/secrets"
 	"github.com/koduj-dev/context-commander/internal/security"
 	"github.com/koduj-dev/context-commander/internal/skills"
@@ -73,6 +74,7 @@ type Deps struct {
 	Messages    *messages.Service
 	Changes     *changes.Service
 	Portability *portability.Service
+	Retention   *retention.Service
 	// Security records refusals and Limiter bounds them. Both are safe to
 	// leave nil — a nil *security.Recorder records nothing and a nil
 	// *ratelimit.Limiter allows everything, which is what the CLI and the
@@ -178,6 +180,8 @@ func NewHandler(deps Deps) http.Handler {
 			r.Get("/me/projects", deps.listMyProjects)
 			// Every project's state of work in numbers, for the home screen.
 			r.Get("/me/projects/overview", deps.myProjectsOverview)
+			r.Get("/me/projects/pending-deletion", deps.myPendingDeletions)
+			r.Post("/me/projects/pending-deletion/{projectID}/cancel", deps.cancelDeletion)
 			r.Get("/me/handoffs", deps.listWaiting)
 			r.Get("/me/organizations", deps.listMyOrganizations)
 			r.Post("/me/tokens", deps.issueToken)
@@ -252,6 +256,7 @@ func NewHandler(deps Deps) http.Handler {
 				r.Use(deps.resolveProjectMiddleware)
 
 				r.Get("/", deps.getProject)
+				r.Delete("/", deps.deleteProject)
 				r.Post("/members", deps.addMember)
 				r.Get("/members", deps.listMembers)
 				r.Patch("/members/{principalID}", deps.setMemberRole)

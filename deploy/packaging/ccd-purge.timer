@@ -1,0 +1,13 @@
+[Unit]
+Description=Context Commander — daily purge
+Documentation=https://github.com/koduj-dev/context-commander/blob/main/docs/adr/0036-project-deletion-legal-hold-and-purge.md
+
+# Not enabled by the package: purging cannot be undone, so an operator turns
+# it on knowingly, with `systemctl enable --now ccd-purge.timer`.
+[Timer]
+OnCalendar=daily
+RandomizedDelaySec=1h
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -36,6 +36,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/portability"
 	"github.com/koduj-dev/context-commander/internal/projects"
 	"github.com/koduj-dev/context-commander/internal/ratelimit"
+	"github.com/koduj-dev/context-commander/internal/retention"
 	"github.com/koduj-dev/context-commander/internal/secrets"
 	"github.com/koduj-dev/context-commander/internal/security"
 	"github.com/koduj-dev/context-commander/internal/skills"
@@ -149,7 +150,8 @@ func newFixtureWithDeps(t *testing.T, recordSecurity *bool, limits ratelimit.Lim
 		Handoffs: handoffsSvc, History: historySvc,
 		Skills: skillsSvc, Gates: gatesAdmin, Secrets: secretsSvc,
 		Installation: installationSvc, ContextPack: contextSvc, Plans: plansSvc, Memories: memoriesSvc, Ideas: ideasSvc, Messages: messagesSvc, Changes: changes.NewService(appPool, authz, memoriesSvc, plansSvc), Portability: portability.NewService(appPool, authz, artifactsSvc, memoriesSvc, plansSvc, ideasSvc, handoffsSvc, historySvc),
-		Security: securityRec, Limiter: ratelimit.New(limits), SecurityEvents: securitySvc,
+		Retention: retention.NewService(appPool, authz),
+		Security:  securityRec, Limiter: ratelimit.New(limits), SecurityEvents: securitySvc,
 	}
 	if adjust != nil {
 		adjust(&deps)

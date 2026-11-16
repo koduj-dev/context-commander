@@ -46,6 +46,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/projects"
 	"github.com/koduj-dev/context-commander/internal/quota"
 	"github.com/koduj-dev/context-commander/internal/ratelimit"
+	"github.com/koduj-dev/context-commander/internal/retention"
 	"github.com/koduj-dev/context-commander/internal/secrets"
 	"github.com/koduj-dev/context-commander/internal/security"
 	"github.com/koduj-dev/context-commander/internal/skills"
@@ -455,7 +456,8 @@ func newServeCmd() *cobra.Command {
 				Handoffs: handoffsSvc, History: historySvc,
 				Skills: skillsSvc, Gates: gatesAdmin, Secrets: secretsSvc,
 				Installation: installationSvc, ContextPack: contextSvc, Plans: plansSvc, Memories: memoriesSvc, Ideas: ideasSvc, Messages: messagesSvc, Changes: changesSvc, Portability: portability.NewService(pool, authz, artifactsSvc, memoriesSvc, plansSvc, ideasSvc, handoffsSvc, historySvc),
-				Security: securityRec, Limiter: limiter, SecurityEvents: securitySvc, ClientIP: clientIPs,
+				Retention: retention.NewService(pool, authz),
+				Security:  securityRec, Limiter: limiter, SecurityEvents: securitySvc, ClientIP: clientIPs,
 				FirstRun: firstRunCode, Embeddings: embeddingsStatus,
 				// Nil unless --ldap-url was given, and a nil Directory is what
 				// closes the path rather than opening it.

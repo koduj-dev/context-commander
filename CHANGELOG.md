@@ -86,6 +86,17 @@ All notable changes to Context Commander are documented here. The format follows
   whether the provider answers, the last error, the queue and the memories
   still waiting.
 
+- **Project deletion, legal hold and purge.** An OWNER deletes a project
+  from its Settings tab, typing its path; it disappears for everyone at once
+  (row-level security), and its OWNERs can restore it from the home screen
+  for seven days. `ccd purge`, as `cc_owner`, then removes it for good, rows
+  and stored objects, along with the versions of artifacts deleted more than
+  30 days ago. `ccd project hold` places a legal hold that blocks deletion
+  and every purge; `ccd project purge` removes one project at once. The
+  packages ship `ccd-purge.timer`, not enabled. Migration 000047; `cc_app`
+  no longer has UPDATE on `projects`.
+  [ADR 0036](docs/adr/0036-project-deletion-legal-hold-and-purge.md).
+
 - **Project import.** `ccd project import --file … --project ns/slug
   --owner email`, connected as `cc_owner`, writes an export into a new
   project under this installation's keys: new ids with every

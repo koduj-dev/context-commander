@@ -128,6 +128,12 @@ export const es: Partial<Record<MessageKey, string>> = {
 
   "dashboard.title": "Panel",
   "dashboard.lead": "Qué ha cambiado, dónde estaba trabajando y si algo le está esperando.",
+  "dashboard.pendingDeletion": "Programados para eliminación",
+  "dashboard.pendingDeletionLead":
+    "Ocultos para todos. Cancela antes de la fecha para recuperar un proyecto; después, la purga de un operador lo elimina.",
+  "dashboard.purgeColumn": "Se purga después del",
+  "dashboard.purgeAfter": "Se purga después del {date}",
+  "dashboard.cancelDeletion": "Cancelar eliminación",
   "dashboard.waiting": "Le está esperando",
   "dashboard.noneWaiting": "Nada le está esperando",
   "dashboard.noneWaitingBody": "Ningún traspaso abierto y ninguna denegación que merezca atención.",
@@ -608,7 +614,12 @@ export const es: Partial<Record<MessageKey, string>> = {
     "El contenido está cifrado en reposo bajo una clave propia de este proyecto, envuelta a su vez por la clave raíz de la instalación. Los cuerpos de los traspasos y los secretos pasan por ese sobre; los bytes de los artefactos van al almacén de objetos.",
   "settings.danger": "Irreversible",
   "settings.noWrites":
-    "Nada de esta pantalla puede cambiarse aquí: la API no tiene actualización ni borrado de un proyecto. Renombrar, cambiar la visibilidad y eliminar son operaciones de la CLI, y un control que abriera un diálogo y luego fallara sería peor que su ausencia.",
+    "Renombrar un proyecto y cambiar su visibilidad aún no están construidos, así que esta pantalla no ofrece ninguna de las dos cosas.",
+  "settings.delete": "Eliminar proyecto",
+  "settings.deleteLead":
+    "Eliminar oculta el proyecto a todos de inmediato. Sus OWNER pueden cancelarlo durante {days, plural, one {# día} other {# días}}; después, la purga de un operador lo borra todo definitivamente. Solo un OWNER puede eliminar, y solo aquí, no con el token de un agente.",
+  "settings.deleteConfirm": "Escribe {path} para confirmar",
+  "settings.deleteButton": "Eliminar proyecto",
   "settings.connect": "Conectar un agente",
   "settings.connectLead":
     "Apunte un cliente MCP a este servidor con un token de acceso personal. El proyecto se nombra en cada llamada, así que un solo token alcanza todos los proyectos de los que es miembro.",
