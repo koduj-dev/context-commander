@@ -22,9 +22,26 @@ Please include, as far as you can:
   standalone, self-hosted).
 
 Do not include working exploit code or real credentials in the report — describe the class of
-problem and, where possible, a minimal reproduction against a disposable local instance. We aim
-to acknowledge a report within a few days. This is a community project maintained on a
-best-effort basis — thanks for your patience.
+problem and, where possible, a minimal reproduction against a disposable local instance.
+
+## Coordinated disclosure
+
+- **Acknowledgement** within 5 working days, and an assessment (reproduced or not, severity by
+  CVSS v4) within 10.
+- **Fix targets** from confirmation: critical or actively exploited, 7 days; high, 14 days;
+  medium, 30 days or the next release; low, the next release. A fix ships as a patch release, so
+  taking it does not mean taking new features.
+- **Disclosure** through a GitHub Security Advisory with a CVE, once a fixed release exists:
+  what was wrong, which versions are affected, what to do. We agree the date with you, and do
+  not delay past 90 days from your report without your agreement.
+- **Credit** in the advisory, if you want it.
+- **Good faith.** Research that respects these rules, avoids other people's data and services,
+  and gives us a chance to fix the problem before it is public is welcome, and we will not take
+  action against it.
+
+Actively exploited vulnerabilities and severe incidents are also reported to the competent
+CSIRT and ENISA as the EU Cyber Resilience Act requires. How vulnerabilities are handled end to
+end is in [docs/cra/vulnerability-handling.md](docs/cra/vulnerability-handling.md).
 
 ## What review this code has had — and what it hasn't
 

@@ -26,6 +26,7 @@ one of them is wrong.
 | [`architecture-cookbook.md`](architecture-cookbook.md) | Why is the system shaped this way? The long-form rationale, by domain. |
 | [`adr/`](adr/) | What exactly was decided, when, and what did it rule out? One decision per file. |
 | [`context-commander-ui-spec.md`](context-commander-ui-spec.md) | What is the web UI meant to become? |
+| [`cra/`](cra/README.md) | What does the EU Cyber Resilience Act ask of this product, and where is each answer? The manufacturer's working file. |
 
 ## Working on it
 
