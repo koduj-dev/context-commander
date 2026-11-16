@@ -108,10 +108,7 @@ func overviewCounts(ctx context.Context, tx pgx.Tx, ids []uuid.UUID, index map[u
 		if err := rows.Scan(&id, &status, &n); err != nil {
 			return err
 		}
-		c := &out[index[id]].Counts
-		for range n {
-			c.add(status)
-		}
+		out[index[id]].Counts.addN(status, n)
 	}
 	return rows.Err()
 }

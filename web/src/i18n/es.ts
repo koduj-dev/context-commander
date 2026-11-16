@@ -1174,8 +1174,8 @@ export const es: Partial<Record<MessageKey, string>> = {
   "overview.waitingLead":
     "Propuestas que aceptar o rechazar, pasos bloqueados y el traspaso que quedó para quien venga después.",
   "overview.waitingNone": "Nada espera a una persona",
-  "overview.waitingNoneBody":
-    "Ninguna propuesta por decidir, nada bloqueado, ningún traspaso abierto.",
+  "overview.noProposals": "Ninguna propuesta por decidir",
+  "overview.waitingNoneBody": "Ninguna propuesta por decidir y nada bloqueado.",
   "overview.kind.proposal": "Propuesta",
   "overview.kind.blocked": "Bloqueado",
   "overview.phaseTime": "{time} registrado",

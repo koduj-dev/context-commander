@@ -91,12 +91,18 @@ const IDEAS = {
   items: [{ project: "acme/beta", name: "Beta", open: 0, claimed: 0, lapsed: 0, proposed: 1 }],
 };
 
-function stubServer(waiting: unknown = WAITING) {
+/** A URL ending in one of `failing` answers 500. */
+function stubServer(waiting: unknown = WAITING, failing: string[] = []) {
   const calls: string[] = [];
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string) => {
       calls.push(url);
+      if (failing.some((f) => url.endsWith(f))) {
+        return new Response(JSON.stringify({ error: { code: "internal", message: "boom" } }), {
+          status: 500,
+        });
+      }
       if (url.endsWith("/v1/me/projects/overview")) {
         return new Response(JSON.stringify(OVERVIEW), { status: 200 });
       }
@@ -222,5 +228,32 @@ describe("the dashboard", () => {
     render(wrap());
 
     await waitFor(() => expect(screen.getByText("Nothing is waiting on you")).toBeTruthy());
+  });
+
+  it("keeps every project's link when the overview fails", async () => {
+    stubServer(WAITING, ["/v1/me/projects/overview"]);
+    render(wrap());
+
+    const table = (await screen.findByRole("heading", { name: "Projects at a glance" })).closest(
+      "section",
+    ) as HTMLElement;
+    expect(await within(table).findByText("Something went wrong")).toBeTruthy();
+    expect(within(table).getByRole("link", { name: "Alpha" }).getAttribute("href")).toBe(
+      "/p/acme/alpha",
+    );
+    // The reason a row has no numbers is the failure, not the reader's role.
+    expect(within(table).queryByText("Your role does not show plans")).toBeNull();
+  });
+
+  it("shows a failed project list as an error, not as no projects", async () => {
+    stubServer(WAITING, ["/v1/me/projects", "/v1/me/projects/overview"]);
+    render(wrap());
+
+    const table = (await screen.findByRole("heading", { name: "Projects at a glance" })).closest(
+      "section",
+    ) as HTMLElement;
+    expect((await within(table).findAllByText("Something went wrong")).length).toBe(2);
+    expect(within(table).queryByText("You are not in any project yet")).toBeNull();
+    expect(within(table).getAllByRole("button", { name: "Try again" })).toHaveLength(2);
   });
 });

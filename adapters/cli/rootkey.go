@@ -53,8 +53,8 @@ func newRootKeyCmd() *cobra.Command {
 			case len(res.Others) == 0:
 				_, _ = fmt.Fprintf(out, "%s: wraps all %d project keys\n", res.Current, res.Matching)
 			default:
-				return fmt.Errorf("%s wraps %d project keys, and %d are wrapped under other keys: %v; "+
-					"finish the rotation with `ccd root-key rotate`", res.Current, res.Matching, others(res), res.Others)
+				return fmt.Errorf("%s wraps %d project keys, and %d are wrapped under other keys: %s; "+
+					"finish the rotation with `ccd root-key rotate`", res.Current, res.Matching, others(res), crypto.FormatRootKeyUses(res.Others))
 			}
 			return nil
 		},

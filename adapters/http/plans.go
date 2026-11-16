@@ -2,7 +2,6 @@ package http
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -680,15 +679,16 @@ type projectOverviewResponse struct {
 	LastActivity *time.Time     `json:"last_activity,omitempty"`
 }
 
-// overviewDays reads ?days=, 14 when absent.
+// overviewDays reads ?days=, 14 when absent. The range is the service's to
+// check (plans.ErrInvalid, a 400), so the bound lives in one place.
 func overviewDays(w http.ResponseWriter, r *http.Request) (int, bool) {
 	raw := r.URL.Query().Get("days")
 	if raw == "" {
 		return plans.DefaultOverviewDays, true
 	}
 	n, err := strconv.Atoi(raw)
-	if err != nil || n < 1 || n > plans.MaxOverviewDays {
-		writeError(w, http.StatusBadRequest, "invalid_request", fmt.Sprintf("days must be a whole number between 1 and %d", plans.MaxOverviewDays))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", "days must be a whole number")
 		return 0, false
 	}
 	return n, true
