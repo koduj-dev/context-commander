@@ -134,7 +134,6 @@ export const de: Partial<Record<MessageKey, string>> = {
   "dashboard.lead":
     "Was sich geändert hat, woran Sie gearbeitet haben und ob etwas auf Sie wartet.",
   "dashboard.waiting": "Wartet auf Sie",
-  "dashboard.yourProjects": "Ihre Projekte",
   "dashboard.noneWaiting": "Nichts wartet auf Sie",
   "dashboard.noneWaitingBody":
     "Keine offenen Übergaben, keine Ablehnungen, die einen Blick lohnen.",
@@ -157,9 +156,6 @@ export const de: Partial<Record<MessageKey, string>> = {
   "project.tab.members": "Mitglieder",
   "project.tab.skills": "Skills",
   "project.tab.activity": "Aktivität",
-  "project.notBuilt.title": "Noch nicht gebaut",
-  "project.notBuilt.artifacts":
-    "Für Artefakte, Notizen, Richtlinien und Geheimnisse gibt es Entwürfe, aber in der API noch keinen Lesepfad.",
 
   "handoff.current": "Aktuelle Übergabe",
   "handoff.summary": "Zusammenfassung",
@@ -1164,4 +1160,60 @@ export const de: Partial<Record<MessageKey, string>> = {
   "messages.state.expired": "Verfallen",
   "messages.state.delivered": "Zugestellt: {count, plural, one {# Sitzung} other {# Sitzungen}}",
   "messages.state.acked": "Bestätigt: {count, plural, one {# Sitzung} other {# Sitzungen}}",
+  "overview.progress":
+    "{percent} · {done} von {total, plural, one {# Eintrag} other {# Einträgen}}",
+  "overview.progressAria": "{done} erledigt, {doing} in Arbeit, {blocked} blockiert, {open} offen",
+  "overview.noPlan": "Noch kein Plan",
+  "overview.legend.done": "Erledigt",
+  "overview.legend.doing": "In Arbeit",
+  "overview.legend.blocked": "Blockiert",
+  "overview.legend.open": "Offen",
+  "overview.doneDay":
+    "{day}: {count, plural, one {# Eintrag erledigt} other {# Einträge erledigt}}",
+  "overview.doneAria": "Erledigte Einträge pro Tag: {values}",
+  "overview.timeDay": "{day}: {time}",
+  "overview.timeAria": "Gemeldete Zeit pro Tag: {values}",
+  "overview.portfolio": "Projekte im Überblick",
+  "overview.portfolioLead":
+    "Der Fortschritt zählt die Einträge aller nicht aufgegebenen Pläne. Aktivität sind erledigte Einträge pro Tag.",
+  "overview.col.progress": "Fortschritt",
+  "overview.col.doing": "In Arbeit",
+  "overview.col.blocked": "Blockiert",
+  "overview.col.people": "Arbeitet gerade",
+  "overview.col.activity": "Aktivität ({count, plural, one {# Tag} other {# Tage}})",
+  "overview.col.waiting": "Wartet auf dich",
+  "overview.col.last": "Letzte Änderung",
+  "overview.nobody": "Niemand",
+  "overview.waitingCount": "{count, plural, one {# Eintrag} other {# Einträge}}",
+  "overview.never": "Noch nichts",
+  "overview.noPlanAccess": "Deine Rolle zeigt keine Pläne",
+  "overview.kpi.done": "Erledigt ({done} von {total})",
+  "overview.kpi.doing": "In Arbeit",
+  "overview.kpi.blocked": "Blockiert",
+  "overview.kpi.people": "Arbeitet gerade",
+  "overview.waiting": "Wartet auf einen Menschen",
+  "overview.waitingLead":
+    "Vorschläge zum Annehmen oder Ablehnen, blockierte Schritte und die Übergabe für die nächste Person.",
+  "overview.waitingNone": "Nichts wartet auf einen Menschen",
+  "overview.waitingNoneBody":
+    "Kein Vorschlag zu entscheiden, nichts blockiert, keine offene Übergabe.",
+  "overview.kind.proposal": "Vorschlag",
+  "overview.kind.blocked": "Blockiert",
+  "overview.phaseTime": "{time} erfasst",
+  "overview.noPhases": "Noch keine Phasen",
+  "overview.noPhasesBody":
+    "Phasen gliedern Pläne in Etappen. Lege sie im Tab Pläne an oder überlass es einer Planungssitzung.",
+  "overview.days": "Letzte {count, plural, one {# Tag} other {# Tage}}",
+  "overview.finished": "Erledigte Einträge pro Tag",
+  "overview.timePerDay": "Gemeldete Zeit pro Tag",
+  "overview.noTime":
+    "Keine Zeit gemeldet. Clients, die Nutzung melden, füllen das aus; es ist optional.",
+  "overview.branches": "Aktive Branches ({count, plural, one {# Tag} other {# Tage}})",
+  "overview.col.branch": "Branch",
+  "overview.col.ticket": "Ticket",
+  "overview.col.time": "Zeit",
+  "overview.noBranch": "Kein Branch angegeben",
+  "overview.memories": "Neueste Entscheidungen und Stolperfallen",
+  "overview.memoriesNone": "Noch keine Entscheidungen, Erkenntnisse oder Stolperfallen erfasst",
+  "overview.memoriesAll": "Alle Erinnerungen",
 };

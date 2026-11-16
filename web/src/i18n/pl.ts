@@ -160,7 +160,6 @@ export const pl: Partial<Record<MessageKey, string>> = {
   "dashboard.title": "Pulpit",
   "dashboard.lead": "Co się zmieniło, gdzie pracowałaś lub pracowałeś i czy coś na Ciebie czeka.",
   "dashboard.waiting": "Czeka na Ciebie",
-  "dashboard.yourProjects": "Twoje projekty",
   "dashboard.noneWaiting": "Nic na Ciebie nie czeka",
   "dashboard.noneWaitingBody": "Żadnych otwartych przekazań, żadnych odmów wartych spojrzenia.",
 
@@ -508,9 +507,6 @@ export const pl: Partial<Record<MessageKey, string>> = {
   "project.tab.members": "Członkowie",
   "project.tab.skills": "Skille",
   "project.tab.activity": "Aktywność",
-  "project.notBuilt.title": "Jeszcze nie zrobione",
-  "project.notBuilt.artifacts":
-    "Artefakty, notatki, polityki i sekrety mają zaprojektowane ekrany, ale na razie nie mają ścieżki odczytu w API.",
 
   "context.title": "Kontekst",
   "context.lead":
@@ -1163,4 +1159,65 @@ export const pl: Partial<Record<MessageKey, string>> = {
     "Doręczono: {count, plural, one {# sesja} few {# sesje} many {# sesji} other {# sesji}}",
   "messages.state.acked":
     "Potwierdzono: {count, plural, one {# sesja} few {# sesje} many {# sesji} other {# sesji}}",
+  "overview.progress":
+    "{percent} · {done} z {total, plural, one {# pozycji} few {# pozycji} many {# pozycji} other {# pozycji}}",
+  "overview.progressAria":
+    "ukończone: {done}, w toku: {doing}, zablokowane: {blocked}, otwarte: {open}",
+  "overview.noPlan": "Brak planu",
+  "overview.legend.done": "Ukończone",
+  "overview.legend.doing": "W toku",
+  "overview.legend.blocked": "Zablokowane",
+  "overview.legend.open": "Otwarte",
+  "overview.doneDay":
+    "{day}: {count, plural, one {# pozycja ukończona} few {# pozycje ukończone} many {# pozycji ukończonych} other {# pozycji ukończonych}}",
+  "overview.doneAria": "Pozycje ukończone dziennie: {values}",
+  "overview.timeDay": "{day}: {time}",
+  "overview.timeAria": "Zgłoszony czas dziennie: {values}",
+  "overview.portfolio": "Projekty w skrócie",
+  "overview.portfolioLead":
+    "Postęp liczy pozycje wszystkich niezarzuconych planów. Aktywność to pozycje ukończone dziennie.",
+  "overview.col.progress": "Postęp",
+  "overview.col.doing": "W toku",
+  "overview.col.blocked": "Zablokowane",
+  "overview.col.people": "Teraz pracują",
+  "overview.col.activity":
+    "Aktywność ({count, plural, one {# dzień} few {# dni} many {# dni} other {# dnia}})",
+  "overview.col.waiting": "Czeka na ciebie",
+  "overview.col.last": "Ostatnia zmiana",
+  "overview.nobody": "Nikt",
+  "overview.waitingCount":
+    "{count, plural, one {# pozycja} few {# pozycje} many {# pozycji} other {# pozycji}}",
+  "overview.never": "Jeszcze nic",
+  "overview.noPlanAccess": "Twoja rola nie pokazuje planów",
+  "overview.kpi.done": "Ukończone ({done} z {total})",
+  "overview.kpi.doing": "W toku",
+  "overview.kpi.blocked": "Zablokowane",
+  "overview.kpi.people": "Teraz pracują",
+  "overview.waiting": "Czeka na człowieka",
+  "overview.waitingLead":
+    "Propozycje do przyjęcia lub odrzucenia, zablokowane kroki i przekazanie zostawione dla następnej osoby.",
+  "overview.waitingNone": "Nic nie czeka na człowieka",
+  "overview.waitingNoneBody":
+    "Żadnej propozycji do decyzji, nic zablokowanego, żadnego otwartego przekazania.",
+  "overview.kind.proposal": "Propozycja",
+  "overview.kind.blocked": "Zablokowane",
+  "overview.phaseTime": "Zmierzono: {time}",
+  "overview.noPhases": "Brak faz",
+  "overview.noPhasesBody":
+    "Fazy dzielą plany na etapy. Utwórz je na karcie Plany albo zostaw to sesji planowania.",
+  "overview.days":
+    "{count, plural, one {Ostatni # dzień} few {Ostatnie # dni} many {Ostatnie # dni} other {Ostatnie # dnia}}",
+  "overview.finished": "Pozycje ukończone dziennie",
+  "overview.timePerDay": "Zgłoszony czas dziennie",
+  "overview.noTime":
+    "Brak zgłoszonego czasu. Wypełniają to klienty, które zgłaszają użycie; to opcjonalne.",
+  "overview.branches":
+    "Aktywne gałęzie ({count, plural, one {# dzień} few {# dni} many {# dni} other {# dnia}})",
+  "overview.col.branch": "Gałąź",
+  "overview.col.ticket": "Zgłoszenie",
+  "overview.col.time": "Czas",
+  "overview.noBranch": "Bez podanej gałęzi",
+  "overview.memories": "Ostatnie decyzje i pułapki",
+  "overview.memoriesNone": "Brak zapisanych decyzji, ustaleń i pułapek",
+  "overview.memoriesAll": "Wszystkie wspomnienia",
 };

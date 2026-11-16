@@ -63,6 +63,13 @@ export function number(value: number, locale: string): string {
  * decimals that takes: a step that cost a fraction of a cent must not read
  * as "$0.00", which says "free".
  */
+/** A share, 0 to 1, as a whole percentage in the reader's notation. */
+export function percent(fraction: number, locale: string): string {
+  return new Intl.NumberFormat(locale, { style: "percent", maximumFractionDigits: 0 }).format(
+    fraction,
+  );
+}
+
 export function money(value: number, currency: string, locale: string): string {
   const abs = Math.abs(value);
   if (abs > 0 && abs < 0.01) {

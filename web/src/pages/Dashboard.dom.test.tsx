@@ -56,12 +56,56 @@ const WAITING = [
   },
 ];
 
+const OVERVIEW = {
+  from: "2026-11-03",
+  days: 14,
+  items: [
+    {
+      project: "acme/beta",
+      name: "Beta",
+      role: "MEMBER",
+      counts: { open: 1, in_progress: 0, done: 2, blocked: 1, skipped: 3 },
+      done_per_day: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1],
+      last_activity: "2026-11-16T09:00:00Z",
+    },
+  ],
+};
+
+const PRESENCE = {
+  items: [
+    {
+      client_id: "c-1",
+      client_type: "claude-code",
+      principal_id: "pr-2",
+      you: false,
+      project: "acme/beta",
+      since: "2026-11-16T08:00:00Z",
+      last_seen: "2026-11-16T09:00:00Z",
+      idle: false,
+    },
+  ],
+  people: { "pr-2": { kind: "user", name: "Ada Lovelace" } },
+};
+
+const IDEAS = {
+  items: [{ project: "acme/beta", name: "Beta", open: 0, claimed: 0, lapsed: 0, proposed: 1 }],
+};
+
 function stubServer(waiting: unknown = WAITING) {
   const calls: string[] = [];
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string) => {
       calls.push(url);
+      if (url.endsWith("/v1/me/projects/overview")) {
+        return new Response(JSON.stringify(OVERVIEW), { status: 200 });
+      }
+      if (url.endsWith("/v1/me/presence")) {
+        return new Response(JSON.stringify(PRESENCE), { status: 200 });
+      }
+      if (url.endsWith("/v1/me/ideas/counts")) {
+        return new Response(JSON.stringify(IDEAS), { status: 200 });
+      }
       if (url.endsWith("/v1/me/handoffs")) {
         return new Response(JSON.stringify(waiting), { status: 200 });
       }
@@ -147,6 +191,30 @@ describe("the dashboard", () => {
     const summary = await waitFor(() => screen.getByText("Picked the schema, migration is next"));
     const link = within(summary.closest("tr")!).getByRole("link", { name: "acme/brand-new" });
     expect(link.getAttribute("href")).toBe("/p/acme/brand-new");
+  });
+
+  it("shows each project's progress, people, and what waits, in one row", async () => {
+    stubServer();
+    render(wrap());
+
+    const table = (await screen.findByRole("heading", { name: "Projects at a glance" })).closest(
+      "section",
+    )!;
+    const beta = (await within(table as HTMLElement).findByText("acme/beta")).closest("tr")!;
+    // Skipped items count in neither the share nor the total.
+    expect(within(beta).getByText("50% · 2 of 4 items")).toBeTruthy();
+    expect(
+      within(beta).getByRole("img", { name: "2 done, 0 in progress, 1 blocked, 1 open" }),
+    ).toBeTruthy();
+    expect(within(beta).getByRole("img", { name: "Ada Lovelace" })).toBeTruthy();
+    // One open handoff and one proposal to decide.
+    expect(within(beta).getByText("2 items")).toBeTruthy();
+
+    // A project the overview leaves out still has its row, with the reason.
+    const alpha = within(table as HTMLElement)
+      .getByText("acme/alpha")
+      .closest("tr")!;
+    expect(within(alpha).getByText("Your role does not show plans")).toBeTruthy();
   });
 
   it("says plainly when nothing is waiting", async () => {

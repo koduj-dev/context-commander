@@ -164,7 +164,6 @@ export const fr: Partial<Record<MessageKey, string>> = {
   "dashboard.title": "Tableau de bord",
   "dashboard.lead": "Ce qui a changé, où vous travailliez, et si quelque chose vous attend.",
   "dashboard.waiting": "En attente de vous",
-  "dashboard.yourProjects": "Vos projets",
   "dashboard.noneWaiting": "Rien ne vous attend",
   "dashboard.noneWaitingBody": "Aucun transfert ouvert, aucun refus qui mérite un coup d’œil.",
 
@@ -503,9 +502,6 @@ export const fr: Partial<Record<MessageKey, string>> = {
   "project.tab.members": "Membres",
   "project.tab.skills": "Skills",
   "project.tab.activity": "Activité",
-  "project.notBuilt.title": "Pas encore implémenté",
-  "project.notBuilt.artifacts":
-    "Les artefacts, les notes, les politiques et les secrets ont des écrans maquettés, mais aucun chemin de lecture dans l’API pour l’instant.",
 
   "context.title": "Contexte",
   "context.lead":
@@ -1152,4 +1148,59 @@ export const fr: Partial<Record<MessageKey, string>> = {
   "messages.state.delivered": "Remis : {count, plural, one {# session} other {# sessions}}",
   "messages.state.acked":
     "Accusé de réception : {count, plural, one {# session} other {# sessions}}",
+  "overview.progress": "{percent} · {done} sur {total, plural, one {# élément} other {# éléments}}",
+  "overview.progressAria": "{done} terminés, {doing} en cours, {blocked} bloqués, {open} ouverts",
+  "overview.noPlan": "Pas encore de plan",
+  "overview.legend.done": "Terminé",
+  "overview.legend.doing": "En cours",
+  "overview.legend.blocked": "Bloqué",
+  "overview.legend.open": "Ouvert",
+  "overview.doneDay":
+    "{day} : {count, plural, one {# élément terminé} other {# éléments terminés}}",
+  "overview.doneAria": "Éléments terminés par jour : {values}",
+  "overview.timeDay": "{day} : {time}",
+  "overview.timeAria": "Temps déclaré par jour : {values}",
+  "overview.portfolio": "Projets en un coup d’œil",
+  "overview.portfolioLead":
+    "La progression compte les éléments de tous les plans non abandonnés. L’activité correspond aux éléments terminés par jour.",
+  "overview.col.progress": "Progression",
+  "overview.col.doing": "En cours",
+  "overview.col.blocked": "Bloqués",
+  "overview.col.people": "Au travail",
+  "overview.col.activity": "Activité ({count, plural, one {# jour} other {# jours}})",
+  "overview.col.waiting": "En attente de vous",
+  "overview.col.last": "Dernier changement",
+  "overview.nobody": "Personne",
+  "overview.waitingCount": "{count, plural, one {# élément} other {# éléments}}",
+  "overview.never": "Rien pour l’instant",
+  "overview.noPlanAccess": "Votre rôle n’affiche pas les plans",
+  "overview.kpi.done": "Terminé ({done} sur {total})",
+  "overview.kpi.doing": "En cours",
+  "overview.kpi.blocked": "Bloqués",
+  "overview.kpi.people": "Au travail",
+  "overview.waiting": "En attente d’une personne",
+  "overview.waitingLead":
+    "Propositions à accepter ou refuser, étapes bloquées et le transfert laissé pour la suite.",
+  "overview.waitingNone": "Rien n’attend une personne",
+  "overview.waitingNoneBody":
+    "Aucune proposition à trancher, rien de bloqué, aucun transfert ouvert.",
+  "overview.kind.proposal": "Proposition",
+  "overview.kind.blocked": "Bloqué",
+  "overview.phaseTime": "{time} suivis",
+  "overview.noPhases": "Pas encore de phases",
+  "overview.noPhasesBody":
+    "Les phases regroupent les plans en étapes. Créez-les dans l’onglet Plans ou laissez une session de planification s’en charger.",
+  "overview.days": "{count, plural, one {Dernier # jour} other {# derniers jours}}",
+  "overview.finished": "Éléments terminés par jour",
+  "overview.timePerDay": "Temps déclaré par jour",
+  "overview.noTime":
+    "Aucun temps déclaré. Les clients qui déclarent l’usage le remplissent ; c’est facultatif.",
+  "overview.branches": "Branches en cours ({count, plural, one {# jour} other {# jours}})",
+  "overview.col.branch": "Branche",
+  "overview.col.ticket": "Ticket",
+  "overview.col.time": "Temps",
+  "overview.noBranch": "Aucune branche indiquée",
+  "overview.memories": "Décisions et pièges récents",
+  "overview.memoriesNone": "Aucune décision, constatation ni piège enregistré pour l’instant",
+  "overview.memoriesAll": "Toutes les mémoires",
 };

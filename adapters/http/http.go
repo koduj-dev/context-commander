@@ -172,6 +172,8 @@ func NewHandler(deps Deps) http.Handler {
 
 			r.Get("/me", deps.getMe)
 			r.Get("/me/projects", deps.listMyProjects)
+			// Every project's state of work in numbers, for the home screen.
+			r.Get("/me/projects/overview", deps.myProjectsOverview)
 			r.Get("/me/handoffs", deps.listWaiting)
 			r.Get("/me/organizations", deps.listMyOrganizations)
 			r.Post("/me/tokens", deps.issueToken)
@@ -283,12 +285,13 @@ func NewHandler(deps Deps) http.Handler {
 				r.Get("/usage", deps.projectUsage)
 
 				// Plans, phases and presence (docs/adr/0022). Static segments
-				// ("board", "events", "search", "items", "presence") are registered
+				// ("board", "events", "search", "overview", "items", "presence") are registered
 				// before "/{planID}": chi prefers them, so none is read as an id.
 				r.Route("/plans", func(r chi.Router) {
 					r.Get("/board", deps.getPlanBoard)
 					r.Get("/events", deps.streamPlanBoard)
 					r.Get("/search", deps.searchPlans)
+					r.Get("/overview", deps.getPlanOverview)
 					r.Post("/presence", deps.reportPresence)
 					r.Delete("/presence", deps.clearPresence)
 					r.Patch("/items/{itemID}", deps.updatePlanItem)
