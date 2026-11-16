@@ -93,6 +93,11 @@ const (
 	// on a user's PAT holds exactly the user's role.
 	CapIdeaRead  Capability = "idea.read"
 	CapIdeaWrite Capability = "idea.write"
+
+	// CapProjectExport is downloading the whole project as a plaintext
+	// archive (internal/portability, docs/adr/0035). ADMIN and OWNER: it
+	// reads everything at once into a file that leaves the server.
+	CapProjectExport Capability = "project.export"
 )
 
 // roleCapabilities is the single source of truth for what each role can do.
@@ -124,7 +129,7 @@ var roleCapabilities = map[projects.Role]map[Capability]bool{
 		CapArtifactWrite, CapArtifactDelete, CapSkillWrite, CapSkillInstall,
 		CapEventPublish,
 		CapProjectUpdate, CapMemberManage, CapIntegrationManage,
-		CapAuditRead,
+		CapAuditRead, CapProjectExport,
 		CapSecretRead, CapSecretWrite,
 		CapSkillPublish, CapSkillOverride, CapGateManage,
 		CapHandoffRead, CapHandoffWrite, CapHistoryRead, CapHistoryWrite,
@@ -143,7 +148,7 @@ var roleCapabilities = map[projects.Role]map[Capability]bool{
 		CapArtifactWrite, CapArtifactDelete, CapSkillWrite, CapSkillInstall,
 		CapEventPublish,
 		CapProjectUpdate, CapMemberManage, CapIntegrationManage,
-		CapAuditRead,
+		CapAuditRead, CapProjectExport,
 		CapSecretRead, CapSecretWrite,
 		CapSkillPublish, CapSkillOverride, CapGateManage,
 		CapHandoffRead, CapHandoffWrite, CapHistoryRead, CapHistoryWrite,

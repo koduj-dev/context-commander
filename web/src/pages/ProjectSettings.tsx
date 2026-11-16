@@ -1,5 +1,20 @@
+import { useState } from "react";
 import { useT } from "../i18n";
-import { Code, Copyable, Def, Defs, Grid, Mono, Note, PageHead, Panel, Stack } from "../ui";
+import { api } from "../lib/api";
+import {
+  Btn,
+  Code,
+  Copyable,
+  Def,
+  Defs,
+  ErrorState,
+  Grid,
+  Mono,
+  Note,
+  PageHead,
+  Panel,
+  Stack,
+} from "../ui";
 import { useProject } from "./ProjectLayout";
 
 /**
@@ -52,6 +67,8 @@ export function ProjectSettings() {
           <Panel title={t("settings.encryption")}>
             <p className="sec">{t("settings.encryptionBody")}</p>
           </Panel>
+
+          <ExportPanel />
         </Stack>
 
         <Stack top>
@@ -73,5 +90,50 @@ export function ProjectSettings() {
         </Stack>
       </Grid>
     </>
+  );
+}
+
+/**
+ * Downloading the project as an archive (docs/adr/0035). Shown to every
+ * member: the server decides who may, and a refusal says so here. Fetched
+ * rather than linked, because a cookie-authenticated request needs the CSRF
+ * header a plain link cannot send.
+ */
+function ExportPanel() {
+  const t = useT();
+  const { namespace, slug } = useProject();
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState<unknown>();
+
+  async function download() {
+    setBusy(true);
+    setFailure(undefined);
+    try {
+      const { blob, filename } = await api.exportProject(namespace, slug);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setFailure(err);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Panel title={t("settings.export")}>
+      <p className="sec lead-out">{t("settings.exportLead")}</p>
+      <Btn onClick={() => void download()} disabled={busy}>
+        {busy ? t("settings.exporting") : t("settings.exportButton")}
+      </Btn>
+      {failure !== undefined && (
+        <div className="mt">
+          <ErrorState error={failure} />
+        </div>
+      )}
+    </Panel>
   );
 }

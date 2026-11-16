@@ -625,6 +625,11 @@ export const en = {
   "settings.lead": "What this project is, and what can be changed about it from here.",
   "settings.identity": "Identity",
   "settings.visibility": "Visibility",
+  "settings.export": "Export",
+  "settings.exportLead":
+    "Download the whole project as one archive: artifacts with every version, memories, plans, ideas, handoffs and conversation history, in plaintext. Secrets, members and the audit trail are not included. OWNER and ADMIN only; keep the file as carefully as the project.",
+  "settings.exportButton": "Download archive",
+  "settings.exporting": "Preparing the archive…",
   "settings.encryption": "Encryption",
   "settings.encryptionBody":
     "Content is encrypted at rest under a key belonging to this project, itself wrapped by the installation root key. Handoff bodies and secrets travel through that envelope; artifact bytes go to the object store.",

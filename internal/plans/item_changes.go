@@ -101,3 +101,21 @@ func (s *Service) ItemChanges(ctx context.Context, principalID, projectID uuid.U
 	}
 	return out, nil
 }
+
+// Snapshot returns every phase and every plan of projectID with its items,
+// abandoned plans included, decrypted: what a project export carries.
+func (s *Service) Snapshot(ctx context.Context, principalID, projectID uuid.UUID) ([]Phase, []Plan, error) {
+	if err := s.checkCapability(ctx, principalID, projectID, auth.CapPlanRead); err != nil {
+		return nil, nil, err
+	}
+	var proj project
+	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+		var err error
+		proj, err = s.loadProject(ctx, tx, projectID)
+		return err
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("plans: snapshot: %w", err)
+	}
+	return proj.phases, proj.plans, nil
+}

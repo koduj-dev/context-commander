@@ -609,6 +609,11 @@ export const zhCN: Partial<Record<MessageKey, string>> = {
   "settings.lead": "这个项目是什么，以及从这里能改动它的哪些部分。",
   "settings.identity": "标识",
   "settings.visibility": "可见性",
+  "settings.export": "导出",
+  "settings.exportLead":
+    "将整个项目下载为一个归档：包含所有版本的工件、记忆、计划、想法、交接和对话历史，均为明文。不包含 secret、成员和审计日志。仅限 OWNER 和 ADMIN；请像保管项目一样妥善保管该文件。",
+  "settings.exportButton": "下载归档",
+  "settings.exporting": "正在准备归档…",
   "settings.encryption": "加密",
   "settings.encryptionBody":
     "内容在静态存储时用属于这个项目的密钥加密，而该密钥本身又被安装实例的根密钥包裹。交接正文和密钥走这层信封；工件的字节进入对象存储。",

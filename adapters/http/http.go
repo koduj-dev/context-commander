@@ -36,6 +36,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/messages"
 	"github.com/koduj-dev/context-commander/internal/organizations"
 	"github.com/koduj-dev/context-commander/internal/plans"
+	"github.com/koduj-dev/context-commander/internal/portability"
 	"github.com/koduj-dev/context-commander/internal/projects"
 	"github.com/koduj-dev/context-commander/internal/ratelimit"
 	"github.com/koduj-dev/context-commander/internal/secrets"
@@ -67,10 +68,11 @@ type Deps struct {
 	// (docs/adr/0028). Nil when no embedding provider is configured; an
 	// interface, and set only when there is one, for the reason Directory
 	// is (adapters/cli/serve.go ldapFromFlags).
-	Embeddings EmbeddingsStatus
-	Ideas      *ideas.Service
-	Messages   *messages.Service
-	Changes    *changes.Service
+	Embeddings  EmbeddingsStatus
+	Ideas       *ideas.Service
+	Messages    *messages.Service
+	Changes     *changes.Service
+	Portability *portability.Service
 	// Security records refusals and Limiter bounds them. Both are safe to
 	// leave nil — a nil *security.Recorder records nothing and a nil
 	// *ratelimit.Limiter allows everything, which is what the CLI and the
@@ -340,6 +342,7 @@ func NewHandler(deps Deps) http.Handler {
 				r.Post("/messages", deps.sendMessage)
 				r.Get("/messages", deps.listSentMessages)
 				r.Get("/changes", deps.projectChanges)
+				r.Get("/export", deps.exportProject)
 				r.Route("/phases", func(r chi.Router) {
 					r.Post("/", deps.createPhase)
 					r.Patch("/{phaseID}", deps.updatePhase)

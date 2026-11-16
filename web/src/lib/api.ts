@@ -1181,6 +1181,12 @@ export const api = {
       method: "POST",
       body: { principal_id: principalID, role },
     }),
+  /** The whole project as a .tar.gz archive (docs/adr/0035). OWNER and ADMIN. */
+  exportProject: async (ns: string, slug: string): Promise<{ blob: Blob; filename: string }> => {
+    const res = await raw(`${project(ns, slug)}/export`);
+    const match = /filename="([^"]+)"/.exec(res.headers.get("Content-Disposition") ?? "");
+    return { blob: await res.blob(), filename: match?.[1] ?? `${slug}.ccproject.tar.gz` };
+  },
   setMemberRole: (ns: string, slug: string, principalID: string, role: string) =>
     request<void>(`${project(ns, slug)}/members/${principalID}`, {
       method: "PATCH",
