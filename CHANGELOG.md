@@ -6,6 +6,33 @@ All notable changes to Context Commander are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.0-beta.3] — 2026-11-17
+
+Projects from start to finish, and agents that hear what changed. Dashboards
+for every project and across them; members whose role can change and who
+can be removed; agents that learn mid-session what their colleagues did; a
+manifest that says what an arriving agent must read; a project exported,
+imported into another installation, deleted with a grace period, held, and
+purged; a root key the server checks at startup and an operator can rotate;
+messages to agents mid-work; and the material for the EU Cyber Resilience
+Act.
+
+### Upgrading
+
+- **Migrations 000042 to 000047 run on start** (the compose `migrate`
+  service, `ccd-migrate.service` in the packages). `cc_app` loses UPDATE on
+  `projects`, which nothing in the application used.
+- **`ccd serve` now refuses to start with the wrong `CC_ROOT_KEY`.** If it
+  stops with `wrong root key`, it was already unable to read anything; start
+  it with the key the data was written under (`ccd root-key check`).
+- **Purging is opt-in.** Nothing is removed until an operator runs
+  `ccd purge` or enables `ccd-purge.timer`.
+- **The web interface sends a Content-Security-Policy.** After upgrading,
+  check the browser console for violations and report any.
+- To get the change feed in Claude Code, update
+  `claude-code-inbox-hook.py` from `deploy/mcp-clients/` and set
+  `CC_PROJECT`.
+
 ### Added
 
 - **Project dashboards.** The home screen opens with **Projects at a
@@ -1687,6 +1714,7 @@ database forward. Install it as described in
   by `Create`/`Delete` (`internal/secrets/reference.go`,
   `internal/secrets/service.go`).
 
-[Unreleased]: https://github.com/koduj-dev/context-commander/compare/v0.1.0-beta.2...HEAD
+[Unreleased]: https://github.com/koduj-dev/context-commander/compare/v0.1.0-beta.3...HEAD
+[0.1.0-beta.3]: https://github.com/koduj-dev/context-commander/compare/v0.1.0-beta.2...v0.1.0-beta.3
 [0.1.0-beta.2]: https://github.com/koduj-dev/context-commander/compare/v0.1.0-beta.1...v0.1.0-beta.2
 [0.1.0-beta.1]: https://github.com/koduj-dev/context-commander/releases/tag/v0.1.0-beta.1
