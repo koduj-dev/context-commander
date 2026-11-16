@@ -86,6 +86,17 @@ All notable changes to Context Commander are documented here. The format follows
   whether the provider answers, the last error, the queue and the memories
   still waiting.
 
+- **Root key check and rotation.** `ccd serve` refuses to start when
+  `CC_ROOT_KEY` wraps none of the project keys, naming both fingerprints,
+  instead of coming up and failing every read of encrypted content with a
+  500. A database with some project keys under another key (an unfinished
+  rotation) starts with a warning. `ccd root-key generate`, `check` and
+  `rotate` generate a key, run the same check, and rewrap every project key
+  from `CC_ROOT_KEY_PREVIOUS` to `CC_ROOT_KEY` in one transaction, as
+  `cc_owner`. Migration 000044 adds `cc_root_key_refs()`, which returns only
+  the fingerprints and how many project keys use each. See
+  [docs/backup-restore.md](docs/backup-restore.md#rotate-the-root-key).
+
 ### Changed
 
 - The error for a project key wrapped under another root key now says it is
