@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted, 2026-11-16. Export is built; import follows in its own change.
+Accepted, 2026-11-16.
 
 ## Context
 
@@ -59,15 +59,33 @@ Ids in the archive are the source installation's; they tie records together
 (a memory's plan, an idea's resulting plan, an object's parent) and mean
 nothing elsewhere.
 
-### Import (next)
+### Import
 
 Import is an operator command, `ccd project import`, connected as
-`cc_owner`, into a new project whose OWNER the operator names. Records are
-written through the domain packages, encrypted under the new project's key,
-with new ids and the archive's cross-references rewritten. Authors and
-timestamps are restored afterwards from the archive: a principal is mapped
-by email to a user of the target installation, and otherwise to the new
-project's owner.
+`cc_owner`, into a new project whose OWNER the operator names by email:
+
+```bash
+ccd project import --database-url "$OWNER_DSN" --file work.ccproject.tar.gz \
+  --project team/work --owner filip@example.com
+```
+
+The archive is read and checked first (format, version, `complete`, every
+JSON file, every blob against its hash), so a broken archive is refused
+before a project exists. Records are then written through the domain
+packages as the owner, validated and encrypted under the new project's key,
+with new ids and the archive's cross-references rewritten (a memory's plan
+and step, what superseded it, an idea's resulting plan, a handoff's
+artifacts, an object's parent). Plaintext metadata is restored afterwards in
+one transaction: statuses, positions, who and when. A principal is mapped by
+email to a user of the target installation, and otherwise to the owner.
+
+Two things do not come back as they were: a claimed idea comes back open (a
+claim is a lease held by a client of the old installation), and every write
+is in the audit trail as the owner's, at the time of the import.
+
+If an import stops part way, the project exists with what was written
+before the error. There is no project deletion yet; that is the purge
+workflow of Phase 3.
 
 Restoring authorship is why import is an operator action and not an
 endpoint: a member able to import could attribute content to anyone whose

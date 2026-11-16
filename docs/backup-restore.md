@@ -53,6 +53,21 @@ members or the audit trail
 ([ADR 0035](adr/0035-project-export-and-import.md)). Store it as carefully
 as the project itself.
 
+To bring it into an installation, as an operator: connected as `cc_owner`,
+with that installation's `CC_ROOT_KEY` and storage. The `app` service has
+the key and the storage; give it the owner connection the `migrate` service
+uses:
+
+```bash
+docker compose run --rm --no-deps -v "$PWD:/import:ro" \
+  -e CC_DATABASE_URL="postgres://cc_owner:…@postgres:5432/context_commander?sslmode=disable" \
+  app project import --file /import/work.ccproject.tar.gz --project team/work --owner filip@example.com
+```
+
+It creates the project, owned by that user. People the archive names are
+found by email; anyone this installation does not know is attributed to
+the owner. Set the project's secrets again afterwards.
+
 ## What does not need a backup
 
 - **Sign-in signing keys.** The key that signs the OIDC sign-in attempt

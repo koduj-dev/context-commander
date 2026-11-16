@@ -86,6 +86,13 @@ All notable changes to Context Commander are documented here. The format follows
   whether the provider answers, the last error, the queue and the memories
   still waiting.
 
+- **Project import.** `ccd project import --file … --project ns/slug
+  --owner email`, connected as `cc_owner`, writes an export into a new
+  project under this installation's keys: new ids with every
+  cross-reference rewritten, statuses and positions restored, and authors
+  mapped by email (anyone unknown becomes the owner). A broken, incomplete
+  or tampered archive is refused before the project is created.
+
 - **Project export.** `GET /v1/projects/{ns}/{slug}/export` and a button on
   the project's Settings tab download the whole project as a `.tar.gz`:
   artifacts with every version, memories, phases and plans, ideas, handoffs
