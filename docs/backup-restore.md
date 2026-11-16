@@ -222,8 +222,11 @@ sudo systemctl start ccd     # runs ccd-migrate.service first
 
 `restore.sh` has already checked the key. Then:
 
-1. **The server is up and the key is right.** `docker compose logs app`
-   shows `listening on …` and no line containing `wrapped under root key`.
+1. **The server is up and the key is right.** `ccd serve` refuses to start
+   with a root key that wraps none of the project keys, so `docker compose
+   logs app` shows `listening on …`, not `wrong root key`. A line saying
+   that some project keys are wrapped under another root key means an
+   unfinished rotation (see "Rotate the root key" below).
 2. **Read one of each kind of content.** Sign in, open a project, and open
    an artifact (this reads storage and the database), a memory and a
    handoff. Resolve a secret from the CLI, which is the only place a secret
@@ -247,7 +250,7 @@ A failed restore shows up like this:
 
 | Symptom | Cause |
 |---|---|
-| Every content read is `500 internal error`, and the log says `project key was wrapped under root key "env:…", but the current root key is "env:…"` | The wrong `CC_ROOT_KEY` |
+| The server does not start, and the log says `wrong root key: CC_ROOT_KEY has fingerprint "env:…", but the project keys are wrapped under "env:…"` | The wrong `CC_ROOT_KEY` |
 | Memories and secrets read fine, artifacts fail | The storage archive was not restored, or was restored to another directory |
 | `permission denied` on artifact writes | The storage files are not owned by uid 65532: unpack with `--numeric-owner`, as root |
 | `pg_restore: error: … already exists` | The database was not empty, usually because `migrate` ran before the restore |
@@ -277,19 +280,61 @@ docker compose exec -T postgres psql -U postgres -d context_commander -Atc \
   "SELECT DISTINCT root_key_ref FROM project_keys"
 ```
 
+Or let `ccd` compare them, as `ccd serve` does at startup:
+
+```bash
+docker compose run --rm --no-deps app root-key check
+```
+
+## Rotate the root key
+
+When the key may have leaked, or someone who knew it leaves, rewrap the
+project keys under a new one. Content is not re-encrypted, only the project
+keys, so it takes seconds however much is stored.
+
+1. Generate the new key and keep it next to the old one in your password
+   manager:
+
+   ```bash
+   docker compose run --rm --no-deps migrate root-key generate
+   ```
+
+2. Stop the server. Once the rotation commits, a server still running with
+   the old key cannot read anything, and a project it creates in the
+   meantime gets a key under the old root key.
+
+   ```bash
+   docker compose stop app
+   ```
+
+3. Rotate, connected as `cc_owner`: the `migrate` service already is, and
+   through `cc_app` the command refuses. The old key goes in
+   `CC_ROOT_KEY_PREVIOUS`, the new one in `CC_ROOT_KEY`. `read -rs` keeps
+   them out of the shell history, and `-e` without a value passes them on:
+
+   ```bash
+   read -rsp 'old key: ' CC_ROOT_KEY_PREVIOUS; echo
+   read -rsp 'new key: ' CC_ROOT_KEY; echo
+   export CC_ROOT_KEY_PREVIOUS CC_ROOT_KEY
+   docker compose run --rm --no-deps -e CC_ROOT_KEY_PREVIOUS -e CC_ROOT_KEY \
+     migrate root-key rotate
+   ```
+
+   It runs in one transaction: either every project key is rewrapped or
+   none is. Running it again rewraps only what is still under the old key.
+
+4. Put the new key in `.env` (or `/etc/context-commander/ccd.env`) and start
+   the server. It checks the key at startup.
+
+5. **Keep the old key.** Backups taken before the rotation are wrapped under
+   it and restore only with it. Take a new backup, verify it, and retire the
+   old key when you no longer need the older backups.
+
+For the packages, run the same with `sudo systemctl stop ccd` and
+`ccd root-key rotate` with the variables set in the shell.
+
 ## Known gaps
 
-- **The server starts with the wrong root key.** `ccd serve` does not check
-  the key against `project_keys` at startup, so it comes up, serves the
-  interface and sign-in, and then fails every read of encrypted content
-  with a 500.
-  The cause is only in the log. `restore.sh` checks the fingerprint before
-  starting the server; a manual restore should do the same. A startup check
-  would need a way for `cc_app` to read `root_key_ref` past row-level
-  security, which is a privilege change and wants its own decision.
-- **The root key cannot be rotated.** `RotateRootKey` exists in
-  `internal/crypto`, but no command runs it. If the key leaks, there is no
-  supported way to re-wrap the project keys under a new one yet.
 - **The root key comes only from an environment variable.** There is no
   file, KMS or Vault provider yet, so the key sits in `.env` or `ccd.env` on
   the server, and backing up those files backs up the key.
