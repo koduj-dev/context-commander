@@ -196,6 +196,15 @@ export const de: Partial<Record<MessageKey, string>> = {
   "members.inviteActions": "Aktionen",
   "members.inviteRevoke": "Widerrufen",
   "members.count": "{count, plural, one {# Mitglied} other {# Mitglieder}}",
+  "members.actions": "Aktionen",
+  "members.remove": "Entfernen",
+  "members.leave": "Projekt verlassen",
+  "members.roleOf": "Rolle von {name}",
+  "members.confirmRemove":
+    "{name} aus diesem Projekt entfernen? Was {name} geschrieben hat, bleibt im Projekt.",
+  "members.confirmLeave":
+    "Dieses Projekt verlassen? Sie verlieren den Zugriff, bis Sie jemand wieder hinzufügt.",
+  "members.ownerOnly": "Nur ein OWNER kann die Rolle eines OWNER ändern oder ihn entfernen.",
 
   "skills.title": "Skills",
   "skills.lead":
@@ -290,11 +299,11 @@ export const de: Partial<Record<MessageKey, string>> = {
   "prefs.serverFormat":
     "Der Server sendet nie eine formatierte Zeichenkette. Er sendet den Wert; die Oberfläche liest ihn.",
 
+  "members.noRemoval":
+    "Mitglieder zu entfernen und Rollen zu ändern ist nicht gebaut: die API hat dafür keinen Schreibpfad, also bietet dieser Bildschirm auch keinen an.",
   "members.addHelp":
     "Eine Projektrolle gehört einem Principal — einem Menschen oder einem Agenten. Beide stehen hier zur Auswahl, wenn Sie diese Installation administrieren; sonst nimmt das Feld die Principal-ID, die nicht dasselbe ist wie eine Benutzer-ID.",
   "members.principalPlaceholder": "Principal-UUID",
-  "members.noRemoval":
-    "Mitglieder zu entfernen und Rollen zu ändern ist nicht gebaut: die API hat dafür keinen Schreibpfad, also bietet dieser Bildschirm auch keinen an.",
 
   "orgs.title": "Organisationen",
   "orgs.lead":

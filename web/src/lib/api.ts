@@ -1177,6 +1177,14 @@ export const api = {
       method: "POST",
       body: { principal_id: principalID, role },
     }),
+  setMemberRole: (ns: string, slug: string, principalID: string, role: string) =>
+    request<void>(`${project(ns, slug)}/members/${principalID}`, {
+      method: "PATCH",
+      body: { role },
+    }),
+  /** Your own principal id leaves the project. */
+  removeMember: (ns: string, slug: string, principalID: string) =>
+    request<void>(`${project(ns, slug)}/members/${principalID}`, { method: "DELETE" }),
 
   contextPack: (ns: string, slug: string, opts: { budget?: number; eventLimit?: number } = {}) =>
     request<ContextPack>(

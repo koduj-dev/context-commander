@@ -190,6 +190,15 @@ export const es: Partial<Record<MessageKey, string>> = {
   "members.inviteActions": "Acciones",
   "members.inviteRevoke": "Revocar",
   "members.count": "{count, plural, one {# miembro} other {# miembros}}",
+  "members.actions": "Acciones",
+  "members.remove": "Quitar",
+  "members.leave": "Salir del proyecto",
+  "members.roleOf": "Rol de {name}",
+  "members.confirmRemove":
+    "¿Quitar a {name} de este proyecto? Lo que haya escrito se queda en el proyecto.",
+  "members.confirmLeave":
+    "¿Salir de este proyecto? Perderás el acceso hasta que alguien vuelva a añadirte.",
+  "members.ownerOnly": "Solo un OWNER puede cambiar el rol de un OWNER o quitarlo.",
 
   "skills.title": "Skills",
   "skills.lead":
@@ -284,11 +293,11 @@ export const es: Partial<Record<MessageKey, string>> = {
   "prefs.serverFormat":
     "El servidor nunca envía una cadena con formato. Envía el valor; la interfaz lo lee.",
 
+  "members.noRemoval":
+    "Quitar a un miembro y cambiar un rol no están construidos: la API no tiene escritura para ninguno de los dos, así que esta pantalla tampoco la ofrece.",
   "members.addHelp":
     "Un rol de proyecto pertenece a un principal — una persona o un agente. Aquí se ofrecen ambos si usted administra esta instalación; si no, el campo toma el id del principal, que no es lo mismo que el id de una cuenta.",
   "members.principalPlaceholder": "UUID del principal",
-  "members.noRemoval":
-    "Quitar a un miembro y cambiar un rol no están construidos: la API no tiene escritura para ninguno de los dos, así que esta pantalla tampoco la ofrece.",
 
   "orgs.title": "Organizaciones",
   "orgs.lead":

@@ -215,6 +215,16 @@ export const pl: Partial<Record<MessageKey, string>> = {
   "members.inviteRevoke": "Odwołaj",
   "members.count":
     "{count, plural, one {# członek} few {# członkowie} many {# członków} other {# członka}}",
+  "members.actions": "Akcje",
+  "members.remove": "Usuń",
+  "members.leave": "Opuść projekt",
+  "members.roleOf": "Rola: {name}",
+  "members.confirmRemove": "Usunąć {name} z tego projektu? To, co napisano, zostaje w projekcie.",
+  "members.confirmLeave":
+    "Opuścić ten projekt? Stracisz dostęp, dopóki ktoś nie doda cię ponownie.",
+  "members.ownerOnly": "Tylko OWNER może zmienić rolę OWNER-a lub go usunąć.",
+  "members.noRemoval":
+    "Usuwanie członka i zmiana roli nie są zrobione: API nie ma zapisu dla żadnej z tych operacji, więc ten ekran ich nie proponuje.",
   "members.addHelp":
     "Rola w projekcie należy do principala — osoby albo agenta. Oba są tu do wyboru, jeśli administrujesz tą instalacją; w przeciwnym razie pole przyjmuje identyfikator principala, który nie jest tym samym co identyfikator konta.",
   "members.principalPlaceholder": "UUID principala",
@@ -224,8 +234,6 @@ export const pl: Partial<Record<MessageKey, string>> = {
   "picker.agent": "agent",
   "picker.noDirectory":
     "Tylko osoba administrująca instalacją może wypisać jej użytkowników, więc to pole prosi o identyfikator, zamiast proponować wybór. Poproś o niego administratora albo skopiuj go z ekranu konta tej osoby.",
-  "members.noRemoval":
-    "Usuwanie członka i zmiana roli nie są zrobione: API nie ma zapisu dla żadnej z tych operacji, więc ten ekran ich nie proponuje.",
 
   "skills.title": "Skille",
   "skills.lead":

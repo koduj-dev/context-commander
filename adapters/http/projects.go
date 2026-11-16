@@ -102,6 +102,45 @@ func (d Deps) addMember(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+type setMemberRoleRequest struct {
+	Role string `json:"role"`
+}
+
+// setMemberRole changes a member's role. The rules (member.manage, OWNER to
+// grant or take away OWNER, never the last OWNER) are internal/members'.
+func (d Deps) setMemberRole(w http.ResponseWriter, r *http.Request) {
+	target, err := uuid.Parse(chi.URLParam(r, "principalID"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", "principal id must be a UUID")
+		return
+	}
+	var req setMemberRoleRequest
+	if err := decodeJSONBody(w, r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", "malformed JSON body")
+		return
+	}
+	if err := d.Members.SetRole(r.Context(), principalIDFrom(r.Context()), projectFrom(r.Context()).ID, target, projects.Role(req.Role)); err != nil {
+		writeDomainError(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// removeMember takes a member off the project; a member removing themselves
+// leaves it.
+func (d Deps) removeMember(w http.ResponseWriter, r *http.Request) {
+	target, err := uuid.Parse(chi.URLParam(r, "principalID"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", "principal id must be a UUID")
+		return
+	}
+	if err := d.Members.Remove(r.Context(), principalIDFrom(r.Context()), projectFrom(r.Context()).ID, target); err != nil {
+		writeDomainError(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 type memberResponse struct {
 	PrincipalID string  `json:"principal_id"`
 	Role        string  `json:"role"`

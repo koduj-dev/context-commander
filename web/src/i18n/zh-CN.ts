@@ -216,6 +216,14 @@ export const zhCN: Partial<Record<MessageKey, string>> = {
   "members.inviteActions": "操作",
   "members.inviteRevoke": "撤销",
   "members.count": "{count, plural, other {# 名成员}}",
+  "members.actions": "操作",
+  "members.remove": "移除",
+  "members.leave": "退出项目",
+  "members.roleOf": "{name} 的角色",
+  "members.confirmRemove": "将 {name} 移出此项目？其写下的内容仍保留在项目中。",
+  "members.confirmLeave": "退出此项目？在有人重新添加你之前，你将无法访问它。",
+  "members.ownerOnly": "只有 OWNER 可以修改 OWNER 的角色或将其移除。",
+  "members.noRemoval": "移除成员和修改角色尚未实现：API 对两者都没有写入接口，所以此页面也不提供。",
   "members.addHelp":
     "项目角色属于某个 principal — 可以是人，也可以是 agent。如果你管理这个安装实例，两者都可以在这里选择；否则此处需要填 principal 的 ID，它与账号 ID 不是一回事。",
   "members.principalPlaceholder": "Principal 的 UUID",
@@ -225,7 +233,6 @@ export const zhCN: Partial<Record<MessageKey, string>> = {
   "picker.agent": "agent",
   "picker.noDirectory":
     "只有管理该安装实例的人才能列出其中的用户，因此这里要求填 ID，而不是给出可选项。向管理员索取，或从当事人自己的账号页面复制。",
-  "members.noRemoval": "移除成员和修改角色尚未实现：API 对两者都没有写入接口，所以此页面也不提供。",
 
   "skills.title": "Skill",
   "skills.lead":

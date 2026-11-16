@@ -86,6 +86,17 @@ All notable changes to Context Commander are documented here. The format follows
   whether the provider answers, the last error, the queue and the memories
   still waiting.
 
+- **Change a member's role, remove a member, leave a project.**
+  `PATCH` and `DELETE /v1/projects/{ns}/{slug}/members/{principal_id}`, MCP
+  `project.set_member_role` and `project.remove_member`, and controls on the
+  Members tab. ADMIN and OWNER manage members; granting, taking away or
+  removing OWNER needs OWNER; any member may leave. The last OWNER can
+  neither step down nor leave (409 `last_owner`), and the owners are locked
+  for that check, so two owners demoting each other at once leave one.
+  Removal ends access and clears the member's presence on the project; what
+  they wrote stays. Both are audited (`member.role_change`,
+  `member.remove`, `member.leave`). Migration 000045 grants the delete.
+
 - **Root key check and rotation.** `ccd serve` refuses to start when
   `CC_ROOT_KEY` wraps none of the project keys, naming both fingerprints,
   instead of coming up and failing every read of encrypted content with a

@@ -220,6 +220,57 @@ func (s *Store) GetMembership(ctx context.Context, tx pgx.Tx, projectID, princip
 	return m, nil
 }
 
+// SetMemberRole changes an existing member's role. ErrNotFound when the
+// principal is not a member.
+func (s *Store) SetMemberRole(ctx context.Context, tx pgx.Tx, projectID, principalID uuid.UUID, role Role) error {
+	tag, err := tx.Exec(ctx,
+		`UPDATE project_members SET role = $3 WHERE project_id = $1 AND principal_id = $2`,
+		projectID, principalID, role)
+	if err != nil {
+		return fmt.Errorf("projects: set member role: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// RemoveMember deletes a membership. ErrNotFound when there is none.
+func (s *Store) RemoveMember(ctx context.Context, tx pgx.Tx, projectID, principalID uuid.UUID) error {
+	tag, err := tx.Exec(ctx,
+		`DELETE FROM project_members WHERE project_id = $1 AND principal_id = $2`,
+		projectID, principalID)
+	if err != nil {
+		return fmt.Errorf("projects: remove member: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// LockOwners locks the project's OWNER rows until the transaction ends and
+// returns how many there are. Two owners demoting or removing each other at
+// once would otherwise both see the other still there and leave the project
+// with none: the second waits here, and then no longer counts the first.
+func (s *Store) LockOwners(ctx context.Context, tx pgx.Tx, projectID uuid.UUID) (int, error) {
+	rows, err := tx.Query(ctx,
+		`SELECT principal_id FROM project_members WHERE project_id = $1 AND role = $2 FOR UPDATE`,
+		projectID, RoleOwner)
+	if err != nil {
+		return 0, fmt.Errorf("projects: lock owners: %w", err)
+	}
+	defer rows.Close()
+	n := 0
+	for rows.Next() {
+		n++
+	}
+	if err := rows.Err(); err != nil {
+		return 0, fmt.Errorf("projects: lock owners: %w", err)
+	}
+	return n, nil
+}
+
 // ListMembers lists every member of a project, driven by the project_id
 // half of project_members' primary key — the mirror image of
 // ListForPrincipal. RLS (project_members_select, migration 000004) already
