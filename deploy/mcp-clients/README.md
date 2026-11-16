@@ -266,6 +266,23 @@ What to know:
 Codex CLI has no hook that can add context in the middle of a turn. It gets
 the notice on tool results, and its agent calls `inbox.next`.
 
+### What others changed
+
+With `CC_PROJECT=namespace/slug` set, the same hook also tells the agent
+what everyone else did on that project since its previous poll: memories
+recorded, plan steps blocked, finished or unblocked, and handoffs opened
+(docs/adr/0033). A few lines, each naming the tool that reads the rest:
+
+```text
+Context Commander: since this session last checked, other people and agents changed team/app. …
+- Filip recorded a gotcha: "Staging Ollama needs the VPN" (memory.get 6f1c…)
+- Codex finished a step in plan "Semantic search": "Wire the index" (plan.get 9a2e…)
+```
+
+The first poll of a session only records where to start. `CC_CHANGES=0`
+turns the report off. Agents without the hook get the same list from the
+`project.changes` tool.
+
 ## What to expect once connected
 
 The server advertises `context.bootstrap` as the first call to make. On a

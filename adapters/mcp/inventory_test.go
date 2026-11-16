@@ -93,6 +93,7 @@ var expectedTools = []string{
 	"plan.update",
 	"plan.update_item",
 	"project.add_member",
+	"project.changes",
 	"project.create",
 	"project.list",
 	"project.list_members",

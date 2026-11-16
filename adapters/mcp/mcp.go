@@ -16,6 +16,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/artifacts"
 	"github.com/koduj-dev/context-commander/internal/audit"
 	"github.com/koduj-dev/context-commander/internal/auth"
+	"github.com/koduj-dev/context-commander/internal/changes"
 	"github.com/koduj-dev/context-commander/internal/contextpack"
 	"github.com/koduj-dev/context-commander/internal/db"
 	"github.com/koduj-dev/context-commander/internal/events"
@@ -59,6 +60,7 @@ type Deps struct {
 	Memories      *memories.Service
 	Ideas         *ideas.Service
 	Messages      *messages.Service
+	Changes       *changes.Service
 	// Both may be nil — a nil Recorder records nothing, a nil Limiter
 	// allows everything (see adapters/http.Deps).
 	Security *security.Recorder
@@ -173,6 +175,7 @@ func newServer(deps Deps, principalID, clientID uuid.UUID) *sdkmcp.Server {
 	registerMemoryTools(server, deps, principalID, clientID)
 	registerIdeaTools(server, deps, principalID, clientID)
 	registerInboxTools(server, deps, principalID, clientID)
+	registerChangeTools(server, deps, principalID, clientID)
 	registerHistoryTools(server, deps, principalID, clientID)
 	registerSkillTools(server, deps, principalID, clientID)
 	registerGateTools(server, deps, principalID, clientID)

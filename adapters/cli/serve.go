@@ -23,6 +23,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/artifacts"
 	"github.com/koduj-dev/context-commander/internal/audit"
 	"github.com/koduj-dev/context-commander/internal/auth"
+	"github.com/koduj-dev/context-commander/internal/changes"
 	"github.com/koduj-dev/context-commander/internal/clientip"
 	"github.com/koduj-dev/context-commander/internal/contextpack"
 	"github.com/koduj-dev/context-commander/internal/crypto"
@@ -208,6 +209,7 @@ func newServeCmd() *cobra.Command {
 			contextSvc.WithMemories(memoriesSvc)
 			ideasSvc := ideas.NewService(pool, cryptoProvider, authz, plansSvc)
 			messagesSvc := messages.NewService(pool, cryptoProvider, authz, plansSvc)
+			changesSvc := changes.NewService(pool, authz, memoriesSvc, plansSvc)
 			contextSvc.WithIdeas(ideasSvc)
 
 			// Read before the logger is set up and before anything listens,
@@ -443,7 +445,7 @@ func newServeCmd() *cobra.Command {
 				Events: eventsSvc, Organizations: orgSvc, Audit: auditSvc,
 				Handoffs: handoffsSvc, History: historySvc,
 				Skills: skillsSvc, Gates: gatesAdmin, Secrets: secretsSvc,
-				Installation: installationSvc, ContextPack: contextSvc, Plans: plansSvc, Memories: memoriesSvc, Ideas: ideasSvc, Messages: messagesSvc,
+				Installation: installationSvc, ContextPack: contextSvc, Plans: plansSvc, Memories: memoriesSvc, Ideas: ideasSvc, Messages: messagesSvc, Changes: changesSvc,
 				Security: securityRec, Limiter: limiter,
 			}))
 			mux.Handle("/", cchttp.NewHandler(cchttp.Deps{
@@ -451,7 +453,7 @@ func newServeCmd() *cobra.Command {
 				Events: eventsSvc, Organizations: orgSvc, Audit: auditSvc,
 				Handoffs: handoffsSvc, History: historySvc,
 				Skills: skillsSvc, Gates: gatesAdmin, Secrets: secretsSvc,
-				Installation: installationSvc, ContextPack: contextSvc, Plans: plansSvc, Memories: memoriesSvc, Ideas: ideasSvc, Messages: messagesSvc,
+				Installation: installationSvc, ContextPack: contextSvc, Plans: plansSvc, Memories: memoriesSvc, Ideas: ideasSvc, Messages: messagesSvc, Changes: changesSvc,
 				Security: securityRec, Limiter: limiter, SecurityEvents: securitySvc, ClientIP: clientIPs,
 				FirstRun: firstRunCode, Embeddings: embeddingsStatus,
 				// Nil unless --ldap-url was given, and a nil Directory is what

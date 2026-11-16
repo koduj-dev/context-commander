@@ -19,6 +19,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/artifacts"
 	"github.com/koduj-dev/context-commander/internal/audit"
 	"github.com/koduj-dev/context-commander/internal/auth"
+	"github.com/koduj-dev/context-commander/internal/changes"
 	"github.com/koduj-dev/context-commander/internal/clientip"
 	"github.com/koduj-dev/context-commander/internal/contextpack"
 	"github.com/koduj-dev/context-commander/internal/db"
@@ -69,6 +70,7 @@ type Deps struct {
 	Embeddings EmbeddingsStatus
 	Ideas      *ideas.Service
 	Messages   *messages.Service
+	Changes    *changes.Service
 	// Security records refusals and Limiter bounds them. Both are safe to
 	// leave nil — a nil *security.Recorder records nothing and a nil
 	// *ratelimit.Limiter allows everything, which is what the CLI and the
@@ -337,6 +339,7 @@ func NewHandler(deps Deps) http.Handler {
 				// the caller sent with who received it.
 				r.Post("/messages", deps.sendMessage)
 				r.Get("/messages", deps.listSentMessages)
+				r.Get("/changes", deps.projectChanges)
 				r.Route("/phases", func(r chi.Router) {
 					r.Post("/", deps.createPhase)
 					r.Patch("/{phaseID}", deps.updatePhase)
