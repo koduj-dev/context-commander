@@ -89,10 +89,9 @@ notice that a newer version exists.
 **(g) Data minimisation.** The server stores what agents and people write
 on purpose, and the metadata needed to find it. Usage is aggregated per day,
 not logged per event, and old ledger rows can be dropped
-(`--usage-ledger-retention`). Messages to agents are pruned. *Open:* the web
-interface loads its font from Google Fonts, which tells Google the address
-of everyone who opens it; serving the font from the product itself is the
-fix (it needs one npm dependency, not yet approved).
+(`--usage-ledger-retention`). Messages to agents are pruned. The web interface
+loads nothing from third parties: its font is bundled, and the
+Content-Security-Policy allows only the product's own origin.
 
 **(h) Availability of essential functions, resilience against denial of
 service.**

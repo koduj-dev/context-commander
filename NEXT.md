@@ -171,8 +171,8 @@ Only on top of a core loop people actually use:
       assessment, a declaration-of-conformity template, and a coordinated
       disclosure policy in SECURITY.md. The SBOM was already in every
       release. Still open: the TODO(manufacturer) items (legal name and
-      address, support period, CSIRT), serving the web font locally,
-      deleting a user account, and an in-product update notice.* Annex I (2)(l) — recording security-relevant internal activity
+      address, support period, CSIRT), deleting a user account, and an
+      in-product update notice.* Annex I (2)(l) — recording security-relevant internal activity
       with a user opt-out — is now implemented (`internal/security`,
       migration 000019, `--security-log`). Not yet looked at: whether the
       CRA applies to this project at all (the free-and-open-source exemption
