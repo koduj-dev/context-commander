@@ -84,6 +84,7 @@ supersedes it, so the trail of what was believed when stays readable.
 | [0036](adr/0036-project-deletion-legal-hold-and-purge.md) | Project deletion, legal hold and purge |
 | [0037](adr/0037-root-key-sources.md) | Where the root key comes from: environment, file, or Vault |
 | [0038](adr/0038-telemetry-without-content.md) | Telemetry without content |
+| [0039](adr/0039-retention-by-age.md) | Retention by age, set by the operator |
 
 ## Not documentation
 

@@ -48,7 +48,7 @@ granting OWNER widely.
 | Denial of service | Body caps, pagination limits, budgets, quotas, rate limits | Volumetric attacks are the network's to absorb |
 | Supply chain: dependencies | Dependabot, CodeQL, pinned action SHAs, SBOM | A compromised upstream release before an advisory exists |
 | Supply chain: our releases | Tag-built in CI, cosign keyless signatures, SLSA provenance | A compromised maintainer GitHub account |
-| Data kept longer than needed | Usage retention, message pruning, project deletion and purge (ADR 0036) | Memories, history and audit have no age-based retention yet |
+| Data kept longer than needed | Usage retention, message pruning, project deletion and purge (ADR 0036), opt-in retention by age for memories, history and audit (ADR 0039) | Nothing is removed by age unless the operator sets a rule |
 | Third-party tracking | Nothing loaded from third parties; font bundled; CSP limits every fetch to the product's origin | — |
 
 ## Decisions this assessment led to

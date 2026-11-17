@@ -299,8 +299,9 @@ Only on top of a core loop people actually use:
       deletion with a grace period, legal hold, and `ccd purge` for deleted
       projects and long-deleted artifacts are built
       ([ADR 0036](docs/adr/0036-project-deletion-legal-hold-and-purge.md)).
-      Still open: retention by age for memories, history and the audit
-      trail, which wants a decision on what a team must keep.
+      Retention by age followed on 2026-11-17
+      ([ADR 0039](docs/adr/0039-retention-by-age.md)): `ccd purge` flags for
+      archived memories, history and the audit trail, all off by default.
 - [ ] Signed/trusted skill packages and an approval workflow.
 - [x] ~~Operational telemetry that doesn't leak content.~~ Closed 2026-11-17
       ([ADR 0038](docs/adr/0038-telemetry-without-content.md)): Prometheus

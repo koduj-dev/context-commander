@@ -249,3 +249,64 @@ func TestPurge(t *testing.T) {
 		t.Errorf("a held project was purged: %+v", r)
 	}
 }
+
+func (b *bench) count(sql string, args ...any) int {
+	b.t.Helper()
+	var n int
+	ck(b.t, db.WithoutPrincipal(b.ctx, b.owner, func(tx pgx.Tx) error {
+		return tx.QueryRow(b.ctx, sql, args...).Scan(&n)
+	}))
+	return n
+}
+
+// Age rules remove only what they name and only what is old enough: never
+// an active memory, never a recent record, never anything in a held
+// project; with no rules, nothing at all.
+func TestRunAge(t *testing.T) {
+	b := newBench(t)
+	p, held := b.project("aged"), b.project("held")
+	for _, id := range []uuid.UUID{p, held} {
+		b.exec(`UPDATE memories SET status = 'archived', updated_at = now() - interval '400 days' WHERE project_id = $1`, id)
+		_, err := b.memories.Create(b.ctx, b.alice, nil, id, memories.NewMemory{Title: "fresh"})
+		ck(t, err)
+		b.exec(`UPDATE history_objects SET created_at = now() - interval '400 days' WHERE project_id = $1`, id)
+		b.exec(`UPDATE conversations SET created_at = now() - interval '400 days' WHERE project_id = $1`, id)
+		b.exec(`UPDATE audit_log SET ts = now() - interval '400 days' WHERE project_id = $1`, id)
+	}
+	b.exec(`UPDATE projects SET legal_hold = true WHERE id = $1`, held)
+	// An old active memory stays whatever its age.
+	b.exec(`UPDATE memories SET updated_at = now() - interval '400 days' WHERE project_id = $1 AND status = 'active'`, p)
+	auditBefore := b.count(`SELECT count(*) FROM audit_log WHERE project_id = $1`, p)
+
+	purger := retention.NewPurger(b.owner, b.store)
+	none, err := purger.RunAge(b.ctx, retention.AgeRules{}, false)
+	ck(t, err)
+	if none != (retention.AgeReport{}) {
+		t.Fatalf("no rules removed %+v", none)
+	}
+	rules := retention.AgeRules{ArchivedMemoryDays: 365, HistoryDays: 365, AuditDays: 365}
+	dry, err := purger.RunAge(b.ctx, rules, true)
+	ck(t, err)
+	if dry.Memories != 1 || dry.Conversations != 1 || dry.AuditRows != int64(auditBefore) {
+		t.Fatalf("dry run %+v (audit rows %d)", dry, auditBefore)
+	}
+	r, err := purger.RunAge(b.ctx, rules, false)
+	ck(t, err)
+	if r != dry {
+		t.Errorf("removed %+v, dry run said %+v", r, dry)
+	}
+	if n := b.count(`SELECT count(*) FROM memories WHERE project_id = $1`, p); n != 1 {
+		t.Errorf("%d memories left, want the active one", n)
+	}
+	if n := b.count(`SELECT count(*) FROM conversations WHERE project_id = $1`, p); n != 0 {
+		t.Errorf("%d conversations left", n)
+	}
+	if n := b.count(`SELECT count(*) FROM audit_log WHERE project_id = $1 AND ts < now() - interval '365 days'`, p); n != 0 {
+		t.Errorf("%d old audit rows left", n)
+	}
+	for _, table := range []string{"memories", "conversations", "history_objects", "audit_log"} {
+		if n := b.count(fmt.Sprintf(`SELECT count(*) FROM %s WHERE project_id = $1`, table), held); n == 0 {
+			t.Errorf("held project lost its %s", table)
+		}
+	}
+}
