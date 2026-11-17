@@ -49,7 +49,7 @@ granting OWNER widely.
 | Supply chain: dependencies | Dependabot, CodeQL, pinned action SHAs, SBOM | A compromised upstream release before an advisory exists |
 | Supply chain: our releases | Tag-built in CI, cosign keyless signatures, SLSA provenance | A compromised maintainer GitHub account |
 | Data kept longer than needed | Usage retention, message pruning, project deletion and purge (ADR 0036) | Memories, history and audit have no age-based retention yet |
-| Third-party tracking | — | The web interface loads its font from Google Fonts (open, see Annex I (2)(g)) |
+| Third-party tracking | Nothing loaded from third parties; font bundled; CSP limits every fetch to the product's origin | — |
 
 ## Decisions this assessment led to
 

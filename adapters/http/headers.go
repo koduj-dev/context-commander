@@ -3,14 +3,14 @@ package http
 import "net/http"
 
 // contentSecurityPolicy allows the interface what it loads and nothing
-// else: its own scripts and styles, the Inter webfont from Google Fonts
-// (web/index.html), inline style attributes (React's style prop, used where
+// else: its own scripts, styles and fonts (Inter is bundled, web/src/main.tsx;
+// nothing is fetched from a third party), inline style attributes (React's style prop, used where
 // a value is data: a meter's width), data: and blob: images, and requests to
 // this origin. No inline script, no framing, no plugins, no foreign forms.
 const contentSecurityPolicy = "default-src 'self'; " +
 	"script-src 'self'; " +
-	"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
-	"font-src 'self' https://fonts.gstatic.com; " +
+	"style-src 'self' 'unsafe-inline'; " +
+	"font-src 'self'; " +
 	"img-src 'self' data: blob:; " +
 	"connect-src 'self'; " +
 	"frame-ancestors 'none'; " +

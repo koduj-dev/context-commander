@@ -17,7 +17,8 @@ func TestSecurityHeaders(t *testing.T) {
 		csp := h.Get("Content-Security-Policy")
 		if h.Get("X-Content-Type-Options") != "nosniff" || h.Get("X-Frame-Options") != "DENY" ||
 			h.Get("Referrer-Policy") != "no-referrer" || !strings.Contains(csp, "frame-ancestors 'none'") ||
-			!strings.Contains(csp, "script-src 'self';") || strings.Contains(csp, "unsafe-eval") {
+			!strings.Contains(csp, "script-src 'self';") || strings.Contains(csp, "unsafe-eval") ||
+			strings.Contains(csp, "https://") {
 			t.Errorf("%s: headers %v", path, h)
 		}
 		if h.Get("Strict-Transport-Security") != "" {

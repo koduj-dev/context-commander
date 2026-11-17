@@ -6,6 +6,14 @@ All notable changes to Context Commander are documented here. The format follows
 
 ## [Unreleased]
 
+### Security
+
+- **The web interface no longer loads anything from Google.** The Inter
+  font is bundled (`@fontsource/inter`, SIL Open Font License 1.1) instead of
+  fetched from Google Fonts, which told Google the address of everyone who
+  opened the interface. The Content-Security-Policy now allows fonts and
+  styles from the product's own origin only.
+
 ## [0.1.0-beta.3] — 2026-11-17
 
 Projects from start to finish, and agents that hear what changed. Dashboards
