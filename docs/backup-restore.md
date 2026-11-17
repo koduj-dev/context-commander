@@ -387,6 +387,19 @@ you turn it on:
 sudo systemctl enable --now ccd-purge.timer
 ```
 
+Records can also be removed by age, and only if you say so: every rule
+defaults to keeping forever ([ADR 0039](adr/0039-retention-by-age.md)).
+
+```bash
+ccd purge --memories-archived-after 365 --history-after 180 --audit-after 730 --dry-run
+```
+
+`--memories-archived-after` removes archived and superseded memories, never
+active ones; `--history-after` removes conversations whose newest object is
+older; `--audit-after` removes audit trail rows. For the packaged timer, put
+the flags in a drop-in (`systemctl edit ccd-purge.service`, then
+`ExecStart=` and `ExecStart=/usr/bin/ccd purge --history-after 180 …`).
+
 A legal hold stops all of it for one project: it cannot be scheduled for
 deletion, a scheduled deletion is cancelled, and every purge skips it.
 

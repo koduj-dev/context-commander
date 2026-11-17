@@ -8,6 +8,12 @@ All notable changes to Context Commander are documented here. The format follows
 
 ### Added
 
+- **Retention by age.** `ccd purge --memories-archived-after N
+  --history-after N --audit-after N` removes archived and superseded memories,
+  old conversations and old audit rows. Every rule defaults to keeping
+  forever, active memories are never removed by age, and projects under
+  legal hold are skipped. [ADR 0039](docs/adr/0039-retention-by-age.md).
+
 - **Prometheus metrics, without content.** `ccd serve --metrics-addr
   127.0.0.1:9490` (or `CC_METRICS_ADDR`) serves `/metrics` on a listener of
   its own: HTTP requests and latency by route pattern, MCP tool calls by tool

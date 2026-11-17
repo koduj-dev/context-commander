@@ -69,7 +69,7 @@ func storageFlags(cmd *cobra.Command) {
 func newPurgeCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "purge",
-		Short: "Remove what is due: projects past their deletion grace period, and long-deleted artifacts (as cc_owner)",
+		Short: "Remove what is due: deleted projects and artifacts, and records older than the rules you set (as cc_owner)",
 		Long: "Purges every project whose scheduled deletion is past its grace period, and the stored versions of " +
 			"artifacts deleted more than --deleted-artifacts-after days ago. Projects under legal hold are left alone. " +
 			"Connect as cc_owner with the server's storage directory; run it daily from cron or a systemd timer " +
@@ -83,6 +83,10 @@ func newPurgeCmd() *cobra.Command {
 				return err
 			}
 			defer pool.Close()
+			rules := retention.AgeRules{}
+			rules.ArchivedMemoryDays, _ = cmd.Flags().GetInt("memories-archived-after")
+			rules.HistoryDays, _ = cmd.Flags().GetInt("history-after")
+			rules.AuditDays, _ = cmd.Flags().GetInt("audit-after")
 			r, err := purger.Run(cmd.Context(), days, dry)
 			verb := "purged"
 			if dry {
@@ -90,11 +94,22 @@ func newPurgeCmd() *cobra.Command {
 			}
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s %d projects %v, %d deleted artifacts, %d stored objects; %d due projects held\n",
 				verb, len(r.Projects), r.Projects, r.Artifacts, r.Objects, r.HeldSkips)
+			if err != nil {
+				return err
+			}
+			age, err := purger.RunAge(cmd.Context(), rules, dry)
+			if rules != (retention.AgeRules{}) {
+				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s by age: %d archived or superseded memories, %d conversations, %d audit rows\n",
+					verb, age.Memories, age.Conversations, age.AuditRows)
+			}
 			return err
 		},
 	}
 	cmd.Flags().Int("deleted-artifacts-after", retention.DefaultDeletedArtifactDays, "days a deleted artifact's versions stay before they are purged; 0 keeps them forever")
 	cmd.Flags().Bool("dry-run", false, "only report what would be purged")
+	cmd.Flags().Int("memories-archived-after", 0, "days an archived or superseded memory is kept after it last changed; 0 keeps them forever (active memories are never removed by age)")
+	cmd.Flags().Int("history-after", 0, "days a conversation is kept after its newest history object; 0 keeps history forever")
+	cmd.Flags().Int("audit-after", 0, "days audit trail rows are kept; 0 keeps the audit trail forever")
 	storageFlags(cmd)
 	return cmd
 }
