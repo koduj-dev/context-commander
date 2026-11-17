@@ -36,6 +36,9 @@ type Service struct {
 	projects           *projects.Store
 	store              storage.ObjectStore
 	installationAdmins *installation.Store
+	// requireTrust: only signed or approved versions may be installed
+	// (docs/adr/0040).
+	requireTrust bool
 }
 
 func NewService(
@@ -210,6 +213,20 @@ func (s *Service) Publish(
 	skillID *uuid.UUID, name, author, origin string,
 	content []byte, declaredCapabilities []string,
 ) (SkillVersion, error) {
+	return s.PublishSigned(ctx, principalID, userID, scope, scopeRef, skillID, name, author, origin, content, declaredCapabilities, nil)
+}
+
+// PublishSigned is Publish with an optional Ed25519 signature over
+// SigningMessage(name, checksum) (docs/adr/0040). A signature that verifies
+// against an active signer key makes the version "signed"; one that does
+// not is a refusal, never a silently unsigned version. For a new version of
+// an existing skill, name is that skill's name.
+func (s *Service) PublishSigned(
+	ctx context.Context, principalID, userID uuid.UUID,
+	scope Scope, scopeRef *uuid.UUID,
+	skillID *uuid.UUID, name, author, origin string,
+	content []byte, declaredCapabilities []string, signature []byte,
+) (SkillVersion, error) {
 	// Checked here rather than only in the adapters: the CLI publishes
 	// straight from a file with no HTTP body limit in the way, so the cap
 	// belongs at the domain chokepoint that every adapter shares. See
@@ -239,7 +256,9 @@ func (s *Service) Publish(
 		if skillID != nil {
 			// A new version is charged where the skill lives, which need not
 			// be the scope the caller named.
-			if err := tx.QueryRow(ctx, `SELECT scope, scope_ref FROM skills WHERE id = $1`, *skillID).Scan(&skill.Scope, &skill.ScopeRef); err != nil {
+			// The name too: a signature covers the skill's name, whatever
+			// name the request carried.
+			if err := tx.QueryRow(ctx, `SELECT scope, scope_ref, name FROM skills WHERE id = $1`, *skillID).Scan(&skill.Scope, &skill.ScopeRef, &skill.Name); err != nil {
 				if errors.Is(err, pgx.ErrNoRows) {
 					return ErrNotFound
 				}
@@ -302,18 +321,30 @@ func (s *Service) Publish(
 		ID: versionID, SkillID: skill.ID, Version: nextVersion,
 		Checksum: checksum, StorageKey: storageKey,
 		Files: []FileManifestEntry{}, DeclaredCapabilities: declared,
-		TrustStatus: "unverified",
+		TrustStatus: TrustUnverified,
 	}
 	err = db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
+		var signedBy *uuid.UUID
+		var sig []byte
+		if len(signature) > 0 {
+			id, err := verifySignature(ctx, tx, skill.Name, checksum, signature)
+			if err != nil {
+				return err
+			}
+			signedBy, sig, result.TrustStatus = &id, signature, TrustSigned
+		}
 		_, err := tx.Exec(ctx,
 			`INSERT INTO skill_versions (id, skill_id, version, checksum, storage_key, files, declared_capabilities, trust_status,
-			                             published_in_project, published_by, size_bytes)
-			 VALUES ($1, $2, $3, $4, $5, $6, $7, 'unverified', $8, $9, $10)`,
-			versionID, skill.ID, nextVersion, checksum, storageKey, []byte("[]"), declared, publishedInProject(scope, scopeRef), principalID,
-			int64(len(content)),
+			                             published_in_project, published_by, size_bytes, signature, signed_by)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+			versionID, skill.ID, nextVersion, checksum, storageKey, []byte("[]"), declared, result.TrustStatus,
+			publishedInProject(scope, scopeRef), principalID, int64(len(content)), sig, signedBy,
 		)
 		return quota.Translate(err)
 	})
+	if errors.Is(err, ErrBadSignature) {
+		return SkillVersion{}, err
+	}
 	if errors.Is(err, quota.ErrExceeded) {
 		return SkillVersion{}, err
 	}
@@ -352,6 +383,15 @@ func (s *Service) Install(
 		}
 		if err := s.checkSkillVersionBelongsTo(ctx, tx, skillID, skillVersionID); err != nil {
 			return err
+		}
+		if s.requireTrust {
+			trusted, err := versionTrusted(ctx, tx, skillVersionID)
+			if err != nil {
+				return err
+			}
+			if !trusted {
+				return ErrUntrusted
+			}
 		}
 		// Installing a skill that this scope already binds MOVES the
 		// binding to the named version rather than adding a second one.
@@ -405,6 +445,15 @@ func (s *Service) Override(
 	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
 		if err := s.checkSkillVersionBelongsTo(ctx, tx, skillID, skillVersionID); err != nil {
 			return err
+		}
+		if s.requireTrust {
+			trusted, err := versionTrusted(ctx, tx, skillVersionID)
+			if err != nil {
+				return err
+			}
+			if !trusted {
+				return ErrUntrusted
+			}
 		}
 
 		orgID, err := s.resolveProjectOrgID(ctx, tx, projectID)

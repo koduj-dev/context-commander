@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -23,7 +24,7 @@ func newSkillCmd() *cobra.Command {
 		Use:   "skill",
 		Short: "Publish, install, and list skills (docs/adr/0012-skill-registry-supply-chain.md)",
 	}
-	skillCmd.AddCommand(newSkillPublishCmd(), newSkillGetCmd(), newSkillSearchCmd(), newSkillVersionsCmd(), newSkillPromoteCmd(), newSkillInstallCmd(), newSkillOverrideCmd(), newSkillPinCmd(true), newSkillPinCmd(false), newSkillListEffectiveCmd())
+	skillCmd.AddCommand(newSkillPublishCmd(), newSkillKeygenCmd(), newSkillSignCmd(), newSkillGetCmd(), newSkillSearchCmd(), newSkillVersionsCmd(), newSkillPromoteCmd(), newSkillInstallCmd(), newSkillOverrideCmd(), newSkillPinCmd(true), newSkillPinCmd(false), newSkillListEffectiveCmd())
 	return skillCmd
 }
 
@@ -165,12 +166,23 @@ func newSkillPublishCmd() *cobra.Command {
 				scopeRef = &id
 			}
 
-			v, err := sc.svc.Publish(cmd.Context(), sc.principalID, sc.userID, skills.Scope(scope), scopeRef,
-				skillID, name, author, origin, content, nil)
+			var signature []byte
+			if keyPath, _ := cmd.Flags().GetString("sign-key"); keyPath != "" {
+				if name == "" {
+					return errors.New("--sign-key needs --name: the signature covers the skill's name")
+				}
+				key, err := readSigningKey(keyPath)
+				if err != nil {
+					return err
+				}
+				signature = signSkill(key, name, content)
+			}
+			v, err := sc.svc.PublishSigned(cmd.Context(), sc.principalID, sc.userID, skills.Scope(scope), scopeRef,
+				skillID, name, author, origin, content, nil, signature)
 			if err != nil {
 				return err
 			}
-			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "published skill_id=%s version=%d id=%s checksum=%s\n", v.SkillID, v.Version, v.ID, v.Checksum)
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "published skill_id=%s version=%d id=%s checksum=%s trust=%s\n", v.SkillID, v.Version, v.ID, v.Checksum, v.TrustStatus)
 			return nil
 		},
 	}
@@ -181,6 +193,7 @@ func newSkillPublishCmd() *cobra.Command {
 	cmd.Flags().String("file", "", "file to read content from (default: stdin)")
 	cmd.Flags().String("scope", "project", `where the skill should live: "project" (uses --project), "organization" or "installation"`)
 	cmd.Flags().String("scope-ref", "", "organization UUID when --scope=organization")
+	cmd.Flags().String("sign-key", "", "sign the content with this key from `ccd skill keygen` (needs --name); the version is then signed")
 	skillFlags(cmd)
 	return cmd
 }

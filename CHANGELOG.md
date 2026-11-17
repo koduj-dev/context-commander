@@ -8,6 +8,15 @@ All notable changes to Context Commander are documented here. The format follows
 
 ### Added
 
+- **Trusted skill packages.** A skill version is trusted when it is signed
+  by an Ed25519 key an installation administrator registered (checked at
+  publish; `ccd skill keygen`, `ccd skill sign`, `ccd skill publish
+  --sign-key`) or approved by a person allowed for its scope who did not
+  publish it (**Approve this version** on the skill's page). Every read
+  reports `signed`, `approved` or `unverified`. With `--skills-require-trust`
+  only trusted versions install, and context packs leave out the rest.
+  Migration 000048. [ADR 0040](docs/adr/0040-trusted-skill-packages.md).
+
 - **Retention by age.** `ccd purge --memories-archived-after N
   --history-after N --audit-after N` removes archived and superseded memories,
   old conversations and old audit rows. Every rule defaults to keeping

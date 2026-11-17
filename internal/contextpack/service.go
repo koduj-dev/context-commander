@@ -449,6 +449,14 @@ func (s *Service) fillSkills(ctx context.Context, principalID, projectID uuid.UU
 			b.note("skill", binding.SkillVersionID.String(), 0, reasonFor(err, "could not read the skill's content"))
 			continue
 		}
+		// Bound before trust was required, or approved and then the policy
+		// tightened: an untrusted version is not handed to an agent as an
+		// instruction (docs/adr/0040).
+		if s.skills.RequireTrust() && v.Version.TrustStatus == skills.TrustUnverified {
+			b.note("skill", v.Skill.Name, int64(len(v.Content)),
+				"omitted: this installation uses only signed or approved skills, and this version is neither")
+			continue
+		}
 		if !b.fits(len(v.Content)) {
 			b.note("skill", v.Skill.Name, int64(len(v.Content)),
 				"omitted: over the remaining budget — fetch it with skill.get")

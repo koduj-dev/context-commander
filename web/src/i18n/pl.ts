@@ -295,6 +295,7 @@ export const pl: Partial<Record<MessageKey, string>> = {
   "scope.project": "Projekt",
 
   "trust.signed": "Podpisany",
+  "trust.approved": "Zatwierdzona",
   "trust.unverified": "Niesprawdzony",
 
   "role.OWNER": "Własność",
@@ -723,6 +724,11 @@ export const pl: Partial<Record<MessageKey, string>> = {
   "handoff.column.status": "Stan",
 
   "skill.versions": "Wersje",
+  "skill.approve": "Zatwierdź tę wersję",
+  "skill.approveLead":
+    "Przeczytałeś tę wersję i ręczysz za nią. Zatwierdzone wersje są zaufane, tak jak podpisane; instalacja wymagająca zaufania nie instaluje niczego innego. Nie możesz zatwierdzić wersji, którą sam opublikowałeś.",
+  "skill.approveNote": "Notatka (opcjonalnie)",
+  "skill.approveButton": "Zatwierdź",
   "skill.versionsLead":
     "Wszystkie wersje kiedykolwiek opublikowane pod tą nazwą. Opublikowana wersja jest niezmienna — kolejna publikacja dodaje tu wiersz, nigdy żadnego nie zmienia.",
   "skill.content": "Treść",

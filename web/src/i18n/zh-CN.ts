@@ -293,6 +293,7 @@ export const zhCN: Partial<Record<MessageKey, string>> = {
   "scope.project": "项目",
 
   "trust.signed": "已签名",
+  "trust.approved": "已批准",
   "trust.unverified": "未验证",
 
   "role.OWNER": "所有者",
@@ -692,6 +693,11 @@ export const zhCN: Partial<Record<MessageKey, string>> = {
   "handoff.column.status": "状态",
 
   "skill.versions": "版本",
+  "skill.approve": "批准此版本",
+  "skill.approveLead":
+    "你已阅读此版本并为其担保。已批准的版本与已签名的版本一样被视为可信；要求可信的安装不会安装其他版本。你不能批准自己发布的版本。",
+  "skill.approveNote": "备注（可选）",
+  "skill.approveButton": "批准",
   "skill.versionsLead":
     "以这个名字发布过的所有版本。已发布的版本不可变 — 再次发布是在这里加一行，从不会改动已有的那一行。",
   "skill.content": "内容",

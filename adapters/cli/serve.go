@@ -80,6 +80,9 @@ const (
 // metricsAddrEnv turns metrics on (docs/adr/0038).
 const metricsAddrEnv = "CC_METRICS_ADDR"
 
+// skillsRequireTrustEnv turns on the trusted-skills policy (docs/adr/0040).
+const skillsRequireTrustEnv = "CC_SKILLS_REQUIRE_TRUST"
+
 // Version is the build's version, set by cmd/ccd from its -ldflags value,
 // for ccd_build_info.
 var Version = "dev"
@@ -206,6 +209,13 @@ func newServeCmd() *cobra.Command {
 			historySvc := history.NewService(pool, cryptoProvider, authz)
 			installationStore := installation.NewStore()
 			skillsSvc := skills.NewService(pool, authz, orgStore, projStore, store, installationStore)
+			// Only signed or approved skill versions may be installed, and
+			// context packs leave others out (docs/adr/0040).
+			requireTrust, _ := cmd.Flags().GetBool("skills-require-trust")
+			if !requireTrust && os.Getenv(skillsRequireTrustEnv) == "true" {
+				requireTrust = true
+			}
+			skillsSvc.SetRequireTrust(requireTrust)
 			gatesAdmin := gates.NewAdminService(pool, authz, orgStore, projStore, installationStore)
 			installationSvc := installation.NewService(pool, installationStore, identity.NewStore())
 			secretsBackend := secrets.NewLocalEncryptedBackend(pool, cryptoProvider)
@@ -557,6 +567,8 @@ func newServeCmd() *cobra.Command {
 		fmt.Sprintf("allow binding a non-loopback --addr without TLS — bearer tokens and content travel in plaintext (defaults to $%s=true)", insecureAllowCleartextEnv))
 	cmd.Flags().Bool("dev", false, "skip mounting the embedded web UI — run 'cd web && npm run dev' separately, proxying /v1 back here")
 	cmd.Flags().String("log-format", "json", `structured log format: "json" or "text"`)
+	cmd.Flags().Bool("skills-require-trust", false,
+		fmt.Sprintf("install only skill versions that are signed by a registered key or approved by a person, and leave others out of context packs (defaults to $%s=true)", skillsRequireTrustEnv))
 	cmd.Flags().String("metrics-addr", "",
 		fmt.Sprintf("serve Prometheus metrics at /metrics on this address, e.g. 127.0.0.1:9490 (defaults to $%s; empty turns metrics off). They hold counts and timings only, never content", metricsAddrEnv))
 	cmd.Flags().String("storage-quota", "",

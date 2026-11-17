@@ -198,6 +198,18 @@ func writeDomainError(w http.ResponseWriter, r *http.Request, err error) {
 		// supply-chain event (docs/adr/0012), not a missing resource.
 		writeError(w, http.StatusConflict, "checksum_mismatch",
 			"the stored skill content no longer matches its published checksum")
+	case errors.Is(err, skills.ErrBadSignature):
+		writeError(w, http.StatusBadRequest, "bad_signature", skills.ErrBadSignature.Error())
+	case errors.Is(err, skills.ErrBadSigner):
+		writeError(w, http.StatusBadRequest, "invalid_request", skills.ErrBadSigner.Error())
+	case errors.Is(err, skills.ErrSignerExists), errors.Is(err, skills.ErrAlreadyTrusted):
+		writeError(w, http.StatusConflict, "conflict", err.Error())
+	case errors.Is(err, skills.ErrNeedsPerson):
+		writeError(w, http.StatusForbidden, "needs_person", skills.ErrNeedsPerson.Error())
+	case errors.Is(err, skills.ErrSelfApproval):
+		writeError(w, http.StatusForbidden, "self_approval", skills.ErrSelfApproval.Error())
+	case errors.Is(err, skills.ErrUntrusted):
+		writeError(w, http.StatusConflict, "untrusted_skill", skills.ErrUntrusted.Error())
 	case errors.Is(err, skills.ErrTooLarge):
 		writeError(w, http.StatusRequestEntityTooLarge, "too_large", err.Error())
 	case errors.Is(err, skills.ErrNotPromotable):

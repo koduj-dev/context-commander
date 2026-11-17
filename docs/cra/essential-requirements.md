@@ -83,6 +83,9 @@ notice that a newer version exists.
 - Releases are signed (cosign, keyless), carry SLSA build provenance, and
   the container image is signed and attested (`.github/workflows/release.yml`).
 - Migrations are embedded in the binary and versioned.
+- Skill packages, the instructions agents follow, can be required to be
+  signed by a registered key or approved by a responsible person before they
+  install (`--skills-require-trust`, ADR 0040).
 - *Reporting:* a failed decryption is an error naming the cause (a wrong
   root key is named as such); the audit trail records every write.
 

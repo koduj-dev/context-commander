@@ -244,6 +244,7 @@ export const de: Partial<Record<MessageKey, string>> = {
   "scope.project": "Projekt",
 
   "trust.signed": "Signiert",
+  "trust.approved": "Freigegeben",
   "trust.unverified": "Ungeprüft",
 
   "role.OWNER": "Eigentum",
@@ -477,6 +478,11 @@ export const de: Partial<Record<MessageKey, string>> = {
   "events.empty": "Noch keine Ereignisse",
 
   "skill.versions": "Versionen",
+  "skill.approve": "Diese Version freigeben",
+  "skill.approveLead":
+    "Sie haben diese Version gelesen und stehen für sie ein. Freigegebene Versionen gelten wie signierte als vertrauenswürdig; eine Installation, die Vertrauen verlangt, installiert nichts anderes. Eine selbst veröffentlichte Version können Sie nicht freigeben.",
+  "skill.approveNote": "Notiz (optional)",
+  "skill.approveButton": "Freigeben",
   "skill.versionsLead":
     "Jede jemals unter diesem Namen veröffentlichte Version. Eine veröffentlichte Version ist unveränderlich — erneutes Veröffentlichen fügt hier eine Zeile hinzu und bearbeitet nie eine.",
   "skill.content": "Inhalt",

@@ -1526,6 +1526,9 @@ export const api = {
     request<Page<CatalogEntry>>(withQuery("/skills", { q: query, cursor, limit })),
   skillVersions: (skillID: string, cursor?: string) =>
     request<Page<SkillVersion>>(withQuery(`/skills/${skillID}/versions`, { cursor })),
+  /** A person vouches for a skill version (docs/adr/0040). */
+  approveSkillVersion: (skillVersionID: string, note: string) =>
+    request<void>(`/skills/versions/${skillVersionID}/approve`, { method: "POST", body: { note } }),
   skillVersion: (skillVersionID: string) =>
     request<SkillContent>(`/skills/versions/${skillVersionID}`),
 
