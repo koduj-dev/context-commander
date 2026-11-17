@@ -267,6 +267,23 @@ make build                # bin/ccd, version "dev"
 VERSION=v0.1.0 make release   # every platform into dist-bin/, as CI does
 ```
 
+## Metrics
+
+`ccd serve --metrics-addr 127.0.0.1:9490` (or `CC_METRICS_ADDR` in
+`ccd.env`) serves Prometheus metrics at `/metrics` on that address, and
+only there: request rates and latencies by route, MCP tool calls by tool
+and outcome, database pool use, and the build. Labels are route patterns,
+tool names and status classes, never a project, a path, a person or
+anything a project holds ([ADR 0038](adr/0038-telemetry-without-content.md)).
+Off unless set; keep it on loopback or behind your monitoring network.
+
+```yaml
+scrape_configs:
+  - job_name: context-commander
+    static_configs:
+      - targets: ["127.0.0.1:9490"]
+```
+
 ## Verifying a download
 
 Every release ships a `SHA256SUMS` and a keyless **cosign** signature bundle

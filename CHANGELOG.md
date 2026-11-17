@@ -8,6 +8,13 @@ All notable changes to Context Commander are documented here. The format follows
 
 ### Added
 
+- **Prometheus metrics, without content.** `ccd serve --metrics-addr
+  127.0.0.1:9490` (or `CC_METRICS_ADDR`) serves `/metrics` on a listener of
+  its own: HTTP requests and latency by route pattern, MCP tool calls by tool
+  and outcome, database pool use, goroutines, heap and the build. No
+  project, path, person, id or query is ever a label. Off unless set.
+  [ADR 0038](docs/adr/0038-telemetry-without-content.md).
+
 - **The root key can come from a file or from HashiCorp Vault.** Besides
   `CC_ROOT_KEY`: `CC_ROOT_KEY_FILE` (Docker and Kubernetes secrets, systemd
   credentials) or `CC_ROOT_KEY_VAULT_CIPHERTEXT`, the key encrypted by

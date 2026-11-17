@@ -43,6 +43,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/secrets"
 	"github.com/koduj-dev/context-commander/internal/security"
 	"github.com/koduj-dev/context-commander/internal/skills"
+	"github.com/koduj-dev/context-commander/internal/telemetry"
 )
 
 // Deps bundles what every handler needs — constructed once in cmd/ccd and
@@ -75,6 +76,8 @@ type Deps struct {
 	Changes     *changes.Service
 	Portability *portability.Service
 	Retention   *retention.Service
+	// Telemetry counts requests by route when metrics are on; nil otherwise.
+	Telemetry *telemetry.Server
 	// Security records refusals and Limiter bounds them. Both are safe to
 	// leave nil — a nil *security.Recorder records nothing and a nil
 	// *ratelimit.Limiter allows everything, which is what the CLI and the
@@ -131,6 +134,9 @@ func NewHandler(deps Deps) http.Handler {
 	// reads the header only from a proxy named in --trusted-proxies.
 	r.Use(middleware.Recoverer)
 	r.Use(securityHeaders)
+	if deps.Telemetry != nil {
+		r.Use(countRequests(deps.Telemetry))
+	}
 
 	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)

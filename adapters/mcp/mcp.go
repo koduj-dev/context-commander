@@ -36,6 +36,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/secrets"
 	"github.com/koduj-dev/context-commander/internal/security"
 	"github.com/koduj-dev/context-commander/internal/skills"
+	"github.com/koduj-dev/context-commander/internal/telemetry"
 )
 
 // Deps bundles what every tool handler needs — constructed once in
@@ -61,6 +62,8 @@ type Deps struct {
 	Ideas         *ideas.Service
 	Messages      *messages.Service
 	Changes       *changes.Service
+	// Telemetry counts tool calls when metrics are on; nil otherwise.
+	Telemetry *telemetry.Server
 	// Both may be nil — a nil Recorder records nothing, a nil Limiter
 	// allows everything (see adapters/http.Deps).
 	Security *security.Recorder
@@ -186,6 +189,9 @@ func newServer(deps Deps, principalID, clientID uuid.UUID) *sdkmcp.Server {
 	// Last, so it wraps every tool call: the notice of unread messages
 	// rides on whatever tool the agent calls next (docs/adr/0032).
 	server.AddReceivingMiddleware(inboxNotice(deps, principalID, clientID))
+	if deps.Telemetry != nil {
+		server.AddReceivingMiddleware(countToolCalls(deps.Telemetry))
+	}
 
 	return server
 }
