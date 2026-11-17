@@ -302,7 +302,10 @@ Only on top of a core loop people actually use:
       Still open: retention by age for memories, history and the audit
       trail, which wants a decision on what a team must keep.
 - [ ] Signed/trusted skill packages and an approval workflow.
-- [ ] Operational telemetry that doesn't leak content.
+- [x] ~~Operational telemetry that doesn't leak content.~~ Closed 2026-11-17
+      ([ADR 0038](docs/adr/0038-telemetry-without-content.md)): Prometheus
+      metrics on an opt-in listener, labelled by route pattern, tool and
+      status class only. Still open: tracing.
 
 - [x] ~~**Plans, phases and progress across a team**~~ Closed 2026-10-27
       ([ADR 0022](docs/adr/0022-plans-phases-and-presence.md)). Covers phases →

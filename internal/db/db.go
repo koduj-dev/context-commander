@@ -134,3 +134,17 @@ func WithoutPrincipal(ctx context.Context, p *Pool, fn func(tx pgx.Tx) error) er
 	}
 	return nil
 }
+
+// PoolStats is what the connection pool is doing, for telemetry.
+type PoolStats struct {
+	Acquired, Idle, Total, Max      int32
+	AcquireCount, EmptyAcquireCount int64
+}
+
+func (p *Pool) Stats() PoolStats {
+	s := p.pool.Stat()
+	return PoolStats{
+		Acquired: s.AcquiredConns(), Idle: s.IdleConns(), Total: s.TotalConns(), Max: s.MaxConns(),
+		AcquireCount: s.AcquireCount(), EmptyAcquireCount: s.EmptyAcquireCount(),
+	}
+}

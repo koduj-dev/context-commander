@@ -51,6 +51,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/security"
 	"github.com/koduj-dev/context-commander/internal/skills"
 	"github.com/koduj-dev/context-commander/internal/storage/filesystem"
+	"github.com/koduj-dev/context-commander/internal/telemetry"
 	"github.com/koduj-dev/context-commander/web"
 )
 
@@ -76,6 +77,13 @@ const (
 // and decrypted project content on a network any other host can observe.
 // Anything else (a wildcard bind, an empty host, a non-loopback hostname or
 // IP) is untrusted here; TLS or an explicit override is required for it.
+// metricsAddrEnv turns metrics on (docs/adr/0038).
+const metricsAddrEnv = "CC_METRICS_ADDR"
+
+// Version is the build's version, set by cmd/ccd from its -ldflags value,
+// for ccd_build_info.
+var Version = "dev"
+
 func isLoopbackAddr(addr string) bool {
 	host, _, err := net.SplitHostPort(addr)
 	if err != nil {
@@ -442,6 +450,18 @@ func newServeCmd() *cobra.Command {
 				}
 			}
 
+			// Metrics (docs/adr/0038): off unless an address is given, on a
+			// listener of their own, so /metrics is never on the address the
+			// API and the interface are published at.
+			metricsAddr, _ := cmd.Flags().GetString("metrics-addr")
+			if metricsAddr == "" {
+				metricsAddr = os.Getenv(metricsAddrEnv)
+			}
+			var metrics *telemetry.Server
+			if metricsAddr != "" {
+				metrics = telemetry.NewServer(Version, pool)
+			}
+
 			mux := http.NewServeMux()
 			mux.Handle("/mcp", ccmcp.NewHandler(ccmcp.Deps{
 				Pool: pool, Projects: projStore, Members: membersSvc, Authz: authz, Artifacts: artifactsSvc,
@@ -449,7 +469,7 @@ func newServeCmd() *cobra.Command {
 				Handoffs: handoffsSvc, History: historySvc,
 				Skills: skillsSvc, Gates: gatesAdmin, Secrets: secretsSvc,
 				Installation: installationSvc, ContextPack: contextSvc, Plans: plansSvc, Memories: memoriesSvc, Ideas: ideasSvc, Messages: messagesSvc, Changes: changesSvc,
-				Security: securityRec, Limiter: limiter,
+				Security: securityRec, Limiter: limiter, Telemetry: metrics,
 			}))
 			mux.Handle("/", cchttp.NewHandler(cchttp.Deps{
 				Pool: pool, Projects: projStore, Members: membersSvc, Authz: authz, Artifacts: artifactsSvc,
@@ -472,6 +492,7 @@ func newServeCmd() *cobra.Command {
 				// and sign-in would look like it worked.
 				SessionCookieSecure: !insecure,
 				WebFS:               webFS,
+				Telemetry:           metrics,
 			}))
 
 			server := &http.Server{
@@ -497,6 +518,17 @@ func newServeCmd() *cobra.Command {
 			}
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "listening on %s://%s — REST at /v1, MCP at /mcp\n", scheme, addr)
 
+			var metricsServer *http.Server
+			if metrics != nil {
+				metricsServer = &http.Server{Addr: metricsAddr, Handler: metrics.Handler(), ReadHeaderTimeout: 5 * time.Second}
+				go func() {
+					if err := metricsServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+						serverErr <- fmt.Errorf("metrics listener: %w", err)
+					}
+				}()
+				slog.Info("metrics", "addr", metricsAddr, "path", "/metrics")
+			}
+
 			ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 			defer stop()
 
@@ -510,6 +542,9 @@ func newServeCmd() *cobra.Command {
 				shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 				defer cancel()
 				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "shutting down...")
+				if metricsServer != nil {
+					_ = metricsServer.Shutdown(shutdownCtx)
+				}
 				return server.Shutdown(shutdownCtx)
 			}
 		},
@@ -522,6 +557,8 @@ func newServeCmd() *cobra.Command {
 		fmt.Sprintf("allow binding a non-loopback --addr without TLS — bearer tokens and content travel in plaintext (defaults to $%s=true)", insecureAllowCleartextEnv))
 	cmd.Flags().Bool("dev", false, "skip mounting the embedded web UI — run 'cd web && npm run dev' separately, proxying /v1 back here")
 	cmd.Flags().String("log-format", "json", `structured log format: "json" or "text"`)
+	cmd.Flags().String("metrics-addr", "",
+		fmt.Sprintf("serve Prometheus metrics at /metrics on this address, e.g. 127.0.0.1:9490 (defaults to $%s; empty turns metrics off). They hold counts and timings only, never content", metricsAddrEnv))
 	cmd.Flags().String("storage-quota", "",
 		fmt.Sprintf("default storage limit per user or organization, e.g. 10GB or 2GiB (defaults to $%s; empty means no limit — an administrator can still set one per namespace)", storageQuotaEnv))
 	cmd.Flags().String("usage-prices", "",
