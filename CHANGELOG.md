@@ -6,6 +6,16 @@ All notable changes to Context Commander are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **The root key can come from a file or from HashiCorp Vault.** Besides
+  `CC_ROOT_KEY`: `CC_ROOT_KEY_FILE` (Docker and Kubernetes secrets, systemd
+  credentials) or `CC_ROOT_KEY_VAULT_CIPHERTEXT`, the key encrypted by
+  Vault's Transit engine and decrypted at startup with `VAULT_ADDR` and a
+  token. Exactly one may be set. The fingerprint does not change with the
+  source, so moving the key is not a rotation. `ccd serve` logs which source
+  it used. [ADR 0037](docs/adr/0037-root-key-sources.md).
+
 ### Security
 
 - **The web interface no longer loads anything from Google.** The Inter

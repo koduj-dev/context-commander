@@ -176,7 +176,7 @@ func newServeCmd() *cobra.Command {
 			}
 			defer pool.Close()
 
-			root, err := crypto.NewEnvRootKeyProvider(rootKeyEnv)
+			root, err := crypto.LoadRootKey(cmd.Context(), rootKeyEnv)
 			if err != nil {
 				return err
 			}
@@ -241,6 +241,7 @@ func newServeCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("serve: %w", err)
 			}
+			slog.Info("root key", "source", root.Source, "fingerprint", keyCheck.Current, "project_keys", keyCheck.Matching)
 			if len(keyCheck.Others) > 0 {
 				slog.Warn("some project keys are wrapped under another root key, so those projects cannot be read: "+
 					"an unfinished rotation; run `ccd root-key rotate` again with the previous key in $"+rootKeyPreviousEnv,
