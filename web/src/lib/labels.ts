@@ -23,8 +23,14 @@ export function scopeLabel(t: T, scope: string): string {
 
 export function trustLabel(t: T, trust: string): string {
   if (trust === "signed") return t("trust.signed");
+  if (trust === "approved") return t("trust.approved");
   if (trust === "unverified") return t("trust.unverified");
   return trust;
+}
+
+/** Signed and approved versions are trusted (docs/adr/0040); anything else warns. */
+export function trustTone(trust: string): "ok" | "warn" {
+  return trust === "signed" || trust === "approved" ? "ok" : "warn";
 }
 
 /** Up to two initials of a name, for an avatar. */

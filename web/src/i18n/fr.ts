@@ -296,6 +296,7 @@ export const fr: Partial<Record<MessageKey, string>> = {
   "scope.project": "Projet",
 
   "trust.signed": "Signé",
+  "trust.approved": "Approuvée",
   "trust.unverified": "Non vérifié",
 
   "role.OWNER": "Propriété",
@@ -717,6 +718,11 @@ export const fr: Partial<Record<MessageKey, string>> = {
   "handoff.column.status": "État",
 
   "skill.versions": "Versions",
+  "skill.approve": "Approuver cette version",
+  "skill.approveLead":
+    "Vous avez lu cette version et vous vous en portez garant. Les versions approuvées comptent comme fiables, comme les versions signées ; une installation qui exige la confiance n’installe rien d’autre. Vous ne pouvez pas approuver une version que vous avez publiée.",
+  "skill.approveNote": "Note (facultatif)",
+  "skill.approveButton": "Approuver",
   "skill.versionsLead":
     "Toutes les versions jamais publiées sous ce nom. Une version publiée est immuable — publier de nouveau ajoute une ligne ici, cela n’en modifie jamais une.",
   "skill.content": "Contenu",

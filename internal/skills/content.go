@@ -91,7 +91,7 @@ func (s *Service) GetVersion(ctx context.Context, principalID, skillVersionID uu
 		// distinction this domain makes anywhere else either.
 		err := tx.QueryRow(ctx,
 			`SELECT v.id, v.skill_id, v.version, v.checksum, v.storage_key, v.files, v.declared_capabilities,
-			        v.trust_status, v.signature, v.created_at, v.published_in_project, v.published_by,
+			        `+trustExpr+`, v.signature, v.created_at, v.published_in_project, v.published_by,
 			        s.id, s.name, COALESCE(s.author, ''), COALESCE(s.origin, ''), s.created_at
 			 FROM skill_versions v JOIN skills s ON s.id = v.skill_id
 			 WHERE v.id = $1`,

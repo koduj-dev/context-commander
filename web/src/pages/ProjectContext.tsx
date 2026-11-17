@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useT } from "../i18n";
 import { useFormat } from "../app/prefs";
 import { api } from "../lib/api";
-import { roleLabel, scopeLabel } from "../lib/labels";
+import { roleLabel, scopeLabel, trustTone } from "../lib/labels";
 import { useResource } from "../lib/resource";
 import {
   Badge,
@@ -138,9 +138,7 @@ export function ProjectContext() {
                     <Scope kind={s.scope}>{scopeLabel(t, s.scope)}</Scope>
                   </td>
                   <td className="r">
-                    <Badge tone={s.trust_status === "signed" ? "ok" : "warn"}>
-                      {s.trust_status}
-                    </Badge>
+                    <Badge tone={trustTone(s.trust_status)}>{s.trust_status}</Badge>
                   </td>
                 </tr>
               ))}

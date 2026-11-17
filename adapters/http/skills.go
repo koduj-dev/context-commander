@@ -1,6 +1,7 @@
 package http
 
 import (
+	"encoding/base64"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -59,9 +60,17 @@ func (d Deps) publishSkill(w http.ResponseWriter, r *http.Request) {
 		Origin               string     `json:"origin"`
 		Content              string     `json:"content"`
 		DeclaredCapabilities []string   `json:"declared_capabilities"`
+		// Signature is an optional Ed25519 signature, base64, over
+		// skills.SigningMessage(name, sha256(content)) (docs/adr/0040).
+		Signature string `json:"signature"`
 	}
 	if err := decodeJSONBody(w, r, &body); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_request", "could not decode request body")
+		return
+	}
+	signature, err := base64.StdEncoding.DecodeString(body.Signature)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", "signature must be base64")
 		return
 	}
 	if body.Scope == "" {
@@ -75,8 +84,8 @@ func (d Deps) publishSkill(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	v, err := d.Skills.Publish(r.Context(), principalID, userID, skills.Scope(body.Scope), body.ScopeRef,
-		body.SkillID, body.Name, body.Author, body.Origin, []byte(body.Content), body.DeclaredCapabilities)
+	v, err := d.Skills.PublishSigned(r.Context(), principalID, userID, skills.Scope(body.Scope), body.ScopeRef,
+		body.SkillID, body.Name, body.Author, body.Origin, []byte(body.Content), body.DeclaredCapabilities, signature)
 	if err != nil {
 		writeDomainError(w, r, err)
 		return

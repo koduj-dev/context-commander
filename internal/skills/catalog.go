@@ -78,7 +78,7 @@ func (s *Service) Search(
 		rows, err := tx.Query(ctx,
 			`SELECT DISTINCT ON (s.id)
 			        s.id, s.name, COALESCE(s.author, ''), COALESCE(s.origin, ''), s.scope, s.scope_ref,
-			        v.id, v.version, v.checksum, v.trust_status
+			        v.id, v.version, v.checksum, `+trustExpr+`
 			 FROM skills s JOIN skill_versions v ON v.skill_id = s.id
 			 WHERE ($1::text IS NULL OR lower(s.name) LIKE $1 ESCAPE '\')
 			   AND (NOT $2::bool OR (lower(s.name), s.id) > (lower($3::text), $4::uuid))
@@ -134,7 +134,7 @@ func (s *Service) ListVersions(
 		// returned rather than up from zero.
 		rows, err := tx.Query(ctx,
 			`SELECT v.id, v.skill_id, v.version, v.checksum, v.storage_key, v.files, v.declared_capabilities,
-			        v.trust_status, v.signature, v.created_at, v.published_in_project, v.published_by
+			        `+trustExpr+`, v.signature, v.created_at, v.published_in_project, v.published_by
 			 FROM skill_versions v
 			 WHERE v.skill_id = $1 AND (NOT $2::bool OR v.version < $3::int)
 			 ORDER BY v.version DESC LIMIT $4`,
@@ -304,7 +304,7 @@ func (s *Service) Get(ctx context.Context, principalID, skillID uuid.UUID) (Cata
 	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
 		err := tx.QueryRow(ctx,
 			`SELECT s.id, s.name, COALESCE(s.author, ''), COALESCE(s.origin, ''), s.scope, s.scope_ref,
-			        v.id, v.version, v.checksum, v.trust_status
+			        v.id, v.version, v.checksum, `+trustExpr+`
 			 FROM skills s JOIN skill_versions v ON v.skill_id = s.id
 			 WHERE s.id = $1
 			 ORDER BY v.version DESC LIMIT 1`,

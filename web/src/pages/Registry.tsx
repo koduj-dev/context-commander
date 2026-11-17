@@ -4,7 +4,7 @@ import { useT } from "../i18n";
 import { useAuth } from "../app/auth";
 import { useCrumbs } from "../app/crumbs";
 import { api, principalName } from "../lib/api";
-import { scopeLabel, trustLabel } from "../lib/labels";
+import { scopeLabel, trustLabel, trustTone } from "../lib/labels";
 import { useDebounced, useList } from "../lib/resource";
 import {
   Badge,
@@ -135,9 +135,7 @@ export function Registry() {
                   <span className="num">v{s.latest_version}</span>
                 </td>
                 <td className="r">
-                  <Badge tone={s.trust_status === "signed" ? "ok" : "warn"}>
-                    {trustLabel(t, s.trust_status)}
-                  </Badge>
+                  <Badge tone={trustTone(s.trust_status)}>{trustLabel(t, s.trust_status)}</Badge>
                 </td>
               </tr>
             ))}

@@ -3,7 +3,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useT } from "../i18n";
 import { useCrumbs } from "../app/crumbs";
 import { api, type SkillContent } from "../lib/api";
-import { scopeLabel, trustLabel } from "../lib/labels";
+import { scopeLabel, trustLabel, trustTone } from "../lib/labels";
 import { useList, useResource } from "../lib/resource";
 import {
   Badge,
@@ -153,9 +153,7 @@ export function SkillDetail() {
                     </Btn>
                   </td>
                   <td className="r">
-                    <Badge tone={v.trust_status === "signed" ? "ok" : "warn"}>
-                      {trustLabel(t, v.trust_status)}
-                    </Badge>
+                    <Badge tone={trustTone(v.trust_status)}>{trustLabel(t, v.trust_status)}</Badge>
                   </td>
                 </tr>
               ))}
@@ -163,6 +161,15 @@ export function SkillDetail() {
           </Panel>
 
           {content.data && <Provenance version={content.data} />}
+          {content.data && content.data.trust_status === "unverified" && (
+            <Approve
+              versionID={selectedID}
+              onApproved={() => {
+                content.reload();
+                versions.reload();
+              }}
+            />
+          )}
           {entry && <Promote skillID={skillID} scope={entry.scope} />}
         </Stack>
       </Grid>
@@ -384,6 +391,57 @@ function NewVersion({
           {busy ? t("common.loading") : t("registry.publish")}
         </Btn>
       </div>
+    </Panel>
+  );
+}
+
+/**
+ * Vouching for an unsigned version (docs/adr/0040). Shown to everyone; the
+ * server decides who may approve for the skill's scope, refuses the person
+ * who published it, and the refusal is shown as it comes.
+ */
+function Approve({ versionID, onApproved }: { versionID: string; onApproved: () => void }) {
+  const t = useT();
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState<unknown>();
+
+  async function approve() {
+    setBusy(true);
+    setFailure(undefined);
+    try {
+      await api.approveSkillVersion(versionID, note.trim());
+      setNote("");
+      onApproved();
+    } catch (err) {
+      setFailure(err);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Panel title={t("skill.approve")}>
+      <p className="sec lead-out">{t("skill.approveLead")}</p>
+      <div className="stack-sm">
+        <TextArea
+          label={t("skill.approveNote")}
+          value={note}
+          onChange={setNote}
+          rows={2}
+          labelled
+        />
+        <div>
+          <Btn kind="primary" onClick={() => void approve()} disabled={busy}>
+            {t("skill.approveButton")}
+          </Btn>
+        </div>
+      </div>
+      {failure !== undefined && (
+        <div className="mt">
+          <ErrorState error={failure} />
+        </div>
+      )}
     </Panel>
   );
 }

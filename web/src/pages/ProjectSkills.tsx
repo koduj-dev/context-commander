@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useT } from "../i18n";
 import { api } from "../lib/api";
-import { scopeLabel, trustLabel } from "../lib/labels";
+import { scopeLabel, trustLabel, trustTone } from "../lib/labels";
 import { useDebounced, useList, useResource } from "../lib/resource";
 import {
   Badge,
@@ -271,9 +271,7 @@ function InstallSkill({
                 <Scope kind={s.scope}>{scopeLabel(t, s.scope)}</Scope>
               </td>
               <td>
-                <Badge tone={s.trust_status === "signed" ? "ok" : "warn"}>
-                  {trustLabel(t, s.trust_status)}
-                </Badge>
+                <Badge tone={trustTone(s.trust_status)}>{trustLabel(t, s.trust_status)}</Badge>
               </td>
               <td className="r">
                 {installed.has(s.skill_id) ? (

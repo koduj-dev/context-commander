@@ -237,6 +237,7 @@ export const es: Partial<Record<MessageKey, string>> = {
   "scope.project": "Proyecto",
 
   "trust.signed": "Firmado",
+  "trust.approved": "Aprobada",
   "trust.unverified": "Sin verificar",
 
   "role.OWNER": "Propiedad",
@@ -467,6 +468,11 @@ export const es: Partial<Record<MessageKey, string>> = {
   "events.empty": "Todavía no hay eventos",
 
   "skill.versions": "Versiones",
+  "skill.approve": "Aprobar esta versión",
+  "skill.approveLead":
+    "Has leído esta versión y respondes por ella. Las versiones aprobadas cuentan como de confianza, igual que las firmadas; una instalación que exige confianza no instala nada más. No puedes aprobar una versión que publicaste tú.",
+  "skill.approveNote": "Nota (opcional)",
+  "skill.approveButton": "Aprobar",
   "skill.versionsLead":
     "Todas las versiones publicadas alguna vez con este nombre. Una versión publicada es inmutable — volver a publicar añade una fila aquí, nunca edita una.",
   "skill.content": "Contenido",

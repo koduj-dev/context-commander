@@ -292,6 +292,7 @@ export const en = {
   "scope.project": "Project",
 
   "trust.signed": "Signed",
+  "trust.approved": "Approved",
   "trust.unverified": "Unverified",
 
   "role.OWNER": "Owner",
@@ -713,6 +714,11 @@ export const en = {
   "handoff.column.status": "Status",
 
   "skill.versions": "Versions",
+  "skill.approve": "Approve this version",
+  "skill.approveLead":
+    "You have read this version and vouch for it. Approved versions count as trusted, like signed ones; an installation that requires trust installs nothing else. You cannot approve a version you published.",
+  "skill.approveNote": "Note (optional)",
+  "skill.approveButton": "Approve",
   "skill.versionsLead":
     "Every version ever published under this name. A published version is immutable — publishing again adds a row here, it never edits one.",
   "skill.content": "Content",

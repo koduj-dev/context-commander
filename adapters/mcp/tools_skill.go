@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 
 	"github.com/google/uuid"
@@ -142,6 +143,7 @@ func registerSkillTools(server *sdkmcp.Server, deps Deps, principalID, clientID 
 		Origin               string   `json:"origin,omitempty"`
 		Content              string   `json:"content" jsonschema:"the skill's packaged content"`
 		DeclaredCapabilities []string `json:"declared_capabilities,omitempty" jsonschema:"e.g. [\"network\", \"filesystem\"] — see docs/architecture-cookbook.md §12.4"`
+		Signature            string   `json:"signature,omitempty" jsonschema:"optional Ed25519 signature, base64, over \"context-commander/skill/v1\\n<name>\\n<sha256 of content, hex>\" by a key an administrator registered; makes the version signed (ccd skill sign makes one)"`
 	}
 	sdkmcp.AddTool(server, &sdkmcp.Tool{
 		Name: "skill.publish",
@@ -167,7 +169,11 @@ func registerSkillTools(server *sdkmcp.Server, deps Deps, principalID, clientID 
 			}
 			skillID = &id
 		}
-		v, err := deps.Skills.Publish(ctx, principalID, userID, scope, scopeRef, skillID, args.Name, args.Author, args.Origin, []byte(args.Content), args.DeclaredCapabilities)
+		signature, err := base64.StdEncoding.DecodeString(args.Signature)
+		if err != nil {
+			return nil, skillVersionResult{}, errors.New("signature must be base64")
+		}
+		v, err := deps.Skills.PublishSigned(ctx, principalID, userID, scope, scopeRef, skillID, args.Name, args.Author, args.Origin, []byte(args.Content), args.DeclaredCapabilities, signature)
 		if err != nil {
 			return nil, skillVersionResult{}, err
 		}
