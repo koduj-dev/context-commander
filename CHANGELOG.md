@@ -6,6 +6,24 @@ All notable changes to Context Commander are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.0-beta.4] — 2026-11-17
+
+The operator's release: skills an installation can require to be signed or
+approved, a root key that can come from a file or HashiCorp Vault, Prometheus
+metrics that hold no content, retention by age that keeps everything unless
+told otherwise, and an interface that loads nothing from third parties.
+
+### Upgrading
+
+- **Migration 000048 runs on start.** Existing skill versions stay
+  `unverified`; nothing changes for them unless you turn on
+  `--skills-require-trust`.
+- **Nothing new is on by default.** Metrics, retention by age and the
+  trusted-skills policy all need a flag; the root key keeps coming from
+  `CC_ROOT_KEY` unless you set a different source (exactly one).
+- **The Content-Security-Policy is stricter**: fonts and styles from the
+  server's own origin only. Check the browser console after upgrading.
+
 ### Added
 
 - **Trusted skill packages.** A skill version is trusted when it is signed
@@ -1754,7 +1772,8 @@ database forward. Install it as described in
   by `Create`/`Delete` (`internal/secrets/reference.go`,
   `internal/secrets/service.go`).
 
-[Unreleased]: https://github.com/koduj-dev/context-commander/compare/v0.1.0-beta.3...HEAD
+[Unreleased]: https://github.com/koduj-dev/context-commander/compare/v0.1.0-beta.4...HEAD
+[0.1.0-beta.4]: https://github.com/koduj-dev/context-commander/compare/v0.1.0-beta.3...v0.1.0-beta.4
 [0.1.0-beta.3]: https://github.com/koduj-dev/context-commander/compare/v0.1.0-beta.2...v0.1.0-beta.3
 [0.1.0-beta.2]: https://github.com/koduj-dev/context-commander/compare/v0.1.0-beta.1...v0.1.0-beta.2
 [0.1.0-beta.1]: https://github.com/koduj-dev/context-commander/releases/tag/v0.1.0-beta.1
