@@ -87,6 +87,37 @@ EOF
 
 Copy `CC_ROOT_KEY` out of `ccd.env` into your password manager now.
 
+The key does not have to sit in `ccd.env`
+([ADR 0037](adr/0037-root-key-sources.md)). Set exactly one of:
+
+- `CC_ROOT_KEY`, the key itself, as above;
+- `CC_ROOT_KEY_FILE`, a file holding it. With systemd credentials, the
+  file stays root-only and the service reads a private copy:
+
+  ```bash
+  sudo install -m 0600 /dev/null /etc/context-commander/root-key
+  openssl rand -base64 32 | sudo tee /etc/context-commander/root-key >/dev/null
+  sudo systemctl edit ccd   # add:
+  #   [Service]
+  #   LoadCredential=root-key:/etc/context-commander/root-key
+  #   Environment=CC_ROOT_KEY_FILE=%d/root-key
+  ```
+
+- `CC_ROOT_KEY_VAULT_CIPHERTEXT`, the key encrypted by HashiCorp Vault's
+  Transit engine. Encrypt it once, keep the ciphertext in `ccd.env`, and
+  give the server a token that may only decrypt with that key:
+
+  ```bash
+  vault write -field=ciphertext transit/encrypt/context-commander plaintext="$CC_ROOT_KEY"
+  # ccd.env:
+  #   CC_ROOT_KEY_VAULT_CIPHERTEXT=vault:v1:...
+  #   VAULT_ADDR=https://vault.example.com:8200
+  #   VAULT_TOKEN_FILE=/etc/context-commander/vault-token
+  ```
+
+The fingerprint is the same whichever source holds the key, so moving it
+is not a rotation. `ccd serve` logs which source it used.
+
 To run migrations by hand instead, leave `CC_DATABASE_URL` in `migrate.env`
 commented out. `ccd-migrate.service` is then skipped. You run
 `ccd migrate` with the owner's URL after each upgrade, before you start the

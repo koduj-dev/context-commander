@@ -71,7 +71,7 @@ func setupHandoffContext(cmd *cobra.Command) (*handoffContext, error) {
 		return nil, fmt.Errorf("resolve project %q: %w", projectPath, err)
 	}
 
-	root, err := crypto.NewEnvRootKeyProvider(rootKeyEnv)
+	root, err := crypto.LoadRootKey(cmd.Context(), rootKeyEnv)
 	if err != nil {
 		return nil, err
 	}

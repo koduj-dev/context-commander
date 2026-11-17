@@ -68,7 +68,7 @@ func newProjectImportCmd() *cobra.Command {
 				return err
 			}
 			defer pool.Close()
-			root, err := crypto.NewEnvRootKeyProvider(rootKeyEnv)
+			root, err := crypto.LoadRootKey(cmd.Context(), rootKeyEnv)
 			if err != nil {
 				return err
 			}

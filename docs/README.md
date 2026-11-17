@@ -82,6 +82,7 @@ supersedes it, so the trail of what was believed when stays readable.
 | [0034](adr/0034-project-manifest.md) | A project manifest: what an arriving agent must read |
 | [0035](adr/0035-project-export-and-import.md) | Project export and import |
 | [0036](adr/0036-project-deletion-legal-hold-and-purge.md) | Project deletion, legal hold and purge |
+| [0037](adr/0037-root-key-sources.md) | Where the root key comes from: environment, file, or Vault |
 
 ## Not documentation
 

@@ -104,7 +104,7 @@ func setupArtifactContext(cmd *cobra.Command) (*artifactContext, error) {
 		return nil, err
 	}
 
-	root, err := crypto.NewEnvRootKeyProvider(rootKeyEnv)
+	root, err := crypto.LoadRootKey(cmd.Context(), rootKeyEnv)
 	if err != nil {
 		return nil, err
 	}

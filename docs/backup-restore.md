@@ -401,9 +401,11 @@ part way.
 
 ## Known gaps
 
-- **The root key comes only from an environment variable.** There is no
-  file, KMS or Vault provider yet, so the key sits in `.env` or `ccd.env` on
-  the server, and backing up those files backs up the key.
+- **Cloud KMS is not a root key source yet.** The key can come from the
+  environment, a file or Vault Transit
+  ([ADR 0037](adr/0037-root-key-sources.md)), not from AWS, Google or Azure
+  key management. With the environment or a file, backing up that file
+  backs up the key.
 - **A purge does not reach backups.** `ccd purge` removes deleted
   projects and long-deleted artifacts from the database and storage
   ([ADR 0036](adr/0036-project-deletion-legal-hold-and-purge.md)); backups

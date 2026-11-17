@@ -76,7 +76,7 @@ func newRootKeyCmd() *cobra.Command {
 				return err
 			}
 			defer pool.Close()
-			oldRoot, err := crypto.NewEnvRootKeyProvider(rootKeyPreviousEnv)
+			oldRoot, err := crypto.LoadRootKey(cmd.Context(), rootKeyPreviousEnv)
 			if err != nil {
 				return err
 			}
@@ -101,7 +101,7 @@ func newRootKeyCmd() *cobra.Command {
 }
 
 func openWithRootKey(cmd *cobra.Command, env string) (*db.Pool, crypto.RootKeyProvider, error) {
-	root, err := crypto.NewEnvRootKeyProvider(env)
+	root, err := crypto.LoadRootKey(cmd.Context(), env)
 	if err != nil {
 		return nil, nil, err
 	}

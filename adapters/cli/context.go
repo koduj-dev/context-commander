@@ -173,7 +173,7 @@ func setupContextService(cmd *cobra.Command) (*contextpack.Service, uuid.UUID, p
 		return nil, uuid.Nil, projects.Project{}, nil, err
 	}
 
-	root, err := crypto.NewEnvRootKeyProvider(rootKeyEnv)
+	root, err := crypto.LoadRootKey(cmd.Context(), rootKeyEnv)
 	if err != nil {
 		pool.Close()
 		return nil, uuid.Nil, projects.Project{}, nil, err
