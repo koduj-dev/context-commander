@@ -95,6 +95,8 @@ export const en = {
   "setup.whereIsTheCode":
     "The code exists only in the running server's memory and only while there are no users, so it never reaches a backup and cannot be read out of the database.",
 
+  "account.mustChange":
+    "An administrator set this password for you. Choose your own before you continue; until then the server refuses everything else.",
   "account.password": "Password",
   "account.passwordLead":
     "Used to sign in to this interface. Agents and the CLI use access tokens instead, which are managed separately.",

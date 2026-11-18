@@ -281,10 +281,9 @@ Only on top of a core loop people actually use:
         an account that already exists. Both need `CapCredentialManage` on top
         of creating — setting someone's password is the power to sign in as
         them, which is what issuing them a token already was.
-      - [ ] No "must change at next sign-in" flag. It needs a column, a check
-        on every authenticated request and a screen of its own, and half of it
-        is worse than none: a flag nothing enforces reads as a promise the
-        product does not keep.
+      - [x] ~~No "must change at next sign-in" flag.~~ Closed 2026-11-18
+        ([ADR 0041](docs/adr/0041-temporary-passwords.md)): every password
+        an administrator sets is temporary, enforced on every request.
 - [x] ~~**Storage quotas per user/organization.**~~ Closed 2026-10-27
       ([ADR 0021](docs/adr/0021-storage-quotas-per-namespace.md)): the limit is per
       namespace, set by `--storage-quota` with per-namespace exceptions made by an

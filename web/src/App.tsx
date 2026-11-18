@@ -3,7 +3,8 @@ import { Shell } from "./app/Shell";
 import { useAuth } from "./app/auth";
 import { Solo } from "./app/Solo";
 import { useT } from "./i18n";
-import { Btn, Loading, Panel } from "./ui";
+import { Btn, Loading, Note, Panel, Stack } from "./ui";
+import { PasswordPanel } from "./pages/AccountSecurity";
 import { FirstRun } from "./pages/FirstRun";
 import { SignIn } from "./pages/SignIn";
 import { Dashboard } from "./pages/Dashboard";
@@ -49,7 +50,7 @@ import { NotFound } from "./pages/NotFound";
  */
 export function App() {
   const t = useT();
-  const { me, loading, needsSetup, unreachable, retry } = useAuth();
+  const { me, loading, needsSetup, unreachable, retry, signOut } = useAuth();
 
   // Nothing renders until the stored token has been checked. Showing the
   // shell first and yanking it away is worse than a moment of nothing — and
@@ -84,6 +85,23 @@ export function App() {
   // sending someone to a login form would be asking for a credential that
   // cannot exist (docs/adr/0019).
   if (!me) return needsSetup ? <FirstRun /> : <SignIn />;
+
+  // A temporary password an administrator set (docs/adr/0041): the server
+  // refuses everything else until it is replaced, so the interface offers
+  // nothing else either, rather than a dashboard of 403s.
+  if (me.must_change_password) {
+    return (
+      <Solo>
+        <Stack>
+          <Note tone="warn">{t("account.mustChange")}</Note>
+          <PasswordPanel onChanged={retry} />
+          <div>
+            <Btn onClick={() => void signOut()}>{t("nav.signOut")}</Btn>
+          </div>
+        </Stack>
+      </Solo>
+    );
+  }
 
   return (
     <Routes>
