@@ -98,6 +98,8 @@ export const zhCN: Partial<Record<MessageKey, string>> = {
   "setup.alreadyDone": "此安装已有用户，请改为登录。",
   "setup.whereIsTheCode":
     "安装码只存在于正在运行的服务器内存中，而且只在没有用户时存在——它不会进入任何备份，也无法从数据库中读出。",
+  "account.mustChange":
+    "此密码由管理员为你设置。请先设置你自己的密码再继续；在此之前，服务器会拒绝其他所有操作。",
   "account.password": "密码",
   "account.passwordLead": "用于登录此界面。agent 和命令行使用访问 token，单独管理。",
   "account.currentPassword": "当前密码",

@@ -133,7 +133,7 @@ func (s *Service) CreateUser(
 			return err
 		}
 		if passwordHash != nil {
-			return s.identity.SetPassword(ctx, tx, u.ID, *passwordHash)
+			return s.identity.SetTemporaryPassword(ctx, tx, u.ID, *passwordHash)
 		}
 		return nil
 	})
@@ -173,7 +173,7 @@ func (s *Service) SetUserPassword(
 		if _, err := s.identity.GetUser(ctx, tx, targetUserID); err != nil {
 			return err
 		}
-		return s.identity.SetPassword(ctx, tx, targetUserID, passwordHash)
+		return s.identity.SetTemporaryPassword(ctx, tx, targetUserID, passwordHash)
 	})
 	if err != nil {
 		return fmt.Errorf("installation: set user password: %w", err)

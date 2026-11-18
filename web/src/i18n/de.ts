@@ -77,6 +77,8 @@ export const de: Partial<Record<MessageKey, string>> = {
   "setup.alreadyDone": "Diese Installation hat bereits Benutzer. Melden Sie sich stattdessen an.",
   "setup.whereIsTheCode":
     "Der Code existiert nur im Speicher des laufenden Servers und nur solange es keine Benutzer gibt — er erreicht also kein Backup und lässt sich nicht aus der Datenbank lesen.",
+  "account.mustChange":
+    "Ein Administrator hat dieses Passwort für Sie festgelegt. Wählen Sie ein eigenes, bevor Sie fortfahren; bis dahin lehnt der Server alles andere ab.",
   "account.password": "Passwort",
   "account.passwordLead":
     "Wird für die Anmeldung an dieser Oberfläche verwendet. Agenten und die Kommandozeile verwenden stattdessen Zugriffstoken, die separat verwaltet werden.",

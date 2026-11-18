@@ -93,6 +93,8 @@ export const pl: Partial<Record<MessageKey, string>> = {
   "setup.alreadyDone": "Ta instalacja ma już użytkowników. Zaloguj się zamiast tego.",
   "setup.whereIsTheCode":
     "Kod istnieje wyłącznie w pamięci działającego serwera i tylko dopóki nie ma użytkowników — nigdy nie trafia do kopii zapasowej i nie da się go odczytać z bazy danych.",
+  "account.mustChange":
+    "To hasło ustawił dla Ciebie administrator. Wybierz własne, zanim przejdziesz dalej; do tego czasu serwer odmawia wszystkiego innego.",
   "account.password": "Hasło",
   "account.passwordLead":
     "Służy do logowania w tym interfejsie. Agenci i wiersz poleceń używają tokenów dostępu, zarządzanych osobno.",

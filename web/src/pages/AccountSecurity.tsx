@@ -32,7 +32,7 @@ const MIN_PASSWORD = 12;
  * without it, anyone who arrived by token could never set a first password
  * without an administrator.
  */
-export function PasswordPanel() {
+export function PasswordPanel({ onChanged }: { onChanged?: () => void } = {}) {
   const t = useT();
   const { me } = useAuth();
   // Asked of the server rather than guessed from `me`: whether a password
@@ -62,6 +62,7 @@ export function PasswordPanel() {
     try {
       await api.changePassword(current, next);
       setDone(true);
+      onChanged?.();
       setCurrent("");
       setNext("");
       setAgain("");

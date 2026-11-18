@@ -14,6 +14,7 @@ const (
 	ctxKeyPrincipalID ctxKey = iota
 	ctxKeyClientID
 	ctxKeyProject
+	ctxKeyPasswordChange
 )
 
 func principalIDFrom(ctx context.Context) uuid.UUID {

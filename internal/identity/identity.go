@@ -64,6 +64,10 @@ type ClientCredential struct {
 	LastUsedAt  *time.Time
 	ExpiresAt   *time.Time
 	RevokedAt   *time.Time
+	// PasswordChangeRequired is set on a browser session whose user holds a
+	// temporary password an administrator set (docs/adr/0041). Such a
+	// session may do nothing but change it. Never set on a token.
+	PasswordChangeRequired bool
 }
 
 // Active reports whether the credential can currently authenticate a
