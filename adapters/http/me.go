@@ -28,6 +28,11 @@ type meResponse struct {
 	// Whether a password exists is not a secret from its own owner, and this
 	// endpoint only ever describes the caller.
 	HasPassword bool `json:"has_password"`
+	// MustChangePassword: this session's password is a temporary one an
+	// administrator set; the interface shows only the form to replace it,
+	// and every other request answers 403 password_change_required
+	// (docs/adr/0041).
+	MustChangePassword bool `json:"must_change_password,omitempty"`
 }
 
 // getMe resolves the authenticated caller's own identity — the web UI's
@@ -41,7 +46,7 @@ type meResponse struct {
 func (d Deps) getMe(w http.ResponseWriter, r *http.Request) {
 	principalID := principalIDFrom(r.Context())
 
-	var resp meResponse
+	resp := meResponse{MustChangePassword: passwordChangeRequiredFrom(r.Context())}
 	var callerUserID *uuid.UUID
 	err := db.WithPrincipal(r.Context(), d.Pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
 		identityStore := identity.NewStore()

@@ -82,8 +82,17 @@ func (d Deps) authenticateMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
+		// A temporary password (docs/adr/0041): the session may read who it
+		// is and change the password, and nothing else, until it does.
+		if cred.PasswordChangeRequired && !allowedBeforePasswordChange(r) {
+			writeError(w, http.StatusForbidden, "password_change_required",
+				"this account has a temporary password; change it before doing anything else")
+			return
+		}
+
 		ctx := context.WithValue(r.Context(), ctxKeyPrincipalID, cred.PrincipalID)
 		ctx = context.WithValue(ctx, ctxKeyClientID, cred.ID)
+		ctx = context.WithValue(ctx, ctxKeyPasswordChange, cred.PasswordChangeRequired)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
@@ -172,4 +181,22 @@ func (d Deps) limitUnauthenticated(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// allowedBeforePasswordChange is what a session with a temporary password
+// may still do: find out who it is (and that it must change the password),
+// and change it. Signing out is a public endpoint and needs no exception.
+func allowedBeforePasswordChange(r *http.Request) bool {
+	switch {
+	case r.Method == http.MethodGet && r.URL.Path == "/v1/me":
+		return true
+	case r.Method == http.MethodPut && r.URL.Path == "/v1/me/password":
+		return true
+	}
+	return false
+}
+
+func passwordChangeRequiredFrom(ctx context.Context) bool {
+	v, _ := ctx.Value(ctxKeyPasswordChange).(bool)
+	return v
 }

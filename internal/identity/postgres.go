@@ -267,11 +267,15 @@ func (s *Store) IssueCredential(
 func (s *Store) GetCredential(ctx context.Context, tx pgx.Tx, id uuid.UUID) (ClientCredential, error) {
 	var cred ClientCredential
 	err := tx.QueryRow(ctx,
-		`SELECT id, principal_id, client_type, token_hash, created_at, last_used_at, expires_at, revoked_at
-		 FROM client_credentials WHERE id = $1`,
+		`SELECT c.id, c.principal_id, c.client_type, c.token_hash, c.created_at, c.last_used_at, c.expires_at, c.revoked_at,
+		        COALESCE(c.client_type = 'session' AND up.must_change, false)
+		 FROM client_credentials c
+		 JOIN principals p ON p.id = c.principal_id
+		 LEFT JOIN user_passwords up ON up.user_id = p.user_id
+		 WHERE c.id = $1`,
 		id,
 	).Scan(&cred.ID, &cred.PrincipalID, &cred.ClientType, &cred.TokenHash,
-		&cred.CreatedAt, &cred.LastUsedAt, &cred.ExpiresAt, &cred.RevokedAt)
+		&cred.CreatedAt, &cred.LastUsedAt, &cred.ExpiresAt, &cred.RevokedAt, &cred.PasswordChangeRequired)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ClientCredential{}, ErrNotFound
 	}
@@ -565,14 +569,25 @@ func (s *Store) listCredentials(ctx context.Context, tx pgx.Tx, where string, ar
 // only create a way to get "already exists" from a screen whose user is
 // holding the new password.
 func (s *Store) SetPassword(ctx context.Context, tx pgx.Tx, userID uuid.UUID, passwordHash string) error {
+	return s.setPassword(ctx, tx, userID, passwordHash, false)
+}
+
+// SetTemporaryPassword stores a password its owner must replace at their
+// next sign-in: what an administrator sets for someone (docs/adr/0041).
+func (s *Store) SetTemporaryPassword(ctx context.Context, tx pgx.Tx, userID uuid.UUID, passwordHash string) error {
+	return s.setPassword(ctx, tx, userID, passwordHash, true)
+}
+
+func (s *Store) setPassword(ctx context.Context, tx pgx.Tx, userID uuid.UUID, passwordHash string, mustChange bool) error {
 	_, err := tx.Exec(ctx,
-		`INSERT INTO user_passwords (user_id, password_hash, algorithm, updated_at)
-		 VALUES ($1, $2, 'argon2id', now())
+		`INSERT INTO user_passwords (user_id, password_hash, algorithm, updated_at, must_change)
+		 VALUES ($1, $2, 'argon2id', now(), $3)
 		 ON CONFLICT (user_id) DO UPDATE
 		   SET password_hash = EXCLUDED.password_hash,
 		       algorithm     = EXCLUDED.algorithm,
-		       updated_at    = now()`,
-		userID, passwordHash,
+		       updated_at    = now(),
+		       must_change   = EXCLUDED.must_change`,
+		userID, passwordHash, mustChange,
 	)
 	if err != nil {
 		return fmt.Errorf("identity: set password: %w", err)

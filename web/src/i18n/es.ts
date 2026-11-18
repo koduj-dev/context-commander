@@ -73,6 +73,8 @@ export const es: Partial<Record<MessageKey, string>> = {
   "setup.alreadyDone": "Esta instalación ya tiene usuarios. Inicie sesión en su lugar.",
   "setup.whereIsTheCode":
     "El código existe solo en la memoria del servidor en ejecución y solo mientras no haya usuarios, así que nunca llega a una copia de seguridad ni puede leerse de la base de datos.",
+  "account.mustChange":
+    "Un administrador estableció esta contraseña para ti. Elige la tuya antes de continuar; hasta entonces el servidor rechaza todo lo demás.",
   "account.password": "Contraseña",
   "account.passwordLead":
     "Se usa para iniciar sesión en esta interfaz. Los agentes y la línea de comandos usan tokens de acceso, que se gestionan por separado.",

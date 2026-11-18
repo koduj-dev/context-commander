@@ -126,6 +126,12 @@ func authenticateMiddleware(deps Deps, next http.Handler) http.Handler {
 			http.Error(w, "invalid or expired token", http.StatusUnauthorized)
 			return
 		}
+		// A session holding a temporary password does nothing but change it
+		// (docs/adr/0041), and that is not done over MCP.
+		if cred.PasswordChangeRequired {
+			http.Error(w, "this account has a temporary password; change it in the interface first", http.StatusForbidden)
+			return
+		}
 
 		if !deps.Limiter.AllowCredential(cred.ID) {
 			deps.Security.Record(r.Context(), security.Event{

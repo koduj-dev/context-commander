@@ -272,6 +272,8 @@ export type Me = {
    * which cannot ask for something that does not exist.
    */
   has_password: boolean;
+  /** A temporary password an administrator set must be replaced first (docs/adr/0041). */
+  must_change_password?: boolean;
 };
 
 /** What to call a principal on screen, whichever kind it is. */

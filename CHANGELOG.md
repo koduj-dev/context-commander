@@ -6,6 +6,15 @@ All notable changes to Context Commander are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Passwords an administrator sets are temporary.** After signing in with
+  one, the interface shows only the form to replace it, and the server
+  answers every other request from that session with `403
+  password_change_required` until it is changed. The person's tokens keep
+  working. First-run setup and `ccd user set-password` are unaffected.
+  Migration 000049. [ADR 0041](docs/adr/0041-temporary-passwords.md).
+
 ## [0.1.0-beta.4] — 2026-11-17
 
 The operator's release: skills an installation can require to be signed or
