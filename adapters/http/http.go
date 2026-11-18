@@ -184,6 +184,7 @@ func NewHandler(deps Deps) http.Handler {
 			})
 
 			r.Get("/me", deps.getMe)
+			r.Delete("/me", deps.deleteOwnAccount)
 			r.Get("/me/projects", deps.listMyProjects)
 			// Every project's state of work in numbers, for the home screen.
 			r.Get("/me/projects/overview", deps.myProjectsOverview)
@@ -250,6 +251,7 @@ func NewHandler(deps Deps) http.Handler {
 				r.Get("/users", deps.listInstallationUsers)
 				r.Post("/users", deps.createInstallationUser)
 				r.Put("/users/{id}/password", deps.setUserPassword)
+				r.Delete("/users/{id}", deps.deleteInstallationUser)
 				r.Get("/service-principals", deps.listServicePrincipals)
 				r.Post("/service-principals", deps.createServicePrincipal)
 				r.Post("/principals/{id}/tokens", deps.issueCredentialFor)

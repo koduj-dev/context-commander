@@ -95,6 +95,11 @@ export const pl: Partial<Record<MessageKey, string>> = {
     "Kod istnieje wyłącznie w pamięci działającego serwera i tylko dopóki nie ma użytkowników — nigdy nie trafia do kopii zapasowej i nie da się go odczytać z bazy danych.",
   "account.mustChange":
     "To hasło ustawił dla Ciebie administrator. Wybierz własne, zanim przejdziesz dalej; do tego czasu serwer odmawia wszystkiego innego.",
+  "account.delete": "Usuń konto",
+  "account.deleteLead":
+    "Usuwa Twoje imię i e-mail, każde członkostwo, hasło, sesje i tokeny dostępu, od razu i na zawsze. To, co napisałeś, zostaje w projektach, oznaczone jako napisane przez „Deleted user”. Jeśli jesteś ostatnim OWNER-em projektu lub organizacji, najpierw ustaw kogoś innego jako OWNER.",
+  "account.deleteConfirm": "Wpisz {email}, aby potwierdzić",
+  "account.deleteButton": "Usuń moje konto",
   "account.password": "Hasło",
   "account.passwordLead":
     "Służy do logowania w tym interfejsie. Agenci i wiersz poleceń używają tokenów dostępu, zarządzanych osobno.",

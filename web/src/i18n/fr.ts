@@ -99,6 +99,11 @@ export const fr: Partial<Record<MessageKey, string>> = {
     "Le code n’existe que dans la mémoire du serveur en cours d’exécution et seulement tant qu’il n’y a aucun utilisateur : il n’atteint donc jamais une sauvegarde et ne peut pas être lu dans la base de données.",
   "account.mustChange":
     "Un administrateur a défini ce mot de passe pour vous. Choisissez le vôtre avant de continuer ; d’ici là, le serveur refuse tout le reste.",
+  "account.delete": "Supprimer le compte",
+  "account.deleteLead":
+    "Supprime votre nom et votre e-mail, chaque appartenance, votre mot de passe, vos sessions et vos tokens d’accès, immédiatement et définitivement. Ce que vous avez écrit reste dans ses projets, affiché comme écrit par « Deleted user ». Si vous êtes le dernier OWNER d’un projet ou d’une organisation, nommez d’abord quelqu’un d’autre OWNER.",
+  "account.deleteConfirm": "Saisissez {email} pour confirmer",
+  "account.deleteButton": "Supprimer mon compte",
   "account.password": "Mot de passe",
   "account.passwordLead":
     "Sert à se connecter à cette interface. Les agents et la ligne de commande utilisent des tokens d’accès, gérés séparément.",

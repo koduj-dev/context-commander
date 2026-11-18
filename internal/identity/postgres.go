@@ -426,7 +426,8 @@ func (s *Store) ListUsers(ctx context.Context, tx pgx.Tx, opts paging.Options) (
 		`SELECT u.id, u.email, u.display_name, u.created_at, p.id
 		 FROM users u
 		 JOIN principals p ON p.user_id = u.id
-		 WHERE (NOT $1::bool OR (u.created_at, u.id) > ($2::timestamptz, $3::uuid))
+		 WHERE u.deleted_at IS NULL -- a deleted account is a tombstone, not someone to pick (docs/adr/0042)
+		   AND (NOT $1::bool OR (u.created_at, u.id) > ($2::timestamptz, $3::uuid))
 		 ORDER BY u.created_at ASC, u.id ASC LIMIT $4`,
 		hasCursor, cursorTime, cursorID, limit+1,
 	)

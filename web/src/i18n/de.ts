@@ -79,6 +79,11 @@ export const de: Partial<Record<MessageKey, string>> = {
     "Der Code existiert nur im Speicher des laufenden Servers und nur solange es keine Benutzer gibt — er erreicht also kein Backup und lässt sich nicht aus der Datenbank lesen.",
   "account.mustChange":
     "Ein Administrator hat dieses Passwort für Sie festgelegt. Wählen Sie ein eigenes, bevor Sie fortfahren; bis dahin lehnt der Server alles andere ab.",
+  "account.delete": "Konto löschen",
+  "account.deleteLead":
+    "Entfernt Ihren Namen und Ihre E-Mail, jede Mitgliedschaft, Ihr Passwort, Ihre Sitzungen und Ihre Zugangstokens, sofort und endgültig. Was Sie geschrieben haben, bleibt in seinen Projekten, angezeigt als von „Deleted user“. Sind Sie der letzte OWNER eines Projekts oder einer Organisation, machen Sie zuerst jemand anderen zum OWNER.",
+  "account.deleteConfirm": "Zur Bestätigung {email} eingeben",
+  "account.deleteButton": "Mein Konto löschen",
   "account.password": "Passwort",
   "account.passwordLead":
     "Wird für die Anmeldung an dieser Oberfläche verwendet. Agenten und die Kommandozeile verwenden stattdessen Zugriffstoken, die separat verwaltet werden.",

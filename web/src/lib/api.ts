@@ -1154,6 +1154,8 @@ export const api = {
     request<{ expires_at: string }>("/auth/token", { method: "POST", body: { token } }),
   signOut: () => request<void>("/auth/session", { method: "DELETE" }),
 
+  /** Deletes the caller's own account (docs/adr/0042); `confirm` is its email. */
+  deleteAccount: (confirm: string) => request<void>("/me", { method: "DELETE", body: { confirm } }),
   changePassword: (currentPassword: string, newPassword: string) =>
     request<void>("/me/password", {
       method: "PUT",

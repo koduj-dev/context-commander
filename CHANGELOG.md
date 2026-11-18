@@ -8,6 +8,16 @@ All notable changes to Context Commander are documented here. The format follows
 
 ### Added
 
+- **Deleting an account.** A person deletes their own account in
+  Preferences, or an administrator deletes someone's (`DELETE /v1/me`,
+  `DELETE /v1/installation/users/{id}`), confirming with the email. The email
+  and name are replaced by a tombstone; memberships, the administrator role,
+  password, directory links, sessions and tokens go; pending invitations to
+  the address are revoked. What they wrote stays, as "Deleted user". Refused
+  for the last OWNER of a project or organization and for the last
+  administrator. Migration 000050.
+  [ADR 0042](docs/adr/0042-deleting-a-user-account.md).
+
 - **Passwords an administrator sets are temporary.** After signing in with
   one, the interface shows only the form to replace it, and the server
   answers every other request from that session with `403
