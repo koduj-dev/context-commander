@@ -16,9 +16,9 @@ func TestTemporaryPasswordMustBeChanged(t *testing.T) {
 	bobUser := f.userIDByEmail("pw-bob@example.test")
 
 	f.mustDo(http.MethodPut, "/v1/installation/users/"+bobUser+"/password", admin,
-		[]byte(`{"password":"temporary-pass-123"}`), http.StatusNoContent, "admin sets a password")
+		[]byte(`{"password":"a temporary passphrase"}`), http.StatusNoContent, "admin sets a password")
 
-	r := f.post("/v1/auth/password", `{"email":"pw-bob@example.test","password":"temporary-pass-123"}`)
+	r := f.post("/v1/auth/password", `{"email":"pw-bob@example.test","password":"a temporary passphrase"}`)
 	cookie := r.sessionCookie()
 	if r.status != http.StatusOK || cookie == nil {
 		t.Fatalf("sign in: %d %s", r.status, r.body)
@@ -43,7 +43,7 @@ func TestTemporaryPasswordMustBeChanged(t *testing.T) {
 	// Bob's own token is not a session and is not held back.
 	f.mustDo(http.MethodGet, "/v1/me/projects", bobToken, nil, http.StatusOK, "bob's token")
 
-	body, _ := json.Marshal(map[string]string{"current_password": "temporary-pass-123", "new_password": "bobs-own-pass-456"}) //nolint:gosec // G101: test fixture passwords
+	body, _ := json.Marshal(map[string]string{"current_password": "a temporary passphrase", "new_password": "bobs own long passphrase"})
 	if got := f.cookieDo(http.MethodPut, "/v1/me/password", cookie, string(body)); got.status != http.StatusNoContent {
 		t.Fatalf("change: %d %s", got.status, got.body)
 	}
