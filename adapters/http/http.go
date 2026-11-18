@@ -44,6 +44,7 @@ import (
 	"github.com/koduj-dev/context-commander/internal/security"
 	"github.com/koduj-dev/context-commander/internal/skills"
 	"github.com/koduj-dev/context-commander/internal/telemetry"
+	"github.com/koduj-dev/context-commander/internal/updatecheck"
 )
 
 // Deps bundles what every handler needs — constructed once in cmd/ccd and
@@ -78,6 +79,9 @@ type Deps struct {
 	Retention   *retention.Service
 	// Telemetry counts requests by route when metrics are on; nil otherwise.
 	Telemetry *telemetry.Server
+	// Updates reports the running version and, if enabled, the newest
+	// release (docs/adr/0043).
+	Updates *updatecheck.Checker
 	// Security records refusals and Limiter bounds them. Both are safe to
 	// leave nil — a nil *security.Recorder records nothing and a nil
 	// *ratelimit.Limiter allows everything, which is what the CLI and the
@@ -240,6 +244,7 @@ func NewHandler(deps Deps) http.Handler {
 
 			r.Route("/installation", func(r chi.Router) {
 				r.Get("/admins", deps.listInstallationAdmins)
+				r.Get("/version", deps.getVersion)
 				r.Get("/skill-signers", deps.listSkillSigners)
 				r.Post("/skill-signers", deps.addSkillSigner)
 				r.Delete("/skill-signers/{id}", deps.revokeSkillSigner)

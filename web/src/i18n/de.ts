@@ -84,6 +84,8 @@ export const de: Partial<Record<MessageKey, string>> = {
     "Entfernt Ihren Namen und Ihre E-Mail, jede Mitgliedschaft, Ihr Passwort, Ihre Sitzungen und Ihre Zugangstokens, sofort und endgültig. Was Sie geschrieben haben, bleibt in seinen Projekten, angezeigt als von „Deleted user“. Sind Sie der letzte OWNER eines Projekts oder einer Organisation, machen Sie zuerst jemand anderen zum OWNER.",
   "account.deleteConfirm": "Zur Bestätigung {email} eingeben",
   "account.deleteButton": "Mein Konto löschen",
+  "update.available": "Version {latest} ist verfügbar; diese Installation läuft mit {current}.",
+  "update.notes": "Versionshinweise",
   "account.password": "Passwort",
   "account.passwordLead":
     "Wird für die Anmeldung an dieser Oberfläche verwendet. Agenten und die Kommandozeile verwenden stattdessen Zugriffstoken, die separat verwaltet werden.",

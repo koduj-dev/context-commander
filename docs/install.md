@@ -267,6 +267,15 @@ make build                # bin/ccd, version "dev"
 VERSION=v0.1.0 make release   # every platform into dist-bin/, as CI does
 ```
 
+## Hearing about new releases
+
+`ccd serve --update-check` (or `CC_UPDATE_CHECK=true` in `ccd.env`) asks
+GitHub once a day whether a newer release exists, writes it to the log and
+shows administrators a notice in the interface
+([ADR 0043](adr/0043-update-notice.md)). It is off unless you set it: the
+server contacts nobody by itself. Upgrading stays yours to do, with the
+package manager, the image or `ccd self-update`.
+
 ## Metrics
 
 `ccd serve --metrics-addr 127.0.0.1:9490` (or `CC_METRICS_ADDR` in

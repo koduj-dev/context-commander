@@ -6,7 +6,9 @@ import { useAuth } from "./auth";
 import { useCrumbsValue, useDocumentTitle } from "./crumbs";
 import { QuickFind } from "./QuickFind";
 import { modifierLabel } from "../lib/platform";
-import { SelectField } from "../ui";
+import { Note, SelectField } from "../ui";
+import { api } from "../lib/api";
+import { useResource } from "../lib/resource";
 import { initials } from "../lib/labels";
 import { useTheme } from "./theme";
 
@@ -199,11 +201,36 @@ export function Shell() {
           </span>
         </div>
         <main className="page" id="main" tabIndex={-1}>
+          {me?.is_installation_admin && <UpdateNotice />}
           <Outlet />
         </main>
 
         {finding && <QuickFind onClose={() => setFinding(false)} />}
       </div>
+    </div>
+  );
+}
+
+/**
+ * A newer release exists (docs/adr/0043). Only for administrators, who are
+ * the ones who can upgrade, and only when the operator turned the check on;
+ * otherwise the server knows nothing to say and this draws nothing.
+ */
+function UpdateNotice() {
+  const t = useT();
+  const version = useResource(() => api.installationVersion(), []);
+  const v = version.data;
+  if (!v?.update_available || !v.latest) return null;
+  return (
+    <div className="mb">
+      <Note tone="info">
+        {t("update.available", { latest: v.latest, current: v.current })}{" "}
+        {v.url && (
+          <a href={v.url} target="_blank" rel="noreferrer">
+            {t("update.notes")}
+          </a>
+        )}
+      </Note>
     </div>
   );
 }

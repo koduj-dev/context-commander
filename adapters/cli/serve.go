@@ -49,9 +49,11 @@ import (
 	"github.com/koduj-dev/context-commander/internal/retention"
 	"github.com/koduj-dev/context-commander/internal/secrets"
 	"github.com/koduj-dev/context-commander/internal/security"
+	"github.com/koduj-dev/context-commander/internal/selfupdate"
 	"github.com/koduj-dev/context-commander/internal/skills"
 	"github.com/koduj-dev/context-commander/internal/storage/filesystem"
 	"github.com/koduj-dev/context-commander/internal/telemetry"
+	"github.com/koduj-dev/context-commander/internal/updatecheck"
 	"github.com/koduj-dev/context-commander/web"
 )
 
@@ -79,6 +81,9 @@ const (
 // IP) is untrusted here; TLS or an explicit override is required for it.
 // metricsAddrEnv turns metrics on (docs/adr/0038).
 const metricsAddrEnv = "CC_METRICS_ADDR"
+
+// updateCheckEnv turns on the daily update check (docs/adr/0043).
+const updateCheckEnv = "CC_UPDATE_CHECK"
 
 // skillsRequireTrustEnv turns on the trusted-skills policy (docs/adr/0040).
 const skillsRequireTrustEnv = "CC_SKILLS_REQUIRE_TRUST"
@@ -472,6 +477,19 @@ func newServeCmd() *cobra.Command {
 				metrics = telemetry.NewServer(Version, pool)
 			}
 
+			// The update notice (docs/adr/0043): off unless asked for, because
+			// it means asking GitHub once a day.
+			updateCheck, _ := cmd.Flags().GetBool("update-check")
+			if !updateCheck && os.Getenv(updateCheckEnv) == "true" {
+				updateCheck = true
+			}
+			var updateSource updatecheck.Source
+			if updateCheck {
+				updateSource = selfupdate.New()
+			}
+			updates := updatecheck.New(Version, updateSource)
+			go updates.Run(cmd.Context())
+
 			mux := http.NewServeMux()
 			mux.Handle("/mcp", ccmcp.NewHandler(ccmcp.Deps{
 				Pool: pool, Projects: projStore, Members: membersSvc, Authz: authz, Artifacts: artifactsSvc,
@@ -503,6 +521,7 @@ func newServeCmd() *cobra.Command {
 				SessionCookieSecure: !insecure,
 				WebFS:               webFS,
 				Telemetry:           metrics,
+				Updates:             updates,
 			}))
 
 			server := &http.Server{
@@ -567,6 +586,8 @@ func newServeCmd() *cobra.Command {
 		fmt.Sprintf("allow binding a non-loopback --addr without TLS — bearer tokens and content travel in plaintext (defaults to $%s=true)", insecureAllowCleartextEnv))
 	cmd.Flags().Bool("dev", false, "skip mounting the embedded web UI — run 'cd web && npm run dev' separately, proxying /v1 back here")
 	cmd.Flags().String("log-format", "json", `structured log format: "json" or "text"`)
+	cmd.Flags().Bool("update-check", false,
+		fmt.Sprintf("ask GitHub once a day whether a newer release exists, and show administrators a notice (defaults to $%s=true; off, the server contacts nobody)", updateCheckEnv))
 	cmd.Flags().Bool("skills-require-trust", false,
 		fmt.Sprintf("install only skill versions that are signed by a registered key or approved by a person, and leave others out of context packs (defaults to $%s=true)", skillsRequireTrustEnv))
 	cmd.Flags().String("metrics-addr", "",

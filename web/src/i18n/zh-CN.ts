@@ -105,6 +105,8 @@ export const zhCN: Partial<Record<MessageKey, string>> = {
     "立即并永久删除你的姓名和邮箱、所有成员身份、密码、会话和访问 token。你写下的内容保留在各自的项目中，显示为由“Deleted user”撰写。如果你是某个项目或组织的最后一个 OWNER，请先将其他人设为 OWNER。",
   "account.deleteConfirm": "输入 {email} 以确认",
   "account.deleteButton": "删除我的账户",
+  "update.available": "{latest} 版本已发布；此安装运行的是 {current}。",
+  "update.notes": "发布说明",
   "account.password": "密码",
   "account.passwordLead": "用于登录此界面。agent 和命令行使用访问 token，单独管理。",
   "account.currentPassword": "当前密码",

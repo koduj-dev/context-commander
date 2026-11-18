@@ -48,8 +48,9 @@ container image), through the apt repository, Homebrew and GHCR. Context
 Commander is server software an operator runs; updates are applied by the
 operator's package manager or image pull, not installed by the product
 itself, because an unattended restart of a team's server is the operator's
-call. Release notes mark security fixes. *Open:* there is no in-product
-notice that a newer version exists.
+call. Release notes mark security fixes. With `--update-check` the server
+checks daily for a newer release and shows administrators a notice (off by
+default, because the server contacts nobody unless told to; ADR 0043).
 
 **(d) Protection from unauthorised access.**
 - Every request is authenticated: a personal access token (hashed, ADR

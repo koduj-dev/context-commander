@@ -8,6 +8,13 @@ All notable changes to Context Commander are documented here. The format follows
 
 ### Added
 
+- **Update notice.** `ccd serve --update-check` (`CC_UPDATE_CHECK=true`)
+  asks GitHub once a day whether a newer release exists, writes it to the
+  log and shows installation administrators a notice with the release
+  notes. `GET /v1/installation/version` reports the running and newest
+  versions. Off by default: the server contacts nobody unless told to.
+  [ADR 0043](docs/adr/0043-update-notice.md).
+
 - **Deleting an account.** A person deletes their own account in
   Preferences, or an administrator deletes someone's (`DELETE /v1/me`,
   `DELETE /v1/installation/users/{id}`), confirming with the email. The email

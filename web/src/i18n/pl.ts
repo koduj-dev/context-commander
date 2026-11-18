@@ -100,6 +100,8 @@ export const pl: Partial<Record<MessageKey, string>> = {
     "Usuwa Twoje imię i e-mail, każde członkostwo, hasło, sesje i tokeny dostępu, od razu i na zawsze. To, co napisałeś, zostaje w projektach, oznaczone jako napisane przez „Deleted user”. Jeśli jesteś ostatnim OWNER-em projektu lub organizacji, najpierw ustaw kogoś innego jako OWNER.",
   "account.deleteConfirm": "Wpisz {email}, aby potwierdzić",
   "account.deleteButton": "Usuń moje konto",
+  "update.available": "Dostępna jest wersja {latest}; ta instalacja działa na {current}.",
+  "update.notes": "Informacje o wydaniu",
   "account.password": "Hasło",
   "account.passwordLead":
     "Służy do logowania w tym interfejsie. Agenci i wiersz poleceń używają tokenów dostępu, zarządzanych osobno.",

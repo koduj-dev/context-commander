@@ -545,3 +545,17 @@ func replaceExecutable(goos, exe, tmp string) error {
 	}
 	return os.Rename(tmp, exe)
 }
+
+// Latest returns the newest release this build would move to: the newest
+// stable one, or with pre the newest of any kind (while there is no stable
+// release, the newest pre-release either way). For the server's update
+// notice (internal/updatecheck); it downloads nothing.
+func (u *Updater) Latest(ctx context.Context, pre bool) (tag, url string, err error) {
+	ctx, cancel := context.WithTimeout(ctx, httpTimeout)
+	defer cancel()
+	rel, _, err := u.resolve(ctx, pre)
+	if err != nil {
+		return "", "", err
+	}
+	return rel.TagName, rel.HTMLURL, nil
+}
