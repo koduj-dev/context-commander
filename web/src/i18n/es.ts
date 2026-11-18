@@ -80,6 +80,8 @@ export const es: Partial<Record<MessageKey, string>> = {
     "Elimina tu nombre y tu correo, cada membresía, tu contraseña, tus sesiones y tus tokens de acceso, de inmediato y para siempre. Lo que escribiste se queda en sus proyectos, mostrado como escrito por «Deleted user». Si eres el último OWNER de un proyecto u organización, haz OWNER a otra persona primero.",
   "account.deleteConfirm": "Escribe {email} para confirmar",
   "account.deleteButton": "Eliminar mi cuenta",
+  "update.available": "La versión {latest} está disponible; esta instalación ejecuta {current}.",
+  "update.notes": "Notas de la versión",
   "account.password": "Contraseña",
   "account.passwordLead":
     "Se usa para iniciar sesión en esta interfaz. Los agentes y la línea de comandos usan tokens de acceso, que se gestionan por separado.",

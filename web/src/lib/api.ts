@@ -1154,6 +1154,16 @@ export const api = {
     request<{ expires_at: string }>("/auth/token", { method: "POST", body: { token } }),
   signOut: () => request<void>("/auth/session", { method: "DELETE" }),
 
+  /** The running version and, when the check is on, the newest release (docs/adr/0043). */
+  installationVersion: () =>
+    request<{
+      current: string;
+      update_check: boolean;
+      latest?: string;
+      url?: string;
+      update_available: boolean;
+      checked_at?: string;
+    }>("/installation/version"),
   /** Deletes the caller's own account (docs/adr/0042); `confirm` is its email. */
   deleteAccount: (confirm: string) => request<void>("/me", { method: "DELETE", body: { confirm } }),
   changePassword: (currentPassword: string, newPassword: string) =>
