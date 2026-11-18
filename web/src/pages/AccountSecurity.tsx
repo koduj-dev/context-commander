@@ -296,3 +296,59 @@ export function StoragePanel() {
     </Panel>
   );
 }
+
+/**
+ * Deleting one's own account (docs/adr/0042). The email is typed back as the
+ * confirmation and checked again by the server. What blocks it, such as
+ * being the last OWNER of a project, comes back from the server by name.
+ */
+export function DeleteAccountPanel() {
+  const t = useT();
+  const { me, retry } = useAuth();
+  const [typed, setTyped] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState<unknown>();
+  const email = me?.email ?? "";
+  if (me?.kind !== "user" || !email) return null;
+
+  async function remove() {
+    setBusy(true);
+    setFailure(undefined);
+    try {
+      await api.deleteAccount(typed.trim());
+      retry();
+    } catch (err) {
+      setFailure(err);
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Panel title={t("account.delete")}>
+      <p className="sec lead-out">{t("account.deleteLead")}</p>
+      <div className="stack-sm">
+        <TextField
+          label={t("account.deleteConfirm", { email })}
+          placeholder={email}
+          value={typed}
+          onChange={setTyped}
+          labelled
+        />
+        <div>
+          <Btn
+            kind="danger"
+            onClick={() => void remove()}
+            disabled={busy || typed.trim().toLowerCase() !== email.toLowerCase()}
+          >
+            {t("account.deleteButton")}
+          </Btn>
+        </div>
+      </div>
+      {failure !== undefined && (
+        <div className="mt">
+          <ErrorState error={failure} />
+        </div>
+      )}
+    </Panel>
+  );
+}

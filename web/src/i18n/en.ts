@@ -97,6 +97,11 @@ export const en = {
 
   "account.mustChange":
     "An administrator set this password for you. Choose your own before you continue; until then the server refuses everything else.",
+  "account.delete": "Delete account",
+  "account.deleteLead":
+    "Removes your name and email, every membership, your password, your sessions and your access tokens, at once and for good. What you wrote stays in its projects, shown as written by “Deleted user”. If you are the last OWNER of a project or organization, make someone else OWNER first.",
+  "account.deleteConfirm": "Type {email} to confirm",
+  "account.deleteButton": "Delete my account",
   "account.password": "Password",
   "account.passwordLead":
     "Used to sign in to this interface. Agents and the CLI use access tokens instead, which are managed separately.",

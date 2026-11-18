@@ -75,6 +75,11 @@ export const es: Partial<Record<MessageKey, string>> = {
     "El código existe solo en la memoria del servidor en ejecución y solo mientras no haya usuarios, así que nunca llega a una copia de seguridad ni puede leerse de la base de datos.",
   "account.mustChange":
     "Un administrador estableció esta contraseña para ti. Elige la tuya antes de continuar; hasta entonces el servidor rechaza todo lo demás.",
+  "account.delete": "Eliminar cuenta",
+  "account.deleteLead":
+    "Elimina tu nombre y tu correo, cada membresía, tu contraseña, tus sesiones y tus tokens de acceso, de inmediato y para siempre. Lo que escribiste se queda en sus proyectos, mostrado como escrito por «Deleted user». Si eres el último OWNER de un proyecto u organización, haz OWNER a otra persona primero.",
+  "account.deleteConfirm": "Escribe {email} para confirmar",
+  "account.deleteButton": "Eliminar mi cuenta",
   "account.password": "Contraseña",
   "account.passwordLead":
     "Se usa para iniciar sesión en esta interfaz. Los agentes y la línea de comandos usan tokens de acceso, que se gestionan por separado.",

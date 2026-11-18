@@ -147,5 +147,7 @@ securely.**
 - Transfer: a project exports to an archive and imports into another
   installation under that installation's keys, with integrity checked by
   hash (ADR 0035). The archive is plaintext and is handled as such.
-- *Open:* deleting a user account, as opposed to its memberships, has no
-  command yet.
+- A person deletes their own account, or an administrator deletes it: the
+  email and name are removed, every membership, password, directory link,
+  session and token goes, and what they wrote stays with its projects
+  (ADR 0042).

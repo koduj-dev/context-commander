@@ -137,6 +137,18 @@ func writeDomainError(w http.ResponseWriter, r *http.Request, err error) {
 		writeError(w, http.StatusConflict, "conflict", "that already exists")
 	case errors.Is(err, members.ErrAlreadyMember), errors.Is(err, organizations.ErrAlreadyMember):
 		writeError(w, http.StatusConflict, "conflict", err.Error())
+	case errors.Is(err, identity.ErrDeleteForbidden):
+		writeError(w, http.StatusForbidden, "forbidden", identity.ErrDeleteForbidden.Error())
+	case errors.Is(err, identity.ErrDeleteNeedsPerson):
+		writeError(w, http.StatusForbidden, "needs_person", "only a person signed in to the interface can delete an account")
+	case errors.Is(err, identity.ErrDeleteConfirmation):
+		writeError(w, http.StatusBadRequest, "confirmation_required", "confirm by sending the account's email address as \"confirm\"")
+	case errors.Is(err, identity.ErrAccountGone):
+		writeError(w, http.StatusNotFound, "not_found", "no such account, or it is already deleted")
+	case errors.Is(err, identity.ErrLastOwner):
+		writeError(w, http.StatusConflict, "last_owner", strings.TrimPrefix(err.Error(), identity.ErrLastOwner.Error()+": "))
+	case errors.Is(err, identity.ErrLastAdmin):
+		writeError(w, http.StatusConflict, "last_admin", strings.TrimPrefix(err.Error(), identity.ErrLastAdmin.Error()+": "))
 	case errors.Is(err, retention.ErrForbidden):
 		writeError(w, http.StatusForbidden, "forbidden", "only an OWNER can delete a project, or cancel its deletion")
 	case errors.Is(err, retention.ErrNeedsPerson):

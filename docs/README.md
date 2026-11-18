@@ -87,6 +87,7 @@ supersedes it, so the trail of what was believed when stays readable.
 | [0039](adr/0039-retention-by-age.md) | Retention by age, set by the operator |
 | [0040](adr/0040-trusted-skill-packages.md) | Trusted skill packages: signatures and approvals |
 | [0041](adr/0041-temporary-passwords.md) | Passwords an administrator sets are temporary |
+| [0042](adr/0042-deleting-a-user-account.md) | Deleting a user account |
 
 ## Not documentation
 

@@ -100,6 +100,11 @@ export const zhCN: Partial<Record<MessageKey, string>> = {
     "安装码只存在于正在运行的服务器内存中，而且只在没有用户时存在——它不会进入任何备份，也无法从数据库中读出。",
   "account.mustChange":
     "此密码由管理员为你设置。请先设置你自己的密码再继续；在此之前，服务器会拒绝其他所有操作。",
+  "account.delete": "删除账户",
+  "account.deleteLead":
+    "立即并永久删除你的姓名和邮箱、所有成员身份、密码、会话和访问 token。你写下的内容保留在各自的项目中，显示为由“Deleted user”撰写。如果你是某个项目或组织的最后一个 OWNER，请先将其他人设为 OWNER。",
+  "account.deleteConfirm": "输入 {email} 以确认",
+  "account.deleteButton": "删除我的账户",
   "account.password": "密码",
   "account.passwordLead": "用于登录此界面。agent 和命令行使用访问 token，单独管理。",
   "account.currentPassword": "当前密码",
