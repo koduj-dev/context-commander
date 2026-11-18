@@ -539,13 +539,15 @@ blocked on that is done:
   (deb/rpm) and Homebrew Cellar binaries with the right upgrade command.
   Tested against v0.1.0-beta.1 in alpine (busybox sh) and debian (dash,
   real cosign v3) containers. docs/install.md.
-- [ ] Verify at the next release: `ccd-man.tar.gz` is published and covered
-  by the signed SHA256SUMS, the homebrew job renders `__SHA_MAN__`, and
-  `brew install koduj-dev/tap/ccd` then `man ccd` works (and `brew test ccd`,
-  which now checks for `ccd-serve.1.gz`). v0.1.0-beta.1 has no man bundle,
-  so until then the installer skips the pages and the formula stays as is.
-- [ ] The two projects' apt publishes are serialized only per repo. A
-  simultaneous publish refuses the second push; re-run it.
+- [ ] Verify on a Mac: `brew install koduj-dev/tap/ccd`, then `man ccd` and
+  `brew test ccd`. Checked on v0.1.0-beta.4 (2026-11-18): `ccd-man.tar.gz`
+  is published, its checksum is in the signed SHA256SUMS and matches, it
+  holds `ccd-serve.1.gz`, and the formula's man resource carries that
+  checksum. What is left needs Homebrew.
+- [x] ~~The two projects' apt publishes are serialized only per repo.~~
+  Closed 2026-11-18: a refused push resets to the remote, re-includes the
+  packages and pushes again, up to five times. docker-commander's copy of
+  the workflow wants the same change.
 
 ---
 
