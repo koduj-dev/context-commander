@@ -305,7 +305,8 @@ Only on top of a core loop people actually use:
       2026-11-17 ([ADR 0040](docs/adr/0040-trusted-skill-packages.md)):
       Ed25519 signatures checked at publish against keys an administrator
       registers, approvals by a responsible person, and
-      `--skills-require-trust`. Still open: signing keys per organization.
+      `--skills-require-trust`. Signing keys per organization followed on
+      2026-11-20.
 - [x] ~~Operational telemetry that doesn't leak content.~~ Closed 2026-11-17
       ([ADR 0038](docs/adr/0038-telemetry-without-content.md)): Prometheus
       metrics on an opt-in listener, labelled by route pattern, tool and

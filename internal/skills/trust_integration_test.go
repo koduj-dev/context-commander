@@ -70,18 +70,18 @@ func TestSignedSkillVersions(t *testing.T) {
 	pub, priv, _ := ed25519.GenerateKey(rand.Reader)
 	pubB64 := base64.StdEncoding.EncodeToString(pub)
 
-	if _, err := f.svc.AddSigner(f.ctx, f.principalID, f.userID, "release", pubB64); !errors.Is(err, skills.ErrForbidden) {
+	if _, err := f.svc.AddSigner(f.ctx, f.principalID, f.userID, nil, "release", pubB64); !errors.Is(err, skills.ErrForbidden) {
 		t.Fatalf("a non-admin adding a signer: %v", err)
 	}
 	f.grantInstallationAdmin()
-	if _, err := f.svc.AddSigner(f.ctx, f.principalID, f.userID, "bad", "c2hvcnQ="); !errors.Is(err, skills.ErrBadSigner) {
+	if _, err := f.svc.AddSigner(f.ctx, f.principalID, f.userID, nil, "bad", "c2hvcnQ="); !errors.Is(err, skills.ErrBadSigner) {
 		t.Errorf("a short key: %v", err)
 	}
-	signer, err := f.svc.AddSigner(f.ctx, f.principalID, f.userID, "release", pubB64)
+	signer, err := f.svc.AddSigner(f.ctx, f.principalID, f.userID, nil, "release", pubB64)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.svc.AddSigner(f.ctx, f.principalID, f.userID, "release", pubB64); !errors.Is(err, skills.ErrSignerExists) {
+	if _, err := f.svc.AddSigner(f.ctx, f.principalID, f.userID, nil, "release", pubB64); !errors.Is(err, skills.ErrSignerExists) {
 		t.Errorf("the same key twice: %v", err)
 	}
 
@@ -107,7 +107,7 @@ func TestSignedSkillVersions(t *testing.T) {
 		t.Errorf("a signature over other content: %v", err)
 	}
 
-	if err := f.svc.RevokeSigner(f.ctx, f.principalID, f.userID, signer.ID); err != nil {
+	if err := f.svc.RevokeSigner(f.ctx, f.principalID, f.userID, nil, signer.ID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := f.svc.PublishSigned(f.ctx, f.principalID, f.userID, skills.ScopeProject, &f.projectID, &v.SkillID,
@@ -167,5 +167,95 @@ func TestApprovingAndRequiringTrust(t *testing.T) {
 	}
 	if err := f.svc.Approve(f.ctx, owner, ownerUser, &ownerSession, mine.ID, ""); !errors.Is(err, skills.ErrSelfApproval) {
 		t.Errorf("approving one's own version: %v", err)
+	}
+}
+
+// Organization keys: managed by the organization's managers as well as
+// installation administrators, readable by its members, and trusted only
+// for skills that live in the organization or its projects.
+func TestOrganizationSigners(t *testing.T) {
+	f := newFixture(t)
+	f.grantInstallationAdmin()
+	org, err := f.orgSvc.Create(f.ctx, f.principalID, f.userID, "Signing Org")
+	if err != nil {
+		t.Fatal(err)
+	}
+	orgProject := uuid.New()
+	_, manager, _, _ := f.person("CONTRIBUTOR")
+	_, member, _, _ := f.person("CONTRIBUTOR")
+	_, outsider, _, _ := f.person("CONTRIBUTOR")
+	err = db.WithoutPrincipal(f.ctx, f.ownerPool, func(tx pgx.Tx) error {
+		ns := uuid.New()
+		if _, err := tx.Exec(f.ctx, `INSERT INTO namespaces (id, kind, slug, organization_id) VALUES ($1, 'organization', $2, $3)`,
+			ns, "sign-org-"+ns.String()[:8], org.ID); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(f.ctx, `INSERT INTO projects (id, namespace_id, slug, name) VALUES ($1, $2, 'app', 'App')`, orgProject, ns); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(f.ctx, `INSERT INTO project_members (project_id, principal_id, role) VALUES ($1, $2, 'ADMIN')`, orgProject, f.principalID); err != nil {
+			return err
+		}
+		_, err := tx.Exec(f.ctx, `INSERT INTO organization_members (organization_id, user_id, role) VALUES ($1, $2, 'ADMIN'), ($1, $3, 'MEMBER')`,
+			org.ID, manager, member)
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	pub, priv, _ := ed25519.GenerateKey(rand.Reader)
+	pubB64 := base64.StdEncoding.EncodeToString(pub)
+
+	if _, err := f.svc.AddSigner(f.ctx, f.principalID, member, &org.ID, "org", pubB64); !errors.Is(err, skills.ErrForbidden) {
+		t.Errorf("a MEMBER adding an organization key: %v", err)
+	}
+	if _, err := f.svc.AddSigner(f.ctx, f.principalID, manager, nil, "org", pubB64); !errors.Is(err, skills.ErrForbidden) {
+		t.Errorf("an organization manager adding an installation key: %v", err)
+	}
+	signer, err := f.svc.AddSigner(f.ctx, f.principalID, manager, &org.ID, "release", pubB64)
+	if err != nil || signer.OrganizationID == nil || *signer.OrganizationID != org.ID {
+		t.Fatalf("an organization manager adding an organization key: %+v, %v", signer, err)
+	}
+	// Names are per scope; keys are unique everywhere.
+	other, _, _ := ed25519.GenerateKey(rand.Reader)
+	if _, err := f.svc.AddSigner(f.ctx, f.principalID, f.userID, nil, "release", base64.StdEncoding.EncodeToString(other)); err != nil {
+		t.Errorf("the same name as an installation key: %v", err)
+	}
+	if _, err := f.svc.AddSigner(f.ctx, f.principalID, f.userID, nil, "again", pubB64); !errors.Is(err, skills.ErrSignerExists) {
+		t.Errorf("an organization's key again as an installation key: %v", err)
+	}
+
+	if list, err := f.svc.Signers(f.ctx, f.principalID, member, &org.ID); err != nil || len(list) != 1 {
+		t.Errorf("a member listing the organization's keys: %d, %v", len(list), err)
+	}
+	if _, err := f.svc.Signers(f.ctx, f.principalID, outsider, &org.ID); !errors.Is(err, skills.ErrForbidden) {
+		t.Errorf("an outsider listing the organization's keys: %v", err)
+	}
+	if list, err := f.svc.Signers(f.ctx, f.principalID, outsider, nil); err != nil || len(list) != 1 || list[0].OrganizationID != nil {
+		t.Errorf("installation keys: %+v, %v", list, err)
+	}
+
+	content := []byte("org review")
+	if v, err := f.svc.PublishSigned(f.ctx, f.principalID, f.userID, skills.ScopeProject, &orgProject, nil,
+		"org-review", "", "", content, nil, sign(priv, "org-review", content)); err != nil || v.TrustStatus != skills.TrustSigned {
+		t.Errorf("an organization key on its project's skill: %+v, %v", v, err)
+	}
+	if v, err := f.svc.PublishSigned(f.ctx, f.principalID, f.userID, skills.ScopeOrganization, &org.ID, nil,
+		"org-wide", "", "", content, nil, sign(priv, "org-wide", content)); err != nil || v.TrustStatus != skills.TrustSigned {
+		t.Errorf("an organization key on its organization's skill: %+v, %v", v, err)
+	}
+	if _, err := f.svc.PublishSigned(f.ctx, f.principalID, f.userID, skills.ScopeProject, &f.projectID, nil,
+		"elsewhere", "", "", content, nil, sign(priv, "elsewhere", content)); !errors.Is(err, skills.ErrBadSignature) {
+		t.Errorf("an organization key on a project outside it: %v", err)
+	}
+
+	if err := f.svc.RevokeSigner(f.ctx, f.principalID, f.userID, nil, signer.ID); !errors.Is(err, skills.ErrNotFound) {
+		t.Errorf("revoking an organization key as an installation key: %v", err)
+	}
+	if err := f.svc.RevokeSigner(f.ctx, f.principalID, member, &org.ID, signer.ID); !errors.Is(err, skills.ErrForbidden) {
+		t.Errorf("a MEMBER revoking: %v", err)
+	}
+	if err := f.svc.RevokeSigner(f.ctx, f.principalID, manager, &org.ID, signer.ID); err != nil {
+		t.Errorf("an organization manager revoking: %v", err)
 	}
 }

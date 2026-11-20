@@ -13,6 +13,12 @@ All notable changes to Context Commander are documented here. The format follows
   someone else created or updated (by path, never content) and ideas added,
   proposed, accepted, rejected or withdrawn.
   [ADR 0033](docs/adr/0033-what-changed-while-you-worked.md).
+- **Signing keys per organization.** An organization's owners and admins
+  register their own skill signing keys
+  (`POST /v1/organizations/{id}/skill-signers`). Such a key makes a version
+  "signed" only for skills of that organization and its projects;
+  installation keys still count everywhere. Migration 000051.
+  [ADR 0040](docs/adr/0040-trusted-skill-packages.md).
 - **A broken manifest is refused when it is written.** Writing a
   `context/manifest.json` the context pack would ignore (invalid JSON, a
   misspelled field, a wrong version, a bad entry, data after the closing

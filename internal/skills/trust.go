@@ -50,14 +50,17 @@ func SigningMessage(name, checksum string) []byte {
 	return []byte("context-commander/skill/v1\n" + name + "\n" + checksum)
 }
 
-// Signer is a key an installation administrator trusts to sign skills.
+// Signer is a key trusted to sign skills: installation-wide when
+// OrganizationID is nil, otherwise only for that organization's skills and
+// its projects' skills.
 type Signer struct {
-	ID        uuid.UUID
-	Name      string
-	PublicKey []byte
-	AddedBy   *uuid.UUID
-	CreatedAt time.Time
-	RevokedAt *time.Time
+	ID             uuid.UUID
+	OrganizationID *uuid.UUID
+	Name           string
+	PublicKey      []byte
+	AddedBy        *uuid.UUID
+	CreatedAt      time.Time
+	RevokedAt      *time.Time
 }
 
 // SetRequireTrust makes Install refuse skill versions that are neither
@@ -81,22 +84,38 @@ func (s *Service) requireAdmin(ctx context.Context, tx pgx.Tx, userID uuid.UUID)
 	return nil
 }
 
+// requireSignerManager: an installation administrator manages every key; an
+// organization manager (CapOrgManageMembers) manages their organization's.
+func (s *Service) requireSignerManager(ctx context.Context, tx pgx.Tx, userID uuid.UUID, orgID *uuid.UUID) error {
+	err := s.requireAdmin(ctx, tx, userID)
+	if !errors.Is(err, ErrForbidden) || orgID == nil {
+		return err
+	}
+	if m, merr := s.orgs.GetMembership(ctx, tx, *orgID, userID); merr == nil &&
+		organizations.RoleCan(m.Role, organizations.CapOrgManageMembers) {
+		return nil
+	}
+	return ErrForbidden
+}
+
 // AddSigner registers a public key whose signatures make a version
-// "signed". Installation administrators only.
-func (s *Service) AddSigner(ctx context.Context, principalID, userID uuid.UUID, name, publicKeyB64 string) (Signer, error) {
+// "signed". With orgID nil the key is trusted installation-wide and only an
+// installation administrator may add it; with an organization it is trusted
+// for that organization's skills, and its managers may add it too.
+func (s *Service) AddSigner(ctx context.Context, principalID, userID uuid.UUID, orgID *uuid.UUID, name, publicKeyB64 string) (Signer, error) {
 	key, err := base64.StdEncoding.DecodeString(strings.TrimSpace(publicKeyB64))
 	name = strings.TrimSpace(name)
 	if err != nil || len(key) != ed25519.PublicKeySize || name == "" || len(name) > 100 {
 		return Signer{}, ErrBadSigner
 	}
-	sg := Signer{ID: uuid.New(), Name: name, PublicKey: key, AddedBy: &principalID}
+	sg := Signer{ID: uuid.New(), OrganizationID: orgID, Name: name, PublicKey: key, AddedBy: &principalID}
 	err = db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
-		if err := s.requireAdmin(ctx, tx, userID); err != nil {
+		if err := s.requireSignerManager(ctx, tx, userID, orgID); err != nil {
 			return err
 		}
 		return tx.QueryRow(ctx,
-			`INSERT INTO skill_signers (id, name, public_key, added_by) VALUES ($1, $2, $3, $4) RETURNING created_at`,
-			sg.ID, sg.Name, sg.PublicKey, principalID).Scan(&sg.CreatedAt)
+			`INSERT INTO skill_signers (id, organization_id, name, public_key, added_by) VALUES ($1, $2, $3, $4, $5) RETURNING created_at`,
+			sg.ID, orgID, sg.Name, sg.PublicKey, principalID).Scan(&sg.CreatedAt)
 	})
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
@@ -108,21 +127,38 @@ func (s *Service) AddSigner(ctx context.Context, principalID, userID uuid.UUID, 
 	return sg, nil
 }
 
-// Signers lists every registered key, revoked ones included.
-func (s *Service) Signers(ctx context.Context, principalID uuid.UUID) ([]Signer, error) {
+// Signers lists keys, revoked ones included: with orgID nil the
+// installation-wide keys, readable by anyone signed in (a public key is
+// public); otherwise that organization's, readable by its members and
+// installation administrators.
+func (s *Service) Signers(ctx context.Context, principalID, userID uuid.UUID, orgID *uuid.UUID) ([]Signer, error) {
 	var out []Signer
 	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
-		rows, err := tx.Query(ctx, `SELECT id, name, public_key, added_by, created_at, revoked_at FROM skill_signers ORDER BY created_at`)
+		if orgID != nil {
+			if err := s.requireAdmin(ctx, tx, userID); errors.Is(err, ErrForbidden) {
+				if _, merr := s.orgs.GetMembership(ctx, tx, *orgID, userID); merr != nil {
+					return ErrForbidden
+				}
+			} else if err != nil {
+				return err
+			}
+		}
+		rows, err := tx.Query(ctx,
+			`SELECT id, organization_id, name, public_key, added_by, created_at, revoked_at FROM skill_signers
+			 WHERE organization_id IS NOT DISTINCT FROM $1 ORDER BY created_at`, orgID)
 		if err != nil {
 			return err
 		}
 		out, err = pgx.CollectRows(rows, func(r pgx.CollectableRow) (Signer, error) {
 			var sg Signer
-			err := r.Scan(&sg.ID, &sg.Name, &sg.PublicKey, &sg.AddedBy, &sg.CreatedAt, &sg.RevokedAt)
+			err := r.Scan(&sg.ID, &sg.OrganizationID, &sg.Name, &sg.PublicKey, &sg.AddedBy, &sg.CreatedAt, &sg.RevokedAt)
 			return sg, err
 		})
 		return err
 	})
+	if errors.Is(err, ErrForbidden) {
+		return nil, err
+	}
 	if err != nil {
 		return nil, fmt.Errorf("skills: list signers: %w", err)
 	}
@@ -130,13 +166,17 @@ func (s *Service) Signers(ctx context.Context, principalID uuid.UUID) ([]Signer,
 }
 
 // RevokeSigner stops a key from signing new versions. Versions it signed
-// before stay signed: their signature was valid when it was checked.
-func (s *Service) RevokeSigner(ctx context.Context, principalID, userID, signerID uuid.UUID) error {
+// before stay signed: their signature was valid when it was checked. orgID
+// is the scope the caller manages (nil for installation keys); a key in
+// another scope is not found.
+func (s *Service) RevokeSigner(ctx context.Context, principalID, userID uuid.UUID, orgID *uuid.UUID, signerID uuid.UUID) error {
 	err := db.WithPrincipal(ctx, s.pool, db.Principal{ID: principalID}, func(tx pgx.Tx) error {
-		if err := s.requireAdmin(ctx, tx, userID); err != nil {
+		if err := s.requireSignerManager(ctx, tx, userID, orgID); err != nil {
 			return err
 		}
-		tag, err := tx.Exec(ctx, `UPDATE skill_signers SET revoked_at = now() WHERE id = $1 AND revoked_at IS NULL`, signerID)
+		tag, err := tx.Exec(ctx,
+			`UPDATE skill_signers SET revoked_at = now()
+			 WHERE id = $1 AND organization_id IS NOT DISTINCT FROM $2 AND revoked_at IS NULL`, signerID, orgID)
 		if err != nil {
 			return err
 		}
@@ -152,9 +192,12 @@ func (s *Service) RevokeSigner(ctx context.Context, principalID, userID, signerI
 }
 
 // verifySignature returns the active signer whose key verifies signature
-// over (name, checksum), or ErrBadSignature.
-func verifySignature(ctx context.Context, tx pgx.Tx, name, checksum string, signature []byte) (uuid.UUID, error) {
-	rows, err := tx.Query(ctx, `SELECT id, public_key FROM skill_signers WHERE revoked_at IS NULL`)
+// over (name, checksum), or ErrBadSignature. Installation keys always
+// count; an organization's keys count when orgID is that organization.
+func verifySignature(ctx context.Context, tx pgx.Tx, orgID *uuid.UUID, name, checksum string, signature []byte) (uuid.UUID, error) {
+	rows, err := tx.Query(ctx,
+		`SELECT id, public_key FROM skill_signers
+		 WHERE revoked_at IS NULL AND (organization_id IS NULL OR organization_id = $1)`, orgID)
 	if err != nil {
 		return uuid.Nil, err
 	}
@@ -177,6 +220,25 @@ func verifySignature(ctx context.Context, tx pgx.Tx, name, checksum string, sign
 		}
 	}
 	return uuid.Nil, ErrBadSignature
+}
+
+// skillOrganization is the organization whose keys may sign a skill living
+// in scope: the organization itself, a project's namespace's organization,
+// or none for an installation skill or a project in a personal namespace.
+func skillOrganization(ctx context.Context, tx pgx.Tx, scope Scope, scopeRef *uuid.UUID) (*uuid.UUID, error) {
+	switch {
+	case scopeRef == nil:
+		return nil, nil
+	case scope == ScopeOrganization:
+		return scopeRef, nil
+	case scope == ScopeProject:
+		var org *uuid.UUID
+		err := tx.QueryRow(ctx,
+			`SELECT n.organization_id FROM projects p JOIN namespaces n ON n.id = p.namespace_id WHERE p.id = $1`, *scopeRef,
+		).Scan(&org)
+		return org, err
+	}
+	return nil, nil
 }
 
 // Approve marks a skill version as reviewed and trusted. It needs a person
