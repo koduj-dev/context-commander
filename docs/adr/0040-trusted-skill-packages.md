@@ -36,6 +36,18 @@ number is not signed, because the server assigns it. `ccd skill keygen`
 and `ccd skill sign` work offline, so the private key never needs to be on
 the server.
 
+*Organization keys (amended 2026-11-20, migration 000051).* A key can
+instead belong to one organization: its owners and admins (or an
+installation administrator) register it with
+`POST /v1/organizations/{id}/skill-signers`, its members list it with
+`GET`, and it is revoked with `DELETE …/{signerID}`. Such a key verifies
+only skills that live in that organization or in a project whose namespace
+belongs to it; installation keys verify everything, as before. A public key
+belongs to one signer, so `signed_by` always names a single owner; names are
+unique within an organization and among installation keys. A version keeps
+its status when its skill is promoted out of the organization: like a
+revocation, a move does not undo a check that passed.
+
 Revoking a key stops it from signing new versions. Versions it signed stay
 signed: the signature was valid when it was checked, and a version is
 immutable.
@@ -65,5 +77,4 @@ signing should not lose its skills on upgrade.
 - An operator can require that every instruction handed to an agent was
   signed by a known key or read by a responsible person.
 - Agents see the trust of every skill they load and can weigh it.
-- Not done: signing keys bound to an organization rather than the whole
-  installation, and transparency-log style publication of signatures.
+- Not done: transparency-log style publication of signatures.

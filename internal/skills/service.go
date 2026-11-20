@@ -327,7 +327,11 @@ func (s *Service) PublishSigned(
 		var signedBy *uuid.UUID
 		var sig []byte
 		if len(signature) > 0 {
-			id, err := verifySignature(ctx, tx, skill.Name, checksum, signature)
+			org, err := skillOrganization(ctx, tx, skill.Scope, skill.ScopeRef)
+			if err != nil {
+				return fmt.Errorf("resolve the skill's organization: %w", err)
+			}
+			id, err := verifySignature(ctx, tx, org, skill.Name, checksum, signature)
 			if err != nil {
 				return err
 			}
