@@ -42,7 +42,8 @@ func newSkillKeygenCmd() *cobra.Command {
 		Short: "Create an Ed25519 key pair for signing skills",
 		Long: "Writes the private key to --out (mode 0600; keep it off the server, with whoever publishes skills) and " +
 			"prints the public key, which an installation administrator registers with " +
-			"POST /v1/installation/skill-signers (docs/adr/0040). Works offline.",
+			"POST /v1/installation/skill-signers, or an organization's owner or admin with " +
+			"POST /v1/organizations/{id}/skill-signers (docs/adr/0040). Works offline.",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			out, _ := cmd.Flags().GetString("out")

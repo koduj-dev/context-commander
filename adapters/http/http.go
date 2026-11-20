@@ -241,13 +241,16 @@ func NewHandler(deps Deps) http.Handler {
 			r.Post("/organizations/{id}/members", deps.addOrganizationMember)
 			r.Get("/organizations/{id}/members", deps.listOrganizationMembers)
 			r.Get("/organizations/{id}/audit", deps.queryOrganizationAudit)
+			r.Get("/organizations/{id}/skill-signers", deps.listSkillSigners)
+			r.Post("/organizations/{id}/skill-signers", deps.addSkillSigner)
+			r.Delete("/organizations/{id}/skill-signers/{signerID}", deps.revokeSkillSigner)
 
 			r.Route("/installation", func(r chi.Router) {
 				r.Get("/admins", deps.listInstallationAdmins)
 				r.Get("/version", deps.getVersion)
 				r.Get("/skill-signers", deps.listSkillSigners)
 				r.Post("/skill-signers", deps.addSkillSigner)
-				r.Delete("/skill-signers/{id}", deps.revokeSkillSigner)
+				r.Delete("/skill-signers/{signerID}", deps.revokeSkillSigner)
 				r.Get("/stats", deps.getInstallationStats)
 				r.Get("/embeddings", deps.getEmbeddingsStatus)
 				r.Get("/trends", deps.getInstallationTrends)
