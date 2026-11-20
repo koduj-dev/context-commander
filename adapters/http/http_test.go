@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -116,6 +117,7 @@ func newFixtureWithDeps(t *testing.T, recordSecurity *bool, limits ratelimit.Lim
 	projStore := projects.NewStore()
 	authz := auth.NewAuthzService(appPool, projStore)
 	artifactsSvc := artifacts.NewService(appPool, cryptoProvider, store, authz, gates.NewEngine(appPool))
+	artifactsSvc.CheckContentAt(contextpack.ManifestPath, contextpack.CheckManifest) // as cmd/ccd serve does
 
 	orgStore := organizations.NewStore()
 	eventsSvc := events.NewService(appPool, authz)
@@ -249,6 +251,30 @@ func TestCreateProjectWriteReadArtifact(t *testing.T) {
 	_ = resp.Body.Close()
 	if len(list) != 1 {
 		t.Fatalf("list artifacts: got %d entries, want 1", len(list))
+	}
+}
+
+// A manifest the next context pack would ignore is refused when it is
+// written, and the answer says what is wrong with it.
+func TestBrokenManifestRefusedOnWrite(t *testing.T) {
+	f := newFixture(t)
+	token := f.newUserWithToken("owner@example.test")
+	createBody, _ := json.Marshal(map[string]string{"project": "owner/manifest", "name": "Manifest"})
+	_ = f.do(http.MethodPost, "/v1/projects", token, createBody).Body.Close()
+
+	put := "/v1/projects/owner/manifest/artifacts/content?path=context/manifest.json&content_type=application/json&expected_version=0"
+	resp := f.do(http.MethodPut, put, token, []byte(`{"version": 1, "read": [{"path": "a", "max_byte": 10}]}`))
+	body, _ := io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusUnprocessableEntity || !strings.Contains(string(body), "invalid_content") || !strings.Contains(string(body), "max_byte") {
+		t.Fatalf("broken manifest: status=%d body=%s", resp.StatusCode, body)
+	}
+
+	resp = f.do(http.MethodPut, put, token, []byte(`{"version": 1, "read": [{"path": "a", "max_bytes": 10}]}`))
+	body, _ = io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("valid manifest: status=%d body=%s", resp.StatusCode, body)
 	}
 }
 

@@ -26,6 +26,10 @@ var (
 	ErrConflict = errors.New("artifacts: version conflict")
 	ErrTooLarge = errors.New("artifacts: content exceeds the 50 MB MVP limit")
 	ErrDeleted  = errors.New("artifacts: artifact is deleted")
+	// ErrInvalidContent is returned by Write when a content check registered
+	// for the path refuses the bytes (see Service.CheckContentAt). The
+	// wrapped message says what is wrong.
+	ErrInvalidContent = errors.New("artifacts: content refused")
 )
 
 type Artifact struct {

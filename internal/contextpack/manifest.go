@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"unicode/utf8"
 
@@ -64,6 +65,9 @@ func ParseManifest(raw []byte) (Manifest, error) {
 	if err := dec.Decode(&m); err != nil {
 		return Manifest{}, fmt.Errorf("not valid manifest JSON: %w", err)
 	}
+	if _, err := dec.Token(); !errors.Is(err, io.EOF) {
+		return Manifest{}, errors.New("not valid manifest JSON: data after the closing brace")
+	}
 	if m.Version != 1 {
 		return Manifest{}, fmt.Errorf("version must be 1, got %d", m.Version)
 	}
@@ -82,6 +86,14 @@ func ParseManifest(raw []byte) (Manifest, error) {
 		}
 	}
 	return m, nil
+}
+
+// CheckManifest is ParseManifest for artifacts.Service.CheckContentAt: a
+// manifest that the next pack would ignore is refused when it is written,
+// so the mistake reaches whoever made it (docs/adr/0034).
+func CheckManifest(raw []byte) error {
+	_, err := ParseManifest(raw)
+	return err
 }
 
 // selection is one artifact the pack will try to carry, with what the

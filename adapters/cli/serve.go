@@ -204,6 +204,7 @@ func newServeCmd() *cobra.Command {
 				return err
 			}
 			artifactsSvc := artifacts.NewService(pool, cryptoProvider, store, authz, gatesEngine)
+			artifactsSvc.CheckContentAt(contextpack.ManifestPath, contextpack.CheckManifest)
 
 			membersSvc := members.NewService(pool, projStore, authz)
 			orgStore := organizations.NewStore()

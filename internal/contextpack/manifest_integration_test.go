@@ -105,6 +105,7 @@ func TestParseManifest(t *testing.T) {
 		`{"version": 1, "read": [{"path": "a", "max_bytes": -1}]}`,
 		`{"version": 1, "budget": -5, "read": []}`,
 		`not json`,
+		`{"version": 1, "read": []} {"version": 1}`,
 	} {
 		if _, err := contextpack.ParseManifest([]byte(bad)); err == nil {
 			t.Errorf("accepted %s", bad)

@@ -118,8 +118,8 @@ Only after the core loop is proven:
 - [x] ~~Declarative project manifest naming "must-read" artifacts and their
       budgets.~~ Closed 2026-11-16 ([ADR 0034](docs/adr/0034-project-manifest.md)):
       `context/manifest.json` with paths, prefixes, `max_bytes`, `why` and a
-      default budget. Still open: nothing checks a manifest when it is
-      written; the next pack reports what is wrong.
+      default budget. Since 2026-11-20 a manifest the pack would ignore is
+      refused when it is written.
 - [x] ~~Metadata/full-text retrieval filtered by type, author, time,
       provenance.~~ Narrowed 2026-11-16: memories filter by kind, author,
       assignee, branch, ticket, tag and creation time, and search by words or
