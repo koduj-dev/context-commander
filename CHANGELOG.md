@@ -6,6 +6,28 @@ All notable changes to Context Commander are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.0-beta.5] — 2026-11-20
+
+The accounts-and-awareness release: passwords an administrator sets are
+temporary, people can delete their accounts while their work stays, an
+opt-in notice says when a newer release exists, agents hear about artifacts
+and ideas others touched while they worked, a broken project manifest is
+refused when it is written, and organizations register their own skill
+signing keys.
+
+### Upgrading
+
+- **Migrations 000049–000051 run on start.** Existing passwords are not
+  temporary; only passwords an administrator sets from now on are.
+  Existing signing keys stay installation-wide.
+- **Nothing new reaches the network by default.** The update check needs
+  `--update-check` (`CC_UPDATE_CHECK=true`).
+- **Writing an invalid `context/manifest.json` now fails** with `422
+  invalid_content` instead of succeeding. A manifest already stored is read
+  as before and, if broken, still ignored with a note in the pack.
+- **`GET /v1/installation/skill-signers` lists installation keys only.**
+  An organization's keys are under `/v1/organizations/{id}/skill-signers`.
+
 ### Added
 
 - **Artifacts and ideas in "what changed".** `project.changes`,
@@ -13,12 +35,14 @@ All notable changes to Context Commander are documented here. The format follows
   someone else created or updated (by path, never content) and ideas added,
   proposed, accepted, rejected or withdrawn.
   [ADR 0033](docs/adr/0033-what-changed-while-you-worked.md).
+
 - **Signing keys per organization.** An organization's owners and admins
   register their own skill signing keys
   (`POST /v1/organizations/{id}/skill-signers`). Such a key makes a version
   "signed" only for skills of that organization and its projects;
   installation keys still count everywhere. Migration 000051.
   [ADR 0040](docs/adr/0040-trusted-skill-packages.md).
+
 - **A broken manifest is refused when it is written.** Writing a
   `context/manifest.json` the context pack would ignore (invalid JSON, a
   misspelled field, a wrong version, a bad entry, data after the closing
@@ -1816,7 +1840,8 @@ database forward. Install it as described in
   by `Create`/`Delete` (`internal/secrets/reference.go`,
   `internal/secrets/service.go`).
 
-[Unreleased]: https://github.com/koduj-dev/context-commander/compare/v0.1.0-beta.4...HEAD
+[Unreleased]: https://github.com/koduj-dev/context-commander/compare/v0.1.0-beta.5...HEAD
+[0.1.0-beta.5]: https://github.com/koduj-dev/context-commander/compare/v0.1.0-beta.4...v0.1.0-beta.5
 [0.1.0-beta.4]: https://github.com/koduj-dev/context-commander/compare/v0.1.0-beta.3...v0.1.0-beta.4
 [0.1.0-beta.3]: https://github.com/koduj-dev/context-commander/compare/v0.1.0-beta.2...v0.1.0-beta.3
 [0.1.0-beta.2]: https://github.com/koduj-dev/context-commander/compare/v0.1.0-beta.1...v0.1.0-beta.2
