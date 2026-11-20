@@ -68,6 +68,13 @@ An entry naming a missing file is reported like any missing path.
   order that matters, at the length that matters.
 - The Context tab shows each artifact's `why` and, for a cut one, how much
   was included.
-- Nothing validates a manifest when it is written: the first pack after the
-  write says what is wrong with it. A write-time check would put artifact
-  content rules into the artifact service, which knows nothing about packs.
+- *Amended 2026-11-20:* a manifest is checked when it is written. The
+  original concern, that a write-time check would put pack rules into the
+  artifact service, is met by keeping the rule out of it: the artifact
+  service takes a content check per exact path
+  (`artifacts.Service.CheckContentAt`), and `ccd serve` and `ccd artifact
+  write` register `contextpack.CheckManifest` for `context/manifest.json`.
+  A refused write is `422 invalid_content` over HTTP and a tool error over
+  MCP, both naming the problem; nothing is stored. A manifest written
+  before this change, or brought in by `ccd project import`, is still
+  reported by the next pack and falls back to the convention, as above.

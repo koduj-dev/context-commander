@@ -41,6 +41,22 @@ type Service struct {
 	store  storage.ObjectStore
 	authz  *auth.AuthzService
 	gates  *gates.Engine
+	// checks are content checks keyed by exact logical path, set once at
+	// startup by CheckContentAt and only read afterwards.
+	checks map[string]func([]byte) error
+}
+
+// CheckContentAt makes Write refuse content at logicalPath that check
+// rejects, with ErrInvalidContent wrapping check's error. It exists for
+// files the server itself reads back with a fixed format, such as the
+// project manifest (docs/adr/0034), so a mistake is reported to whoever
+// made it instead of to the next agent that arrives. Call it before the
+// service is shared; it is not safe to call concurrently with Write.
+func (s *Service) CheckContentAt(logicalPath string, check func([]byte) error) {
+	if s.checks == nil {
+		s.checks = map[string]func([]byte) error{}
+	}
+	s.checks[logicalPath] = check
 }
 
 // NewService wires Service to AuthzService deliberately: every method here
@@ -93,6 +109,11 @@ func (s *Service) Write(
 	}
 	if int64(len(plaintext)) > MaxSize {
 		return Version{}, ErrTooLarge
+	}
+	if check := s.checks[logicalPath]; check != nil {
+		if err := check(plaintext); err != nil {
+			return Version{}, fmt.Errorf("%w: %s: %w", ErrInvalidContent, logicalPath, err)
+		}
 	}
 
 	var orgID *uuid.UUID

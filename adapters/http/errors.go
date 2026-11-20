@@ -190,6 +190,8 @@ func writeDomainError(w http.ResponseWriter, r *http.Request, err error) {
 		writeError(w, http.StatusServiceUnavailable, "unavailable", "the server is shutting down")
 	case errors.Is(err, artifacts.ErrConflict):
 		writeError(w, http.StatusConflict, "conflict", "version conflict: the artifact was modified since your expected_version")
+	case errors.Is(err, artifacts.ErrInvalidContent):
+		writeError(w, http.StatusUnprocessableEntity, "invalid_content", err.Error())
 	case errors.Is(err, artifacts.ErrBlockedByGate):
 		writeError(w, http.StatusUnprocessableEntity, "blocked_by_gate", err.Error())
 	case errors.Is(err, artifacts.ErrTooLarge), errors.Is(err, history.ErrTooLarge):
