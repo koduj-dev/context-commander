@@ -23,7 +23,8 @@ Configuration, from the environment Claude Code runs in:
   CC_PROJECT         optional, the project path ("namespace/slug"). With it,
                      each poll also reports what everyone else did on that
                      project since the previous poll: memories recorded,
-                     steps blocked, finished or unblocked, handoffs opened
+                     steps blocked, finished or unblocked, handoffs opened,
+                     artifacts written, ideas added, proposed or decided
                      (GET /v1/projects/{ns}/{slug}/changes, docs/adr/0033).
   CC_CHANGES         set to 0 to turn that report off.
 
@@ -102,6 +103,11 @@ def describe(c: dict) -> str:
         return f"- {who} {verb}{where}: \"{title}\" (plan.get {c.get('plan_id', '')})"
     if kind == "handoff":
         return f"- {who} opened a handoff (handoff.get {c.get('id')})"
+    if kind == "artifact":
+        return f"- {who} {detail or 'updated'} {title} (artifact.read {title})"
+    if kind == "idea":
+        verb = {"added": "added an idea", "proposed": "proposed a solution to an idea"}.get(detail, f"marked an idea {detail}")
+        return f"- {who} {verb}: \"{title}\" (idea.get {c.get('id')})"
     return f"- {who}: {kind} {detail} {title}".rstrip()
 
 

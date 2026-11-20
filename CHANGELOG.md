@@ -8,6 +8,12 @@ All notable changes to Context Commander are documented here. The format follows
 
 ### Added
 
+- **Artifacts and ideas in "what changed".** `project.changes`,
+  `GET …/changes` and the Claude Code inbox hook now also report artifacts
+  someone else created or updated (by path, never content) and ideas added,
+  proposed, accepted, rejected or withdrawn.
+  [ADR 0033](docs/adr/0033-what-changed-while-you-worked.md).
+
 - **Update notice.** `ccd serve --update-check` (`CC_UPDATE_CHECK=true`)
   asks GitHub once a day whether a newer release exists, writes it to the
   log and shows installation administrators a notice with the release

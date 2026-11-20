@@ -149,7 +149,7 @@ func newFixtureWithDeps(t *testing.T, recordSecurity *bool, limits ratelimit.Lim
 		Events: eventsSvc, Organizations: orgSvc, Audit: auditSvc,
 		Handoffs: handoffsSvc, History: historySvc,
 		Skills: skillsSvc, Gates: gatesAdmin, Secrets: secretsSvc,
-		Installation: installationSvc, ContextPack: contextSvc, Plans: plansSvc, Memories: memoriesSvc, Ideas: ideasSvc, Messages: messagesSvc, Changes: changes.NewService(appPool, authz, memoriesSvc, plansSvc), Portability: portability.NewService(appPool, authz, artifactsSvc, memoriesSvc, plansSvc, ideasSvc, handoffsSvc, historySvc),
+		Installation: installationSvc, ContextPack: contextSvc, Plans: plansSvc, Memories: memoriesSvc, Ideas: ideasSvc, Messages: messagesSvc, Changes: changes.NewService(appPool, authz, memoriesSvc, plansSvc, ideasSvc), Portability: portability.NewService(appPool, authz, artifactsSvc, memoriesSvc, plansSvc, ideasSvc, handoffsSvc, historySvc),
 		Retention: retention.NewService(appPool, authz),
 		Security:  securityRec, Limiter: ratelimit.New(limits), SecurityEvents: securitySvc,
 	}

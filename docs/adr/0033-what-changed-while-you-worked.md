@@ -29,7 +29,11 @@ the project after `since`:
 - memories recorded (with their kind and title),
 - plan steps moved to blocked or done, or out of blocked (with the step's
   text and its plan),
-- handoffs opened.
+- handoffs opened,
+- artifacts written, one line per artifact for its newest version
+  ("created" or "updated", with the logical path), *added 2026-11-20*,
+- ideas added, proposed, accepted, rejected or withdrawn, each idea's latest
+  such move with its title; claims are left out, *added 2026-11-20*.
 
 Newest first, at most 20, reaching back at most a day. The answer carries
 the server's `now`, which the next call passes as `since`. Without `since`
@@ -40,13 +44,16 @@ refused.
 **The Claude Code inbox hook reports it.** With `CC_PROJECT` set, each poll
 of the inbox hook also asks for changes and prints a few lines into the
 model's context after any messages: who did what, and which tool reads it
-(`memory.get`, `plan.get`, `handoff.get`). The first poll of a session only
+(`memory.get`, `plan.get`, `handoff.get`, `artifact.read`, `idea.get`). The first poll of a session only
 records the starting point. Other clients call `project.changes` when they
 resume work or between larger steps; the agent guide says so.
 
 **Built from what is stored, not from a new event log.** `internal/changes`
-composes the memories and plans services and reads handoffs' plaintext id,
-status and author. Every read goes through the owning service's
+composes the memories, plans and ideas services and reads the plaintext
+metadata of handoffs (id, status, author) and artifact versions (path,
+version, author) — never artifact content. Ideas come from the 20 most
+recently updated ones, so a burst of claims can push an older idea's move
+out of one read; the next one is about what is new anyway. Every read goes through the owning service's
 authorization and decryption. `domain_events` was considered and not used:
 it covers only artifacts and handoffs and does not record who acted, so it
 cannot leave the caller's own changes out.
