@@ -14,6 +14,12 @@ All notable changes to Context Commander are documented here. The format follows
   "signed" only for skills of that organization and its projects;
   installation keys still count everywhere. Migration 000051.
   [ADR 0040](docs/adr/0040-trusted-skill-packages.md).
+- **A broken manifest is refused when it is written.** Writing a
+  `context/manifest.json` the context pack would ignore (invalid JSON, a
+  misspelled field, a wrong version, a bad entry, data after the closing
+  brace) answers `422 invalid_content` over HTTP and a tool error over MCP,
+  saying what is wrong, instead of leaving the next agent to find out.
+  [ADR 0034](docs/adr/0034-project-manifest.md).
 
 - **Update notice.** `ccd serve --update-check` (`CC_UPDATE_CHECK=true`)
   asks GitHub once a day whether a newer release exists, writes it to the

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -175,6 +176,33 @@ func TestWriteReadRoundTrip(t *testing.T) {
 // other just advanced past) — exactly one succeeds, the other gets
 // ErrConflict, via the atomic UPDATE ... WHERE current_version = expected
 // (not an app-level read-then-write).
+// A content check registered for a path refuses bad bytes there before
+// anything is stored, and leaves every other path alone.
+func TestWriteRefusedByContentCheck(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	f.svc.CheckContentAt("context/manifest.json", func(b []byte) error {
+		if string(b) != "ok" {
+			return errors.New("must say ok")
+		}
+		return nil
+	})
+
+	_, err := f.svc.Write(ctx, f.principalID, f.clientID, f.projectID, "context/manifest.json", "application/json", []byte("nope"), 0)
+	if !errors.Is(err, artifacts.ErrInvalidContent) || !strings.Contains(err.Error(), "must say ok") {
+		t.Fatalf("bad content at a checked path: %v", err)
+	}
+	if _, err := f.svc.Stat(ctx, f.principalID, f.projectID, "context/manifest.json"); !errors.Is(err, artifacts.ErrNotFound) {
+		t.Errorf("a refused write left an artifact behind: %v", err)
+	}
+	if _, err := f.svc.Write(ctx, f.principalID, f.clientID, f.projectID, "context/manifest.json", "application/json", []byte("ok"), 0); err != nil {
+		t.Errorf("good content at a checked path: %v", err)
+	}
+	if _, err := f.svc.Write(ctx, f.principalID, f.clientID, f.projectID, "context/other.json", "application/json", []byte("nope"), 0); err != nil {
+		t.Errorf("an unchecked path: %v", err)
+	}
+}
+
 func TestConcurrentWriteConflict(t *testing.T) {
 	f := newFixture(t)
 	ctx := context.Background()
