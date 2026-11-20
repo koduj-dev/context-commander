@@ -195,8 +195,10 @@ everyone out of OIDC, or skip recording events, which lets anyone silence the
 security log. `internal/security` rules out the second ("off-switch, not
 sampling"). With Secure cookies a sibling can no longer plant an attempt at
 all, but anyone can still produce mismatches by calling `/start` themselves. A per-IP bound would cover them and failed password
-sign-ins alike, and it waits on the trusted-proxy item in the backlog, as
-before.
+sign-ins alike. *(2026-11-20: that bound exists since 2026-11-13 —
+`--trusted-proxies` and the per-IP limit on the public route group, which
+holds `/start` and the callback; see
+[ADR 0029](0029-trusted-proxies-and-per-ip-limits.md).)*
 
 ## Consequences
 

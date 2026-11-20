@@ -264,13 +264,12 @@ Only on top of a core loop people actually use:
           session~~ Closed 2026-11-03: every sign-in (OIDC, password, LDAP,
           token, first-run setup) ends the session the browser already
           held.
-        - [ ] A mismatched state writes a security event with no limit of
-          its own. A global bound was considered and rejected (ADR 0023): it
-          would let anyone either lock everyone out of OIDC or silence the
-          security log. With Secure cookies a sibling can no longer plant
-          an attempt, but anyone can still call `/start`. The per-IP limit that would bound this
-          and failed password sign-ins alike is still the backlog's
-          trusted-proxy item.
+        - [x] ~~A mismatched state writes a security event with no limit of
+          its own.~~ Bounded since 2026-11-13: `/start` and the callback are
+          in the public route group, which `--trusted-proxies` and the
+          per-IP limit cover, as are failed password sign-ins
+          ([ADR 0029](docs/adr/0029-trusted-proxies-and-per-ip-limits.md)).
+          A global bound stays rejected (ADR 0023).
       - Group-to-role mapping is a separate decision. A directory proves who
         someone is, not what they may do; authorization stays in project and
         organization membership and `installation_admins`.
