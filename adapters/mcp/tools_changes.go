@@ -36,9 +36,10 @@ func registerChangeTools(server *sdkmcp.Server, deps Deps, principalID, _ uuid.U
 	sdkmcp.AddTool(server, &sdkmcp.Tool{
 		Name: "project.changes",
 		Description: "What everyone else did on the project since a moment: memories recorded, plan steps blocked, " +
-			"finished or unblocked, and handoffs opened, newest first, at most 20, reaching back at most a day. " +
+			"finished or unblocked, handoffs opened, artifacts written, and ideas added, proposed or decided, " +
+			"newest first, at most 20, reaching back at most a day. " +
 			"Call it when you resume work or between larger steps, passing the now of your previous call as since, " +
-			"and read whatever touches your task (memory.get, plan.get, handoff.get). Your own changes are left out.",
+			"and read whatever touches your task (memory.get, plan.get, handoff.get, artifact.read with the title as path, idea.get). Your own changes are left out.",
 	}, func(ctx context.Context, _ *sdkmcp.CallToolRequest, a args) (*sdkmcp.CallToolResult, changesResult, error) {
 		projectID, err := resolve(ctx, a.Project)
 		if err != nil {

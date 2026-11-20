@@ -110,7 +110,7 @@ func newFixtureWith(t *testing.T, adjust func(*ccmcp.Deps)) *fixture {
 		Events: eventsSvc, Organizations: orgSvc, Audit: auditSvc,
 		Handoffs: handoffsSvc, History: historySvc,
 		Skills: skillsSvc, Gates: gatesAdmin, Secrets: secretsSvc,
-		Installation: installationSvc, ContextPack: contextSvc, Plans: plansSvc, Memories: memoriesSvc, Ideas: ideasSvc, Messages: messagesSvc, Changes: changes.NewService(appPool, authz, memoriesSvc, plansSvc),
+		Installation: installationSvc, ContextPack: contextSvc, Plans: plansSvc, Memories: memoriesSvc, Ideas: ideasSvc, Messages: messagesSvc, Changes: changes.NewService(appPool, authz, memoriesSvc, plansSvc, ideasSvc),
 	}
 	if adjust != nil {
 		adjust(&deps)

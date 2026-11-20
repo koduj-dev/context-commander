@@ -136,10 +136,10 @@ Only after the core loop is proven:
       (ADR 0035).
 - [x] ~~Subscriptions, or reliable cursor polling, for changes during a
       session.~~ Closed 2026-11-16 ([ADR 0033](docs/adr/0033-what-changed-while-you-worked.md)):
-      `project.changes` and `GET …/changes?since=` list memories, step moves
-      and handoffs by others, and the Claude Code inbox hook prints them.
-      Still open: artifacts and ideas are not in the feed, and Codex has no
-      mid-turn hook.
+      `project.changes` and `GET …/changes?since=` list memories, step moves,
+      handoffs, artifact writes and idea moves by others (artifacts and ideas
+      since 2026-11-20), and the Claude Code inbox hook prints them. Still
+      open: Codex has no mid-turn hook.
 - [x] ~~Diagnostics: "why does this context pack contain exactly these
       items?"~~ Closed 2026-09-14: the interface's Context tab renders the
       assembled pack with its budget report — what was left out, how big it

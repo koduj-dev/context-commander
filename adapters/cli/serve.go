@@ -235,7 +235,7 @@ func newServeCmd() *cobra.Command {
 			contextSvc.WithMemories(memoriesSvc)
 			ideasSvc := ideas.NewService(pool, cryptoProvider, authz, plansSvc)
 			messagesSvc := messages.NewService(pool, cryptoProvider, authz, plansSvc)
-			changesSvc := changes.NewService(pool, authz, memoriesSvc, plansSvc)
+			changesSvc := changes.NewService(pool, authz, memoriesSvc, plansSvc, ideasSvc)
 			contextSvc.WithIdeas(ideasSvc)
 
 			// Read before the logger is set up and before anything listens,

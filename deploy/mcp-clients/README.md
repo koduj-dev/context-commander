@@ -270,7 +270,8 @@ the notice on tool results, and its agent calls `inbox.next`.
 
 With `CC_PROJECT=namespace/slug` set, the same hook also tells the agent
 what everyone else did on that project since its previous poll: memories
-recorded, plan steps blocked, finished or unblocked, and handoffs opened
+recorded, plan steps blocked, finished or unblocked, handoffs opened,
+artifacts written, and ideas added, proposed or decided
 (docs/adr/0033). A few lines, each naming the tool that reads the rest:
 
 ```text

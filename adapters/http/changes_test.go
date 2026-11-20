@@ -23,7 +23,8 @@ type changesJSON struct {
 }
 
 // What a colleague did reaches the other agent: a memory, a step blocked
-// and then finished, a handoff; the agent's own changes and anything before
+// and then finished, a handoff, an artifact created and then updated, an
+// idea added; the agent's own changes and anything before
 // its starting point are left out, and outsiders get a 404.
 func TestProjectChangesOverHTTP(t *testing.T) {
 	f := newFixture(t)
@@ -55,6 +56,10 @@ func TestProjectChangesOverHTTP(t *testing.T) {
 	mustJSON(t, f.mustDo(http.MethodPost, base+"/plans/", alice, []byte(`{"title":"Search","items":[{"text":"Wire the index"}]}`), http.StatusCreated, "plan"), &plan)
 	f.mustDo(http.MethodPatch, base+"/plans/items/"+plan.Items[0].ID, alice, []byte(`{"status":"blocked"}`), http.StatusOK, "block")
 	f.mustDo(http.MethodPost, base+"/handoffs", alice, []byte(`{"summary":"over to you"}`), http.StatusOK, "handoff")
+	put := base + "/artifacts/content?content_type=text/markdown&path="
+	f.mustDo(http.MethodPut, put+"docs/search.md&expected_version=0", alice, []byte("# Search"), http.StatusOK, "alice's artifact")
+	f.mustDo(http.MethodPut, put+"docs/bob.md&expected_version=0", bob, []byte("# Bob"), http.StatusOK, "bob's artifact")
+	f.mustDo(http.MethodPost, base+"/ideas/", alice, []byte(`{"title":"Cache the embeddings"}`), http.StatusCreated, "idea")
 
 	var got changesJSON
 	mustJSON(t, f.mustDo(http.MethodGet, base+"/changes?since="+url.QueryEscape(start.Now), bob, nil, http.StatusOK, "changes"), &got)
@@ -64,7 +69,7 @@ func TestProjectChangesOverHTTP(t *testing.T) {
 		if c.ByName == "" {
 			t.Errorf("no author on %+v", c)
 		}
-		if c.Title == "Old news" || c.Title == "Bob's own note" {
+		if c.Title == "Old news" || c.Title == "Bob's own note" || c.Title == "docs/bob.md" {
 			t.Errorf("reported %q", c.Title)
 		}
 	}
@@ -74,12 +79,17 @@ func TestProjectChangesOverHTTP(t *testing.T) {
 	if _, ok := kinds["handoff:open"]; !ok {
 		t.Errorf("no handoff in %+v", got.Items)
 	}
+	if kinds["artifact:created"] != "docs/search.md" || kinds["idea:added"] != "Cache the embeddings" {
+		t.Errorf("no artifact or idea in %+v", got.Items)
+	}
 
 	// Picking up from the last now: only what came after.
 	f.mustDo(http.MethodPatch, base+"/plans/items/"+plan.Items[0].ID, alice, []byte(`{"status":"done"}`), http.StatusOK, "finish")
+	f.mustDo(http.MethodPut, put+"docs/search.md&expected_version=1", alice, []byte("# Search v2"), http.StatusOK, "update artifact")
 	var next changesJSON
 	mustJSON(t, f.mustDo(http.MethodGet, base+"/changes?since="+url.QueryEscape(got.Now), bob, nil, http.StatusOK, "next"), &next)
-	if len(next.Items) != 1 || next.Items[0].Detail != "done" || next.Items[0].Where != "Search" {
+	if len(next.Items) != 2 || next.Items[0].Kind != "artifact" || next.Items[0].Detail != "updated" ||
+		next.Items[1].Detail != "done" || next.Items[1].Where != "Search" {
 		t.Errorf("next %+v", next.Items)
 	}
 
@@ -134,6 +144,16 @@ func TestTheInboxHookReportsChanges(t *testing.T) {
 	}
 	text := printed.HookSpecificOutput.AdditionalContext
 	if !strings.Contains(text, `recorded a gotcha: "Staging Ollama needs the VPN"`) || strings.Contains(text, "Before the session") {
+		t.Errorf("report %q", text)
+	}
+	f.mustDo(http.MethodPut, base+"/artifacts/content?content_type=text/markdown&path=docs/run.md&expected_version=0", alice, []byte("# Run"), http.StatusOK, "artifact")
+	f.mustDo(http.MethodPost, base+"/ideas/", alice, []byte(`{"title":"Cache the embeddings"}`), http.StatusCreated, "idea")
+	out = run()
+	if err := json.Unmarshal([]byte(out), &printed); err != nil {
+		t.Fatalf("hook output %q: %v", out, err)
+	}
+	text = printed.HookSpecificOutput.AdditionalContext
+	if !strings.Contains(text, `created docs/run.md (artifact.read docs/run.md)`) || !strings.Contains(text, `added an idea: "Cache the embeddings"`) {
 		t.Errorf("report %q", text)
 	}
 	if out := run(); out != "" {

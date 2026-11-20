@@ -8,6 +8,11 @@ All notable changes to Context Commander are documented here. The format follows
 
 ### Added
 
+- **Artifacts and ideas in "what changed".** `project.changes`,
+  `GET …/changes` and the Claude Code inbox hook now also report artifacts
+  someone else created or updated (by path, never content) and ideas added,
+  proposed, accepted, rejected or withdrawn.
+  [ADR 0033](docs/adr/0033-what-changed-while-you-worked.md).
 - **Signing keys per organization.** An organization's owners and admins
   register their own skill signing keys
   (`POST /v1/organizations/{id}/skill-signers`). Such a key makes a version
