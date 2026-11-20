@@ -13,6 +13,7 @@ import (
 
 	"github.com/koduj-dev/context-commander/internal/artifacts"
 	"github.com/koduj-dev/context-commander/internal/auth"
+	"github.com/koduj-dev/context-commander/internal/contextpack"
 	"github.com/koduj-dev/context-commander/internal/crypto"
 	"github.com/koduj-dev/context-commander/internal/db"
 	"github.com/koduj-dev/context-commander/internal/gates"
@@ -111,6 +112,7 @@ func setupArtifactContext(cmd *cobra.Command) (*artifactContext, error) {
 	cryptoProvider := crypto.NewProvider(root)
 	authz := auth.NewAuthzService(pool, projStore)
 	svc := artifacts.NewService(pool, cryptoProvider, store, authz, gates.NewEngine(pool))
+	svc.CheckContentAt(contextpack.ManifestPath, contextpack.CheckManifest)
 
 	return &artifactContext{
 		svc: svc, principalID: principalID, clientID: clientID, project: project, pool: pool,
